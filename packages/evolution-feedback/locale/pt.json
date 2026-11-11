@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Pontuação de feedback",
-    "description": "Transforma as avaliações registradas de skills em uma pontuação de qualidade que a curadoria consegue ler."
+    "title": "Nota de qualidade",
+    "description": "Dá uma nota de qualidade às skills a partir de avaliações que vêm de outra fonte."
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Commands",
-    "description": "Human commands for queue, curation, maintenance and read-only diagnostics."
+    "description": "Adds /evolution commands for approvals, cleanup, checks, merges and diagnostics."
   }
 }

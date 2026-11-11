@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Replay",
-    "description": "Pontua e compara os resultados registrados dos planos; nunca reexecuta um plano."
+    "title": "Comparação de planos",
+    "description": "Compara planos anteriores, dá uma nota a como saíram e nunca os executa de novo."
   }
 }

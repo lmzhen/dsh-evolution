@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Skill-Discovery",
-    "description": "Ergänzt eine optionale Skill-Suche und Domänenkarten, die den Katalog eingrenzen."
+    "title": "Skill-Suche",
+    "description": "Ergänzt die Skill-Suche und kann die Liste auf ein Thema eingrenzen; standardmäßig aus."
   }
 }

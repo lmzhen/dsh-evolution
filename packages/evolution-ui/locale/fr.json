@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Interface web",
-    "description": "Configuration par composant, atelier d’historique des skills et diagnostic."
+    "title": "Atelier des skills",
+    "description": "Ajoute l’historique des skills, les réglages des fonctions principales et le diagnostic."
   }
 }

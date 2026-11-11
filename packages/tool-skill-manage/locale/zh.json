@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "技能工具",
-    "description": "面向模型的 skill_manage 工具：新建、更新和归档技能。"
+    "title": "技能编辑",
+    "description": "让智能体自己新建、更新和归档技能。"
   }
 }

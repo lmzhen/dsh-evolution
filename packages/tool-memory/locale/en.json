@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Memory tool",
-    "description": "The model-facing memory tool and the prompt context that explains it."
+    "title": "Agent memory",
+    "description": "Lets the agent save and recall what it learned."
   }
 }

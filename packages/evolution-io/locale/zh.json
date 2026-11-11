@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "文件 IO",
-    "description": "注册读写自进化各包文件的提供方。"
+    "title": "文件读写",
+    "description": "让这些功能能存下数据，也能读回来。"
   }
 }

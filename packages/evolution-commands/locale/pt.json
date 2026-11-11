@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Comandos",
-    "description": "Comandos manuais para fila, curadoria, manutenção e diagnóstico somente leitura."
+    "description": "Adiciona comandos /evolution para aprovações, limpeza, verificações, merges e diagnóstico."
   }
 }

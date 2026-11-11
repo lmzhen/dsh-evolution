@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Gedächtnis-Tool",
-    "description": "Das Gedächtnis-Tool fürs Modell und der Prompt-Kontext, der es erklärt."
+    "title": "Agenten-Gedächtnis",
+    "description": "Lässt den Agenten speichern, was er gelernt hat, und später wieder abrufen."
   }
 }

@@ -1,19 +1,19 @@
-## Ce que fait l’auto-évolution
+## Ce que ça fait
 
-Une session Harness ordinaire devient une session qui s’améliore seule : l’agent retient ce qu’il a appris, tient une bibliothèque de skills, passe son propre travail en revue, fusionne les skills en double et en assure la curation au fil du temps. Ses données restent dans votre dossier DSH ; les appels au modèle, eux, partent vers le fournisseur que vous avez configuré.
+Au fil du temps, l’agent s’améliore dans son travail : il retient ce qu’il a appris, se constitue une bibliothèque de skills réutilisables, passe son propre travail en revue et peut fusionner les skills en double ou nettoyer ceux qui ne servent plus. Ce qu’il enregistre reste par défaut sur cet ordinateur ; quand il a besoin d’un modèle, il utilise celui que vous avez configuré.
 
-## Contenu
+## Ce qui est inclus
 
-- Mémoire : un outil `memory` exposé au modèle, adossé à un stockage local en couches.
-- Skills : l’outil `skill_manage`, un catalogue que l’agent peut charger et un atelier d’historique des skills.
-- Revue et fusion : revue en arrière-plan, rédaction de skills en deux tours et une approbation de fusion que vous pouvez activer.
-- Curation et maintenance : contrôles du cycle de vie, scans de dérive et une vue de santé en lecture seule, livrée désactivée.
-- Commandes : `/evolution pending`, `curator`, `maintain` et `doctor` fonctionnent dans toute session, avec ou sans panneau.
+- Ce qu’il retient : les faits utiles restent avec l’agent d’une session à l’autre, enregistrés sur cet ordinateur.
+- Skills : l’agent peut créer, mettre à jour et archiver ses propres skills, et une page d’historique montre ce qui a changé.
+- Revue et fusion : il contrôle son propre travail en arrière-plan ; les skills en double peuvent être fusionnés, et chaque fusion laisse un reçu qui permet de l’annuler.
+- Nettoyage et vérifications : les skills inutilisés depuis un moment sont archivés, et une page de diagnostic liste les problèmes sans rien modifier ; elle est désactivée par défaut.
+- Commandes : /evolution pending liste ce qui est en attente d’approbation, et /evolution doctor, /evolution maintain et /evolution curator sont disponibles dans chaque session.
 
-## Où le configurer
+## Où trouver les réglages
 
-Chaque paramètre modifiable relève du composant qui le porte : le panneau y affiche la valeur active, la valeur par défaut livrée et si vous l’avez modifiée. La plupart des modifications s’appliquent immédiatement ; quelques réglages de déploiement demandent un redémarrage. Les paramètres que vous ne touchez pas restent à leur valeur par défaut.
+Les réglages sont regroupés avec la fonction qu’ils concernent : ouvrez les réglages d’une fonction pour voir la valeur actuelle, la valeur par défaut et si vous l’avez modifiée. La plupart des changements prennent effet tout de suite ; quelques-uns seulement demandent un redémarrage. Les réglages que vous ne touchez pas gardent leur valeur par défaut.
 
 ## Remarques
 
-Les écritures ordinaires de mémoire et de skills sont approuvées automatiquement, sauf si vous activez l’approbation d’écriture : dans ce cas, chacune prépare une entrée en attente que vous approuvez ou refusez avant qu’elle ne s’applique. La vue de santé est livrée désactivée. La fusion de skills a son propre réglage d’approbation, distinct de celui des écritures, et laisse un reçu permettant d’annuler la fusion.
+Les changements que l’agent apporte à sa mémoire ou à ses skills sont enregistrés automatiquement, sauf si vous activez l’approbation : chaque changement attend alors votre accord ou votre refus. La fusion des skills a son propre réglage d’approbation, distinct de celui des enregistrements ordinaires, et chaque fusion garde un reçu qui permet de l’annuler.

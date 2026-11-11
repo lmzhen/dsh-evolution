@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Skill-Katalog",
-    "description": "Gibt dem Agenten einen Katalog der Skills, die er verwaltet."
+    "title": "Skill-Liste",
+    "description": "Zeigt dem Agenten, welche Skills er nutzen kann."
   }
 }

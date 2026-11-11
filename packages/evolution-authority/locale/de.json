@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Schreibhoheit",
-    "description": "Eine Stelle vergibt das Schreibrecht, damit zwei Schreiber nicht kollidieren."
+    "title": "Schreibschutz",
+    "description": "Nur intern; hier gibt es nichts einzustellen."
   }
 }

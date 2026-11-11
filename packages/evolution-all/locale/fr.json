@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Bundle d’auto-évolution",
-    "description": "Ajoute à chaque session la mémoire, la gestion des skills, la revue, la fusion et la curation.",
+    "title": "Agent en auto-évolution",
+    "description": "Ajoute à chaque session la mémoire, la gestion des skills, la revue, la fusion et le nettoyage.",
     "detail": "docs/detail/fr.md"
   }
 }

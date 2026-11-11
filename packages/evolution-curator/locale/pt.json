@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Curador",
-    "description": "Ciclo de vida determinístico das skills: detecção de skills obsoletas, arquivamento e recuperação."
+    "title": "Limpeza de skills",
+    "description": "Arquiva skills que ficaram um tempo sem uso e consegue restaurá-las."
   }
 }

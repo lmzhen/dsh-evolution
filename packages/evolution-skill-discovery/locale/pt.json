@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Descoberta de skills",
-    "description": "Adiciona busca opcional de skills e cartões de domínio que estreitam o catálogo."
+    "title": "Busca de skills",
+    "description": "Adiciona a busca de skills; a opção de limitar a lista a um assunto vem desativada."
   }
 }

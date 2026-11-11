@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "命令",
-    "description": "给人用的命令：待批队列、整理、维护和只读诊断。"
+    "description": "加上 /evolution 系列命令，审批、整理、检查、合并、诊断都能用。"
   }
 }

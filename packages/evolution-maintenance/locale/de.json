@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Wartungsscan",
-    "description": "Zieht einen Schnappschuss der Skill-Bibliothek und meldet Abweichungen und technische Fakten."
+    "title": "Bibliotheksprüfung",
+    "description": "Prüft die Skill-Bibliothek und meldet Probleme, ohne etwas zu ändern."
   }
 }

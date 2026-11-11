@@ -1,19 +1,19 @@
 ## What it does
 
-Turns a plain Harness session into a self-improving one: the agent remembers what it learned, keeps a skill library, reviews its own work, merges duplicate skills and curates them over time. Its data stays in your DSH home, while the model calls it makes go to the provider you configured.
+Makes the agent better at its work over time: it remembers what it learned, keeps a library of reusable skills, reviews its own work, and can merge duplicate skills or clean up unused ones. What it saves stays on this computer by default; when it needs a model, it uses the one you configured.
 
 ## What is included
 
-- Memory: a model-facing `memory` tool backed by a local layered memory store.
-- Skills: the `skill_manage` tool, a catalog the agent can load, and a skill-history workbench.
-- Review and merge: background review, two-round skill authoring, and a merge approval you can turn on.
-- Curation and maintenance: lifecycle checks, drift scans and a read-only health view that ships off.
-- Commands: `/evolution pending`, `curator`, `maintain` and `doctor` work in any session, panel or not.
+- What it remembers: useful facts stay with the agent across sessions, saved on this computer.
+- Skills: the agent can create, update and archive its own skills, and a history page shows what changed.
+- Review and merge: it checks its own work in the background; duplicate skills can be merged, and every merge leaves a receipt you can use to undo it.
+- Cleanup and checks: skills left unused for a while are archived, and a skill health page lists problems without changing anything; it is off by default.
+- Commands: /evolution pending lists what is waiting for approval, and /evolution doctor, /evolution maintain and /evolution curator are available in every session.
 
 ## Where to configure it
 
-Every editable parameter belongs to the component that owns it, where the panel shows the live value, the default it ships with and whether you overrode it. Most changes take effect immediately and the few deployment settings need a restart; parameters you leave alone stay at the default.
+Settings sit with the feature they control: open a feature's settings to see the current value, the default and whether you changed it. Most changes take effect right away; a few take effect only after a restart. Anything you leave alone keeps its default.
 
 ## Notes
 
-Ordinary memory and skill writes are approved automatically unless you turn write approval on: with it on, each one stages a pending entry you approve or reject first. The health view ships disabled. Skill merging has its own approval setting, separate from write approval, and keeps a receipt you can undo.
+Changes the agent makes to what it remembers or to its skills are saved automatically unless you turn approval on; then each change waits for you to approve or reject it. Merging skills has its own approval switch, separate from the one for ordinary saves, and every merge keeps a receipt that lets you undo it.

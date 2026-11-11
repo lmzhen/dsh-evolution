@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Fusão de skills",
-    "description": "Encontra skills duplicadas, prepara a fusão em duas rodadas e guarda um comprovante que permite desfazê-la."
+    "title": "Merge de skills",
+    "description": "Encontra skills duplicadas e faz o merge quando você pede; guarda um registro para desfazer."
   }
 }

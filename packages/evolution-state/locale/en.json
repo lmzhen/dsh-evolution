@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "State",
-    "description": "Reads and writes evolution state through pluggable storage."
+    "title": "Saved progress",
+    "description": "Internal component. Nothing to configure."
   }
 }

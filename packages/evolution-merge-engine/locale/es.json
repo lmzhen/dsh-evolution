@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Motor de merge",
-    "description": "El pipeline de filtrado y redacción que combina los dos skills."
+    "title": "Soporte del merge",
+    "description": "Es de uso interno y no hay nada que configurar."
   }
 }

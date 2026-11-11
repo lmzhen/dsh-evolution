@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Skill tool",
-    "description": "The model-facing skill_manage tool: create, update and archive skills."
+    "title": "Skill editing",
+    "description": "Lets the agent create, update and archive its own skills."
   }
 }

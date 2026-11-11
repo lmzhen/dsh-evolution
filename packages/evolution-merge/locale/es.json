@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Merge de skills",
-    "description": "Busca skills duplicados, prepara el merge en dos rondas y deja un recibo para deshacerlo."
+    "description": "Busca y combina skills duplicados cuando se lo pides; guarda un recibo para deshacerlo."
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Datei-IO",
-    "description": "Registriert die Anbieter, die die Dateien der Familie lesen und schreiben."
+    "title": "Dateizugriff",
+    "description": "Lässt die Funktionen ihre Daten speichern und laden."
   }
 }

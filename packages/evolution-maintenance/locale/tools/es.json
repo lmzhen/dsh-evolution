@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Escaneo de mantenimiento",
-    "description": "Hace una foto de la biblioteca de skills e informa de desviaciones y datos mecánicos."
+    "title": "Chequeo de la biblioteca",
+    "description": "Examina la biblioteca de skills e informa de los problemas sin cambiar nada."
   }
 }

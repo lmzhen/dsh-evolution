@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Threat guard",
-    "description": "Checks memory and skill writes for unsafe content before they land."
+    "title": "Safety scan",
+    "description": "Checks the agent's memory and skill changes for unsafe content."
   }
 }

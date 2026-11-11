@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Dominio de almacenaje",
-    "description": "Vincula el estado de evolución al dominio de almacenaje de la plataforma."
+    "title": "Almacén de la plataforma",
+    "description": "Es de uso interno y no hay nada que configurar."
   }
 }

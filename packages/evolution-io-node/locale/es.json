@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "IO local",
-    "description": "Proveedor de IO sobre disco local con escrituras atómicas dentro de un solo proceso."
+    "title": "Archivos locales",
+    "description": "Guarda los datos de las funciones en archivos de este equipo."
   }
 }

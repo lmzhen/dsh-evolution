@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "存储域",
-    "description": "把自进化状态接到平台的存储域上。"
+    "title": "平台存储",
+    "description": "内部机制，无需设置。"
   }
 }

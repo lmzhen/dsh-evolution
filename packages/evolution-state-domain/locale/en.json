@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Storage domain",
-    "description": "Binds evolution state to the platform storage domain."
+    "title": "Platform storage",
+    "description": "Internal component. Nothing to configure."
   }
 }

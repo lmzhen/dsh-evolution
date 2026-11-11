@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Approval queue",
-    "description": "Stages memory and skill writes and waits for your approval before they land."
+    "description": "Holds the agent's memory and skill changes until you approve them; off by default."
   }
 }

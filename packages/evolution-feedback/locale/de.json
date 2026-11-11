@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Feedback-Wertung",
-    "description": "Macht aus aufgezeichneten Skill-Bewertungen einen Qualitätswert, den die Kuration lesen kann."
+    "title": "Qualitätswert",
+    "description": "Macht aus Bewertungen einen Qualitätswert; die Bewertungen muss eine andere Quelle liefern."
   }
 }

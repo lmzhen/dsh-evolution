@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Memória local",
-    "description": "Memória em camadas, baseada em arquivos, que sobrevive entre sessões."
+    "description": "Lembra fatos úteis entre sessões e os mantém neste computador."
   }
 }

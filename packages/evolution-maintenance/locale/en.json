@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Maintenance scan",
-    "description": "Snapshots the skill library and reports drift and mechanical facts."
+    "title": "Library check",
+    "description": "Scans the skill library and reports problems without changing anything."
   }
 }

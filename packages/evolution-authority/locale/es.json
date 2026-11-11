@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Autoridad de mutación",
-    "description": "Una sola autoridad decide qué escritura se ejecuta, así que dos escritores nunca chocan."
+    "title": "Control de escrituras",
+    "description": "Es de uso interno y no hay nada que configurar."
   }
 }

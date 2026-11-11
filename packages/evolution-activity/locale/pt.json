@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Registro de atividades",
-    "description": "Registra o que cada plano de autoevolução decidiu, para o histórico sobreviver ao reinício."
+    "description": "Mantém um histórico de planos e revisões, mesmo depois de reiniciar."
   }
 }

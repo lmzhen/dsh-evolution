@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Replay",
-    "description": "Bewertet und vergleicht aufgezeichnete Plan-Ergebnisse; einen Plan führt es nie erneut aus."
+    "title": "Pläne vergleichen",
+    "description": "Vergleicht frühere Pläne und bewertet, wie sie gelaufen sind; führt sie nie erneut aus."
   }
 }

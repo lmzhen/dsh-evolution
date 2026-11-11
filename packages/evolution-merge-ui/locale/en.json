@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Merge panel",
-    "description": "Workbench view of the pending, retry and skipped merge queues."
+    "title": "Merge page",
+    "description": "Shows merges waiting, skipped or to retry; each action copies the command to run."
   }
 }

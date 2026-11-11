@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Outil skill_manage",
-    "description": "L’outil skill_manage exposé au modèle : créer, mettre à jour et archiver des skills."
+    "title": "Édition des skills",
+    "description": "Permet à l’agent de créer, mettre à jour et archiver ses propres skills."
   }
 }

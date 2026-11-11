@@ -1,19 +1,19 @@
 ## Qué hace
 
-Convierte una sesión normal de Harness en una que se mejora sola: el agente recuerda lo que aprendió, mantiene una biblioteca de skills, revisa su propio trabajo, hace el merge de los skills duplicados y los cura con el tiempo. Sus datos se quedan en tu DSH home, mientras que las llamadas al modelo van al proveedor que tengas configurado.
+Con el tiempo, el agente hace mejor su trabajo: recuerda lo que ha aprendido, mantiene una biblioteca de skills reutilizables, revisa su propio trabajo y puede combinar skills duplicados o limpiar los que no se usan. Por defecto, lo que guarda se queda en este equipo, y cuando necesita un modelo usa el que tengas configurado.
 
 ## Qué incluye
 
-- Memoria: una herramienta `memory` que ve el modelo, respaldada por un almacén local de memoria por capas.
-- Skills: la herramienta `skill_manage`, un catálogo que el agente puede cargar y un workbench del historial de skills.
-- Revisión y merge: revisión en segundo plano, redacción de skills en dos rondas y una aprobación del merge que puedes activar.
-- Curación y mantenimiento: comprobaciones del ciclo de vida, escaneos de desviaciones y una vista de salud de solo lectura que viene desactivada.
-- Comandos: `/evolution pending`, `curator`, `maintain` y `doctor` funcionan en cualquier sesión, con panel o sin él.
+- Lo que recuerda: los datos útiles se quedan con el agente entre sesiones y se guardan en este equipo.
+- Skills: el agente puede crear, actualizar y archivar sus propios skills, y una página de historial muestra qué ha cambiado.
+- Revisión y merge: comprueba su trabajo en segundo plano; los skills duplicados se pueden combinar y cada merge deja un recibo con el que puedes deshacerlo.
+- Limpieza y comprobaciones: los skills que llevan un tiempo sin usarse se archivan, y una página de salud de skills enumera los problemas sin cambiar nada; viene desactivada.
+- Comandos: /evolution pending muestra los pendientes de aprobación, y /evolution doctor, /evolution maintain y /evolution curator funcionan en cualquier sesión.
 
 ## Dónde se configura
 
-Cada parámetro editable se ajusta en el componente que lo define, donde el panel muestra el valor actual, el predeterminado con el que se entrega y si lo modificaste. La mayoría de los cambios se aplican al momento; unos pocos ajustes de despliegue necesitan reiniciar. Los parámetros que no tocas se quedan en el predeterminado.
+Los ajustes de Evolución aparecen junto a la función que controlan: al abrirlos ves el valor actual, el predeterminado y si lo has cambiado. La mayoría de los cambios se aplican al momento; unos pocos, solo después de reiniciar. Lo que dejes sin tocar se queda en el valor predeterminado.
 
 ## Notas
 
-Las escrituras normales de memoria y de skills se aprueban automáticamente. Solo si activas la aprobación de escrituras entran en la lista de pendientes, y entonces cada una espera tu aprobación o rechazo antes de aplicarse. La vista de salud viene desactivada. El merge de skills tiene su propio ajuste de aprobación, independiente de la aprobación de escrituras, y deja un recibo con el que puedes deshacerlo.
+Los cambios que el agente hace en lo que recuerda o en sus skills se guardan automáticamente, salvo que actives la aprobación; entonces cada cambio espera a que lo apruebes o lo rechaces. El merge de skills tiene su propio ajuste de aprobación, independiente del de los guardados normales, y cada merge deja un recibo para deshacerlo.

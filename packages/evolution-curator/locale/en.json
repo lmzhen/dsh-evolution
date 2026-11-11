@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Curator",
-    "description": "Deterministic skill lifecycle: stale detection, archiving and recovery."
+    "title": "Skill cleanup",
+    "description": "Archives skills left unused for a while and can restore them."
   }
 }

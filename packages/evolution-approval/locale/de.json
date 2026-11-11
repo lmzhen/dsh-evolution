@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Freigabeliste",
-    "description": "Hält Gedächtnis- und Skill-Schreibvorgänge zurück, bis du sie freigibst."
+    "description": "Hält Änderungen an Gedächtnis und Skills zurück, bis du sie freigibst; standardmäßig aus."
   }
 }

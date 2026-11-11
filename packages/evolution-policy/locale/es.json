@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Política",
-    "description": "Rechaza escrituras que intenten cambiar la política, los prompts o el enrutado."
+    "title": "Protección de ajustes",
+    "description": "Bloquea los cambios que afectan a los ajustes del asistente."
   }
 }

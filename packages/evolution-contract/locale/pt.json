@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Contratos",
-    "description": "Tipos e contratos compartilhados entre pacotes; sem comportamento em execução."
+    "title": "Definições compartilhadas",
+    "description": "De uso interno; não há nada para configurar."
   }
 }

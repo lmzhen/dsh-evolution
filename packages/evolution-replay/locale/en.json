@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Replay",
-    "description": "Scores and compares recorded plan outcomes; it never re-runs a plan."
+    "title": "Plan compare",
+    "description": "Compares past plans and scores how they went; never re-runs them."
   }
 }

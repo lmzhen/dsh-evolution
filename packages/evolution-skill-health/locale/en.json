@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Skill health",
-    "description": "Workbench view that lists what the skill linter found; off by default."
+    "description": "Lists skill problems but fixes nothing; off by default."
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Curation",
-    "description": "Cycle de vie déterministe des skills : détection de l’obsolescence, archivage et récupération."
+    "title": "Nettoyage des skills",
+    "description": "Archive les skills inutilisés depuis un moment et peut les restaurer."
   }
 }

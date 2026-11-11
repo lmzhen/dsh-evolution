@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Cola de aprobación",
-    "description": "Deja en espera las escrituras de memoria y de skills hasta que las apruebes."
+    "description": "Retiene los cambios de memoria y de skills hasta que los apruebes; viene desactivada."
   }
 }

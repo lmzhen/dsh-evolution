@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Curator",
-    "description": "Deterministischer Skill-Lebenszyklus: veraltete Skills erkennen, archivieren und wiederherstellen."
+    "title": "Skills aufräumen",
+    "description": "Archiviert Skills, die eine Weile ungenutzt bleiben, und holt sie bei Bedarf zurück."
   }
 }

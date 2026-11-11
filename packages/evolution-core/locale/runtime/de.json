@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Kern",
-    "description": "Gemeinsame Speicher, Prompts und Lebenszyklus-Logik, auf denen alle anderen Pakete aufbauen."
+    "title": "Gemeinsamer Kern",
+    "description": "Nur intern; hier gibt es nichts einzustellen."
   }
 }

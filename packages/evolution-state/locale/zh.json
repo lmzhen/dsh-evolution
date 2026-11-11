@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "状态",
-    "description": "通过可插拔的存储读写自进化状态。"
+    "title": "进度保存",
+    "description": "内部机制，无需设置。"
   }
 }

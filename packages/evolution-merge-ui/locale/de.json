@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Merge-Panel",
-    "description": "Ansicht im Arbeitsbereich: die Warteschlangen für ausstehende, zu wiederholende und übersprungene Merges."
+    "title": "Seite zum Zusammenführen",
+    "description": "Zeigt, was wartet, übersprungen wurde oder neu laufen soll; jede Aktion kopiert den Befehl."
   }
 }

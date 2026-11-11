@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Découverte des skills",
-    "description": "Ajoute une recherche de skills optionnelle et des cartes de domaine qui filtrent le catalogue."
+    "title": "Recherche de skills",
+    "description": "Ajoute la recherche de skills et le filtrage par thème ; le filtrage est désactivé par défaut."
   }
 }

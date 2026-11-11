@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Skill-Health",
-    "description": "Ansicht im Arbeitsbereich, die zeigt, was der Skill-Linter gefunden hat; standardmäßig aus."
+    "description": "Listet Probleme mit den Skills auf, behebt aber nichts; standardmäßig aus."
   }
 }

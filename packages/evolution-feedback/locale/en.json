@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Feedback scoring",
-    "description": "Turns recorded skill ratings into a quality score curation can read."
+    "description": "Turns skill ratings into a quality score; needs another source to supply the ratings."
   }
 }

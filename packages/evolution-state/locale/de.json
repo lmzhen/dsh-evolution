@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Zustand",
-    "description": "Liest und schreibt den Evolutionszustand über austauschbare Speicher."
+    "title": "Gespeicherter Fortschritt",
+    "description": "Nur intern; hier gibt es nichts einzustellen."
   }
 }

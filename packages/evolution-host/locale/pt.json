@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Automação do host",
-    "description": "Só infraestrutura: as linhas de automação, sem as ferramentas de memória e de autoria de skills."
+    "title": "Só automação",
+    "description": "Instalação leve: automação em segundo plano, sem memória nem edição de skills; use só esta."
   }
 }

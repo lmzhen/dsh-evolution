@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Usage des skills",
-    "description": "Trace les skills que l’agent utilise vraiment, pour que la curation ait des données."
+    "description": "Suit les skills qui servent vraiment, pour que le nettoyage sache quoi garder."
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Commandes",
-    "description": "Commandes manuelles : file d’attente, curation, maintenance et diagnostic en lecture seule."
+    "description": "Ajoute les commandes /evolution pour approuver, nettoyer, vérifier, fusionner et diagnostiquer."
   }
 }

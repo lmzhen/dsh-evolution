@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Richtlinie",
-    "description": "Weist Schreibvorgänge ab, die versuchen, Richtlinie, Prompts oder Routing zu ändern."
+    "title": "Einrichtungsschutz",
+    "description": "Blockiert Änderungen, die die Einrichtung des Assistenten umbauen wollen."
   }
 }

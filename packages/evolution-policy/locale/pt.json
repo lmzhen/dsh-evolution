@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Política",
-    "description": "Rejeita uma escrita cujo conteúdo tente alterar política, prompts ou roteamento."
+    "title": "Proteção da configuração",
+    "description": "Bloqueia mudanças que tentem alterar como o assistente está configurado."
   }
 }

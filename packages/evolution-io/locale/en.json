@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "File IO",
-    "description": "Registers the providers that read and write the family's files."
+    "title": "File access",
+    "description": "Lets the features save and load their data."
   }
 }

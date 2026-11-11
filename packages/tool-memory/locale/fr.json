@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Outil mémoire",
-    "description": "L’outil de mémoire exposé au modèle et le contexte de prompt qui l’explique."
+    "title": "Mémoire de l’agent",
+    "description": "Permet à l’agent d’enregistrer ce qu’il a appris et de le retrouver."
   }
 }

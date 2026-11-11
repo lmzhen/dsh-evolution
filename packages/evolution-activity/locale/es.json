@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Registro de actividad",
-    "description": "Guarda lo que decidió cada plan de evolución, así el historial sobrevive al reinicio."
+    "description": "Guarda el historial de planes y revisiones, incluso después de reiniciar."
   }
 }

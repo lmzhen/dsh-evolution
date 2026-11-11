@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "IO de archivos",
-    "description": "Registra los proveedores que leen y escriben los archivos de la familia."
+    "title": "Acceso a archivos",
+    "description": "Es lo que usan las funciones para guardar y cargar sus datos."
   }
 }

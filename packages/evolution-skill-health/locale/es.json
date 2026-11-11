@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Salud de skills",
-    "description": "Vista workbench que muestra lo que encontró el analizador de skills; viene desactivada."
+    "description": "Lista los problemas de los skills sin arreglar nada; viene desactivada."
   }
 }

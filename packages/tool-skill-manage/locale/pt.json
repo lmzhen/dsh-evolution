@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Ferramenta de skills",
-    "description": "A ferramenta skill_manage que o modelo vê, para criar, atualizar e arquivar skills."
+    "title": "Edição de skills",
+    "description": "Deixa o agente criar, atualizar e arquivar as próprias skills."
   }
 }

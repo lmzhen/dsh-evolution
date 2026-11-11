@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Speicher-Registry",
-    "description": "Trägt die Speicher-Anbieter ein, die der Evolutionszustand nutzen kann."
+    "title": "Speicher-Anbindung",
+    "description": "Nur intern; hier gibt es nichts einzustellen."
   }
 }

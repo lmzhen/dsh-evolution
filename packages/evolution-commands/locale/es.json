@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Comandos",
-    "description": "Comandos manuales: cola, curación, mantenimiento y diagnóstico de solo lectura."
+    "description": "Añade comandos /evolution para aprobar, limpiar, comprobar, hacer merge y diagnosticar."
   }
 }

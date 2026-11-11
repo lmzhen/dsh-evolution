@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Skill-Merge",
-    "description": "Findet doppelte Skills, entwirft den Merge in zwei Runden und hält einen Beleg zum Rückgängigmachen fest."
+    "title": "Skills zusammenführen",
+    "description": "Führt doppelte Skills auf deinen Wunsch zusammen; mit einem Beleg machst du das rückgängig."
   }
 }

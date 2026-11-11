@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Verificação de ameaças",
-    "description": "Verifica se as escritas de memória e de skills têm conteúdo inseguro antes de aplicá-las."
+    "title": "Verificação de segurança",
+    "description": "Confere se as mudanças de memória e de skills trazem conteúdo inseguro."
   }
 }

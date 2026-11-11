@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Estado",
-    "description": "Lee y escribe el estado de evolución mediante almacenes conectables."
+    "title": "Progreso guardado",
+    "description": "Es de uso interno y no hay nada que configurar."
   }
 }

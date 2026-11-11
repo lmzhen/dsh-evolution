@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Policy",
-    "description": "Rejects a write whose payload tries to change policy, prompts or routing."
+    "title": "Setup guard",
+    "description": "Blocks a change that tries to alter how the assistant is set up."
   }
 }

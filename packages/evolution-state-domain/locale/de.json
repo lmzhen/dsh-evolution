@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Speicherdomäne",
-    "description": "Bindet den Evolutionszustand an die Speicherdomäne der Plattform."
+    "title": "Speicher der Plattform",
+    "description": "Nur intern; hier gibt es nichts einzustellen."
   }
 }

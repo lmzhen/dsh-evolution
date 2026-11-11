@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Uso de skills",
-    "description": "Acompanha quais skills o agente realmente usa, para a curadoria ter dados."
+    "title": "Uso das skills",
+    "description": "Acompanha quais skills são realmente usadas, para a limpeza saber o que manter."
   }
 }

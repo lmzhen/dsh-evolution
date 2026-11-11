@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Memory registry",
-    "description": "Lets memory providers plug into self-evolution."
+    "title": "Memory support",
+    "description": "Internal component. Nothing to configure."
   }
 }

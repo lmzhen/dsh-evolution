@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Local memory",
-    "description": "Layered file-based memory that survives across sessions."
+    "description": "Remembers useful facts across sessions and keeps them on this computer."
   }
 }

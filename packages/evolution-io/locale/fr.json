@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "E/S de fichiers",
-    "description": "Enregistre les fournisseurs qui lisent et écrivent les fichiers de la famille."
+    "title": "Accès aux fichiers",
+    "description": "Permet aux fonctions d’enregistrer et de recharger leurs données."
   }
 }

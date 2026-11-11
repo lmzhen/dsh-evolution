@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Reproducción",
-    "description": "Puntúa y compara resultados registrados de planes; nunca vuelve a ejecutar un plan."
+    "title": "Comparación de planes",
+    "description": "Compara planes anteriores, puntúa cómo salieron y nunca los repite."
   }
 }

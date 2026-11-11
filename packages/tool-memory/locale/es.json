@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Herramienta de memoria",
-    "description": "Expone al modelo la herramienta de memoria y el prompt que la explica."
+    "title": "Memoria del agente",
+    "description": "El agente guarda y recupera lo que aprende."
   }
 }

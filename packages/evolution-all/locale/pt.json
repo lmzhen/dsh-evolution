@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Pacote de autoevolução",
-    "description": "Adiciona memória, gerenciamento de skills, revisão, fusão e curadoria a cada sessão.",
+    "title": "Agente que se aprimora",
+    "description": "Adiciona memória, gerenciamento de skills, revisão, merge e limpeza a cada sessão.",
     "detail": "docs/detail/pt.md"
   }
 }

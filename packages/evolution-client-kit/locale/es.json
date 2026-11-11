@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Kit de cliente",
-    "description": "Código de navegador y ciclo de vida compartidos por las vistas workbench de la familia."
+    "title": "Soporte web",
+    "description": "Es de uso interno y no hay nada que configurar."
   }
 }

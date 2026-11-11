@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Memoria local",
-    "description": "Memoria por capas guardada en archivos que se mantiene entre sesiones."
+    "description": "Recuerda datos útiles entre sesiones y los guarda en este equipo."
   }
 }

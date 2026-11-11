@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Host automation",
-    "description": "Infrastructure only: the automation rows, without the memory and skill-authoring tools."
+    "title": "Automation only",
+    "description": "A lighter install: background automation without memory or skill editing; use it on its own."
   }
 }

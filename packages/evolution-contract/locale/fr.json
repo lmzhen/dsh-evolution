@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Contrats",
-    "description": "Types et contrats partagés entre paquets ; aucun comportement à l’exécution."
+    "title": "Définitions partagées",
+    "description": "Élément interne : rien à régler."
   }
 }

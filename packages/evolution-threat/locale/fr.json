@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Garde-fou des menaces",
-    "description": "Contrôle le contenu des écritures de mémoire et de skills avant qu’elles ne s’appliquent."
+    "title": "Contrôle de sécurité",
+    "description": "Vérifie que les changements de mémoire et de skills ne contiennent rien de dangereux."
   }
 }

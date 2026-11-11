@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Bedrohungsschutz",
-    "description": "Prüft Gedächtnis- und Skill-Schreibvorgänge auf unsicheren Inhalt, bevor sie landen."
+    "title": "Sicherheitsprüfung",
+    "description": "Prüft Änderungen an Gedächtnis und Skills auf unsichere Inhalte."
   }
 }

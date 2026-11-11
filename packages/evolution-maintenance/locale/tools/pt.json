@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Varredura de manutenção",
-    "description": "Faz um instantâneo da biblioteca de skills e relata desvios e fatos mecânicos."
+    "title": "Verificação da biblioteca",
+    "description": "Examina a biblioteca de skills e relata problemas sem alterar nada."
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Web UI",
-    "description": "Per-component configuration, the skill-history workbench and diagnostics."
+    "title": "Skill workbench",
+    "description": "Adds the skill-history workbench, settings for the main features and diagnostics."
   }
 }

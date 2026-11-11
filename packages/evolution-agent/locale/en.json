@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Agent preset",
-    "description": "Exposes memory and skill tools to a session through the Evolution preset."
+    "description": "The Evolution preset, which lets a session remember and edit skills."
   }
 }

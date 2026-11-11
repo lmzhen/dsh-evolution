@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Skill-Tool",
-    "description": "Das skill_manage-Tool fürs Modell: Skills anlegen, ändern und archivieren."
+    "title": "Skills bearbeiten",
+    "description": "Lässt den Agenten eigene Skills anlegen, ändern und archivieren."
   }
 }

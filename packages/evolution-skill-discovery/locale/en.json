@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Skill discovery",
-    "description": "Adds optional skill search and domain cards that narrow the catalog."
+    "title": "Skill search",
+    "description": "Adds skill search and can trim the skill list to a topic; trimming is off by default."
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Rejeu",
-    "description": "Évalue et compare les résultats enregistrés des plans ; il ne relance jamais un plan."
+    "title": "Comparaison de plans",
+    "description": "Compare les plans passés et note comment ils se sont déroulés ; il ne les relance jamais."
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Web-UI",
-    "description": "Konfiguration pro Komponente, der Arbeitsbereich für die Skill-Historie und die Diagnose."
+    "title": "Skill-Arbeitsbereich",
+    "description": "Ergänzt den Skill-Verlauf, Einstellungen für die wichtigsten Funktionen und die Diagnose."
   }
 }

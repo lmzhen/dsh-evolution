@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "存储注册表",
-    "description": "登记自进化状态可以使用的存储提供方。"
+    "title": "存储支持",
+    "description": "内部机制，无需设置。"
   }
 }

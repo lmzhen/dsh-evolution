@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Interface web",
-    "description": "Configuração por componente, o workbench do histórico de skills e diagnósticos."
+    "title": "Painel de skills",
+    "description": "Adiciona o histórico de skills, as configurações dos recursos principais e o diagnóstico."
   }
 }
