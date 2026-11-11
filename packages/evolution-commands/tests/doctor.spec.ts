@@ -336,8 +336,8 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect(report.legacy.pending).toEqual(['memory-files.memoryChars'])
       const text = renderDoctorText(report)
       expect(text).toContain('legacy settings: 1 family value(s) still on')
-      expect(text).toContain('/evolution migrate moves them')
-      expect(report.actions.join('\n')).toContain('/evolution migrate')
+      expect(text).toContain('boot migration moves them')
+      expect(report.actions.join('\n')).toContain('boot migration moves them')
     } finally {
       await rm(home, { recursive: true, force: true })
     }
