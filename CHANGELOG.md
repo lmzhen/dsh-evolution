@@ -1,3 +1,7 @@
+## 0.43.2-rc.1 (fix) — 诊断卡片读取收口
+> **范围**：`DiagnosticsCard` 的读取改为 20 秒超时 + rejection 失败态；`api.view()` 被拒绝或永不 settle 时不再永久停在“正在读取…”，而是走共享失败块。新增 rejected read 回归。
+> **验证**：diagnostics card 单测 7/7、settings registration 3/3；main CI run 42965473576 的 platform line、node 22/24 validate、desktop install 全绿；rc 真机验证待 npm 安装后执行。
+
 ## 0.43.1 (fix) — 发布后复核 P1、preset 出包与安装/文档收口
 > **范围**：修复 0.43.0 发布后复核的 P1：detail slot 补 list id 并按平台 bundle subject 渲染；all 模式拒绝已存在的 one-click preset；row config/detail 同时覆盖产品与源码 bundle scope；release staging 与安装器复制改为 `publishableDirs`，`evolution-preset` 不再进入发布集。同步收敛 root INSTALL/README、迁移/设置命令指引，settings fallback 改用 `/evolution params`，提高 installer 测试与 probe 超时。
 > **验证**：detail registration 3/3、installer all+preset 定向 1/1、gen-client-seam --check、verify-doc-facts、verify-arch-guards、verify-client-seats、verify-surface-convergence、verify-check-registry --strict 通过；npm 0.43.1 待发布后真机验证。
