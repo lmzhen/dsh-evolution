@@ -598,7 +598,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "c006d673b400ae7957f6242f80962d725f0c1725a972eceea1bcd5a9ef9fddd1",
+        "sha256": "772c9990546a5bf166d43c62c148dc56fa7da4535ffd72c0f130bced7508d7cc",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1191,32 +1191,32 @@
           {
             "axis": "executability",
             "rows": 23,
-            "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs",
-            "expiry": "0.44.0",
+            "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
+            "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes"
           },
           {
             "axis": "expiry-due",
             "rows": 3,
-            "reason": "three gate rows carry a due expiry on the 0.41 line; retirement is scheduled",
-            "expiry": "0.44.0",
+            "reason": "three gate rows carry a due expiry on the 0.41 line; retirement is scheduled | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
+            "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes"
           },
           {
             "axis": "falsifiability-carrier",
             "rows": 3,
-            "reason": "three rows lack a carrier or noDrillReason after the gate-table pass",
-            "expiry": "0.44.0",
+            "reason": "three rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
+            "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes"
           },
           {
             "axis": "mutation-coverage",
             "rows": 1,
-            "reason": "the beh-installer-layered probe suite hangs in the local overlay before its green baseline; CI probe owns it",
-            "expiry": "0.44.0",
+            "reason": "the beh-installer-layered probe suite hangs in the local overlay before its green baseline; CI probe owns it | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
+            "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes"
           }
