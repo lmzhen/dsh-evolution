@@ -53,15 +53,15 @@
 
 # ── control plane (immutable policy, deterministic plan validation) ────────
 - id: evolution-policy
-  name: '@deepseek-ai/dsh-evolution-policy'
+  name: '@deepseek-ai/dsh-evolution-core/policy'
 
 # ── IO seam: one registry, one node:fs provider ─────────────────────────────
 - id: evolution-io
-  name: '@deepseek-ai/dsh-evolution-io'
+  name: '@deepseek-ai/dsh-evolution-core/io-registry'
 - id: evolution-io-node
-  name: '@deepseek-ai/dsh-evolution-io-node'
+  name: '@deepseek-ai/dsh-evolution-core/io-node'
 - id: evolution-authority
-  name: '@deepseek-ai/dsh-evolution-authority'
+  name: '@deepseek-ai/dsh-evolution-core/authority-plugin'
 
 # ── durable state: DSH storage-domain KV is the primary provider ────────────
 - id: storage

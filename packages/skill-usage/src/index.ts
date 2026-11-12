@@ -3,7 +3,7 @@
  * @module @deepseek-ai/dsh-skill-usage
  */
 
-import type { } from '@deepseek-ai/dsh-evolution-io'
+import type { } from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'

@@ -4,7 +4,7 @@
  * This package is intentionally a library: it declares state and event shapes,
  * not a Cordis plugin. It must not import any evolution implementation package.
  *
- * @module @deepseek-ai/dsh-evolution-contract
+ * @module @deepseek-ai/dsh-evolution-core/contract
  */
 
 import type {} from '@deepseek-ai/cordis'

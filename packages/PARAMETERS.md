@@ -30,7 +30,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
-| `protectedSkillNames` | E2 | none | cordis | evolution-policy | — | 无（deployment） | Skills the lifecycle never archives or rewrites. |
+| `protectedSkillNames` | E2 | none | cordis | evolution-core | — | 无（deployment） | Skills the lifecycle never archives or rewrites. |
 | `manageUnmanaged` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Let curation touch skills with no family metadata. |
 | `pruneBuiltins` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Let curation nominate bundled skills for pruning. |
 | `referencedSkillNames` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Names treated as referenced by external docs (never retired). |

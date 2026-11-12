@@ -39,10 +39,10 @@ export const HOST_ROW_IDS = [
 
 export const HOST_ROW_NAMES = {
   'evolution-core-runtime': scoped('@deepseek-ai/dsh-evolution-core/runtime'),
-  'evolution-policy': scoped('@deepseek-ai/dsh-evolution-policy'),
-  'evolution-io': scoped('@deepseek-ai/dsh-evolution-io'),
-  'evolution-io-node': scoped('@deepseek-ai/dsh-evolution-io-node'),
-  'evolution-authority': scoped('@deepseek-ai/dsh-evolution-authority'),
+  'evolution-policy': scoped('@deepseek-ai/dsh-evolution-core/policy'),
+  'evolution-io': scoped('@deepseek-ai/dsh-evolution-core/io-registry'),
+  'evolution-io-node': scoped('@deepseek-ai/dsh-evolution-core/io-registry-node'),
+  'evolution-authority': scoped('@deepseek-ai/dsh-evolution-core/authority-plugin'),
   'evolution-state-storage': scoped('@deepseek-ai/dsh-evolution-state-storage'),
   'evolution-state-domain': scoped('@deepseek-ai/dsh-evolution-state-domain'),
   'evolution-state-json': scoped('@deepseek-ai/dsh-evolution-state-json'),

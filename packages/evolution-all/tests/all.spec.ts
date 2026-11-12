@@ -21,7 +21,7 @@ it('evolution-all aggregates the host entry, the four model-tool entries, the pr
   const expected = [
     '@deepseek-ai/dsh-evolution-host',
     // G2: the mutation authority is part of the default composition.
-    '@deepseek-ai/dsh-evolution-authority',
+    '@deepseek-ai/dsh-evolution-core/authority-plugin',
     // 0.28.0: the merge host row and its browser half.
     '@deepseek-ai/dsh-evolution-merge',
     '@deepseek-ai/dsh-evolution-merge-ui',

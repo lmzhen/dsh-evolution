@@ -675,7 +675,7 @@ const COPY_RE = /interface\s+ApprovalPolicyLike|function\s+effectiveSessionPolic
 const FAMILY_IMPORT_RE = /from\s+['"](@deepseek-ai\/dsh-evolution-[a-z0-9-]+|@deepseek-ai\/dsh-memory)['"]/g
 const CORE_ALLOWED_FAMILY = new Set([
   '@deepseek-ai/dsh-evolution-core',
-  '@deepseek-ai/dsh-evolution-contract',
+  '@deepseek-ai/dsh-evolution-core/contract',
   '@deepseek-ai/dsh-evolution-state-storage',
   '@deepseek-ai/dsh-memory',
 ])

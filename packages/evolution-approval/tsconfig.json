@@ -16,12 +16,8 @@
     {
       "path": "../evolution-state"
     },
-    {
-      "path": "../evolution-io"
-    },
-    {
-      "path": "../evolution-io-node"
-    },
+    
+    
     {
       "path": "../evolution-state-json"
     }

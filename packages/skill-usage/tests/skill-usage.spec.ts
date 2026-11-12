@@ -10,10 +10,10 @@ import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { PtcRunRequest, PtcRunResult, PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 // `dsh-evolution-io-node` is a FUNCTION plugin (named `name`/`inject`/`apply`, // no default export), so it is mounted as a namespace; the two service packages
 // default-export their class.
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
 import SkillUsageRegistry from '../src/index.ts'
 import { clearReviewChannel, eventsFile, loadUsage, markReviewChannel, nodeEvolutionIo, readEvolutionTimeline, saveUsage, ToolDispatchNormalizer } from '@deepseek-ai/dsh-evolution-core'
 import { skillsRoot } from '@deepseek-ai/dsh-evolution-core/skills'

@@ -37,7 +37,7 @@ import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, 
 // core's reader (the `evolutionReads` projection for a real Session, the structural accessor for a
 // bare stub view). Re-exported so this package's published surface keeps naming the rule.
 export { filterUnreadSkillOps } from '@deepseek-ai/dsh-evolution-core/skills'
-import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-policy'
+import type { PolicySnapshot } from '@deepseek-ai/dsh-evolution-core/policy'
 import { SessionScopedState } from './session-state.ts'
 
 /** Emit one `evolution/review-scheduled` inside its OWN protection domain (V8-03, V5-19③/F-334).

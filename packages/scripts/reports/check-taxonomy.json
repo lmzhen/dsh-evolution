@@ -89,7 +89,6 @@
         "line-identity-bed"
       ],
       "specs": [
-        "evolution-authority::tests/authority.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
@@ -168,7 +167,6 @@
         "evolution-merge::tests/undo-journal-protocol.spec.ts",
         "evolution-merge::tests/undo-resume-skip.spec.ts",
         "evolution-merge::tests/undo-resume.spec.ts",
-        "evolution-policy::tests/protected-skills.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
@@ -363,7 +361,6 @@
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
-        "evolution-authority::tests/authority.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
@@ -537,9 +534,6 @@
         "evolution-host::tests/skill-root-gate.spec.ts",
         "evolution-host::tests/traceability.spec.ts",
         "evolution-host::tests/verify-published-bytes.spec.ts",
-        "evolution-io-node::tests/io-node.spec.ts",
-        "evolution-io::tests/io.spec.ts",
-        "evolution-io::tests/medium-marker.spec.ts",
         "evolution-learning-graph::tests/graph-write-gate.spec.ts",
         "evolution-maintenance::tests/drift-scan.spec.ts",
         "evolution-maintenance::tests/enrichment.spec.ts",
@@ -747,8 +741,6 @@
         "evolution-merge::tests/unit-recovery-report.spec.ts",
         "evolution-merge::tests/wire-projection.spec.ts",
         "evolution-merge::tests/wire.spec.ts",
-        "evolution-policy::tests/policy.spec.ts",
-        "evolution-policy::tests/protected-skills.spec.ts",
         "evolution-preset::tests/session-query-policy.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
         "evolution-review::tests/redact.spec.ts",
@@ -1088,7 +1080,6 @@
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
-        "evolution-authority::tests/authority.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
@@ -1262,9 +1253,6 @@
         "evolution-host::tests/skill-root-gate.spec.ts",
         "evolution-host::tests/traceability.spec.ts",
         "evolution-host::tests/verify-published-bytes.spec.ts",
-        "evolution-io-node::tests/io-node.spec.ts",
-        "evolution-io::tests/io.spec.ts",
-        "evolution-io::tests/medium-marker.spec.ts",
         "evolution-learning-graph::tests/graph-write-gate.spec.ts",
         "evolution-maintenance::tests/drift-scan.spec.ts",
         "evolution-maintenance::tests/enrichment.spec.ts",
@@ -1472,8 +1460,6 @@
         "evolution-merge::tests/unit-recovery-report.spec.ts",
         "evolution-merge::tests/wire-projection.spec.ts",
         "evolution-merge::tests/wire.spec.ts",
-        "evolution-policy::tests/policy.spec.ts",
-        "evolution-policy::tests/protected-skills.spec.ts",
         "evolution-preset::tests/session-query-policy.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
         "evolution-review::tests/redact.spec.ts",
@@ -1734,7 +1720,6 @@
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
-        "evolution-authority::tests/authority.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
@@ -1927,9 +1912,6 @@
         "evolution-host::tests/skill-root-gate.spec.ts",
         "evolution-host::tests/traceability.spec.ts",
         "evolution-host::tests/verify-published-bytes.spec.ts",
-        "evolution-io-node::tests/io-node.spec.ts",
-        "evolution-io::tests/io.spec.ts",
-        "evolution-io::tests/medium-marker.spec.ts",
         "evolution-learning-graph::tests/graph-write-gate.spec.ts",
         "evolution-learning-graph::tests/graph.spec.ts",
         "evolution-maintenance::tests/drift-scan.spec.ts",
@@ -2139,8 +2121,6 @@
         "evolution-merge::tests/unit-recovery-report.spec.ts",
         "evolution-merge::tests/wire-projection.spec.ts",
         "evolution-merge::tests/wire.spec.ts",
-        "evolution-policy::tests/policy.spec.ts",
-        "evolution-policy::tests/protected-skills.spec.ts",
         "evolution-preset::tests/preset.spec.ts",
         "evolution-preset::tests/session-query-policy.spec.ts",
         "evolution-replay::tests/replay.spec.ts",
@@ -2344,11 +2324,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 107
+      "specs": 105
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 462
+      "specs": 456
     },
     "ci-only": {
       "gates": 18,
@@ -2356,16 +2336,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 462
+      "specs": 456
     },
     "full(ci=on)": {
       "gates": 93,
-      "specs": 535
+      "specs": 529
     }
   },
   "specs": {
-    "total": 535,
-    "marked": 535,
+    "total": 529,
+    "marked": 529,
     "unmarked": 0
   }
 }

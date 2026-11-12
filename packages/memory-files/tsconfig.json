@@ -4,7 +4,6 @@
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
     { "path": "../memory" },
-    { "path": "../evolution-core" },
-    { "path": "../evolution-io" }
+    { "path": "../evolution-core" }
   ]
 }

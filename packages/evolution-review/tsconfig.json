@@ -10,7 +10,7 @@
     { "path": "../evolution-core" },
     { "path": "../../test-support/agent-loop-testkit" },
     { "path": "../evolution-state" },
-    { "path": "../evolution-policy" },
+    
     { "path": "../evolution-curator" }
   ]
 }

@@ -34,7 +34,6 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-skill": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
@@ -43,7 +42,6 @@
   "devDependencies": {
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io": "workspace:^",
     "@deepseek-ai/dsh-skill": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^"

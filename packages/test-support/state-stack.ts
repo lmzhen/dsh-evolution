@@ -7,8 +7,8 @@
  */
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
 import * as JsonState from '@deepseek-ai/dsh-evolution-state-json'
 import { MutationAuthority } from '@deepseek-ai/dsh-evolution-core'
 import EvolutionState from '@deepseek-ai/dsh-evolution-state'

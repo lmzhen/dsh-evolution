@@ -9,7 +9,7 @@ import { resolve } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, paramRowId, payloadText, userSetKeys, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampOnce, liveBool, unwrapLive } from '@deepseek-ai/dsh-evolution-core'
 import type { LiveValue, MemoryStoreOptions } from '@deepseek-ai/dsh-evolution-core'
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import type { MemoryOperation, MemoryProvider, MemorySnapshot, MemoryTarget } from '@deepseek-ai/dsh-memory'
 
 export const name = 'memory-files'

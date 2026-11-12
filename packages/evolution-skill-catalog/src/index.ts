@@ -8,7 +8,7 @@
  * @module @deepseek-ai/dsh-evolution-skill-catalog
  */
 
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import type { Context } from '@deepseek-ai/cordis'
 import { authorityFrom, mutationLockFrom } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'

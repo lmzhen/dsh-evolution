@@ -2,8 +2,8 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import MemoryRegistry from '@deepseek-ai/dsh-memory'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
 import * as MemoryFiles from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 

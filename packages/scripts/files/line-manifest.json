@@ -1,5 +1,5 @@
 {
-  "pin": "f85e6a8c",
+  "pin": "78f71ec9",
   "bed": {
     "mono": "overlay"
   },
@@ -25,19 +25,9 @@
       "relPath": "packages/evolution/evolution-approval"
     },
     {
-      "id": "@deepseek-ai/dsh-evolution-authority",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-authority"
-    },
-    {
       "id": "@deepseek-ai/dsh-evolution-commands",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-commands"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-contract",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-contract"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-core",
@@ -58,16 +48,6 @@
       "id": "@deepseek-ai/dsh-evolution-host",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-host"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-io",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-io"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-io-node",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-io-node"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-learning-graph",
@@ -93,11 +73,6 @@
       "id": "@deepseek-ai/dsh-evolution-merge-ui",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-merge-ui"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-policy",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-policy"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-preset",

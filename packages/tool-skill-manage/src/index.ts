@@ -24,7 +24,7 @@ import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type Wri
 import z from '@deepseek-ai/schemastery'
 import { defineTool, registerEvolutionTool, type PromptSection } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Agent } from '@deepseek-ai/dsh-evolution-core/platform'
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, computeDedupGroups, nearDuplicateSummaries, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_HEALTH_THRESHOLDS, newSkillLibrary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fuzzyPatch } from '@deepseek-ai/dsh-evolution-core'

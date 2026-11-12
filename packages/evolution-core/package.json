@@ -54,7 +54,27 @@
     "./row-overrides.json": "./row-overrides.json",
     "./persisted-write-inventory.json": "./persisted-write-inventory.json",
     "./locale/*.json": "./locale/*.json",
-    "./runtime/locale/*.json": "./locale/runtime/*.json"
+    "./runtime/locale/*.json": "./locale/runtime/*.json",
+    "./contract": {
+      "types": "./lib/types/contract.d.ts",
+      "default": "./lib/contract.js"
+    },
+    "./io-registry": {
+      "types": "./lib/types/io-registry.d.ts",
+      "default": "./lib/io-registry.js"
+    },
+    "./io-node": {
+      "types": "./lib/types/io-node.d.ts",
+      "default": "./lib/io-node.js"
+    },
+    "./authority-plugin": {
+      "types": "./lib/types/authority-plugin.d.ts",
+      "default": "./lib/authority-plugin.js"
+    },
+    "./policy": {
+      "types": "./lib/types/policy.d.ts",
+      "default": "./lib/policy.js"
+    }
   },
   "files": [
     "locale/runtime/*.json",
@@ -67,10 +87,10 @@
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-atomic-write": "workspace:^",
-    "@deepseek-ai/dsh-evolution-contract": "workspace:^",
     "js-yaml": "^4.1.0",
     "yaml": "^2.4.2",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@deepseek-ai/schemastery": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",

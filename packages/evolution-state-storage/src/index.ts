@@ -8,8 +8,8 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
-import type { EvolutionStateStorage, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-contract'
-export type { CuratorStateRecord, EvolutionStateStorage, PendingKind, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-contract'
+import type { EvolutionStateStorage, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-core/contract'
+export type { CuratorStateRecord, EvolutionStateStorage, PendingKind, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-core/contract'
 // S3-2: the two caps live in ./constants.ts (the conformance suite reads them
 // without importing this entry); the local import feeds the pure rules below.
 import { PENDING_RESOLVED_CAP, REVIEW_STATE_SESSION_CAP } from './constants.ts'

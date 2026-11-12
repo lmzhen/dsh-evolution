@@ -12,9 +12,9 @@
  * @module @deepseek-ai/dsh-evolution-core
  */
 
-import type { PlatformServiceProbe } from '@deepseek-ai/dsh-evolution-contract'
+import type { PlatformServiceProbe } from './contract.ts'
 
-export type { PlatformServiceProbe } from '@deepseek-ai/dsh-evolution-contract'
+export type { PlatformServiceProbe } from './contract.ts'
 
 /** The probes, in service-name order (the guard checks this list against the tree). */
 export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.freeze([

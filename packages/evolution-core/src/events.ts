@@ -14,8 +14,8 @@
  */
 
 import type {} from '@deepseek-ai/cordis'
-import type { EvolutionPlanAppliedEvent, EvolutionSkillMutatedEvent } from '@deepseek-ai/dsh-evolution-contract'
-export type { EvolutionPlanAppliedEvent, EvolutionSkillMutatedEvent } from '@deepseek-ai/dsh-evolution-contract'
+import type { EvolutionPlanAppliedEvent, EvolutionSkillMutatedEvent } from './contract.ts'
+export type { EvolutionPlanAppliedEvent, EvolutionSkillMutatedEvent } from './contract.ts'
 import type { ReviewKind } from './signals.ts'
 
 export interface EvolutionReviewScheduledEvent {

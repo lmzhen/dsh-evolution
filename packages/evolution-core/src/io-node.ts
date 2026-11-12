@@ -6,12 +6,12 @@
  * exists(), made directories report absent and let re-archives overwrite
  * older archive folders). Only the provider's `name` is added here.
  *
- * @module @deepseek-ai/dsh-evolution-io-node
+ * @module @deepseek-ai/dsh-evolution-core/io-registry-node
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
-import type { EvolutionIo } from '@deepseek-ai/dsh-evolution-io'
+import { nodeEvolutionIo } from './io.ts'
+import type { EvolutionIo } from './io-registry.ts'
 
 // Compile-time satisfiability (G1.3, F-340): the node backend (with its
 // `name`) must satisfy the narrowed seam. A backend/seam drift fails `tsc`.

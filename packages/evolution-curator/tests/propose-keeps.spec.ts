@@ -4,8 +4,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
 import EvolutionCurator from '../src/index.ts'
 
 it('curator proposes keep for a body-oversize skill', async () => {

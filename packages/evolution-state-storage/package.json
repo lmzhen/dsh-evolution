@@ -28,7 +28,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/dsh-evolution-contract": "workspace:^"
+    "@deepseek-ai/dsh-evolution-core": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"

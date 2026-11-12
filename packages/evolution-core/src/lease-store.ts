@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import type { MutationOwner } from '@deepseek-ai/dsh-evolution-contract'
+import type { MutationOwner } from './contract.ts'
 import type { EvolutionIoLike } from './io.ts'
 
 /** One persisted run/claim lease. Epoch increments on every re-acquire. */

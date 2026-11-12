@@ -1,16 +1,16 @@
 /**
  * Immutable evolution policy service.
  * The policy is the control plane. Model plans may not change it.
- * @module @deepseek-ai/dsh-evolution-policy
+ * @module @deepseek-ai/dsh-evolution-core/policy
  */
 
-import { asRecord } from '@deepseek-ai/dsh-evolution-core'
+import { asRecord } from './guards.ts'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
-import { toolsPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import { toolsPort } from './platform/tools.ts'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import {
@@ -39,7 +39,7 @@ import {
   type CitationPolicy,
   type ReferenceRewritePolicy,
   type SupportFileCharPolicy,
-} from '@deepseek-ai/dsh-evolution-core'
+} from './constants.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {

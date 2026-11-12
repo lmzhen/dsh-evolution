@@ -557,11 +557,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-policy'"
+        "      name: '@deepseek-ai/dsh-evolution-core/policy'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-policy'"
+          "  name: '@deepseek-ai/dsh-evolution-core/policy'"
         ]
       },
       "leads": {
@@ -579,11 +579,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-io'"
+        "      name: '@deepseek-ai/dsh-evolution-core/io-registry'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-io'"
+          "  name: '@deepseek-ai/dsh-evolution-core/io-registry'"
         ]
       },
       "leads": {
@@ -601,11 +601,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-io-node'"
+        "      name: '@deepseek-ai/dsh-evolution-core/io-node'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-io-node'"
+          "  name: '@deepseek-ai/dsh-evolution-core/io-node'"
         ]
       },
       "leads": {
@@ -623,11 +623,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-authority'"
+        "      name: '@deepseek-ai/dsh-evolution-core/authority-plugin'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-authority'"
+          "  name: '@deepseek-ai/dsh-evolution-core/authority-plugin'"
         ]
       },
       "leads": {

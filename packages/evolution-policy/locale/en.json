@@ -1,6 +1,0 @@
-{
-  "meta": {
-    "title": "Setup guard",
-    "description": "Blocks a change that tries to alter how the assistant is set up."
-  }
-}

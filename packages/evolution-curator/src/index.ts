@@ -3,7 +3,7 @@
  * @module @deepseek-ai/dsh-evolution-curator
  */
 
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { authorityFrom, withTreeWrite, type SnapshotView } from '@deepseek-ai/dsh-evolution-core'
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'

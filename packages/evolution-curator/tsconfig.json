@@ -5,7 +5,6 @@
     { "path": "../../../vendor/schemastery" },
     { "path": "../evolution-core" },
     { "path": "../evolution-state" },
-    { "path": "../../core/session" },
-    { "path": "../evolution-io" }
+    { "path": "../../core/session" }
   ]
 }

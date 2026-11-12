@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { isCommittedWarning, isProcessAlive, type transactIo } from './io.ts'
 import { WriteKernel } from './write-kernel.ts'
 import type { UnitClaimPort } from './unit-claim.ts'
-import type { MutationOwner } from '@deepseek-ai/dsh-evolution-contract'
+import type { MutationOwner } from './contract.ts'
 
 export interface MutationRoot {
   name: string

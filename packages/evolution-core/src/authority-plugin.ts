@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { evolutionHome, MutationAuthority } from '@deepseek-ai/dsh-evolution-core'
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import { evolutionHome } from './state-store.ts'
+import { MutationAuthority } from './mutation-authority.ts'
+
 
 declare module '@deepseek-ai/cordis' {
   interface Context {

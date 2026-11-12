@@ -30,9 +30,6 @@
     ]
   },
   "dependencies": {
-    "@deepseek-ai/dsh-evolution-io": "workspace:^",
-    "@deepseek-ai/dsh-evolution-io-node": "workspace:^",
-    "@deepseek-ai/dsh-evolution-authority": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-domain": "workspace:^",
@@ -42,7 +39,6 @@
     "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-skill-usage": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
-    "@deepseek-ai/dsh-evolution-policy": "workspace:^",
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-evolution-threat": "workspace:^",
     "@deepseek-ai/dsh-evolution-review": "workspace:^",

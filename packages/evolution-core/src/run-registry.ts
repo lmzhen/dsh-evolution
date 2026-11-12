@@ -43,8 +43,8 @@ import { join } from 'node:path'
 import { clampedNumber } from './numeric.ts'
 import { isProcessAlive, transactIo } from './io.ts'
 import type { EvolutionIoLike } from './io.ts'
-import type { RunOutcome } from '@deepseek-ai/dsh-evolution-contract'
-export type { RunOutcome } from '@deepseek-ai/dsh-evolution-contract'
+import type { RunOutcome } from './contract.ts'
+export type { RunOutcome } from './contract.ts'
 
 /** The kinds of long-running work the registry tracks. */
 export type RunKind = 'maintain' | 'merge'

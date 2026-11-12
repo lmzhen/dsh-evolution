@@ -6,7 +6,7 @@
  * @module @deepseek-ai/dsh-evolution-state-json
  */
 
-import type {} from '@deepseek-ai/dsh-evolution-io'
+import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'

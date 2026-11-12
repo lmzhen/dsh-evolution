@@ -3,8 +3,7 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
-    { "path": "../evolution-io" },
-    { "path": "../skill-usage" },
-    { "path": "../evolution-io-node" }
+    
+    { "path": "../skill-usage" }
   ]
 }

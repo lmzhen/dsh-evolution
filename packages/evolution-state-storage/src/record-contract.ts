@@ -17,8 +17,8 @@
  */
 
 import { CURATOR_STATE_TABLE, PENDING_TABLE, REVIEW_STATE_TABLE } from './constants.ts'
-import type { PendingKind, PendingStatus } from '@deepseek-ai/dsh-evolution-contract'
-export type { PendingKind, PendingStatus } from '@deepseek-ai/dsh-evolution-contract'
+import type { PendingKind, PendingStatus } from '@deepseek-ai/dsh-evolution-core/contract'
+export type { PendingKind, PendingStatus } from '@deepseek-ai/dsh-evolution-core/contract'
 
 /** The three seam tables a record can belong to. */
 export type SeamRecordTable = typeof REVIEW_STATE_TABLE | typeof CURATOR_STATE_TABLE | typeof PENDING_TABLE

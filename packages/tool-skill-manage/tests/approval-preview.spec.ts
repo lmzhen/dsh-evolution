@@ -10,8 +10,8 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-io'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-io-node'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import { contentHash } from '@deepseek-ai/dsh-evolution-core'
