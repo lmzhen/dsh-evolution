@@ -60,6 +60,55 @@ describe('diagnostics route', () => {
     expect(answer.body.data.runtime[0]?.detail).toContain('probe boom')
   })
 
+  // W9-g5: one assembly per window. The real profile measured 19-37 s per assembly, and the page
+  // polls from several tabs; without coalescing every tab paid the full cost.
+  it('shares ONE assembly between concurrent reads', async () => {
+    const ctx = new Context()
+    let calls = 0
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const host = await mountHostRoutes(ctx, () => makeDiagnosticsRoutes(async () => {
+      calls += 1
+      await gate
+      return inputs()
+    }))
+    const first = host.json(HOST_ROUTES.diagnostics.view)
+    const second = host.json(HOST_ROUTES.diagnostics.view)
+    await new Promise((resolve) => { setTimeout(resolve, 10) })
+    release?.()
+    await Promise.all([first, second])
+    expect(calls).toBe(1)
+  })
+
+  it('reuses one view inside the TTL and re-assembles after it', async () => {
+    let clock = 1_000
+    let calls = 0
+    const host = await mountHostRoutes(new Context(), () => makeDiagnosticsRoutes(async () => {
+      calls += 1
+      return inputs()
+    }, { ttlMs: 5_000, timeoutMs: 5_000, now: () => clock }))
+    await host.json(HOST_ROUTES.diagnostics.view)
+    await host.json(HOST_ROUTES.diagnostics.view)
+    expect(calls).toBe(1)
+    clock += 5_001
+    await host.json(HOST_ROUTES.diagnostics.view)
+    expect(calls).toBe(2)
+  })
+
+  it('answers not-decided when the assembly exceeds its budget', async () => {
+    const host = await mountHostRoutes(new Context(), () => makeDiagnosticsRoutes(async () => {
+      await new Promise((resolve) => { setTimeout(resolve, 100) })
+      return inputs()
+    }, { ttlMs: 5_000, timeoutMs: 10 }))
+    const answer = await host.json<{ ok: boolean; data: { runtime: Array<{ status: string; detail?: string }> } }>(
+      HOST_ROUTES.diagnostics.view,
+    )
+    expect(answer.status).toBe(200)
+    expect(answer.body.ok).toBe(true)
+    expect(answer.body.data.runtime.every(entry => entry.status === 'unknown')).toBe(true)
+    expect(answer.body.data.runtime[0]?.detail).toContain('budget')
+  })
+
   it('declares GET only: an undeclared method falls through on the platform carrier', async () => {
     const ctx = new Context()
     const host = await mountHostRoutes(ctx, () => makeDiagnosticsRoutes(async () => inputs()))
