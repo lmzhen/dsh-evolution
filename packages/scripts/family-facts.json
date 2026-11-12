@@ -598,7 +598,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "1761fe17b9fa6fe9728e9304cda37452719737d4c0e7b6ac1afdf12d25b51024",
+        "sha256": "7a7de103d42f9f44d425aa57857edf2dbf73b2b7bad8bc1ee591c943c58687e1",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1122,35 +1122,40 @@
           {
             "id": "ci-only-19",
             "tier": "ci-only",
-            "criterion": "verify-core-surface"
+            "criterion": "verify-contract-anchors.selftest"
           },
           {
             "id": "ci-only-20",
             "tier": "ci-only",
-            "criterion": "verify-exemptions"
+            "criterion": "verify-core-surface"
           },
           {
             "id": "ci-only-21",
             "tier": "ci-only",
-            "criterion": "verify-layout-sync"
+            "criterion": "verify-exemptions"
           },
           {
             "id": "ci-only-22",
             "tier": "ci-only",
-            "criterion": "verify-param-consumers"
+            "criterion": "verify-layout-sync"
           },
           {
             "id": "ci-only-23",
             "tier": "ci-only",
-            "criterion": "verify-probes"
+            "criterion": "verify-param-consumers"
           },
           {
             "id": "ci-only-24",
             "tier": "ci-only",
-            "criterion": "verify-requirements"
+            "criterion": "verify-probes"
           },
           {
             "id": "ci-only-25",
+            "tier": "ci-only",
+            "criterion": "verify-requirements"
+          },
+          {
+            "id": "ci-only-26",
             "tier": "ci-only",
             "criterion": "verify-test-lines"
           },
@@ -1196,7 +1201,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 111,
+            "rowsWithoutIt": 112,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -1205,13 +1210,13 @@
         "pendingAxes": [
           {
             "axis": "executability",
-            "rows": 25,
+            "rows": 24,
             "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action | 2026-11-12 re-measured: verify-param-consumers.mjs joined CI"
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action | 2026-11-12 re-measured: verify-param-consumers.mjs joined CI | 2026-11-12 re-measured: the anchor selftest row carries its own executable form"
           },
           {
             "axis": "expiry-due",
@@ -1224,13 +1229,13 @@
           },
           {
             "axis": "falsifiability-carrier",
-            "rows": 6,
+            "rows": 7,
             "reason": "three rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition | 2026-11-12 re-measured: the consumer ledger adds one axis definition row"
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition | 2026-11-12 re-measured: the consumer ledger adds one axis definition row | 2026-11-12 re-measured: verify-contract-anchors.selftest.mjs adds an axis definition"
           },
           {
             "axis": "mutation-coverage",
@@ -2583,7 +2588,7 @@
             "key": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
             "ids": [
               "gate-75",
-              "ci-only-21"
+              "ci-only-22"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2593,7 +2598,7 @@
             "key": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
             "ids": [
               "gate-76",
-              "ci-only-23"
+              "ci-only-24"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2603,7 +2608,7 @@
             "key": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
             "ids": [
               "gate-77",
-              "ci-only-24"
+              "ci-only-25"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",

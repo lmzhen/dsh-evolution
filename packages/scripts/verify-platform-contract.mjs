@@ -46,6 +46,7 @@
  *     --upstream <platform-tree> [--accept-recorded]
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { gradeAnchor } from './lib-contract-anchor.mjs'
 import { join, relative, resolve } from 'node:path'
 
 const argv = process.argv.slice(2)
@@ -552,15 +553,21 @@ function resolveCitation(base, rel) {
 }
 
 const recordedDrift = []
+/** How the anchors were graded: symbol = the named identifier is still DECLARED in the file. */
+const anchorGrades = { symbol: 0, text: 0 }
 for (const entry of CONTRACT_ANCHORS) {
   const path = join(upstream, entry.file)
   if (!existsSync(path)) {
     recordedDrift.push(`${entry.id} (${entry.finding}): ${entry.file} is gone — recorded for ${entry.consumer}`)
     continue
   }
-  if (!readFileSync(path, 'utf8').includes(entry.anchor)) {
-    recordedDrift.push(`${entry.id} (${entry.finding}): ${entry.file} no longer contains \`${entry.anchor}\` — recorded for ${entry.consumer}`)
+  const grade = gradeAnchor(readFileSync(path, 'utf8'), entry)
+  if (grade.grade === 'missing') {
+    const what = grade.symbol === null || grade.symbol === undefined ? `\`${entry.anchor}\`` : `a declaration of \`${grade.symbol}\``
+    recordedDrift.push(`${entry.id} (${entry.finding}): ${entry.file} no longer has ${what} — recorded for ${entry.consumer}`)
+    continue
   }
+  anchorGrades[grade.grade] += 1
 }
 // The writer set, measured rather than assumed. A drift here is recorded like an
 // anchor (--accept-recorded tolerates it) but named with its count, because a
@@ -931,7 +938,7 @@ if (citationChecks === 0) {
 }
 for (const finding of citationFindings) recordedDrift.push('platform-citation ' + finding)
 
-console.log(`verify-platform-contract: checked ${CONTRACT_ANCHORS.length} recorded anchor(s), ${writeSiteChecks} dispatch write site(s), ${seedSnapshotChecks} profile seed check(s), ${semanticChecks} semantic assertion(s), ${citationChecks} platform citation(s) (${citationFindings.length} broken), ${symbolChecks} imported symbol(s), ${serviceChecks} service name(s) against ${upstream}`)
+console.log(`verify-platform-contract: checked ${CONTRACT_ANCHORS.length} recorded anchor(s) (symbol-grade ${anchorGrades.symbol}, text-grade ${anchorGrades.text}), ${writeSiteChecks} dispatch write site(s), ${seedSnapshotChecks} profile seed check(s), ${semanticChecks} semantic assertion(s), ${citationChecks} platform citation(s) (${citationFindings.length} broken), ${symbolChecks} imported symbol(s), ${serviceChecks} service name(s) against ${upstream}`)
 if (recordedDrift.length > 0) {
   const label = acceptRecorded
     ? 'accepted recorded difference(s) — each is accounted for by the anchor, semantic-assertion or citation record'

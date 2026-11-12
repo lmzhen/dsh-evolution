@@ -128,6 +128,7 @@
         "evolution-core::tests/platform-line.spec.ts",
         "evolution-core::tests/platform-llm-route.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
+        "evolution-core::tests/projection-port.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
         "evolution-core::tests/proposal-report.spec.ts",
         "evolution-core::tests/proposal-view.spec.ts",
@@ -443,6 +444,7 @@
         "evolution-core::tests/plugin-record-not-dispatch.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
+        "evolution-core::tests/projection-port.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
         "evolution-core::tests/proposal-report.spec.ts",
         "evolution-core::tests/proposal-view.spec.ts",
@@ -920,6 +922,7 @@
         "ci-only-23",
         "ci-only-24",
         "ci-only-25",
+        "ci-only-26",
         "line-identity-ci"
       ],
       "specs": [
@@ -1168,6 +1171,7 @@
         "evolution-core::tests/plugin-record-not-dispatch.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
+        "evolution-core::tests/projection-port.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
         "evolution-core::tests/proposal-report.spec.ts",
         "evolution-core::tests/proposal-view.spec.ts",
@@ -1647,6 +1651,7 @@
         "ci-only-23",
         "ci-only-24",
         "ci-only-25",
+        "ci-only-26",
         "gate-01",
         "gate-02",
         "gate-03",
@@ -1821,6 +1826,7 @@
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/preset-composition.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
+        "evolution-core::tests/projection-port.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
         "evolution-core::tests/proposal-report.spec.ts",
         "evolution-core::tests/proposal-view.spec.ts",
@@ -2344,28 +2350,28 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 106
+      "specs": 107
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 463
+      "specs": 464
     },
     "ci-only": {
-      "gates": 17,
+      "gates": 18,
       "specs": 73
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 463
+      "specs": 464
     },
     "full(ci=on)": {
-      "gates": 92,
-      "specs": 536
+      "gates": 93,
+      "specs": 537
     }
   },
   "specs": {
-    "total": 536,
-    "marked": 536,
+    "total": 537,
+    "marked": 537,
     "unmarked": 0
   }
 }

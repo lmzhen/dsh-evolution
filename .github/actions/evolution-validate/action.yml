@@ -383,6 +383,8 @@ runs:
         node packages/evolution/scripts/verify-error-codes.mjs packages/evolution
         # G4.1/C5: the package map must name exactly what the tree publishes.
         # G4: a declared parameter must name a reader (or be deleted).
+        # G3-b: the contract-anchor grader must be able to go red (fixtures, not the live tree).
+        node packages/evolution/scripts/verify-contract-anchors.selftest.mjs
         node packages/evolution/scripts/verify-param-consumers.mjs packages/evolution
         node packages/evolution/scripts/verify-exemptions.mjs packages/evolution
         # G7-f: a row that cannot execute is only acceptable while it carries a registration;
