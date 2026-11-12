@@ -42,9 +42,11 @@
     "./threat/locale/*.json": "./locale/threat/*.json"
   },
   "files": [
-    "locale/*.json",
+    "lib/**/*.js",
     "lib/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "locale/**/*.json",
+    "locale/*.json"
   ],
   "license": "MIT",
   "dependencies": {

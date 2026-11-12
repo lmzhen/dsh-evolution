@@ -39,7 +39,7 @@
     - id: evolution-authority
       name: '@deepseek-ai/dsh-evolution-core/authority-plugin'
 
-    # ── durable state: provider registry (json active; domain opt-in) ───────
+    # ── durable state: registry + platform storage-domain provider ───────────
     - id: evolution-state-storage
       name: '@deepseek-ai/dsh-evolution-state/storage'
     - id: evolution-state-domain

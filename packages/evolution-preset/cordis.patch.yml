@@ -7,7 +7,7 @@
 # The storage stack (`storage`, `storage-json`, `storage-domain`) is
 # HOST-plane in DSH, exactly like session persistence and the native approval
 # stack. A preset must not own it. `evolution-state-domain` below joins the
-# host's storage-domain facility when present. There is NO automatic fallback
+# platform storage-domain facility (base bundle). There is NO automatic fallback
 # between providers
 # (P2-6): the effective one is whichever registered first unless a profile
 # overlay pins `config: { provider: ... }` on the `evolution-state` row.
@@ -28,7 +28,7 @@
     - id: evolution-authority
       name: '@deepseek-ai/dsh-evolution-core/authority-plugin'
 
-    # ── durable state: provider registry (json active; domain opt-in) ───────
+    # ── durable state: registry + platform storage-domain provider ───────────
     - id: evolution-state-storage
       name: '@deepseek-ai/dsh-evolution-state/storage'
     - id: evolution-state-domain

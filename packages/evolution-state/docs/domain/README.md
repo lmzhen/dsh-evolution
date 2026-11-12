@@ -1,6 +1,6 @@
 # @lmzhen/dsh-evolution-state-domain
 
-Optional `storageDomain` provider for review, curator, and pending state. It is disabled in the shipped bundle patches and requires the platform `storageDomain` service.
+Optional `storageDomain` provider for review, curator, and pending state. It is enabled in the shipped bundle patches (the platform base bundle mounts the storage-domain facility) and requires the platform `storageDomain` service.
 
 The provider defines three schema-validated tables: `review_state`, `curator_state`, and `pending`. The configured domain facility determines the actual medium, which can be JSON, SQLite, remote RPC, or another supported backend; this package does not imply that all state resides in `$DSH_HOME`.
 

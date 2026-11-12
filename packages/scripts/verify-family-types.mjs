@@ -73,6 +73,13 @@ if (real.length === 0 && leaks.length > 0) {
   process.exit(2)
 }
 familyDiagnostics.splice(0, familyDiagnostics.length, ...real)
+// Project-level diagnostics carry no (line,col): they name a file or a project only. They are
+// the shape a broken reference graph takes (TS5083/TS18003), so they are counted, not dropped.
+const positionless = output.split(/\r?\n/).filter((line) => /error TS\d+/.test(line) && !/\(\d+,\d+\): error TS\d+/.test(line))
+for (const line of positionless) {
+  if (/packages\/evolution/.test(line)) familyDiagnostics.push(line.trim())
+  else otherDiagnostics.push(line.trim())
+}
 if (familyDiagnostics.length > 0) {
   console.error('verify-family-types: ' + familyDiagnostics.length + ' family type error(s):')
   for (const line of familyDiagnostics.slice(0, 40)) console.error('  ' + line)
@@ -81,6 +88,6 @@ if (familyDiagnostics.length > 0) {
 }
 console.error(
   'CANNOT DECIDE: tsc -b reports ' + otherDiagnostics.length +
-  ' error(s) in platform projects (the build line owns that graph)',
+  ' project/graph diagnostic(s) outside packages/evolution (the build line owns that graph)',
 )
 process.exit(2)
