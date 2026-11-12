@@ -40,7 +40,7 @@ async function stage(ctx: Awaited<ReturnType<typeof mountApproval>>['ctx'], crea
   if (createdAt !== undefined) {
     // Backdate through the SEAM's own writer (the json provider), so the sweep reads real bytes and
     // the record still passes the field gate. Only the timestamp changes.
-    const provider = ctx.evolutionStateStorage.provider('json')
+    const provider = ctx.evolutionStateStorage.provider('domain')
     const record = (await provider.listPending('pending')).find(item => item.id === id)
     if (record === undefined) throw new Error('the staged record did not land')
     await provider.savePending({ ...record, createdAt })
@@ -125,7 +125,7 @@ describe('staged-window expiry (T4-09/A51)', () => {
   it('releases the claim when an expiry reject throws — the record returns to pending', async () => {
     const { ctx } = await mountApproval(1000)
     const id = await stage(ctx, new Date(Date.now() - 60_000).toISOString())
-    const provider = ctx.evolutionStateStorage.provider('json') as unknown as { tryResolvePending: (...args: unknown[]) => Promise<unknown> }
+    const provider = ctx.evolutionStateStorage.provider('domain') as unknown as { tryResolvePending: (...args: unknown[]) => Promise<unknown> }
     const original = provider.tryResolvePending.bind(provider)
     provider.tryResolvePending = async () => { throw new Error('injected reject failure') }
     try {

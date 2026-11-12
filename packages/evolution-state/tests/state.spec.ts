@@ -40,9 +40,9 @@ describe('evolution-state', () => {
     const home = await tempRoot('dsh-state-ambiguous-')
     const ctx = await mountStateStack(home)
     // Measure-of-record: two media with no pin means the effective one is registration order, which
-    // silently rebinds every state op to the second medium while the json state stays on disk.
-    const json = ctx.evolutionStateStorage.provider('json')
-    ctx.evolutionStateStorage.registerProvider({ ...json, name: 'domain' })
+    // silently rebinds every state op to the second medium while the first medium's state stays written.
+    const domain = ctx.evolutionStateStorage.provider('domain')
+    ctx.evolutionStateStorage.registerProvider({ ...domain, name: 'json' })
     await expect(ctx.plugin(EvolutionState)).rejects.toThrow(/pins none/)
   })
 
@@ -50,8 +50,8 @@ describe('evolution-state', () => {
     const home = await tempRoot('dsh-state-late-provider-')
     const ctx = await mountStateStack(home)
     await ctx.plugin(EvolutionState)
-    const json = ctx.evolutionStateStorage.provider('json')
-    ctx.evolutionStateStorage.registerProvider({ ...json, name: 'domain' })
+    const domain = ctx.evolutionStateStorage.provider('domain')
+    ctx.evolutionStateStorage.registerProvider({ ...domain, name: 'json' })
     expect(() => ctx.evolutionState.loadReviewState('s1')).toThrow(/pins none/)
   })
 
@@ -62,12 +62,12 @@ describe('evolution-state', () => {
     await ctx.plugin(EvolutionState)
     expect(ctx.evolutionState).toBeDefined()
     // Two providers WITH a pin: mounts too - the pin is the escape hatch the refusal names.
-    const json = ctx.evolutionStateStorage.provider('json')
-    ctx.evolutionStateStorage.registerProvider({ ...json, name: 'domain' })
+    const domain = ctx.evolutionStateStorage.provider('domain')
+    ctx.evolutionStateStorage.registerProvider({ ...domain, name: 'json' })
     const pinnedCtx = await mountStateStack(await tempRoot('dsh-state-pinned-'))
-    const pinnedJson = pinnedCtx.evolutionStateStorage.provider('json')
-    pinnedCtx.evolutionStateStorage.registerProvider({ ...pinnedJson, name: 'domain' })
-    await pinnedCtx.plugin(EvolutionState, { provider: 'json' })
+    const pinnedDomain = pinnedCtx.evolutionStateStorage.provider('domain')
+    pinnedCtx.evolutionStateStorage.registerProvider({ ...pinnedDomain, name: 'json' })
+    await pinnedCtx.plugin(EvolutionState, { provider: 'domain' })
     expect(pinnedCtx.evolutionState).toBeDefined()
   })
 })
