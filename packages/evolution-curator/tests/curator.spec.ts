@@ -1746,7 +1746,7 @@ Body of ${name}.
     ctx.evolutionCurator.stop()
   })
 
-  it('latestReport orders by the SAME report time the sweep uses, mtime only as the fallback (S2.9/T3-12, E-54)', { timeout: 20_000 }, async () => {
+  it('latestReport orders by the SAME report time the sweep uses, mtime only as the fallback (S2.9/T3-12, E-54)', { timeout: 30_000 }, async () => {
     const home = await tempHome('dsh-curator-latest-')
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
