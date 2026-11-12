@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-12T05:48:22.429Z",
-  "tree": "8a48449b",
+  "measuredAt": "2026-11-12T06:08:59.519Z",
+  "tree": "6e8077aa",
   "testLines": [
     {
       "spec": "packages/evolution-agent/tests/agent-composition.spec.ts",

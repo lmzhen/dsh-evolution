@@ -797,6 +797,7 @@
         "evolution-ui::tests/history-workbench.client.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
+        "evolution-ui::tests/settings-draft-fence.client.spec.ts",
         "evolution-ui::tests/settings-groups.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card-read-race.client.spec.ts",
@@ -1520,6 +1521,7 @@
         "evolution-ui::tests/history-workbench.client.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
+        "evolution-ui::tests/settings-draft-fence.client.spec.ts",
         "evolution-ui::tests/settings-groups.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card-read-race.client.spec.ts",
@@ -2220,6 +2222,7 @@
         "evolution-ui::tests/history-workbench.client.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
+        "evolution-ui::tests/settings-draft-fence.client.spec.ts",
         "evolution-ui::tests/settings-groups.spec.ts",
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card-read-race.client.spec.ts",
@@ -2343,7 +2346,7 @@
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 462
+      "specs": 463
     },
     "ci-only": {
       "gates": 16,
@@ -2351,16 +2354,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 462
+      "specs": 463
     },
     "full(ci=on)": {
       "gates": 91,
-      "specs": 535
+      "specs": 536
     }
   },
   "specs": {
-    "total": 535,
-    "marked": 535,
+    "total": 536,
+    "marked": 536,
     "unmarked": 0
   }
 }

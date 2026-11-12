@@ -13,7 +13,7 @@
  * typed from the registry (\`control\`), so booleans are switches, enums are
  * selects and numbers are numeric inputs with the unit shown beside the label.
  */
-import { createElement, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createElement, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
 import { PARAM_FIELDS, PARAM_GROUPS, PARAM_UNITS, PARAM_VALUES } from './generated-param-i18n.ts'
@@ -42,10 +42,10 @@ export interface ParamCardFace {
   lang?: () => ParamLanguage
   /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). The returned boolean IS
    * the Host's verdict (contract C2/G5): `true` = accepted, `false` = refused after its recovery read. */
-  mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<boolean>
+  mutateOnce: (ops: readonly SettingsParamOp[], baseRevision?: number) => Promise<boolean>
   /** Structured write result; when present the card distinguishes acceptance from readback. */
   saveOnce?: (ops: readonly SettingsParamOp[]) => Promise<SettingsSaveResult>
-  clear: (field: string) => Promise<boolean>
+  clear: (field: string, baseRevision?: number) => Promise<boolean>
   /** Retry the section read after a transport failure. */
   retry?: (() => void) | undefined
   hooks: { paramSection: ParamSectionSource }
@@ -307,12 +307,14 @@ export interface ParamCardViewProps {
   /** Current UI language for generated labels; omitted defaults to zh. */
   lang?: () => ParamLanguage
   /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). */
-  mutateOnce: (ops: readonly SettingsParamOp[]) => Promise<boolean>
+  mutateOnce: (ops: readonly SettingsParamOp[], baseRevision?: number) => Promise<boolean>
   saveOnce?: (ops: readonly SettingsParamOp[]) => Promise<SettingsSaveResult>
   /** Ask the scope to drop one override; resolves when the scope answered, not when it landed. */
-  clear: (field: string) => Promise<boolean>
+  clear: (field: string, baseRevision?: number) => Promise<boolean>
   /** The current row state, from whichever source owns it (the bound hook or the page). */
   snapshot: ParamSectionSnapshot
+  /** The revision this render read; the DRAFT baseline is captured from it on the first edit. */
+  revision?: number | undefined
 }
 
 /**
@@ -332,6 +334,10 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   // The field whose reset is in flight (T5-05/A60): the button says so and the controls lock, the
   // same posture the save path takes while its write is outstanding.
   const [clearing, setClearing] = useState<string | null>(null)
+  // W9-g6: the CAS fence is the revision the DRAFT began at, not the one the page shows at click
+  // time. Subscribing to the row re-renders the card whenever anyone writes, so a click-time value
+  // is always the newest and the CAS could never refuse a stale draft.
+  const baseRevision = useRef<number | null>(null)
   // hooks 区：所有 hook 无条件先跑；条件分支只决定输出（G4/4.0 S5-01 根治）
   /**
    * Settle a staged write against the Host's answer.
@@ -349,6 +355,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   useEffect(() => {
     if (pending === null) return
     setPending(null)
+    baseRevision.current = null
     setBusy(false)
     setClearing(null)
     // G5 P1-1: the verdict is the HOST'S boolean. Comparing the settled user layer against the
@@ -421,7 +428,10 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     return t(reason, { field: relatedLabel, n: peer ?? '', unit: relatedUnit === '' ? '' : ' ' + relatedUnit })
   }
   const blocked = fields.some(field => invalidText(field) !== null)
-  const change = (id: string, next: string): void => { setDraft({ ...draft, [id]: next }) }
+  const change = (id: string, next: string): void => {
+    if (baseRevision.current === null && props.revision !== undefined) baseRevision.current = props.revision
+    setDraft({ ...draft, [id]: next })
+  }
   /**
    * Restore one field's deployment default (T5-05/A60).
    *
@@ -437,7 +447,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     void (async () => {
       let accepted: boolean
       try {
-        accepted = await clear(fieldKeyOf(namespace, { id: field } as ClientParamField))
+        accepted = await clear(fieldKeyOf(namespace, { id: field } as ClientParamField), baseRevision.current ?? props.revision)
       } catch (caught) {
         setClearing(null)
         setError(caught instanceof Error && caught.message !== '' ? caught.message : t('resetRefused'))
@@ -457,7 +467,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
         // refused by the host and its change silently did not land.
         const ops: SettingsParamOp[] = dirty.map(field => ({ op: 'set', path: [keyOf(field)], value: parseFor(field.control, textOf(field)) }))
         const result = saveOnce === undefined
-          ? { written: await mutateOnce(ops), readback: 'ok' as const }
+          ? { written: await mutateOnce(ops, baseRevision.current ?? props.revision), readback: 'ok' as const }
           : await saveOnce(ops)
         setPending({ accepted: result.written && result.readback === 'ok', readbackFailed: result.written && result.readback === 'failed', ...(result.kind === undefined ? {} : { kind: result.kind }), resets: false })
       } catch (caught) {
