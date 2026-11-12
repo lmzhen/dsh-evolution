@@ -52,7 +52,7 @@ it('RG0 core UnitBackend is the only commitMerge adapter', () => {
 })
 
 it('RG0 core owner modules exist', () => {
-  for (const path of ['../evolution-core/src/run-registry.ts', '../evolution-core/src/tree-lock.ts', '../evolution-core/src/skill-store.ts']) {
+  for (const path of ['../evolution-core/src/run-registry.ts', '../evolution-core/src/authority.ts', '../evolution-core/src/skill-store.ts']) {
     expect(existsSync(root + '/' + path), path).toBe(true)
   }
 })

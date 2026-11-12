@@ -17,7 +17,7 @@ const owners: Array<[string, string, string, string]> = [
   ['staged-file', mergeRoot + '/src', 'writeStagedFile', 'staging-files.ts'],
   ['receipt', coreRoot, 'unitReceiptPath', 'unit-storage.ts'],
   ['runs', coreRoot, 'runsFile', 'run-registry.ts'],
-  ['tree', coreRoot, 'treeLockFile', 'tree-lock.ts'],
+  ['tree', coreRoot, 'authorityHolder', 'authority.ts'],
   ['target', mergeRoot + '/src', 'withGuard', 'target-claim.ts'],
   ['claim', mergeRoot + '/src', 'acquireClaim', 'domain/claim.ts'],
 ]

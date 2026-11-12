@@ -10,7 +10,7 @@ const owners: [string, string][] = [
   ['journal', 'src/domain/commit-journal-store.ts'],
   ['receipt/unit', '../evolution-core/src/skill-store.ts'],
   ['staging', 'src/staging.ts'],
-  ['tree fence', '../evolution-core/src/tree-lock.ts'],
+  ['tree fence', '../evolution-core/src/authority.ts'],
   ['target claim', 'src/target-claim.ts'],
   ['eligibility', 'src/runtime.ts'],
   ['query', 'src/read-commands.ts'],

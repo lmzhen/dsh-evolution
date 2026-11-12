@@ -7,7 +7,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, LlmAdapter, type GenerateOptions, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionId, type Agent } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
-import EvolutionIoRegistry from '../../evolution-io/src/index.ts'
+import EvolutionIoRegistry from '../../evolution-core/src/io-registry.ts'
 import * as mainEntry from '../src/main-entry.ts'
 
 const dirs: string[] = []

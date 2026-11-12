@@ -6,7 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { executeOne, mountToolHost } from '../../test-support/tool-host.ts'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
-import EvolutionIoRegistry from '../../evolution-io/src/index.ts'
+import EvolutionIoRegistry from '../../evolution-core/src/io-registry.ts'
 import * as mainEntry from '../src/main-entry.ts'
 
 async function base(): Promise<Context> {

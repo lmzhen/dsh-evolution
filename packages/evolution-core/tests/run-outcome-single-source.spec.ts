@@ -19,5 +19,5 @@ it('declares RunOutcome only in the contract', () => {
     }
   }
   visit(root)
-  expect(hits).toEqual(['evolution-contract/src/index.ts'])
+  expect(hits).toEqual(['evolution-core/src/contract.ts'])
 })
