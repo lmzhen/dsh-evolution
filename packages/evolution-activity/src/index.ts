@@ -387,9 +387,32 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const root = evolutionHome()
     const authority = (ioCtx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
     const commit = (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => transactIo(io, path, task)
+    /** The ONE cross-process writer: a home fence when the authority provides one, else the seam. */
     const write = async (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => {
       if (authority?.homeFence !== undefined) await authority.homeFence.run(async () => { await commit(path, task) })
       else await commit(path, task)
+    }
+    /**
+     * One durable fold over the activity file, used by BOTH events.
+     *
+     * W9/02-P1.3: the review branch used to call transactIo directly while the plan branch went
+     * through `write`. Both are read-modify-write over the same file, so the asymmetry meant plan
+     * records excluded other processes and review records did not — a review written while another
+     * plane appended a plan read a stale snapshot and silently dropped it. One helper, two events.
+     */
+    const foldActivity = async (task: (current: string | null) => Promise<string | null>): Promise<void> => {
+      await write(activityFile(root), async (current) => {
+        const file = activityFile(root)
+        if (!isCorruptActivity(current)) return await task(current)
+        // Fold would restart from [] and overwrite bytes that are still recoverable — quarantine first.
+        const rescued = await io.writeText(`${file}.corrupt`, current as string).then(() => true, () => false)
+        if (!rescued) {
+          ioCtx.logger.warn(`evolution-activity: ${file} is unreadable; the .corrupt copy could not be written — refusing this write so the original bytes stay recoverable`)
+          return current
+        }
+        ioCtx.logger.warn(`evolution-activity: ${file} is unreadable (unparsable JSON or wrong top-level shape); the original bytes were copied to ${file}.corrupt and the store restarts from the readable entries`)
+        return await task(current)
+      })
     }
     // In-process serialization: each event is one transactIo cycle, so
     // concurrent outcomes in THIS process can never overwrite each other's
@@ -397,18 +420,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     let chain: Promise<unknown> = Promise.resolve()
     ioCtx.on('evolution/plan-applied', (event) => {
       const run = chain.then(() =>
-        write(activityFile(root), async (current) => {
-          const file = activityFile(root)
-          if (isCorruptActivity(current)) {
-            // P2-15: folding would restart from [] and overwrite bytes that are
-            // still recoverable — quarantine them first (state-json/usage posture).
-            const rescued = await io.writeText(`${file}.corrupt`, current as string).then(() => true, () => false)
-            if (!rescued) {
-              ioCtx.logger.warn(`evolution-activity: ${file} is unreadable; the .corrupt copy could not be written — refusing this write so the original bytes stay recoverable`)
-              return current
-            }
-            ioCtx.logger.warn(`evolution-activity: ${file} is unreadable (unparsable JSON or wrong top-level shape); the original bytes were copied to ${file}.corrupt and the store restarts from the readable entries`)
-          }
+        foldActivity(async (current) => {
           const items = applyActivityEvent(parseActivityContent(current), event, maxItems)
           return serializeActivity(items, parseActivityReviews(current))
         }),
@@ -426,16 +438,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
     ioCtx.on('evolution/review-completed', (event) => {
       const run = chain.then(() =>
-        transactIo(io, activityFile(root), async (current) => {
-          const file = activityFile(root)
-          if (isCorruptActivity(current)) {
-            const rescued = await io.writeText(`${file}.corrupt`, current as string).then(() => true, () => false)
-            if (!rescued) {
-              ioCtx.logger.warn(`evolution-activity: ${file} is unreadable; the .corrupt copy could not be written — refusing this write so the original bytes stay recoverable`)
-              return current
-            }
-            ioCtx.logger.warn(`evolution-activity: ${file} is unreadable; the original bytes were copied to ${file}.corrupt and the store restarts from the readable entries`)
-          }
+        foldActivity(async (current) => {
           const reviews = applyReviewActivityEvent(parseActivityReviews(current), event, maxItems)
           return serializeActivity(parseActivityContent(current), reviews)
         }),

@@ -160,6 +160,37 @@ function serialize(items: EvolutionActivityRecord[]): string {
     expect(raw.version).toBe(ACTIVITY_FILE_VERSION)
   })
 
+  // W9/02-P1.3: the review branch used to call transactIo directly while the plan branch went
+  // through the home fence. Both are read-modify-write over the same file, so a review written
+  // while another plane appended a plan could drop it. Both events now fold through ONE writer.
+  it('W9/02-P1.3: BOTH activity events take the home fence', { timeout: 20_000 }, async () => {
+    const root = await tempHome('dsh-activity-fence-')
+    const fenced = vi.fn(async (body: () => Promise<void>) => { await body() })
+    const ctx = new Context()
+    ctx.provide('evolutionMutationAuthority', { homeFence: { run: fenced } })
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(apply, { maxItems: 10 })
+    ctx.emit('evolution/plan-applied', payload())
+    ctx.emit('evolution/review-completed', {
+      version: 1,
+      reviewId: 'review-1',
+      sessionId: 'session-a',
+      kind: 'skill',
+      status: 'completed',
+      trigger: { reason: 'branch', toolCalls: 1, userChars: 1, assistantChars: 1 },
+      finalText: 'done',
+      actions: [],
+      startedAt: 1,
+      finishedAt: 2,
+    })
+    await vi.waitFor(() => { expect(fenced).toHaveBeenCalledTimes(2) }, { timeout: 8_000 })
+    await ctx.fiber.dispose()
+    // The fence must have wrapped a real write, not just been called: the plan record is on disk.
+    const items = await loadActivity(join(root, 'evolution'), nodeEvolutionIo())
+    expect(items.some(item => item.planId === 'plan-1')).toBe(true)
+  })
+
   it('caps the sidecar at maxItems and tolerates a malformed file', { timeout: 20_000 }, async () => {
     const root = await tempHome('dsh-activity-cap-')
     // Malformed sidecar reads as empty instead of crashing the driver.
