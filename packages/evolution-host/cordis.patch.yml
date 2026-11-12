@@ -52,7 +52,7 @@
     - id: memory
       name: '@deepseek-ai/dsh-memory'
     - id: memory-files
-      name: '@deepseek-ai/dsh-memory-files'
+      name: '@deepseek-ai/dsh-memory/files'
 
     # ── skill telemetry (skill catalog/writer live in agent presets) ────────
     # `sessionScoped: true`: the family observes only the sessions that carry
@@ -68,7 +68,7 @@
     # `scoped rows: evolution-review=on/skill-usage=on, probe=never-hit` with the
     # host-only and variant readings spelled out.
     - id: skill-usage
-      name: '@deepseek-ai/dsh-skill-usage'
+      name: '@deepseek-ai/dsh-evolution-skill-discovery/usage'
       config:
         sessionScoped: true
 
@@ -82,7 +82,7 @@
     # does not gate execution is only a log, and the dynamic-package lifecycle
     # belongs to the platform Creator mode.
     - id: evolution-threat
-      name: '@deepseek-ai/dsh-evolution-threat'
+      name: '@deepseek-ai/dsh-evolution-activity/threat'
 
     # ── review / curator / observability / human controls ───────────────────
     - id: evolution-review
@@ -103,11 +103,11 @@
     - id: evolution-activity
       name: '@deepseek-ai/dsh-evolution-activity'
     - id: evolution-feedback
-      name: '@deepseek-ai/dsh-evolution-feedback'
+      name: '@deepseek-ai/dsh-evolution-activity/feedback'
     - id: evolution-learning-graph
-      name: '@deepseek-ai/dsh-evolution-learning-graph'
+      name: '@deepseek-ai/dsh-evolution-activity/learning-graph'
     - id: evolution-replay
-      name: '@deepseek-ai/dsh-evolution-replay'
+      name: '@deepseek-ai/dsh-evolution-activity/replay'
 
     # ── skill merge: the merged-pair queues and the read-only panel ─────────────
     # Host half mounts four read-only routes under /api/dsh-evolution/merge/*

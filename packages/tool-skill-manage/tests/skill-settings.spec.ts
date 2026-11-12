@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
+import SkillUsageRegistry from '@deepseek-ai/dsh-evolution-skill-discovery/usage'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import * as ToolSkillManage from '../src/index.ts'
@@ -133,12 +133,20 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     const { ctx, execute, cleanup, root } = await setup({ skillContentChars: contentCap.ref })
     // The approval seam must exist for the write to STAGE (this is the replay path, not the tool path).
     const EvolutionApproval = (await import('@deepseek-ai/dsh-evolution-approval')).default
+    const { Storage, storageBackendServiceKey } = await import('@deepseek-ai/dsh-storage')
+    const { JsonStorageBackend } = await import('@deepseek-ai/dsh-storage-json')
+    const DomainFacility = await import('@deepseek-ai/dsh-storage-domain')
+    const DomainState = await import('@deepseek-ai/dsh-evolution-state-domain')
     const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state')).default
-    const JsonState = await import('@deepseek-ai/dsh-evolution-state-json')
     const EvolutionState = (await import('@deepseek-ai/dsh-evolution-state')).default
+    await ctx.plugin(Storage)
+    const backend = new JsonStorageBackend(join(root, 'storage'))
+    ctx.storage.backend.register('test-json', backend)
+    ctx.provide(storageBackendServiceKey('test-json'), backend)
+    await ctx.plugin(DomainFacility, { backend: 'test-json' })
     await ctx.plugin(EvolutionStateStorage)
-    await ctx.plugin(JsonState, { root })
-    await ctx.plugin(EvolutionState)
+    await ctx.plugin(DomainState)
+    await ctx.plugin(EvolutionState, { provider: 'domain' })
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
     const body = '---\nname: capped-skill\ndescription: Capped body.\n---\n\n' + 'x'.repeat(300) + '\n'
     const staged = await execute({ action: 'create', name: 'capped-skill', content: body })

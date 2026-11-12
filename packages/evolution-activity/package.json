@@ -19,7 +19,27 @@
       "default": "./lib/index.js"
     },
     "./package.json": "./package.json",
-    "./locale/*.json": "./locale/*.json"
+    "./locale/*.json": "./locale/*.json",
+    "./feedback": {
+      "types": "./lib/types/feedback/index.d.ts",
+      "default": "./lib/feedback/index.js"
+    },
+    "./feedback/locale/*.json": "./locale/feedback/*.json",
+    "./replay": {
+      "types": "./lib/types/replay/index.d.ts",
+      "default": "./lib/replay/index.js"
+    },
+    "./replay/locale/*.json": "./locale/replay/*.json",
+    "./learning-graph": {
+      "types": "./lib/types/learning-graph/index.d.ts",
+      "default": "./lib/learning-graph/index.js"
+    },
+    "./learning-graph/locale/*.json": "./locale/learning-graph/*.json",
+    "./threat": {
+      "types": "./lib/types/threat/index.d.ts",
+      "default": "./lib/threat/index.js"
+    },
+    "./threat/locale/*.json": "./locale/threat/*.json"
   },
   "files": [
     "locale/*.json",
@@ -29,7 +49,9 @@
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
+    "@deepseek-ai/dsh-evolution-approval": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"

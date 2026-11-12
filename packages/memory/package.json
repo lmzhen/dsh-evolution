@@ -19,7 +19,17 @@
       "default": "./lib/index.js"
     },
     "./package.json": "./package.json",
-    "./locale/*.json": "./locale/*.json"
+    "./locale/*.json": "./locale/*.json",
+    "./files": {
+      "types": "./lib/types/files/index.d.ts",
+      "default": "./lib/files/index.js"
+    },
+    "./files/locale/*.json": "./locale/files/*.json",
+    "./tools": {
+      "types": "./lib/types/tools/index.d.ts",
+      "default": "./lib/tools/index.js"
+    },
+    "./tools/locale/*.json": "./locale/tools/*.json"
   },
   "files": [
     "locale/*.json",
@@ -28,7 +38,9 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "workspace:^",
+    "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/dsh-evolution-approval": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"

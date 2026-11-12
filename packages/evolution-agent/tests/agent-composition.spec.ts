@@ -60,8 +60,8 @@ describe('evolution-agent composition', () => {
   it('does not publish host-plane services from the agent layer', () => {
     const names = rows.map(rowName)
     expect(names).not.toContain('@deepseek-ai/dsh-memory')
-    expect(names).not.toContain('@deepseek-ai/dsh-memory-files')
-    expect(names).not.toContain('@deepseek-ai/dsh-skill-usage')
+    expect(names).not.toContain('@deepseek-ai/dsh-memory/files')
+    expect(names).not.toContain('@deepseek-ai/dsh-evolution-skill-discovery/usage')
     expect(names).not.toContain('@deepseek-ai/dsh-evolution-state')
     expect(names).not.toContain('@deepseek-ai/dsh-evolution-approval')
   })

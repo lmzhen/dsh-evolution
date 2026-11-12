@@ -437,6 +437,7 @@ function platformCiteSites(root, text) {
  * entries were dead). Both halves skip this guard's own file (`SELF_REL`, the same exemption N15
  * uses); an entry for it would make the register disagree with the scan. */
 const PLATFORM_CITE_BASELINE = new Map([
+  ['memory/src/tools/index.ts', 1],
   ['evolution-commands/src/index.ts', 3],
   ['evolution-core/src/constants.ts', 1],
   ['evolution-core/src/io.ts', 1],
@@ -456,12 +457,12 @@ const PLATFORM_CITE_BASELINE = new Map([
   ['evolution-review/src/review-notice.ts', 1],
   ['evolution-review/tests/review.spec.ts', 1],
   ['evolution-ui/src/panels/settings/seam.ts', 1],
-  ['memory-files/src/index.ts', 1],
+  ['memory/src/files/index.ts', 1],
   ['scripts/gen-param-client-view.mjs', 1],
   ['scripts/install-layered.mjs', 2],
   ['scripts/verify-param-channel-parity.mjs', 4],
   ['scripts/verify-platform-contract.mjs', 2],
-  ['tool-memory/src/index.ts', 1],
+  ['memory/src/tools/index.ts', 1],
   ['tool-skill-manage/src/index.ts', 5],
   ['tool-skill-manage/tests/skill-settings.spec.ts', 1],
 ])
@@ -701,12 +702,12 @@ const PLATFORM_GET_BASELINE = new Map([
   ['evolution-approval/src/index.ts', 3],
   ['evolution-curator/src/index.ts', 2],
   ['tool-skill-manage/src/index.ts', 2],
-  ['evolution-learning-graph/src/index.ts', 2],
+  ['evolution-activity/src/learning-graph/index.ts', 2],
   ['evolution-state-domain/src/index.ts', 1],
   ['evolution-review/src/index.ts', 9],
   ['evolution-maintenance/src/orchestrate.ts', 1],
   ['evolution-maintenance/src/enrichment.ts', 1],
-  ['tool-memory/src/index.ts', 1],
+  ['memory/src/tools/index.ts', 1],
 ])
 // N11 (v37 P7a): the platform dispatch vocabulary has ONE reader.
 const DISPATCH_EVENT_TYPE_RE = /['"`](tool\/(?:call|result|ptc-dispatch-start|ptc-dispatch))['"`]|\b(?:PTC_DISPATCH_START_EVENT|PTC_DISPATCH_EVENT|NATIVE_CALL_EVENT|NATIVE_RESULT_EVENT)\b|\bDISPATCH_EVENT_TYPES\b/g
@@ -2092,7 +2093,7 @@ const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
     // the same mistake written as a call inside the compartment.
     ['N30', () => handRolledSources("const source = { getSnapshot: () => ({ value: 1 }), subscribe: () => () => {} }").length > 0
       && handRolledSources("hooks: { paramSection: source }").length === 0
-      && handRolledSources("hooks: { paramSection: sources.sourceFor('memory-files') }").length > 0
+      && handRolledSources("hooks: { paramSection: sources.sourceFor('memory') }").length > 0
       && handRolledSources('hooks: { ...spread }').length > 0
       && handRolledSources('// hooks: { paramSection: buildOne() } in prose only').length === 0],
     // N38: the INCIDENT shape (a raw ?.get() on a config member) plus the clean shapes that must pass —

@@ -187,7 +187,7 @@ export class EvolutionStateStorageRegistry extends Service {
       throw new Error(`evolution state storage provider "${name}" is not registered`)
     }
     const first = this.providers.values().next().value
-    if (!first) throw new Error('no evolution state storage provider registered; mount @deepseek-ai/dsh-evolution-state-json or @deepseek-ai/dsh-evolution-state-domain')
+    if (!first) throw new Error('no evolution state storage provider registered; mount @deepseek-ai/dsh-evolution-state-domain or @deepseek-ai/dsh-evolution-state-domain')
     // v28 G3.1 (STATE-04): the io registry refuses multi-default ambiguity;
     // here two providers can silently coexist and the effective one is
     // REGISTRATION ORDER — enabling the domain row in an overlay rebinds every

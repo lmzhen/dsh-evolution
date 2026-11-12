@@ -770,11 +770,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-memory-files'"
+        "      name: '@deepseek-ai/dsh-memory/files'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-memory-files'"
+          "  name: '@deepseek-ai/dsh-memory/files'"
         ]
       },
       "leads": {
@@ -791,11 +791,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-tool-memory'"
+        "      name: '@deepseek-ai/dsh-memory/tools'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-tool-memory'"
+          "  name: '@deepseek-ai/dsh-memory/tools'"
         ]
       },
       "leads": {
@@ -816,7 +816,7 @@
         "    # row); with the model rows at profile root every session carries them."
       ],
       "body": [
-        "      name: '@deepseek-ai/dsh-skill-usage'",
+        "      name: '@deepseek-ai/dsh-evolution-skill-discovery/usage'",
         "      config:",
         "        sessionScoped: true"
       ],
@@ -848,7 +848,7 @@
       },
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-skill-usage'"
+          "  name: '@deepseek-ai/dsh-evolution-skill-discovery/usage'"
         ]
       }
     },
@@ -906,7 +906,7 @@
         "    # tests/rank-contract.spec.ts pins both halves mechanically."
       ],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-skill-catalog'"
+        "      name: '@deepseek-ai/dsh-evolution-skill-discovery/catalog'"
       ],
       "leads": {
         "all": [
@@ -926,7 +926,7 @@
       },
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-skill-catalog'"
+          "  name: '@deepseek-ai/dsh-evolution-skill-discovery/catalog'"
         ]
       }
     },
@@ -973,7 +973,7 @@
         "    # belongs to the platform Creator mode."
       ],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-threat'"
+        "      name: '@deepseek-ai/dsh-evolution-activity/threat'"
       ],
       "leads": {
         "all": [
@@ -991,7 +991,7 @@
       },
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-threat'"
+          "  name: '@deepseek-ai/dsh-evolution-activity/threat'"
         ]
       }
     },
@@ -1139,11 +1139,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-feedback'"
+        "      name: '@deepseek-ai/dsh-evolution-activity/feedback'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-feedback'"
+          "  name: '@deepseek-ai/dsh-evolution-activity/feedback'"
         ]
       },
       "leads": {
@@ -1161,11 +1161,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-learning-graph'"
+        "      name: '@deepseek-ai/dsh-evolution-activity/learning-graph'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-learning-graph'"
+          "  name: '@deepseek-ai/dsh-evolution-activity/learning-graph'"
         ]
       },
       "leads": {
@@ -1183,11 +1183,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-replay'"
+        "      name: '@deepseek-ai/dsh-evolution-activity/replay'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-replay'"
+          "  name: '@deepseek-ai/dsh-evolution-activity/replay'"
         ]
       },
       "leads": {

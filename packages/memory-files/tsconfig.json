@@ -1,9 +1,0 @@
-{
-  "extends": "../tsconfig.pkg.json",
-  "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../../vendor/schemastery" },
-    { "path": "../memory" },
-    { "path": "../evolution-core" }
-  ]
-}

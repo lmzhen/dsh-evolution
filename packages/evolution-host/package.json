@@ -31,28 +31,23 @@
     "@deepseek-ai/dsh-evolution-state-domain": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-memory": "workspace:^",
-    "@deepseek-ai/dsh-memory-files": "workspace:^",
-    "@deepseek-ai/dsh-skill-usage": "workspace:^",
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
-    "@deepseek-ai/dsh-evolution-threat": "workspace:^",
     "@deepseek-ai/dsh-evolution-review": "workspace:^",
     "@deepseek-ai/dsh-evolution-curator": "workspace:^",
     "@deepseek-ai/dsh-evolution-commands": "workspace:^",
     "@deepseek-ai/dsh-evolution-merge": "workspace:^",
     "@deepseek-ai/dsh-evolution-maintenance": "workspace:^",
     "@deepseek-ai/dsh-evolution-activity": "workspace:^",
-    "@deepseek-ai/dsh-evolution-feedback": "workspace:^",
-    "@deepseek-ai/dsh-evolution-learning-graph": "workspace:^",
-    "@deepseek-ai/dsh-evolution-replay": "workspace:^",
-    "@deepseek-ai/dsh-evolution-core": "workspace:^"
+    "@deepseek-ai/dsh-evolution-core": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
     "@deepseek-ai/dsh-skill": "workspace:^",
-    "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
+    "@deepseek-ai/dsh-memory": "workspace:^"
   },
   "exports": {
     ".": {

@@ -21,7 +21,7 @@ const BUNDLE = {
   installed: true,
   optional: false,
   removable: true,
-  rows: [{ rowId: 'memory-files', moduleName: '@deepseek-ai/dsh-memory-files' }],
+  rows: [{ rowId: 'memory-files', moduleName: '@deepseek-ai/dsh-memory/files' }],
   overrides: [],
 }
 
@@ -51,7 +51,7 @@ describe('platform view (G5)', () => {
     const entries = [{ entryId: 'include:evolution-review', enabled: true }]
     const withBase = await readPlatformView(services({
       pluginManager: { listPlugins: (): unknown[] => [{ entryId: 'from-base', enabled: true }] },
-      pluginInventory: { list: async (): Promise<unknown> => ({ entries, agentPresets: [{ id: 'evolution', rows: [{ entryId: 'memory-files', moduleName: '@deepseek-ai/dsh-memory-files' }] }] }) },
+      pluginInventory: { list: async (): Promise<unknown> => ({ entries, agentPresets: [{ id: 'evolution', rows: [{ entryId: 'memory-files', moduleName: '@deepseek-ai/dsh-memory/files' }] }] }) },
     }))
     expect(withBase.plugins?.map(entry => entry.entryId)).toEqual(['from-base'])
     expect(withBase.presets?.[0]?.id).toBe('evolution')

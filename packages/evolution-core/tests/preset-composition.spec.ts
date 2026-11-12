@@ -25,7 +25,7 @@ const run = promisify(execFile)
 describe('composePresetComposition (0.3.15)', () => {
   it('composes standard rows then the delta with one trailing newline', () => {
     const standard = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
     expect(composePresetComposition(standard, delta)).toBe(`${standard.trim()}\n\n${delta.trim()}\n`)
   })
 
@@ -36,8 +36,8 @@ describe('composePresetComposition (0.3.15)', () => {
   })
 
   it('throws (sorted names) when a delta row collides with a standard row', () => {
-    const standard = '- id: zzz\n  name: "@deepseek-ai/dsh-zzz"\n\n- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const standard = '- id: zzz\n  name: "@deepseek-ai/dsh-zzz"\n\n- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
     expect(() => composePresetComposition(standard, delta)).toThrow(/collide with runtime standard rows: tool-memory/)
   })
 
@@ -60,7 +60,7 @@ describe('composePresetComposition (0.3.15)', () => {
     // an accident; the missed cap stays observable through the warn.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const standard = 'groups:\n  - id: tool-skill\n    name: "@deepseek-ai/dsh-tool-skill"\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
     try {
       const composed = composePresetComposition(standard, delta)
       expect(composed).toContain('  - id: tool-skill')
@@ -75,12 +75,12 @@ describe('composePresetComposition (0.3.15)', () => {
     const previous = process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS
     process.env.DSH_EVOLUTION_ALLOW_ROW_COLLISIONS = '1'
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const standard = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const standard = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
     try {
       // Keeps both rows (mounts twice) instead of failing loud.
       expect(composePresetComposition(standard, delta)).toBe(
-        '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n\n- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n',
+        '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n\n- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n',
       )
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('collide with standard rows'))
     } finally {
@@ -98,7 +98,7 @@ describe('composePresetComposition (0.3.15)', () => {
 
   it('V10-14/0.3.53: a standard-sourced tool-skill row receives the 60-char catalog cap', () => {
     const standard = '- id: persona\n  name: "@deepseek-ai/dsh-persona"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
     const composed = composePresetComposition(standard, delta)
     expect(composed).toContain('- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n  # V10-14')
     expect(composed).toContain('catalogDescriptionMaxLength: 60')
@@ -107,7 +107,7 @@ describe('composePresetComposition (0.3.15)', () => {
 
   it('V10-14/0.3.53: an already-configured tool-skill row is left byte-identical (idempotent)', () => {
     const standard = '- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n  config:\n    custom: 1\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
     const composed = composePresetComposition(standard, delta)
     expect(composed).toContain('  config:\n    custom: 1')
     expect(composed).not.toContain('catalogDescriptionMaxLength: 60')
@@ -121,7 +121,7 @@ describe('the shared row-override table (0.3.77, G1 single-source)', () => {
     // side grows a copy again: the entries live in row-overrides.json only, and
     // both implementations are required to produce the same bytes from it.
     const standard = '- id: persona\n  name: "@deepseek-ai/dsh-persona"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
     const composed = composePresetComposition(standard, delta)
     const { loadRowOverrides } = await import('@deepseek-ai/dsh-evolution-core/composition')
     const table = loadRowOverrides()
@@ -164,7 +164,7 @@ describe('composePresetRow / mergePresetRow (G6: declarative presets)', () => {
     order: 40,
   }
   const base = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n'
-  const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+  const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
 
   it('embeds the composed base then delta rows under plugins, with the platform package and identity', () => {
     const row = composePresetRow(base, delta, identity)
@@ -173,7 +173,7 @@ describe('composePresetRow / mergePresetRow (G6: declarative presets)', () => {
     expect(row).toContain('    plugins:\n')
     // Base rows first, delta after — and every composed row sits INSIDE the plugins block.
     expect(row).toContain('      - id: agent-loop\n        name: "@deepseek-ai/dsh-agent-loop"')
-    expect(row).toContain('      - id: tool-memory\n        name: "@deepseek-ai/dsh-tool-memory"')
+    expect(row).toContain('      - id: tool-memory\n        name: "@deepseek-ai/dsh-memory/tools"')
     expect(row.endsWith('\n')).toBe(true)
   })
 
@@ -206,7 +206,7 @@ describe('composePresetRow / mergePresetRow (G6: declarative presets)', () => {
     // A re-run with a different delta REPLACES the row and never doubles it.
     const replaced = mergePresetRow(appended, composePresetRow(base, '- id: tool-memory\n  name: "moved"\n', identity), identity.rowId)
     expect(replaced).toContain('      - id: tool-memory\n        name: "moved"')
-    expect(replaced).not.toContain('@deepseek-ai/dsh-tool-memory')
+    expect(replaced).not.toContain('@deepseek-ai/dsh-memory/tools')
     expect(replaced.match(/- id: evolution-preset/g)).toHaveLength(1)
     expect(replaced).toContain('- id: other-row\n  name: "@deepseek-ai/dsh-other"\n  config:\n    keep: true')
     // Idempotent: merging the same row again is a no-op byte for byte.
@@ -223,7 +223,7 @@ describe('the profile-patch form (G6: insert entry, base extraction, removal)', 
     order: 10,
   }
   const base = '- id: agent-loop\n  name: "@deepseek-ai/dsh-agent-loop"\n'
-  const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+  const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
   const moved = composePresetInsert(composePresetRow(base, '- id: tool-memory\n  name: "moved"\n', identity))
 
   it('wraps the composed row in an insert entry, four spaces deeper', () => {
@@ -336,7 +336,7 @@ describe('the source installer emits the same bytes (install-layered.mjs parity)
     description: 'Standard coding agent plus durable memory and skill evolution tools.',
     order: 10,
   }
-  const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+  const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
   // A platform base patch in the shipped form: one `- insert:` entry whose row carries the preset
   // list under `config.plugins` (`packages/bundle/web-app/presets/standard.patch.yml`).
   const basePatch = [
@@ -441,7 +441,7 @@ describe('the source installer emits the same bytes (install-layered.mjs parity)
     // flattened a platform base preset's multi-paragraph prompt into one paragraph, and the row is
     // written into the profile patch permanently (G6 review, P1).
     const rows = ['- id: persona', "  name: '@deepseek-ai/dsh-persona'", '  config:', '    section: |', '      first paragraph', '', '      second paragraph', ''].join('\n')
-    const row = composePresetRow(rows, '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n', identity)
+    const row = composePresetRow(rows, '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n', identity)
     expect(row).toContain('first paragraph\n\n')
     expect(row).toContain('second paragraph')
   })

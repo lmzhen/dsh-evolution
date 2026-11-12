@@ -11,7 +11,6 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 | `evolution-core` | SkillLibrary, MemoryStore, write kernel/unit transactions, prompts, projections, events, presets, `./restrictor` plugin; `./io-registry` + `./io-node` (IO seam), `./authority-plugin` (the `evolutionMutationAuthority` home lock service), `./policy`, `./contract` |
 | `evolution-state-domain` | Shipped storage-domain provider over the platform KV domain |
 | `evolution-state` | State facade and provider pinning |
-| `evolution-threat` | Write-time threat scan for memory/skill args |
 
 ### Domain services
 
@@ -23,23 +22,16 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 | `evolution-review` | Review cadence, aux delivery, notice state machine |
 | `evolution-maintenance` | `maintenance_probe` tool + maintain scan/facts/validation |
 | `evolution-curator` | Lifecycle curation, restore/history/undo, health view, reports |
-| `evolution-learning-graph` | `/graph` view/detail/edit/delete over skills + memory |
-| `evolution-activity` | Bounded activity sidecar for plan and review outcomes |
-| `evolution-feedback` | Feedback store, quality fold; no in-family producer |
-| `evolution-replay` | Scores recorded plan outcomes and backfills activity history; does not re-execute plans |
+| `evolution-activity` | feedback store, replay scorer, learning graph and threat scan (subpaths `./feedback`, `./replay`, `./learning-graph`, `./threat`);  Bounded activity sidecar for plan and review outcomes |
 
 ### Skill ecosystem
 
 | Package | Role |
 |---|---|
-| `evolution-skill-catalog` | Native `ctx.skills` provider (rank 390, `user-dsh` shadow) |
-| `evolution-skill-discovery` | `skill_search`, `/skill-domain`, pre-step domain cards; `mode: off` default |
 | `evolution-skill-health` | Read-only health route + sidebar panel (disabled in `all`) |
-| `skill-usage` | `ctx.skillUsage` counters and session event observation |
+| `evolution-skill-discovery` | catalog provider, health route/panel and usage counters (subpaths `./catalog`, `./health`, `./usage`);  `skill_search`, `/skill-domain`, pre-step domain cards; `mode: off` default |
 | `tool-skill-manage` | `skill_manage` (13 actions), write gates, approval, guidance |
-| `memory` | `ctx.memory` provider registry |
-| `memory-files` | Local `MEMORY.md`/`USER.md` provider + budget service |
-| `tool-memory` | `memory` tool + guidance/snapshot prompt sections |
+| `memory` | registry, `MEMORY.md`/`USER.md` provider and model tools (subpaths `./files`, `./tools`);  `ctx.memory` provider registry |
 
 ### Command and UI
 

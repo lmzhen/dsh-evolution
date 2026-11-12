@@ -1,5 +1,5 @@
 {
-  "pin": "a80c40ca",
+  "pin": "05a9137b",
   "bed": {
     "mono": "overlay"
   },
@@ -40,19 +40,9 @@
       "relPath": "packages/evolution/evolution-curator"
     },
     {
-      "id": "@deepseek-ai/dsh-evolution-feedback",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-feedback"
-    },
-    {
       "id": "@deepseek-ai/dsh-evolution-host",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-host"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-learning-graph",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-learning-graph"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-maintenance",
@@ -80,19 +70,9 @@
       "relPath": "packages/evolution/evolution-preset"
     },
     {
-      "id": "@deepseek-ai/dsh-evolution-replay",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-replay"
-    },
-    {
       "id": "@deepseek-ai/dsh-evolution-review",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-review"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-skill-catalog",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-skill-catalog"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-skill-discovery",
@@ -113,11 +93,6 @@
       "id": "@deepseek-ai/dsh-evolution-state-domain",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-state-domain"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-threat",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-threat"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-ui",

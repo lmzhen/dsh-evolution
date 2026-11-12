@@ -86,7 +86,7 @@ async function withStaging<T>(manifest: Record<string, unknown>, fn: () => Promi
   // The delta lives INSIDE the staging on a real scoped install; keeping
   // DSH_EVOLUTION_DELTA_PATH unset is what puts packageSourceRoot() on the
   // code path the scope check guards.
-  await writeFile(join(stagingDir, 'evolution-agent', 'agent.cordis.yml'), '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n')
+  await writeFile(join(stagingDir, 'evolution-agent', 'agent.cordis.yml'), '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n')
   try {
     return await fn()
   } finally {
@@ -228,7 +228,7 @@ describe('layered installer', () => {
     // forgetting the injection would fail HERE, not in the power/idempotent
     // cases that feed it a hand-crafted row.
     const standard = '# runtime standard\n- id: persona\n  name: "@deepseek-ai/dsh-persona"\n\n- id: tools\n  name: "@deepseek-ai/dsh-tools"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n\n'
     // The installer script ships no type declarations, so the parity check
     // runs it in a fresh node subprocess (base64 stdout, no lint-visible any).
     const script = [
@@ -253,7 +253,7 @@ describe('layered installer', () => {
     // the top-level tool-skill injection parity, and stay byte-identical.
     const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core/composition')
     const standard = '# runtime standard\ngroups:\n  - id: persona\n    name: "@deepseek-ai/dsh-persona"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
     const script = [
       `import { generateAgentPreset } from ${JSON.stringify(new URL('../../scripts/install-layered.mjs', import.meta.url).href)}`,
       `const out = generateAgentPreset(${JSON.stringify(standard)}, ${JSON.stringify(delta)})`,
@@ -274,7 +274,7 @@ describe('layered installer', () => {
     // mounted twice with every guard green.
     const { composePresetComposition } = await import('@deepseek-ai/dsh-evolution-core/composition')
     const standard = '# runtime standard\ngroups:\n  - id: tool-session-query\n    name: "@deepseek-ai/dsh-tool-session-query"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-tool-memory"\n\n- id: tool-session-query\n'
+    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n\n- id: tool-session-query\n'
     expect(() => composePresetComposition(standard, delta)).toThrow(/collide with runtime standard rows: tool-session-query/)
     const script = [
       `import { generateAgentPreset } from ${JSON.stringify(new URL('../../scripts/install-layered.mjs', import.meta.url).href)}`,

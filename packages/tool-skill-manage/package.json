@@ -30,20 +30,21 @@
   "dependencies": {
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-skill": "workspace:^",
-    "@deepseek-ai/dsh-skill-usage": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
-    "@deepseek-ai/dsh-agent": "workspace:^"
+    "@deepseek-ai/dsh-agent": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-skill": "workspace:^",
-    "@deepseek-ai/dsh-skill-usage": "workspace:^",
-    "@deepseek-ai/dsh-system-prompt": "workspace:^"
+    "@deepseek-ai/dsh-system-prompt": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^"
   }
 }

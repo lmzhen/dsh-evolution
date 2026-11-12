@@ -167,7 +167,7 @@ const PTC_FIXTURE = basePatch('# runtime ptc fixture', [
 const DELTA_FIXTURE = [
   '# evolution delta fixture',
   '- id: tool-memory',
-  '  name: "@deepseek-ai/dsh-tool-memory"',
+  '  name: "@deepseek-ai/dsh-memory/tools"',
   '',
   '- id: tool-session-query',
   '  name: "@deepseek-ai/dsh-tool-session-query"',
@@ -214,7 +214,7 @@ const DEFAULT_BASE_GOLDEN = [
   '              catalogDescriptionMaxLength: 60',
   '          # evolution delta fixture',
   '          - id: tool-memory',
-  '            name: "@deepseek-ai/dsh-tool-memory"',
+  '            name: "@deepseek-ai/dsh-memory/tools"',
   '          - id: tool-session-query',
   '            name: "@deepseek-ai/dsh-tool-session-query"',
   '',

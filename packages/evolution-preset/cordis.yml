@@ -87,9 +87,9 @@
 - id: memory
   name: '@deepseek-ai/dsh-memory'
 - id: memory-files
-  name: '@deepseek-ai/dsh-memory-files'
+  name: '@deepseek-ai/dsh-memory/files'
 - id: tool-memory
-  name: '@deepseek-ai/dsh-tool-memory'
+  name: '@deepseek-ai/dsh-memory/tools'
 
 # ── skills: usage telemetry, model-facing management tool ───────────────────
 # S1-A1: the standalone form carries NO `sessionScoped: true` on the
@@ -100,7 +100,7 @@
 # one-click form. It is NOT byte-consistent with the patch forms' rows, and
 # must not be "synced" to them.
 - id: skill-usage
-  name: '@deepseek-ai/dsh-skill-usage'
+  name: '@deepseek-ai/dsh-evolution-skill-discovery/usage'
 - id: tool-skill-manage
   name: '@deepseek-ai/dsh-tool-skill-manage'
 # S3-1 (G-3) LAYER SEMANTICS: this row files into the PRESET layer, which is the
@@ -109,7 +109,7 @@
 # are therefore the ones that govern a preset session; the same row in
 # evolution-all (global layer) governs only sessions WITHOUT the preset.
 - id: evolution-skill-catalog
-  name: '@deepseek-ai/dsh-evolution-skill-catalog'
+  name: '@deepseek-ai/dsh-evolution-skill-discovery/catalog'
 
 # ── write admission: staged approval (off by default) + threat guard ────────
 - id: evolution-approval
@@ -121,7 +121,7 @@
 # gate execution is only a log, and the dynamic-package lifecycle belongs to the
 # platform Creator mode.
 - id: evolution-threat
-  name: '@deepseek-ai/dsh-evolution-threat'
+  name: '@deepseek-ai/dsh-evolution-activity/threat'
 
 # ── review / curator / observability / human controls ───────────────────────
 - id: evolution-review
@@ -137,8 +137,8 @@
 - id: evolution-activity
   name: '@deepseek-ai/dsh-evolution-activity'
 - id: evolution-feedback
-  name: '@deepseek-ai/dsh-evolution-feedback'
+  name: '@deepseek-ai/dsh-evolution-activity/feedback'
 - id: evolution-learning-graph
-  name: '@deepseek-ai/dsh-evolution-learning-graph'
+  name: '@deepseek-ai/dsh-evolution-activity/learning-graph'
 - id: evolution-replay
-  name: '@deepseek-ai/dsh-evolution-replay'
+  name: '@deepseek-ai/dsh-evolution-activity/replay'

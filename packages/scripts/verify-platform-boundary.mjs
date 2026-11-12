@@ -35,7 +35,7 @@ const allowed = [
   join('packages', 'evolution-client-kit', 'src') + sep,
 ]
 const skipDirs = new Set(['node_modules', 'lib', 'dist', 'vendor', '.release-staging', '.release-staging.next'])
-const familyPackage = (spec) => spec === '@deepseek-ai/dsh-memory' || spec === '@deepseek-ai/dsh-skill-usage' || spec.startsWith('@deepseek-ai/dsh-evolution-')
+const familyPackage = (spec) => spec === '@deepseek-ai/dsh-memory' || spec === '@deepseek-ai/dsh-evolution-skill-discovery/usage' || spec.startsWith('@deepseek-ai/dsh-evolution-')
 
 function walk(dir, out) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

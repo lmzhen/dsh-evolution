@@ -1,0 +1,330 @@
+// @tier pre-tag
+import { describe, expect, it, vi } from 'vitest'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { Context } from '@deepseek-ai/cordis'
+import { ACTIVITY_FILE_VERSION } from '@deepseek-ai/dsh-evolution-activity'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
+import { comparePlans, clampReplayWeights, Config, DEFAULT_WEIGHTS, EvolutionReplayDriver } from '../../src/replay/index.ts'
+import * as ReplayPlugin from '../../src/replay/index.ts'
+import { tempHome } from '../../../test-support/temp-home.ts'
+
+describe('evolution-replay', () => {
+  it('groups recorded plans by policy fingerprint instead of the random plan id', () => {
+    const driver = new EvolutionReplayDriver()
+    // rc.42 payload v2: record() takes the process-event payload directly
+    // (the {type, data} session-event envelope is gone with A1).
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, evidenceQuotes: 2, estimatedInputChars: 1500 })
+    driver.record({ sessionId: 's1', planId: 'run-2', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 1, rejectedOps: 0 })
+    driver.record({ sessionId: 's2', planId: 'run-3', memoryApplied: 0, skillApplied: 0, rejectedOps: 1 })
+    const plans = driver.plansSnapshot()
+    expect(plans.map(plan => plan.policyId)).toEqual(['policy-a', 'policy-a', 'run-3'])
+    expect(plans[0]).toMatchObject({ evidenceQuotes: 2, estimatedInputChars: 1500 })
+  })
+
+  it('V25-01: backfill is once-per-driver — an io reload re-running the loader must not double the leaderboard', () => {
+    const driver = new EvolutionReplayDriver()
+    const item = { sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, at: 1 }
+    // First io mount backfills; a later io dependency replacement re-runs the
+    // loader against the SAME driver — the guard must swallow the replay.
+    driver.backfill([item])
+    driver.backfill([item, item])
+    expect(driver.plansSnapshot()).toHaveLength(1)
+    // Live events recorded after the backfill still land normally.
+    driver.record({ sessionId: 's2', planId: 'run-2', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+    expect(driver.plansSnapshot()).toHaveLength(2)
+  })
+
+  it('selects the plan with better accepted/evidence and lower cost', () => {
+    const result = comparePlans([
+      { policyId: 'A', acceptedOps: 3, rejectedOps: 1, memoryOps: 2, skillOps: 1, evidenceQuotes: 3, estimatedInputChars: 2000 },
+      { policyId: 'B', acceptedOps: 4, rejectedOps: 0, memoryOps: 2, skillOps: 2, evidenceQuotes: 4, estimatedInputChars: 1800 },
+    ])
+    expect(result.winner).toBe('B')
+    expect(result.margin).toBeGreaterThan(0)
+  })
+
+  it('FLOW6-6: an unreadable backfill source qualifies every comparison', () => {
+    const driver = new EvolutionReplayDriver()
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+    // The clean case carries no qualification.
+    expect(driver.compare().sourceCorrupt).toBe(false)
+    expect(driver.compare().report).not.toContain('NOT the recorded history')
+    // apply() marks it when the activity sidecar holds bytes this build cannot
+    // read: an empty/partial leaderboard must not read as "nothing happened".
+    driver.markSourceUnreadable()
+    const qualified = driver.compare()
+    expect(qualified.sourceCorrupt).toBe(true)
+    expect(qualified.report.startsWith('The activity sidecar could not be read as an activity envelope')).toBe(true)
+    expect(qualified.report).toContain('NOT the recorded history')
+    // T4-08/A50: a NEWER writer does not reach this sentence — its records are read, so the
+    // qualification would contradict the leaderboard it just backfilled.
+    expect(qualified.report).not.toContain('newer writer')
+  })
+
+  it('T4-08/A50: a NEWER-version sidecar is READ, not disowned — its records are the history and the report says so', async () => {
+    const root = await tempHome('dsh-replay-foreign-')
+    const home = join(root, 'evolution')
+    await mkdir(home, { recursive: true })
+    // The fixture from the audit: the envelope declares a version this build does not know, with one
+    // perfectly valid record inside.
+    await writeFile(join(home, 'activity.json'), JSON.stringify({
+      version: ACTIVITY_FILE_VERSION + 1,
+      items: [{ sessionId: 's1', planId: 'run-foreign', policyFingerprint: 'policy-a', memoryApplied: 2, skillApplied: 0, rejectedOps: 0, at: 1 }],
+    }), 'utf8')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(ReplayPlugin, {})
+    const driver = (ctx as unknown as { evolutionReplay: EvolutionReplayDriver }).evolutionReplay
+    // The backfill is deferred to the io injection: wait for it, then read the two answers the
+    // audit says used to contradict each other — the record IS in the leaderboard AND the report
+    // said "NOT the recorded history".
+    await vi.waitFor(() => { expect(driver.plansSnapshot()).toHaveLength(1) })
+    const result = driver.compare()
+    expect(result.sourceCorrupt).toBe(false)
+    expect(result.report).not.toContain('NOT the recorded history')
+  })
+
+  it('PLAN S5.1 (P2-18): the sourceCorrupt qualification follows the CURRENT read — a repaired sidecar plus io reload stops qualifying compare()', () => {
+    const driver = new EvolutionReplayDriver()
+    const item = { sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, at: 1 }
+    // Corrupt read: the qualification travels with every comparison, and the
+    // corrupt sidecar parses as [] so the backfill latch stays open (P2-15).
+    driver.markSourceUnreadable()
+    driver.backfill([])
+    const qualified = driver.compare()
+    expect(qualified.sourceCorrupt).toBe(true)
+    expect(qualified.report).toContain('NOT the recorded history')
+    // Repair + io reload: the clean read clears the flag and the latch-open
+    // backfill lands the full history — the report must stop asserting
+    // "NOT the recorded history" against a now-complete leaderboard.
+    driver.markSourceReadable()
+    driver.backfill([item])
+    const healed = driver.compare()
+    expect(healed.sourceCorrupt).toBe(false)
+    expect(healed.report).not.toContain('NOT the recorded history')
+    expect(driver.plansSnapshot()).toHaveLength(1)
+    // Corrupt again (a newer writer lands after the repair): the qualifier
+    // returns with the new read.
+    driver.markSourceUnreadable()
+    const requalified = driver.compare()
+    expect(requalified.sourceCorrupt).toBe(true)
+    expect(requalified.report).toContain('NOT the recorded history')
+  })
+
+  it('0.18.1 (S3): a READ that THREW is a state of its own — never presented as an answered read', () => {
+    const driver = new EvolutionReplayDriver()
+    const item = { sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, at: 1 }
+    driver.backfill([item])
+    // The io itself failed: no verdict was reached, so neither "corrupt" nor
+    // "clean" may be claimed. Before this the throw skipped both markers and
+    // compare() handed back an unqualified leaderboard.
+    driver.markSourceReadFailed('EACCES: permission denied')
+    const failed = driver.compare()
+    expect(failed.sourceReadFailure).toBe('EACCES: permission denied')
+    expect(failed.sourceCorrupt, 'a failed read is NOT evidence that the bytes are corrupt').toBe(false)
+    expect(failed.report).toContain('read FAILED (EACCES: permission denied)')
+    expect(failed.report).not.toContain('NOT the recorded history')
+    // An ANSWERED read retires the failure — the qualification follows the
+    // CURRENT read, exactly as sourceCorrupt already does.
+    driver.markSourceReadable()
+    const answered = driver.compare()
+    expect(answered.sourceReadFailure).toBeUndefined()
+    expect(answered.report).not.toContain('read FAILED')
+  })
+
+  it('0.18.1 (S3): an ANSWERED corrupt read retires a previous read FAILURE (one verdict per read)', () => {
+    const driver = new EvolutionReplayDriver()
+    driver.markSourceReadFailed('boom')
+    driver.markSourceUnreadable()
+    const result = driver.compare()
+    expect(result.sourceReadFailure).toBeUndefined()
+    expect(result.sourceCorrupt).toBe(true)
+    expect(result.report).toContain('NOT the recorded history')
+    expect(result.report).not.toContain('read FAILED')
+  })
+
+  it('clamps an invalid maxPlans to the default so the leaderboard still bounds (G3.1)', () => {
+    const recordMany = (driver: EvolutionReplayDriver, count: number): void => {
+      for (let i = 0; i < count; i += 1) {
+        driver.record({ sessionId: 's', planId: `p-${i}`, policyFingerprint: `fp-${i}`, memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+      }
+    }
+    for (const bad of [0, -1, NaN, Infinity]) {
+      const driver = new EvolutionReplayDriver({ maxPlans: bad })
+      recordMany(driver, 60)
+      expect(driver.plansSnapshot().length, `maxPlans=${String(bad)}`).toBe(50)
+    }
+    // A valid custom cap is preserved.
+    const small = new EvolutionReplayDriver({ maxPlans: 5 })
+    recordMany(small, 6)
+    expect(small.plansSnapshot().length).toBe(5)
+  })
+
+  it('clamps replay weights to their per-field domains (G3.1 matrix)', () => {    // Every invalid value falls back to that field's default.
+    const clamped = clampReplayWeights({ accepted: 0, rejectedPenalty: -1, evidence: NaN, cost: Infinity })
+    expect(clamped).toEqual({ accepted: 10, rejectedPenalty: 15, evidence: 2, cost: 0.001 })
+    // cost = 0 is legal (no cost penalty), so it is retained.
+    expect(clampReplayWeights({ ...DEFAULT_WEIGHTS, cost: 0 }).cost).toBe(0)
+    // Valid custom values are preserved per field.
+    expect(clampReplayWeights({ accepted: 20, rejectedPenalty: 30, evidence: 3, cost: 0.01 }).rejectedPenalty).toBe(30)
+    expect(clampReplayWeights({ accepted: 20, rejectedPenalty: 30, evidence: 3, cost: 0.01 }).accepted).toBe(20)
+  })
+
+  it('rejects 0/negative replay weights and maxPlans at the schema level (G3.1 .min())', () => {
+    const parse = (input: unknown): unknown => (Config as unknown as (i: unknown) => unknown)(input)
+    expect(() => parse({ maxPlans: 0 })).toThrow()
+    expect(() => parse({ weights: { accepted: -1 } })).toThrow()
+    expect(() => parse({ weights: { cost: -0.5 } })).toThrow()
+  })
+
+  it('V4-40: warns once when weights must be clamped, and stays silent for valid values', () => {
+    const warns: string[] = []
+    new EvolutionReplayDriver(
+      { weights: { accepted: 0, rejectedPenalty: -1, evidence: NaN, cost: Infinity } },
+      message => warns.push(message),
+    )
+    expect(warns.some(message => message.includes('weights') && message.includes('falling back'))).toBe(true)
+    // A fully valid custom weights object never warns.
+    const silent: string[] = []
+    new EvolutionReplayDriver(
+      { weights: { accepted: 20, rejectedPenalty: 30, evidence: 3, cost: 0.01 } },
+      message => silent.push(message),
+    )
+    expect(silent).toEqual([])
+    // cost = 0 is legal ("no cost penalty"), so it is not flagged.
+    const costWarns: string[] = []
+    new EvolutionReplayDriver({ weights: { ...DEFAULT_WEIGHTS, cost: 0 } }, message => costWarns.push(message))
+    expect(costWarns).toEqual([])
+  })
+
+  it('V6-10: records and surfaces the execution-failure dimension (0.3.36)', () => {
+    const driver = new EvolutionReplayDriver()
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 0, skillApplied: 0, rejectedOps: 0, executionFailures: 3, executionError: 'staged (approval)' })
+    const plans = driver.plansSnapshot()
+    expect(plans[0]?.executionFailures).toBe(3)
+    expect(plans[0]?.executionError).toBe('staged (approval)')
+    // The leaderboard surface shows the failure dimension — a plan whose ops
+    // all failed must not read as a clean "0/0" plan.
+    const result = driver.compare()
+    expect(result.report).toContain('3 failed: staged (approval)')
+  })
+
+  it('P3-23 (v14): a malformed op counter cannot poison the score with NaN', () => {
+    const driver = new EvolutionReplayDriver()
+    // A persisted event with missing/non-numeric counters (the boundary the
+    // record() fields arrive from) must degrade to 0, not NaN.
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'p', memoryApplied: 'two', skillApplied: undefined, rejectedOps: NaN } as unknown as Parameters<typeof driver.record>[0])
+    const plan = driver.plansSnapshot()[0]!
+    expect(plan.acceptedOps).toBe(0)
+    expect(plan.rejectedOps).toBe(0)
+    expect(Number.isNaN(plan.acceptedOps)).toBe(false)
+  })
+
+  it('P2-2 (v15): NaN evidenceQuotes cannot poison the scored dimension; negatives are counters', () => {
+    const driver = new EvolutionReplayDriver()
+    // The v14 fix covered only 3/6 numeric fields — `typeof NaN === 'number'`
+    // let evidenceQuotes straight into scorePlan (evidence IS scored) and the
+    // comparator degenerated (`b.score - a.score` -> NaN).
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'p', memoryApplied: 2, skillApplied: 1, rejectedOps: 0, evidenceQuotes: NaN, estimatedInputChars: Infinity, executionFailures: NaN })
+    const plan = driver.plansSnapshot()[0]!
+    expect(plan.evidenceQuotes).toBe(3) // missing/malformed keeps the applied-ops heuristic
+    expect(plan.estimatedInputChars).toBe(0)
+    expect(plan.executionFailures).toBe(0)
+    const result = driver.compare()
+    // Winner selection used to be implementation-defined (NaN comparator);
+    // with finite scores the policy id resolves deterministically.
+    expect(result.winner).toBe('p')
+    expect(Number.isNaN(result.margin)).toBe(false)
+    // Negative counters read as malformed (a counter cannot be negative).
+    const driver2 = new EvolutionReplayDriver()
+    driver2.record({ sessionId: 's', planId: 'r', policyFingerprint: 'p', memoryApplied: -5, skillApplied: 1, rejectedOps: 0 })
+    expect(driver2.plansSnapshot()[0]?.acceptedOps).toBe(1)
+    expect(driver2.plansSnapshot()[0]?.memoryOps).toBe(0)
+  })
+
+  it('V27 INS-05: the pre-backfill dedupe window is bounded (FIFO) and still dedupes the newest ids', () => {
+    // `preBackfillIds` was cleared only inside backfill(), so a sidecar load that
+    // never succeeded let every live plan id accumulate for the process
+    // lifetime. Past the cap the OLDEST ids drop out: the window is finite, and
+    // the newest ids — the ones a still-pending read window can replay — stay
+    // deduped. Both directions are observable at the leaderboard.
+    const cap = 4096
+    const driver = new EvolutionReplayDriver({ maxPlans: cap + 10 })
+    const plan = (id: string) => ({ sessionId: 's', planId: id, policyFingerprint: id, memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+    for (let index = 0; index < cap + 1; index += 1) driver.record(plan(`pre-${index}`))
+    expect(driver.plansSnapshot()).toHaveLength(cap + 1)
+    // The oldest id fell out of the tracking set → the sidecar copy is recorded
+    // again; the newest is still tracked → it is dropped as a duplicate.
+    driver.backfill([
+      { ...plan('pre-0'), at: 1 },
+      { ...plan(`pre-${cap}`), at: 2 },
+    ])
+    const ids = driver.plansSnapshot().map(entry => entry.policyId)
+    expect(ids.filter(id => id === 'pre-0')).toHaveLength(2)
+    expect(ids.filter(id => id === `pre-${cap}`)).toHaveLength(1)
+    // The latch is one-shot: a second backfill never re-adds anything.
+    driver.backfill([{ ...plan('pre-1'), at: 3 }])
+    expect(driver.plansSnapshot().filter(entry => entry.policyId === 'pre-1')).toHaveLength(1)
+  })
+
+  it('P2-14: the skippedUnread dimension reaches the leaderboard text (a fully-skipped plan is not a clean 0/0)', () => {
+    const driver = new EvolutionReplayDriver()
+    // R-03: every op was refused because the session never read the skill, so
+    // accepted/rejected are both 0 — the old report printed exactly that.
+    driver.record({ sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 0, skillApplied: 0, rejectedOps: 0, skippedUnread: 2 })
+    expect(driver.plansSnapshot()[0]?.skippedUnread).toBe(2)
+    expect(driver.compare().report).toContain('2 op(s) skipped (skill not read this session)')
+    // A malformed count degrades to 0 like every other counter (never NaN).
+    const poisoned = new EvolutionReplayDriver()
+    poisoned.record({ sessionId: 's', planId: 'r', policyFingerprint: 'p', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, skippedUnread: Number.NaN })
+    expect(poisoned.plansSnapshot()[0]?.skippedUnread).toBe(0)
+    // A plan without the dimension renders exactly as before (no empty segment).
+    const clean = new EvolutionReplayDriver()
+    clean.record({ sessionId: 's', planId: 'r2', policyFingerprint: 'p', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+    expect(clean.compare().report).toContain('(1 accepted, 0 rejected)')
+  })
+
+  it('P2-15: an empty backfill does not commit the latch, so the leaderboard is not locked empty', () => {
+    const driver = new EvolutionReplayDriver()
+    const item = { sessionId: 's1', planId: 'run-1', policyFingerprint: 'policy-a', memoryApplied: 1, skillApplied: 0, rejectedOps: 0, at: 1 }
+    // A quarantined/corrupt sidecar loads as [] — that is not evidence the
+    // sidecar was read, so the next (successful) load must still land.
+    driver.backfill([])
+    driver.backfill([item])
+    expect(driver.plansSnapshot().map(entry => entry.policyId)).toEqual(['policy-a'])
+    // Once records arrived the latch IS committed (V25-01): an io reload that
+    // re-runs the loader against the same driver must not double the entries.
+    driver.backfill([item, { ...item, planId: 'run-2' }])
+    expect(driver.plansSnapshot()).toHaveLength(1)
+  })
+})
+
+it('v28 G4.4 (RPL-01): a single plan yields margin null and an explicit no-comparison note', () => {
+  const result = comparePlans([
+    { policyId: 'only', acceptedOps: 3, rejectedOps: 0, memoryOps: 1, skillOps: 1, evidenceQuotes: 2, estimatedInputChars: 1000 },
+  ])
+  expect(result.winner).toBe('only')
+  expect(result.margin).toBeNull()
+  expect(result.report).toContain('single plan recorded')
+  // No plans at all: same null margin discipline.
+  expect(comparePlans([]).margin).toBeNull()
+})
+
+it('v29 RPL-02: backfilled (older) sidecar plans land at the chronological head, so maxPlans evicts the oldest', () => {
+  const driver = new EvolutionReplayDriver({ maxPlans: 3 })
+  // A live plan lands between listener registration and the async backfill.
+  driver.record({ sessionId: 's', planId: 'live-1', memoryApplied: 1, skillApplied: 0, rejectedOps: 0 })
+  // The sidecar backfill brings OLDER plans (sidecar order: oldest first).
+  driver.backfill([
+    { sessionId: 's', planId: 'old-1', at: 1, memoryApplied: 1, skillApplied: 0, rejectedOps: 0 },
+    { sessionId: 's', planId: 'old-2', at: 2, memoryApplied: 1, skillApplied: 0, rejectedOps: 0 },
+  ])
+  // One more live plan: the FIFO must now evict the OLDEST record (old-1),
+  // not the freshest live plan (the pre-fix order shifted out live-1).
+  driver.record({ sessionId: 's', planId: 'live-2', memoryApplied: 2, skillApplied: 0, rejectedOps: 0 })
+  const ids = driver.plansSnapshot().map(plan => plan.policyId)
+  expect(ids).toEqual(['old-2', 'live-1', 'live-2'])
+})

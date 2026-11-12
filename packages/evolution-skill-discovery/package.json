@@ -19,7 +19,17 @@
       "default": "./lib/main-entry.js"
     },
     "./package.json": "./package.json",
-    "./locale/*.json": "./locale/*.json"
+    "./locale/*.json": "./locale/*.json",
+    "./catalog": {
+      "types": "./lib/types/catalog/index.d.ts",
+      "default": "./lib/catalog/index.js"
+    },
+    "./catalog/locale/*.json": "./locale/catalog/*.json",
+    "./usage": {
+      "types": "./lib/types/usage/index.d.ts",
+      "default": "./lib/usage/index.js"
+    },
+    "./usage/locale/*.json": "./locale/usage/*.json"
   },
   "files": [
     "locale/*.json",
@@ -47,6 +57,7 @@
     "@deepseek-ai/dsh-evolution-core": "workspace:^"
   },
   "dependencies": {
-    "minisearch": "^7.2.0"
+    "minisearch": "^7.2.0",
+    "@deepseek-ai/schemastery": "workspace:^"
   }
 }

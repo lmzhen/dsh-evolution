@@ -109,20 +109,14 @@ export const CLIENT_PARAM_SECTIONS: readonly ClientParamSection[] = [
     ],
   },
   {
-    namespace: 'memory-files',
-    seatKey: 'memory-files',
+    namespace: 'memory',
+    seatKey: 'memory',
     fields: [
       { id: 'memoryChars', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Character budget the memory store enforces for MEMORY.md.', label: '记忆库上限', labelEn: 'Memory store limit', hint: '长期记忆文件（MEMORY.md）最多多少字符。', hintEn: 'Character budget the memory store enforces for MEMORY.md.', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
       { id: 'userChars', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Character budget the memory store enforces for USER.md.', label: '用户画像上限', labelEn: 'User profile limit', hint: '用户画像文件（USER.md）最多多少字符。', hintEn: 'Character budget the memory store enforces for USER.md.', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
+      { id: 'entryPreviewChars', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Characters of one memory entry shown in a tool result preview.', label: '记忆预览长度', labelEn: 'Memory preview length', hint: '列表里每条记忆最多显示多少字符。', hintEn: 'Characters of one memory entry shown in a tool result preview.', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
       { id: 'addDatePrefix', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Prefix stored memory entries with their date heading.', label: '记忆条目加日期', labelEn: 'Prefix memory entries with date', hint: '写入时在条目开头加上日期。', hintEn: 'Prefix stored memory entries with their date heading.', control: 'switch', unit: '', unitEn: '', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
       { id: 'maxConsolidationFailures', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Consolidation failures one turn tolerates before the tool gives up.', label: '合并失败重试', labelEn: 'Consolidation retries', hint: '合并记忆连续失败多少次后停止。', hintEn: 'Consolidation failures one turn tolerates before the tool gives up.', control: 'number', unit: '次', unitEn: 'calls', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
-    ],
-  },
-  {
-    namespace: 'tool-memory',
-    seatKey: 'tool-memory',
-    fields: [
-      { id: 'entryPreviewChars', group: 'memory', groupLabel: '记忆', groupLabelEn: 'Memory', doc: 'Characters of one memory entry shown in a tool result preview.', label: '记忆预览长度', labelEn: 'Memory preview length', hint: '列表里每条记忆最多显示多少字符。', hintEn: 'Characters of one memory entry shown in a tool result preview.', control: 'number', unit: '字符', unitEn: 'chars', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },
     ],
   },
   {

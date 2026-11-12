@@ -22,7 +22,7 @@ const MIRROR = `{
   "compilerOptions": {
     "paths": {
       "@deepseek-ai/dsh-evolution-core": ["./packages/evolution/evolution-core/src/index.ts"],
-      "@deepseek-ai/dsh-tool-memory": ["./packages/evolution/tool-memory/src/index.ts"],
+      "@deepseek-ai/dsh-memory/tools": ["./packages/evolution/tool-memory/src/index.ts"],
       "zod": ["./node_modules/.pnpm/zod@4.4.3/node_modules/zod"]
     }
   }
@@ -42,7 +42,7 @@ describe('inject-evolution-paths (N-7 purity)', () => {
     // Upstream rows survive, evolution lines land inside the paths block.
     expect(next).toContain('"@deepseek-ai/dsh-session"')
     expect(next).toContain('"@deepseek-ai/dsh-evolution-core"')
-    expect(next).toContain('"@deepseek-ai/dsh-tool-memory"')
+    expect(next).toContain('"@deepseek-ai/dsh-memory/tools"')
     // G5.6: `zod` is deliberately NOT injected — its pnpm-store path is
     // machine-specific, and a target that already declares it must not fail
     // the "already declares an evolution alias" check.

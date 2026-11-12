@@ -148,7 +148,7 @@
     {
       "id": "feedback-events",
       "path": "<evolutionHome>/events.json",
-      "writer": "evolution-feedback/src/index.ts",
+      "writer": "evolution-activity/src/feedback/index.ts",
       "serializedBy": "transact",
       "marker": "transactIo(io, eventsPath,",
       "state": [],

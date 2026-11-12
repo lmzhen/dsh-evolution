@@ -19,7 +19,6 @@ export const HOST_ROW_IDS = [
   'evolution-authority',
   'evolution-state-storage',
   'evolution-state-domain',
-  'evolution-state-json',
   'evolution-state',
   'memory',
   'memory-files',
@@ -45,21 +44,20 @@ export const HOST_ROW_NAMES = {
   'evolution-authority': scoped('@deepseek-ai/dsh-evolution-core/authority-plugin'),
   'evolution-state-storage': scoped('@deepseek-ai/dsh-evolution-state'),
   'evolution-state-domain': scoped('@deepseek-ai/dsh-evolution-state-domain'),
-  'evolution-state-json': scoped('@deepseek-ai/dsh-evolution-state-json'),
   'evolution-state': scoped('@deepseek-ai/dsh-evolution-state'),
   memory: scoped('@deepseek-ai/dsh-memory'),
-  'memory-files': scoped('@deepseek-ai/dsh-memory-files'),
-  'skill-usage': scoped('@deepseek-ai/dsh-skill-usage'),
+  'memory-files': scoped('@deepseek-ai/dsh-memory/files'),
+  'skill-usage': scoped('@deepseek-ai/dsh-evolution-skill-discovery/usage'),
   'evolution-approval': scoped('@deepseek-ai/dsh-evolution-approval'),
-  'evolution-threat': scoped('@deepseek-ai/dsh-evolution-threat'),
+  'evolution-threat': scoped('@deepseek-ai/dsh-evolution-activity/threat'),
   'evolution-review': scoped('@deepseek-ai/dsh-evolution-review'),
   'evolution-curator': scoped('@deepseek-ai/dsh-evolution-curator'),
   'evolution-commands': scoped('@deepseek-ai/dsh-evolution-commands'),
   'evolution-maintenance-tools': scoped('@deepseek-ai/dsh-evolution-maintenance/tools'),
   'evolution-activity': scoped('@deepseek-ai/dsh-evolution-activity'),
-  'evolution-feedback': scoped('@deepseek-ai/dsh-evolution-feedback'),
-  'evolution-learning-graph': scoped('@deepseek-ai/dsh-evolution-learning-graph'),
-  'evolution-replay': scoped('@deepseek-ai/dsh-evolution-replay'),
+  'evolution-feedback': scoped('@deepseek-ai/dsh-evolution-activity/feedback'),
+  'evolution-learning-graph': scoped('@deepseek-ai/dsh-evolution-activity/learning-graph'),
+  'evolution-replay': scoped('@deepseek-ai/dsh-evolution-activity/replay'),
   'evolution-merge': scoped('@deepseek-ai/dsh-evolution-merge'),
 } as const
 
@@ -72,10 +70,10 @@ export const AGENT_EVOLUTION_ROW_IDS = [
 ] as const
 
 export const AGENT_EVOLUTION_ROW_NAMES = {
-  'tool-memory': scoped('@deepseek-ai/dsh-tool-memory'),
+  'tool-memory': scoped('@deepseek-ai/dsh-memory/tools'),
   'tool-skill-manage': scoped('@deepseek-ai/dsh-tool-skill-manage'),
   'tool-session-query': scoped('@deepseek-ai/dsh-tool-session-query'),
-  'evolution-skill-catalog': scoped('@deepseek-ai/dsh-evolution-skill-catalog'),
+  'evolution-skill-catalog': scoped('@deepseek-ai/dsh-evolution-skill-discovery/catalog'),
   'evolution-skill-discovery': scoped('@deepseek-ai/dsh-evolution-skill-discovery'),
 } as const
 

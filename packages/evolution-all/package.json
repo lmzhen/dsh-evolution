@@ -40,16 +40,14 @@
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-evolution-host": "workspace:^",
-    "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
     "@deepseek-ai/dsh-evolution-agent-preset": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-health": "workspace:^",
     "@deepseek-ai/dsh-evolution-merge": "workspace:^",
     "@deepseek-ai/dsh-evolution-merge-ui": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
     "@deepseek-ai/dsh-evolution-ui": "workspace:^",
-    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0"
+    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0",
+    "@deepseek-ai/dsh-memory": "workspace:^"
   }
 }

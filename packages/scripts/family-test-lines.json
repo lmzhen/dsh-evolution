@@ -1,8 +1,48 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-12T13:44:34.713Z",
-  "tree": "3908af5e",
+  "measuredAt": "2026-11-12T14:16:45.620Z",
+  "tree": "05a9137b",
   "testLines": [
+    {
+      "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
+      "id": "@deepseek-ai/dsh-commands",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-activity/tests/learning-graph/graph.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-activity"
+    },
+    {
+      "spec": "packages/evolution-activity/tests/threat/threat-guard.spec.ts",
+      "id": "@deepseek-ai/dsh-llm",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-activity/tests/threat/threat-guard.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-activity"
+    },
+    {
+      "spec": "packages/evolution-activity/tests/threat/threat-guard.spec.ts",
+      "id": "@deepseek-ai/dsh-tools",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-activity/tests/threat/threat-guard.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-activity"
+    },
+    {
+      "spec": "packages/evolution-activity/tests/threat/threat-guard.spec.ts",
+      "id": "@deepseek-ai/dsh-agent-loop-testkit",
+      "kind": "testkit",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-activity/tests/threat/threat-guard.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-activity"
+    },
     {
       "spec": "packages/evolution-agent/tests/agent-composition.spec.ts",
       "id": "@deepseek-ai/dsh-app-boot",
@@ -25,17 +65,7 @@
     },
     {
       "spec": "packages/evolution-agent/tests/agent-composition.spec.ts",
-      "id": "@deepseek-ai/dsh-memory-files",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-agent/tests/agent-composition.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-agent"
-    },
-    {
-      "spec": "packages/evolution-agent/tests/agent-composition.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
+      "id": "@deepseek-ai/dsh-memory/files",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -65,7 +95,7 @@
     },
     {
       "spec": "packages/evolution-all/tests/all.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-memory",
+      "id": "@deepseek-ai/dsh-memory/tools",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -145,7 +175,7 @@
     },
     {
       "spec": "packages/evolution-commands/tests/platform-view.spec.ts",
-      "id": "@deepseek-ai/dsh-memory-files",
+      "id": "@deepseek-ai/dsh-memory/files",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -175,7 +205,7 @@
     },
     {
       "spec": "packages/evolution-core/tests/preset-composition.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-memory",
+      "id": "@deepseek-ai/dsh-memory/tools",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -384,26 +414,6 @@
       "owner": "evolution-curator"
     },
     {
-      "spec": "packages/evolution-feedback/tests/feedback.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-feedback/tests/feedback.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-feedback"
-    },
-    {
-      "spec": "packages/evolution-feedback/tests/io-evidence-fs.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-feedback/tests/io-evidence-fs.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-feedback"
-    },
-    {
       "spec": "packages/evolution-host/tests/bundle-mutual-exclusion.spec.ts",
       "id": "@deepseek-ai/dsh-app-boot",
       "kind": "platform",
@@ -535,7 +545,7 @@
     },
     {
       "spec": "packages/evolution-host/tests/inject-paths.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-memory",
+      "id": "@deepseek-ai/dsh-memory/tools",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -565,17 +575,7 @@
     },
     {
       "spec": "packages/evolution-host/tests/installation-matrix.spec.ts",
-      "id": "@deepseek-ai/dsh-memory-files",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installation-matrix.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
+      "id": "@deepseek-ai/dsh-memory/files",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -625,7 +625,7 @@
     },
     {
       "spec": "packages/evolution-host/tests/installation-matrix.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-memory",
+      "id": "@deepseek-ai/dsh-memory/tools",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -705,7 +705,7 @@
     },
     {
       "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-memory",
+      "id": "@deepseek-ai/dsh-memory/tools",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -765,7 +765,7 @@
     },
     {
       "spec": "packages/evolution-host/tests/installer.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-memory",
+      "id": "@deepseek-ai/dsh-memory/tools",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -884,16 +884,6 @@
       "owner": "evolution-host"
     },
     {
-      "spec": "packages/evolution-learning-graph/tests/graph.spec.ts",
-      "id": "@deepseek-ai/dsh-commands",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-learning-graph/tests/graph.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-learning-graph"
-    },
-    {
       "spec": "packages/evolution-maintenance/tests/orchestrate.spec.ts",
       "id": "@deepseek-ai/dsh-agent",
       "kind": "platform",
@@ -1004,16 +994,6 @@
       "owner": "evolution-review"
     },
     {
-      "spec": "packages/evolution-review/tests/review-executor-skill-write.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-review/tests/review-executor-skill-write.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-review"
-    },
-    {
       "spec": "packages/evolution-review/tests/review-executor.spec.ts",
       "id": "@deepseek-ai/dsh-llm",
       "kind": "platform",
@@ -1054,62 +1034,62 @@
       "owner": "evolution-review"
     },
     {
-      "spec": "packages/evolution-skill-catalog/tests/catalog-path-consistency.spec.ts",
-      "id": "@deepseek-ai/dsh-skill",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-skill-catalog/tests/catalog-path-consistency.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-skill-catalog"
-    },
-    {
-      "spec": "packages/evolution-skill-catalog/tests/catalog.spec.ts",
-      "id": "@deepseek-ai/dsh-skill",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-skill-catalog/tests/catalog.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-skill-catalog"
-    },
-    {
-      "spec": "packages/evolution-skill-catalog/tests/io-preference.spec.ts",
-      "id": "@deepseek-ai/dsh-skill",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-skill-catalog/tests/io-preference.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-skill-catalog"
-    },
-    {
-      "spec": "packages/evolution-skill-catalog/tests/rank-contract.spec.ts",
-      "id": "@deepseek-ai/dsh-scope",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-skill-catalog/tests/rank-contract.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-skill-catalog"
-    },
-    {
-      "spec": "packages/evolution-skill-catalog/tests/rank-contract.spec.ts",
-      "id": "@deepseek-ai/dsh-skill",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-skill-catalog/tests/rank-contract.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-skill-catalog"
-    },
-    {
       "spec": "packages/evolution-skill-discovery/tests/awareness.spec.ts",
       "id": "@deepseek-ai/dsh-system-prompt",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
       "reasonRef": "packages/evolution-skill-discovery/tests/awareness.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-skill-discovery"
+    },
+    {
+      "spec": "packages/evolution-skill-discovery/tests/catalog/catalog-path-consistency.spec.ts",
+      "id": "@deepseek-ai/dsh-skill",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-skill-discovery/tests/catalog/catalog-path-consistency.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-skill-discovery"
+    },
+    {
+      "spec": "packages/evolution-skill-discovery/tests/catalog/catalog.spec.ts",
+      "id": "@deepseek-ai/dsh-skill",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-skill-discovery/tests/catalog/catalog.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-skill-discovery"
+    },
+    {
+      "spec": "packages/evolution-skill-discovery/tests/catalog/io-preference.spec.ts",
+      "id": "@deepseek-ai/dsh-skill",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-skill-discovery/tests/catalog/io-preference.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-skill-discovery"
+    },
+    {
+      "spec": "packages/evolution-skill-discovery/tests/catalog/rank-contract.spec.ts",
+      "id": "@deepseek-ai/dsh-scope",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-skill-discovery/tests/catalog/rank-contract.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-skill-discovery"
+    },
+    {
+      "spec": "packages/evolution-skill-discovery/tests/catalog/rank-contract.spec.ts",
+      "id": "@deepseek-ai/dsh-skill",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-skill-discovery/tests/catalog/rank-contract.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
       "owner": "evolution-skill-discovery"
     },
@@ -1334,344 +1314,274 @@
       "owner": "evolution-skill-discovery"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/domain-state.spec.ts",
-      "id": "@deepseek-ai/dsh-storage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
-    },
-    {
-      "spec": "packages/evolution-state-domain/tests/domain-state.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-json",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
-    },
-    {
-      "spec": "packages/evolution-state-domain/tests/domain-state.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-domain",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
-    },
-    {
-      "spec": "packages/evolution-state-domain/tests/domain.spec.ts",
-      "id": "@deepseek-ai/dsh-storage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
-    },
-    {
-      "spec": "packages/evolution-state-domain/tests/domain.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-json",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
-    },
-    {
-      "spec": "packages/evolution-state-domain/tests/domain.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-domain",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
-    },
-    {
-      "spec": "packages/evolution-state-domain/tests/provider-consistency.spec.ts",
-      "id": "@deepseek-ai/dsh-storage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/provider-consistency.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
-    },
-    {
-      "spec": "packages/evolution-state-domain/tests/provider-consistency.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-json",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/provider-consistency.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
-    },
-    {
-      "spec": "packages/evolution-state-domain/tests/provider-consistency.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-domain",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/provider-consistency.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
-    },
-    {
-      "spec": "packages/evolution-threat/tests/threat-guard.spec.ts",
-      "id": "@deepseek-ai/dsh-llm",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-threat/tests/threat-guard.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-threat"
-    },
-    {
-      "spec": "packages/evolution-threat/tests/threat-guard.spec.ts",
-      "id": "@deepseek-ai/dsh-tools",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-threat/tests/threat-guard.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-threat"
-    },
-    {
-      "spec": "packages/evolution-threat/tests/threat-guard.spec.ts",
-      "id": "@deepseek-ai/dsh-agent-loop-testkit",
-      "kind": "testkit",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-threat/tests/threat-guard.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-threat"
-    },
-    {
-      "spec": "packages/memory-files/tests/memory-budget-surfaces.spec.ts",
-      "id": "@deepseek-ai/dsh-memory",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/memory-files/tests/memory-budget-surfaces.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "memory-files"
-    },
-    {
-      "spec": "packages/memory-files/tests/memory-files-clamp.spec.ts",
-      "id": "@deepseek-ai/dsh-memory",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/memory-files/tests/memory-files-clamp.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "memory-files"
-    },
-    {
-      "spec": "packages/memory-files/tests/provider.spec.ts",
-      "id": "@deepseek-ai/dsh-memory",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/memory-files/tests/provider.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "memory-files"
-    },
-    {
-      "spec": "packages/skill-usage/tests/skill-usage.spec.ts",
+      "spec": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts",
       "id": "@deepseek-ai/dsh-tool-executor-ptc",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/skill-usage/tests/skill-usage.spec.ts:1",
+      "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "skill-usage"
+      "owner": "evolution-skill-discovery"
     },
     {
-      "spec": "packages/skill-usage/tests/skill-usage.spec.ts",
+      "spec": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts",
       "id": "@deepseek-ai/dsh-session",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/skill-usage/tests/skill-usage.spec.ts:1",
+      "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "skill-usage"
+      "owner": "evolution-skill-discovery"
     },
     {
-      "spec": "packages/skill-usage/tests/skill-usage.spec.ts",
+      "spec": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts",
       "id": "@deepseek-ai/dsh-tools",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/skill-usage/tests/skill-usage.spec.ts:1",
+      "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "skill-usage"
+      "owner": "evolution-skill-discovery"
     },
     {
-      "spec": "packages/skill-usage/tests/skill-usage.spec.ts",
+      "spec": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts",
       "id": "@deepseek-ai/dsh-system-prompt",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/skill-usage/tests/skill-usage.spec.ts:1",
+      "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "skill-usage"
+      "owner": "evolution-skill-discovery"
     },
     {
-      "spec": "packages/skill-usage/tests/skill-usage.spec.ts",
+      "spec": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts",
       "id": "@deepseek-ai/dsh-agent-loop-testkit",
       "kind": "testkit",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/skill-usage/tests/skill-usage.spec.ts:1",
+      "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "skill-usage"
+      "owner": "evolution-skill-discovery"
     },
     {
-      "spec": "packages/skill-usage/tests/skill-usage.spec.ts",
+      "spec": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts",
       "id": "@deepseek-ai/dsh-ptc-runtime",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/skill-usage/tests/skill-usage.spec.ts:1",
+      "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "skill-usage"
+      "owner": "evolution-skill-discovery"
     },
     {
-      "spec": "packages/tool-memory/tests/boundary.spec.ts",
+      "spec": "packages/evolution-state-domain/tests/domain-state.spec.ts",
+      "id": "@deepseek-ai/dsh-storage",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-state-domain"
+    },
+    {
+      "spec": "packages/evolution-state-domain/tests/domain-state.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-state-domain"
+    },
+    {
+      "spec": "packages/evolution-state-domain/tests/domain-state.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-domain",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-state-domain"
+    },
+    {
+      "spec": "packages/evolution-state-domain/tests/domain.spec.ts",
+      "id": "@deepseek-ai/dsh-storage",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-state-domain/tests/domain.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-state-domain"
+    },
+    {
+      "spec": "packages/evolution-state-domain/tests/domain.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-state-domain/tests/domain.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-state-domain"
+    },
+    {
+      "spec": "packages/evolution-state-domain/tests/domain.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-domain",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-state-domain/tests/domain.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-state-domain"
+    },
+    {
+      "spec": "packages/evolution-state-domain/tests/provider-consistency.spec.ts",
+      "id": "@deepseek-ai/dsh-storage",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-state-domain/tests/provider-consistency.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-state-domain"
+    },
+    {
+      "spec": "packages/evolution-state-domain/tests/provider-consistency.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-state-domain/tests/provider-consistency.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-state-domain"
+    },
+    {
+      "spec": "packages/evolution-state-domain/tests/provider-consistency.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-domain",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-state-domain/tests/provider-consistency.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-state-domain"
+    },
+    {
+      "spec": "packages/memory/tests/files/memory-budget-surfaces.spec.ts",
+      "id": "@deepseek-ai/dsh-memory",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/memory/tests/files/memory-budget-surfaces.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "memory"
+    },
+    {
+      "spec": "packages/memory/tests/files/memory-files-clamp.spec.ts",
+      "id": "@deepseek-ai/dsh-memory",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/memory/tests/files/memory-files-clamp.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "memory"
+    },
+    {
+      "spec": "packages/memory/tests/files/provider.spec.ts",
+      "id": "@deepseek-ai/dsh-memory",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/memory/tests/files/provider.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "memory"
+    },
+    {
+      "spec": "packages/memory/tests/tools/boundary.spec.ts",
       "id": "@deepseek-ai/dsh-llm",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/boundary.spec.ts:1",
+      "reasonRef": "packages/memory/tests/tools/boundary.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
+      "owner": "memory"
     },
     {
-      "spec": "packages/tool-memory/tests/boundary.spec.ts",
+      "spec": "packages/memory/tests/tools/boundary.spec.ts",
       "id": "@deepseek-ai/dsh-agent",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/boundary.spec.ts:1",
+      "reasonRef": "packages/memory/tests/tools/boundary.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
+      "owner": "memory"
     },
     {
-      "spec": "packages/tool-memory/tests/boundary.spec.ts",
+      "spec": "packages/memory/tests/tools/boundary.spec.ts",
       "id": "@deepseek-ai/dsh-memory",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/boundary.spec.ts:1",
+      "reasonRef": "packages/memory/tests/tools/boundary.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
+      "owner": "memory"
     },
     {
-      "spec": "packages/tool-memory/tests/boundary.spec.ts",
-      "id": "@deepseek-ai/dsh-memory-files",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/boundary.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
-    },
-    {
-      "spec": "packages/tool-memory/tests/boundary.spec.ts",
+      "spec": "packages/memory/tests/tools/boundary.spec.ts",
       "id": "@deepseek-ai/dsh-agent-loop-testkit",
       "kind": "testkit",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/boundary.spec.ts:1",
+      "reasonRef": "packages/memory/tests/tools/boundary.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
+      "owner": "memory"
     },
     {
-      "spec": "packages/tool-memory/tests/memory-interpolation.spec.ts",
+      "spec": "packages/memory/tests/tools/memory-interpolation.spec.ts",
       "id": "@deepseek-ai/dsh-system-prompt",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/memory-interpolation.spec.ts:1",
+      "reasonRef": "packages/memory/tests/tools/memory-interpolation.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
+      "owner": "memory"
     },
     {
-      "spec": "packages/tool-memory/tests/memory-interpolation.spec.ts",
+      "spec": "packages/memory/tests/tools/memory-interpolation.spec.ts",
       "id": "@deepseek-ai/dsh-memory",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/memory-interpolation.spec.ts:1",
+      "reasonRef": "packages/memory/tests/tools/memory-interpolation.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
+      "owner": "memory"
     },
     {
-      "spec": "packages/tool-memory/tests/memory-interpolation.spec.ts",
-      "id": "@deepseek-ai/dsh-memory-files",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/memory-interpolation.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
-    },
-    {
-      "spec": "packages/tool-memory/tests/memory-interpolation.spec.ts",
+      "spec": "packages/memory/tests/tools/memory-interpolation.spec.ts",
       "id": "@deepseek-ai/dsh-agent-loop-testkit",
       "kind": "testkit",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/memory-interpolation.spec.ts:1",
+      "reasonRef": "packages/memory/tests/tools/memory-interpolation.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
+      "owner": "memory"
     },
     {
-      "spec": "packages/tool-memory/tests/tool-memory.spec.ts",
+      "spec": "packages/memory/tests/tools/tool-memory.spec.ts",
       "id": "@deepseek-ai/dsh-memory",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/tool-memory.spec.ts:1",
+      "reasonRef": "packages/memory/tests/tools/tool-memory.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
+      "owner": "memory"
     },
     {
-      "spec": "packages/tool-memory/tests/tool-memory.spec.ts",
-      "id": "@deepseek-ai/dsh-memory-files",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/tool-memory.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
-    },
-    {
-      "spec": "packages/tool-memory/tests/tool-memory.spec.ts",
+      "spec": "packages/memory/tests/tools/tool-memory.spec.ts",
       "id": "@deepseek-ai/dsh-agent-loop-testkit",
       "kind": "testkit",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/tool-memory/tests/tool-memory.spec.ts:1",
+      "reasonRef": "packages/memory/tests/tools/tool-memory.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-memory"
-    },
-    {
-      "spec": "packages/tool-skill-manage/tests/approval-preview.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/tool-skill-manage/tests/approval-preview.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-skill-manage"
+      "owner": "memory"
     },
     {
       "spec": "packages/tool-skill-manage/tests/approval-preview.spec.ts",
@@ -1705,16 +1615,6 @@
     },
     {
       "spec": "packages/tool-skill-manage/tests/create-tree-reads.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/tool-skill-manage/tests/create-tree-reads.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-skill-manage"
-    },
-    {
-      "spec": "packages/tool-skill-manage/tests/create-tree-reads.spec.ts",
       "id": "@deepseek-ai/dsh-agent-loop-testkit",
       "kind": "testkit",
       "expectLine": "unknown",
@@ -1745,16 +1645,6 @@
     },
     {
       "spec": "packages/tool-skill-manage/tests/extract-agent.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/tool-skill-manage/tests/extract-agent.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-skill-manage"
-    },
-    {
-      "spec": "packages/tool-skill-manage/tests/extract-agent.spec.ts",
       "id": "@deepseek-ai/dsh-agent-loop-testkit",
       "kind": "testkit",
       "expectLine": "unknown",
@@ -1785,16 +1675,6 @@
     },
     {
       "spec": "packages/tool-skill-manage/tests/review-channel-origin.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/tool-skill-manage/tests/review-channel-origin.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-skill-manage"
-    },
-    {
-      "spec": "packages/tool-skill-manage/tests/review-channel-origin.spec.ts",
       "id": "@deepseek-ai/dsh-agent-loop-testkit",
       "kind": "testkit",
       "expectLine": "unknown",
@@ -1825,7 +1705,17 @@
     },
     {
       "spec": "packages/tool-skill-manage/tests/skill-settings.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
+      "id": "@deepseek-ai/dsh-agent-loop-testkit",
+      "kind": "testkit",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/tool-skill-manage/tests/skill-settings.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "tool-skill-manage"
+    },
+    {
+      "spec": "packages/tool-skill-manage/tests/skill-settings.spec.ts",
+      "id": "@deepseek-ai/dsh-storage",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -1835,8 +1725,18 @@
     },
     {
       "spec": "packages/tool-skill-manage/tests/skill-settings.spec.ts",
-      "id": "@deepseek-ai/dsh-agent-loop-testkit",
-      "kind": "testkit",
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/tool-skill-manage/tests/skill-settings.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "tool-skill-manage"
+    },
+    {
+      "spec": "packages/tool-skill-manage/tests/skill-settings.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-domain",
+      "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
       "reasonRef": "packages/tool-skill-manage/tests/skill-settings.spec.ts:1",
@@ -1856,16 +1756,6 @@
     {
       "spec": "packages/tool-skill-manage/tests/tool-skill-manage.spec.ts",
       "id": "@deepseek-ai/dsh-agent",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/tool-skill-manage/tests/tool-skill-manage.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "tool-skill-manage"
-    },
-    {
-      "spec": "packages/tool-skill-manage/tests/tool-skill-manage.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -1915,7 +1805,17 @@
     },
     {
       "spec": "packages/tool-skill-manage/tests/write-gates.spec.ts",
-      "id": "@deepseek-ai/dsh-skill-usage",
+      "id": "@deepseek-ai/dsh-agent-loop-testkit",
+      "kind": "testkit",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "tool-skill-manage"
+    },
+    {
+      "spec": "packages/tool-skill-manage/tests/write-gates.spec.ts",
+      "id": "@deepseek-ai/dsh-storage",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
@@ -1925,8 +1825,18 @@
     },
     {
       "spec": "packages/tool-skill-manage/tests/write-gates.spec.ts",
-      "id": "@deepseek-ai/dsh-agent-loop-testkit",
-      "kind": "testkit",
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "tool-skill-manage"
+    },
+    {
+      "spec": "packages/tool-skill-manage/tests/write-gates.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-domain",
+      "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
       "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",

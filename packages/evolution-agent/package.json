@@ -21,12 +21,11 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/dsh-tool-memory": "workspace:^",
     "@deepseek-ai/dsh-tool-skill-manage": "workspace:^",
-    "@deepseek-ai/dsh-evolution-skill-catalog": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
-    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0"
+    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0",
+    "@deepseek-ai/dsh-memory": "workspace:^"
   },
   "exports": {
     ".": {

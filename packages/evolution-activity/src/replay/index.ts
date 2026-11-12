@@ -1,0 +1,477 @@
+/**
+ * Replay/A-B evaluation for evolution plans.
+ *
+ * The pure scoring functions remain deterministic and runtime-free. The DSH
+ * driver records every `evolution/plan-applied` process event (payload v2,
+ * with sessionId) into an in-memory leaderboard and exposes `/evolution
+ * replay` (via the `/evolution` command family) for comparison, so a human can
+ * A/B review policy/prompt changes against real plan outcomes.
+ *
+ * V24-13 (v24): the in-memory leaderboard is BACKFILLED at mount from the
+ * `evolution-activity` sidecar (`$DSH_HOME/evolution/activity.json`) — the
+ * header previously claimed "durability across restarts is the
+ * evolution-activity store's job" while nothing ever read the sidecar, so a
+ * restart emptied `/evolution replay` and the persisted history sat unread.
+ * Records are fed in sidecar order (oldest first); the driver's `maxPlans`
+ * window keeps the newest. Best-effort: a missing/unreadable sidecar starts
+ * the leaderboard empty, exactly as before.
+ * @module @deepseek-ai/dsh-evolution-replay
+ */
+
+import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
+import { clampedNumber, evolutionHome, evolutionIoAdapter } from '@deepseek-ai/dsh-evolution-core'
+import type { EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
+import { loadActivityState } from '../index.ts'
+
+export interface ReplayPlan {
+  policyId: string
+  acceptedOps: number
+  rejectedOps: number
+  memoryOps: number
+  skillOps: number
+  evidenceQuotes: number
+  estimatedInputChars: number
+  /** R-03: ops skipped because the session never read the named skill — a plan
+   * whose ops were all skipped must not read as a clean "0/0" either. */
+  skippedUnread?: number | undefined
+  /** V6-10 (0.3.36): execution-layer failures — a plan must not read as a
+   * clean "0/0" when its ops all failed at execution (V5-19 payload). */
+  executionFailures?: number | undefined
+  executionError?: string | undefined
+}
+
+export interface ReplayResult {
+  winner: string | null
+  /** v28 G4.4 (RPL-01): `null` when fewer than two plans were recorded — a
+   * single plan has no runner-up, and reporting its FULL score as a "margin"
+   * read as "won by N points" over nothing. Consumers must null-check. */
+  margin: number | null
+  plans: ReplayPlan[]
+  report: string
+  /** FLOW6-6 (v43): the activity sidecar could not be read as the current
+   * format at the most recent backfill read — `plans` is then NOT the
+   * recorded history, and the report says so. PLAN S5.1 (2026-09-16): the
+   * flag tracks the CURRENT read state, so a later clean read (the sidecar
+   * was repaired and an io reload re-read it) clears the qualification —
+   * it never outlives the condition it describes. */
+  sourceCorrupt?: boolean | undefined
+  /** 0.18.1 (S3): the most recent backfill READ threw (io error, or a state the
+   * reader could not produce at all) — no verdict was reached, which is a
+   * different fact from `sourceCorrupt` (the bytes WERE read and are not an
+   * activity envelope). Carries the failure's message; a later ANSWERED read
+   * clears it (see {@link EvolutionReplayDriver.markSourceReadFailed}). */
+  sourceReadFailure?: string | undefined
+}
+
+export interface ReplayWeights {
+  accepted: number
+  rejectedPenalty: number
+  evidence: number
+  cost: number
+}
+
+export const DEFAULT_WEIGHTS: ReplayWeights = {
+  accepted: 10,
+  rejectedPenalty: 15,
+  evidence: 2,
+  cost: 0.001,
+}
+
+/** The four clampable weight fields, in report order (V4-40 warn). */
+const WEIGHT_FIELDS: Array<keyof ReplayWeights> = ['accepted', 'rejectedPenalty', 'evidence', 'cost']
+
+export interface Config {
+  maxPlans?: number
+  weights?: ReplayWeights
+}
+
+export const Config: z<Config> = z.object({
+  maxPlans: z.number().min(1).default(50),
+  weights: z.object({
+    accepted: z.number().min(1).default(10),
+    rejectedPenalty: z.number().min(1).default(15),
+    evidence: z.number().min(1).default(2),
+    cost: z.number().min(0).default(0.001),
+  }).default(DEFAULT_WEIGHTS),
+})
+
+/**
+ * Clamp a weights object to its per-field domain (G3.1). `accepted`,
+ * `rejectedPenalty` and `evidence` are positive multipliers (min 1 — a zero or
+ * negative weight would silently drop a scoring term or reverse its sign);
+ * `cost` may be 0 (0 means "no cost penalty"), so its min is 0. NaN, ±Infinity
+ * and out-of-range values fall back to the default for that field.
+ */
+export function clampReplayWeights(weights: ReplayWeights | undefined, fallback: ReplayWeights = DEFAULT_WEIGHTS): ReplayWeights {
+  return {
+    accepted: clampedNumber(weights?.accepted, fallback.accepted, { min: 1 }),
+    rejectedPenalty: clampedNumber(weights?.rejectedPenalty, fallback.rejectedPenalty, { min: 1 }),
+    evidence: clampedNumber(weights?.evidence, fallback.evidence, { min: 1 }),
+    cost: clampedNumber(weights?.cost, fallback.cost, { min: 0 }),
+  }
+}
+
+function scorePlan(plan: ReplayPlan, weights: ReplayWeights = DEFAULT_WEIGHTS): number {
+  return plan.acceptedOps * weights.accepted
+    - plan.rejectedOps * weights.rejectedPenalty
+    + plan.evidenceQuotes * weights.evidence
+    - plan.estimatedInputChars * weights.cost
+}
+
+export function comparePlans(plans: ReplayPlan[], weights: ReplayWeights = DEFAULT_WEIGHTS): ReplayResult {
+  if (plans.length === 0) return { winner: null, margin: null, plans, report: '没有可比较的计划。' }
+  const scored = plans.map(plan => ({ plan, score: scorePlan(plan, weights) })).sort((a, b) => b.score - a.score)
+  const winner = scored[0]
+  if (!winner) return { winner: null, margin: null, plans, report: '没有可比较的计划。' }
+  const runnerUp = scored[1]
+  // v28 G4.4 (RPL-01): one plan recorded → no comparison happened; the old
+  // `margin = winner.score` published the absolute score in a field whose
+  // only other meaning is a DIFFERENCE. Null it and say so in the report.
+  const margin = runnerUp ? winner.score - runnerUp.score : null
+  const singleNote = runnerUp ? '' : '\n(single plan recorded — margin is not a comparison)'
+  return {
+    winner: winner.plan.policyId,
+    margin,
+    plans,
+    report: scored.map(({ plan, score }) => `${plan.policyId}: ${score.toFixed(1)} (${plan.acceptedOps} accepted, ${plan.rejectedOps} rejected${(plan.skippedUnread ?? 0) > 0 ? `, ${plan.skippedUnread} op(s) skipped (skill not read this session)` : ''}${(plan.executionFailures ?? 0) > 0 ? `, ${plan.executionFailures} failed${plan.executionError !== undefined ? `: ${plan.executionError}` : ''}` : ''})`).join('\n') + singleNote,
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    evolutionReplay: EvolutionReplayDriver
+  }
+}
+
+export class EvolutionReplayDriver {
+  private readonly plans: ReplayPlan[] = []
+  private readonly maxPlans: number
+  /** V25-01 (v25): backfill-once latch — see {@link EvolutionReplayDriver.backfill}. */
+  private backfilled = false
+  /** FLOW6-6 (v43): the backfill source was unreadable (newer format or corrupt
+   * bytes) — carried into every comparison so an empty leaderboard is never
+   * presented as "nothing was recorded". PLAN S5.1 (2026-09-16): this holds the
+   * most recent READ's verdict, not the first one — {@link EvolutionReplayDriver.markSourceReadable}
+   * clears it on a later clean read, so the qualification reflects the present
+   * instead of latching for the driver lifetime. */
+  private sourceCorrupt = false
+  /** 0.18.1 (S3): the backfill READ itself failed — held as its message. A
+   * thrown read used to skip both markers, so `sourceCorrupt` kept whatever
+   * the previous read said and a failed read presented as a clean one. Cleared
+   * by any ANSWERED read; never sets `sourceCorrupt` (a failed read is not
+   * evidence that the bytes are corrupt). */
+  private sourceReadFailure: string | null = null
+  /** V26-05 (v25): plan ids recorded live BEFORE the backfill settled. A
+   * plan-applied landing inside the one-shot `loadActivityState` read window is
+   * recorded live AND persisted into the sidecar the backfill is reading —
+   * `backfill()` drops those ids so the event is not counted twice.
+   *
+   * V27 INS-05: the set is BOUNDED. `backfill()` is the only place that cleared
+   * it, so a sidecar load that never succeeded (the inject callback's catch
+   * warns and does not retry until the io dependency is replaced) let every
+   * live plan id accumulate for the process lifetime. Past
+   * PRE_BACKFILL_ID_CAP the oldest ids are dropped: the dedupe window is then
+   * finite, and a dropped duplicate can at worst repeat an entry inside the
+   * `maxPlans` window instead of growing memory without bound. */
+  private readonly preBackfillIds = new Set<string>()
+  /** Upper bound on {@link EvolutionReplayDriver.preBackfillIds} (V27 INS-05). */
+  private static readonly PRE_BACKFILL_ID_CAP = 4096
+  private readonly weights: ReplayWeights
+
+  constructor(config: Config = {}, warn: (message: string) => void = () => {}) {
+    // G3.1 (0.3.23): clamp maxPlans and weights. A 0/negative/NaN/±Infinity
+    // maxPlans would break the size bound; the weights clamp keeps every term
+    // in its valid domain. The schema `.min(1)` rejects 0/negative; these
+    // clamps also cover NaN/±Infinity (the number schema lets them through).
+    const maxPlans = clampedNumber(config.maxPlans ?? 50, 50, { min: 1 })
+    this.maxPlans = maxPlans
+    if (config.maxPlans !== undefined && maxPlans !== config.maxPlans) {
+      warn(`evolution-replay: maxPlans=${String(config.maxPlans)} is invalid; falling back to the default 50`)
+    }
+    // V4-40: clamp the weights the same way, but surface a single warn when any
+    // field had to be corrected — the maxPlans clamp already warns, and a silent
+    // weights clamp would hide a mis-scored A/B comparison. cost's 0 is legal
+    // (no cost penalty), so it is only flagged when actually out of range.
+    const rawWeights = config.weights
+    this.weights = clampReplayWeights(rawWeights)
+    if (rawWeights !== undefined) {
+      // Only flag fields the caller EXPLICITLY provided that had to be clamped —
+      // an absent field defaults legitimately and must not warn.
+      const clampedFields = WEIGHT_FIELDS.filter(field => field in rawWeights && this.weights[field] !== rawWeights[field])
+      if (clampedFields.length > 0) {
+        warn(`evolution-replay: weights ${clampedFields.join(', ')} provided an invalid value; falling back to the default`)
+      }
+    }
+  }
+
+  record(plan: EvolutionPlanAppliedEvent): void {
+    // V26-05 (v25): while the one-shot backfill is in flight, live plan ids
+    // are tracked so `backfill()` can drop the same events arriving from the
+    // sidecar (the activity store persists them concurrently with the read).
+    if (!this.backfilled) {
+      this.preBackfillIds.add(plan.planId)
+      // V27 INS-05: FIFO eviction (Set iteration order is insertion order), so
+      // the tracking set cannot grow without bound while a backfill is pending.
+      while (this.preBackfillIds.size > EvolutionReplayDriver.PRE_BACKFILL_ID_CAP) {
+        const oldest = this.preBackfillIds.keys().next().value
+        if (oldest === undefined) break
+        this.preBackfillIds.delete(oldest)
+      }
+    }
+    // P3-23 (v14): the op counters arrive from a persisted session event, so a
+    // malformed log entry (missing/NaN/non-number) used to poison `acceptedOps`
+    // with NaN and every score derived from it. Same finite-number discipline
+    // as the other guarded fields below.
+    // P2-2 (v15): the guard now covers ALL SIX numeric fields — the first cut
+    // left `evidenceQuotes`/`estimatedInputChars`/`executionFailures` on bare
+    // `typeof` checks, and `typeof NaN === 'number'` let them straight into
+    // `scorePlan` (evidence is a scored dimension) — the exact poisoning the
+    // fix claimed to close. `count` also refuses negatives: a counter cannot
+    // be negative and a negative value distorts the ranking.
+    this.plans.push(this.toPlan(plan))
+    if (this.plans.length > this.maxPlans) this.plans.shift()
+  }
+
+  /**
+   * v29 RPL-02: the activity/event record → scored-plan mapping, extracted
+   * from `record` so `backfill` can place sidecar plans at the CHRONOLOGICAL
+   * head of the window instead of appending them after this boot's live plans
+   * (the old order made the FIFO evict the freshest live plan first).
+   */
+  private toPlan(plan: EvolutionPlanAppliedEvent): ReplayPlan {
+    // P3-23 (v14): the op counters arrive from a persisted session event, so a
+    // malformed log entry (missing/NaN/non-number) used to poison `acceptedOps`
+    // with NaN and every score derived from it. Same finite-number discipline
+    // as the other guarded fields below.
+    // P2-2 (v15): the guard now covers ALL SIX numeric fields — the first cut
+    // left `evidenceQuotes`/`estimatedInputChars`/`executionFailures` on bare
+    // `typeof` checks, and `typeof NaN === 'number'` let them straight into
+    // `scorePlan` (evidence is a scored dimension) — the exact poisoning the
+    // fix claimed to close. `count` also refuses negatives: a counter cannot
+    // be negative and a negative value distorts the ranking.
+    const count = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
+    const countOr = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback)
+    const memoryApplied = count(plan.memoryApplied)
+    const skillApplied = count(plan.skillApplied)
+    return ({
+      // 0.3.17 (E-76): an EMPTY policyFingerprint counts as missing — the
+      // leaderboard used to show a nameless "" entry (empty-string checks pass
+      // through typeof).
+      policyId: typeof plan.policyFingerprint === 'string' && plan.policyFingerprint.length > 0 ? plan.policyFingerprint : plan.planId,
+      acceptedOps: memoryApplied + skillApplied,
+      rejectedOps: count(plan.rejectedOps),
+      memoryOps: memoryApplied,
+      skillOps: skillApplied,
+      // A missing evidenceQuotes keeps the E-76-era heuristic (≈ applied ops);
+      // a malformed one (NaN/∞/negative) is treated the same way instead of
+      // poisoning the scored dimension.
+      evidenceQuotes: countOr(plan.evidenceQuotes, memoryApplied + skillApplied),
+      estimatedInputChars: count(plan.estimatedInputChars),
+      // R-03: report-only like executionFailures (E4/P1-10) — the skips are a
+      // refusal cause the score does not weigh, but the text must show them.
+      skippedUnread: count(plan.skippedUnread),
+      // V6-10 (0.3.36): keep the failure dimension for the leaderboard —
+      // a plan whose ops all failed must not score as a clean empty plan.
+      // E4 (P1-10, v11): the failure dimension is a REPORT-ONLY field (shown
+      // in the leaderboard text); scorePlan intentionally weighs only
+      // accepted/rejected/evidence/cost — execution failures and validation
+      // rejections score differently BY DESIGN (the operational layers differ:
+      // rejected ops were prevented, failed ops were attempted). The V6-10
+      // comment above was the only place claiming a score equality it does
+      // not implement; the score function below is the authority.
+      executionFailures: count(plan.executionFailures),
+      ...typeof plan.executionError === 'string' ? { executionError: plan.executionError } : {},
+    })
+  }
+
+  /**
+   * V25-01 (v25): backfill the leaderboard from the activity sidecar — once
+   * per driver instance, and only for a load that carried records (an empty
+   * read is not evidence, see below). The inject callback that loads the sidecar re-runs
+   * whenever the `evolutionIo` dependency is replaced (cordis derived-fiber
+   * reload — plugin restart / HMR) while THIS driver survives at the apply
+   * scope, so the dedupe guard must live here, not in the callback: without
+   * it, every io reload doubled the leaderboard entries.
+   * @param items - activity records in sidecar order (oldest first).
+   */
+  backfill(items: ReadonlyArray<import('@deepseek-ai/dsh-evolution-activity').EvolutionActivityRecord>): void {
+    if (this.backfilled) return
+    // P2-15: an EMPTY list does not prove the sidecar was read — a quarantined
+    // activity.json loads as [] too. Latching on it would lock the leaderboard
+    // empty for the process lifetime, so the latch commits on the first load
+    // that actually carried records; repeating backfill([]) duplicates nothing.
+    if (items.length === 0) return
+    this.backfilled = true
+    // V26-05 (v25): drop the sidecar copies of plans that were already
+    // recorded live inside the read window (same planId — ids are unique per
+    // plan), then retire the tracking set.
+    const fresh = items.filter(item => !this.preBackfillIds.has(item.planId))
+    this.preBackfillIds.clear()
+    // v29 RPL-02: sidecar records are OLDER than this boot's live plans
+    // (live events recorded between listener registration and this async load
+    // landed at the tail first). Inserting them at the CHRONOLOGICAL head —
+    // oldest first — keeps the array time-ordered, so the maxPlans FIFO
+    // evicts the oldest record instead of the freshest live plan (the old
+    // append-after-live order shifted out exactly the plans a human A/B
+    // review most wants).
+    const freshPlans = fresh.map(item => this.toPlan(item))
+    this.plans.unshift(...freshPlans)
+    if (this.plans.length > this.maxPlans) this.plans.splice(0, this.plans.length - this.maxPlans)
+  }
+
+  /**
+   * F-11: test-support API — no production consumer reads the raw
+   * plan list (the leaderboard path goes through `compare()`); tests use this
+   * as a read/inspection window. Kept by declaration (same posture as the
+   * skill-usage `invalidate()` V6-44 declaration), so it is documented intent
+   * rather than undeclared dead code.
+   * @internal Exported for this package's own tests only.
+   */
+  plansSnapshot(): ReplayPlan[] {
+    return [...this.plans]
+  }
+
+  /**
+   * FLOW6-6 (v43): mark the backfill source unreadable. Set by `apply()` when
+   * the activity sidecar carries bytes this build cannot read; the qualification
+   * then travels with every comparison — until a later read says otherwise
+   * (see {@link EvolutionReplayDriver.markSourceReadable}).
+   */
+  markSourceUnreadable(): void {
+    this.sourceCorrupt = true
+    // 0.18.1 (S3): an ANSWERED read — even a corrupt verdict — retires a
+    // previous read FAILURE; only the current read's state may qualify.
+    this.sourceReadFailure = null
+  }
+
+  /**
+   * PLAN S5.1 (2026-09-16, audit P2-18): the counterpart clear — `apply()` calls
+   * this on every successful read whose bytes ARE the current format
+   * (`loadActivityState` answered `corrupt: false`), so the
+   * {@link ReplayResult.sourceCorrupt} qualification follows the CURRENT read
+   * state. Before this the flag latched for the driver lifetime: a repaired
+   * sidecar plus an io reload (HMR / plugin restart) backfilled the full
+   * history while `compare()` kept asserting "NOT the recorded history" — a
+   * permanent report claim contrary to fact. The corruption verdict is
+   * per-read; the past corruption itself stays observable through the warn
+   * `apply()` emits at mark time.
+   */
+  markSourceReadable(): void {
+    this.sourceCorrupt = false
+    this.sourceReadFailure = null
+  }
+
+  /**
+   * 0.18.1 (S3): the backfill read THREW (io error, or a state the reader could
+   * not produce at all). Neither verdict applies — the bytes were never judged.
+   * Before this the throw skipped both markers and `compare()` returned an
+   * unqualified leaderboard, presenting a failed read as an answered one.
+   * @param reason - the failure's message, as thrown.
+   */
+  markSourceReadFailed(reason: string): void {
+    this.sourceReadFailure = reason
+  }
+
+  compare(weights: ReplayWeights = this.weights): ReplayResult {
+    // P3 (v15): sort on a COPY — `comparePlans` sorts its argument in place,
+    // and `this.plans` used to be handed over by reference, so a consumer
+    // sorting/reordering `result.plans` mutated the driver's live leaderboard
+    // (inconsistent with `plansSnapshot()`'s deliberate copy).
+    // C-11 (v18): compare() is public; the constructor clamps its config,
+    // but a caller-supplied weights object must be clamped here too (NaN/negative
+    // weights would produce NaN scores/margins).
+    const result = comparePlans([...this.plans], clampReplayWeights(weights, this.weights))
+    // 0.18.1 (S3): a read FAILURE carries its own qualification. The two are
+    // composed rather than folded together because they are different facts
+    // (never judged vs judged corrupt).
+    const failure = this.sourceReadFailure === null
+      ? ''
+      : `The activity sidecar read FAILED (${this.sourceReadFailure}) — this leaderboard carries no history from the sidecar, and a failed read is NOT "nothing was recorded".\n`
+    if (!this.sourceCorrupt && this.sourceReadFailure === null) return { ...result, sourceCorrupt: false }
+    return {
+      ...result,
+      sourceCorrupt: this.sourceCorrupt,
+      ...this.sourceReadFailure === null ? {} : { sourceReadFailure: this.sourceReadFailure },
+      report: failure + (this.sourceCorrupt
+        // T4-08/A50: the parenthetical used to say "corrupt bytes or a newer writer" — a newer writer's
+        // envelope is READ (its records are the history), so only unreadable bytes reach this sentence.
+        ? 'The activity sidecar could not be read as an activity envelope (unparsable bytes, or no items array) — this leaderboard is NOT the recorded history, and an empty list does not mean nothing happened.\n'
+        : '') + result.report,
+    }
+  }
+}
+
+export const name = 'evolution-replay'
+
+export function apply(ctx: Context, rawConfig: Config = {}): void {
+  const driver = new EvolutionReplayDriver(rawConfig, (message) => {
+    ctx.logger.warn(message)
+  })
+  ctx.provide('evolutionReplay', driver)
+  ctx.on('evolution/plan-applied', (event) => {
+    driver.record(event)
+  })
+  // V24-13 (v24): backfill the leaderboard from the activity sidecar the
+  // evolution-activity package persists on every plan outcome. Deferred
+  // binding (same pattern as activity's own persistence listener): subscribe
+  // only once the evolution IO provider mounts. Records feed in file order
+  // (oldest first) through the same `record()` gate the live path uses, so
+  // the maxPlans window keeps the newest and every numeric guard applies.
+  // The activity record is payload v2 of `evolution/plan-applied` plus an
+  // `at` timestamp — structurally the event the leaderboard consumes.
+  ctx.inject(['evolutionIo'], (ioCtx) => {
+    const ioRegistry = (ioCtx as unknown as { evolutionIo: { provider(): import('@deepseek-ai/dsh-evolution-core').EvolutionIoLike } }).evolutionIo
+    const io = evolutionIoAdapter(() => ioRegistry.provider())
+    const root = evolutionHome()
+    void loadActivityState(root, io)
+      .then((loaded) => {
+        // FLOW6-6 (v43): an unreadable sidecar is not "no history". Say so once
+        // and qualify every comparison, instead of showing an empty leaderboard
+        // that reads as "nothing was ever recorded".
+        if (loaded.corrupt) {
+          // T4-08/A50: ONLY this state means the records are missing — the bytes were not an activity
+          // envelope at all, so there is nothing to backfill and the comparison is qualified.
+          ioCtx.logger.warn('evolution-replay: the activity sidecar could not be read as an activity envelope (unparsable bytes, or no items array) — there is NO history to backfill; the writer quarantines those bytes on its next append')
+          driver.markSourceUnreadable()
+        } else {
+          // ...while a NEWER writer's envelope is NOT that: its items were read as-is (the pinned
+          // behaviour), so this is the recorded history for every field this build knows. Calling it
+          // "NOT the recorded history" while the leaderboard showed its records was the contradiction.
+          if (loaded.foreignVersion) {
+            ioCtx.logger.warn('evolution-replay: the activity sidecar was written by a NEWER activity format than this build reads — its records were read as-is and unknown fields ignored, so the leaderboard is complete for the fields this build knows; the writer quarantines those bytes on its next append')
+          }
+          // PLAN S5.1 (2026-09-16, audit P2-18): a clean read is also a verdict —
+          // clear a stale flag so the compare() qualification follows the current
+          // read (a repaired sidecar reaching us through an io reload must stop
+          // qualifying the report as "NOT the recorded history"). A read that
+          // THREW no longer skips both branches silently: the chain's own
+          // `.catch` below marks the failure (0.18.1 / S3), so `compare()`
+          // qualifies the result instead of presenting it as an answered read.
+          driver.markSourceReadable()
+        }
+        // V25-01 (v25): backfill() is once-per-driver — this callback re-runs
+        // on every evolutionIo dependency replacement while the driver
+        // survives, so a plain record loop here would double the entries.
+        driver.backfill(loaded.records)
+      })
+      .then(
+        undefined,
+        (error: unknown) => {
+          // 0.18.1 (S3): a THROWN read is a state, not a silence — the leaderboard
+          // must stop presenting as an answered read. Review P2-4: ONLY the read's
+          // own rejection reaches this handler (two-argument then), so a failure in
+          // the body above can no longer be misattributed as "the read failed".
+          const reason = error instanceof Error ? error.message : String(error)
+          driver.markSourceReadFailed(reason)
+          ioCtx.logger.warn(`evolution-replay: activity sidecar backfill skipped (${reason}) — this leaderboard carries no history from the sidecar, and a failed read is not "nothing was recorded"`)
+        },
+      )
+      .catch((error: unknown) => {
+        // The read ANSWERED; something in the body failed. The source verdict is
+        // unaffected — only the log says so (no fabricated read-failure state).
+        ioCtx.logger.warn(`evolution-replay: activity sidecar backfill failed after a successful read (${error instanceof Error ? error.message : String(error)}) — the source verdict is unaffected`)
+      })
+  })
+}
+

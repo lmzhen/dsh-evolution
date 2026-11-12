@@ -12,7 +12,7 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
-import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
+import SkillUsageRegistry from '@deepseek-ai/dsh-evolution-skill-discovery/usage'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -416,13 +416,21 @@ describe('write gates: the foreground confirmation (E-317)', () => {
   it('T2-10/A25: with the approval seam staging this write, the confirmation is SKIPPED — one human gate, not two', async () => {
     const { ctx } = await setup({ skillWriteConfirm: 'ask' })
     // The approval stack (state → approval): the SAME foreground create now has two candidate gates.
-    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state')).default
-    const JsonState = await import('@deepseek-ai/dsh-evolution-state-json')
-    const EvolutionState = (await import('@deepseek-ai/dsh-evolution-state')).default
     const home = process.env.DSH_HOME as string
+    const { Storage, storageBackendServiceKey } = await import('@deepseek-ai/dsh-storage')
+    const { JsonStorageBackend } = await import('@deepseek-ai/dsh-storage-json')
+    const DomainFacility = await import('@deepseek-ai/dsh-storage-domain')
+    const DomainState = await import('@deepseek-ai/dsh-evolution-state-domain')
+    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state')).default
+    const EvolutionState = (await import('@deepseek-ai/dsh-evolution-state')).default
+    await ctx.plugin(Storage)
+    const backend = new JsonStorageBackend(join(home, 'storage'))
+    ctx.storage.backend.register('test-json', backend)
+    ctx.provide(storageBackendServiceKey('test-json'), backend)
+    await ctx.plugin(DomainFacility, { backend: 'test-json' })
     await ctx.plugin(EvolutionStateStorage)
-    await ctx.plugin(JsonState, { root: home })
-    await ctx.plugin(EvolutionState)
+    await ctx.plugin(DomainState)
+    await ctx.plugin(EvolutionState, { provider: 'domain' })
     await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
     const { asked } = mountQuestions(ctx, () => ['创建'])
     const created = await callTool(ctx, { action: 'create', name: 'one-gate', content: skillBody('one-gate') }, sessionOf(undefined))

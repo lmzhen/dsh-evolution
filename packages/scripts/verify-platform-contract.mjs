@@ -759,7 +759,7 @@ for (const name of readdirSync(familyRoot, { withFileTypes: true })) {
   walkSources(join(familyRoot, name.name, 'src'), (_path, text) => {
     for (const match of text.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['"]([^'"]+)['"]/g)) {
       const source = match[2]
-      if (!PLATFORM_SCOPED.test(source) || source.startsWith('@deepseek-ai/dsh-evolution') || source.startsWith('@deepseek-ai/dsh-memory') || source.startsWith('@deepseek-ai/dsh-skill-usage') || source.startsWith('@deepseek-ai/dsh-tool-')) continue
+      if (!PLATFORM_SCOPED.test(source) || source.startsWith('@deepseek-ai/dsh-evolution') || source.startsWith('@deepseek-ai/dsh-memory') || source.startsWith('@deepseek-ai/dsh-evolution-skill-discovery/usage') || source.startsWith('@deepseek-ai/dsh-tool-')) continue
       const symbols = new Set()
       for (const part of match[1].split(',')) {
         const trimmed = part.trim().replace(/^type\s+/, '')

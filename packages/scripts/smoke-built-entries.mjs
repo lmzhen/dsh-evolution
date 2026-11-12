@@ -40,7 +40,7 @@ const platform = resolve(platformArg >= 0 ? (argv[platformArg + 1] ?? '') : join
 const problems = []
 
 /** Family package-name prefixes (the specs the compositions may mount). */
-const FAMILY_PREFIXES = ['@deepseek-ai/dsh-evolution-', '@deepseek-ai/dsh-memory', '@deepseek-ai/dsh-skill-usage', '@deepseek-ai/dsh-tool-']
+const FAMILY_PREFIXES = ['@deepseek-ai/dsh-evolution-', '@deepseek-ai/dsh-memory', '@deepseek-ai/dsh-evolution-skill-discovery/usage', '@deepseek-ai/dsh-tool-']
 
 /**
  * Whether a package may legally ship an empty entry.

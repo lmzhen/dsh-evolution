@@ -27,3 +27,10 @@ Domain state defaults to these files below the evolution home:
 With domain mode on, `/skill-domain status` inspects the current view and `/skill-domain generate` builds a domain map. Generation also requires `mapReferenceCwd`; the command refuses to infer a global map from the caller view. `mapReferenceScope` optionally overrides the reference scope.
 
 Projection failures fail open to the original decision so discovery does not hide the ordinary catalog. Search/index degradation is reported explicitly rather than returned as a silent empty result.
+
+## Skill names
+
+The family's canonical name for a skill is its **directory name**. The frontmatter `name` is
+validated against it, and the catalog provider publishes the scanned directory name.
+
+**Decision 1 is open**: whether a skill may ever publish under its frontmatter name instead.
