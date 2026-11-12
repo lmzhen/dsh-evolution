@@ -29,8 +29,6 @@
     // under its own tsconfig boundary.
     "paths": {
       "zod": ["./node_modules/.pnpm/zod@4.4.3/node_modules/zod"],
-    "@deepseek-ai/dsh-evolution-core/io-node": ["./packages/evolution/evolution-core/src/io-node.ts"],
-    "@deepseek-ai/dsh-evolution-core/io-registry": ["./packages/evolution/evolution-core/src/io-registry.ts"],
       "@deepseek-ai/dsh-evolution-feedback": ["./packages/evolution/evolution-feedback/src/index.ts"],
       "@deepseek-ai/dsh-evolution-activity": ["./packages/evolution/evolution-activity/src/index.ts"],
       "@deepseek-ai/dsh-evolution-replay": ["./packages/evolution/evolution-replay/src/index.ts"],
@@ -39,7 +37,6 @@
       "@deepseek-ai/dsh-evolution-state-json": ["./packages/evolution/evolution-state-json/src/index.ts"],
       "@deepseek-ai/dsh-evolution-state-domain": ["./packages/evolution/evolution-state-domain/src/index.ts"],
       "@deepseek-ai/dsh-evolution-state": ["./packages/evolution/evolution-state/src/index.ts"],
-    "@deepseek-ai/dsh-evolution-core/policy": ["./packages/evolution/evolution-core/src/policy.ts"],
       "@deepseek-ai/dsh-evolution-plan-validator": ["./packages/evolution/evolution-plan-validator/src/index.ts"],
       "@deepseek-ai/dsh-memory": ["./packages/evolution/memory/src/index.ts"],
       "@deepseek-ai/dsh-memory-files": ["./packages/evolution/memory-files/src/index.ts"],
@@ -52,7 +49,6 @@
       "@deepseek-ai/dsh-evolution-commands": ["./packages/evolution/evolution-commands/src/index.ts"],
       "@deepseek-ai/dsh-evolution-learning-graph": ["./packages/evolution/evolution-learning-graph/src/index.ts"],
       "@deepseek-ai/dsh-evolution-maintenance": ["./packages/evolution/evolution-maintenance/src/index.ts"],
-    "@deepseek-ai/dsh-evolution-core/contract": ["./packages/evolution/evolution-core/src/contract.ts"],
       "@deepseek-ai/dsh-evolution-core": ["./packages/evolution/evolution-core/src/index.ts"],
       "@deepseek-ai/dsh-evolution-core/composition": ["./packages/evolution/evolution-core/src/composition/index.ts"],
       "@deepseek-ai/dsh-evolution-core/subagent": ["./packages/evolution/evolution-core/src/subagent/index.ts"],

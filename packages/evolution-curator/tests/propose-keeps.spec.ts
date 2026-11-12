@@ -5,7 +5,7 @@ import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import EvolutionCurator from '../src/index.ts'
 
 it('curator proposes keep for a body-oversize skill', async () => {

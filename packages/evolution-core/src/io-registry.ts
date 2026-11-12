@@ -117,7 +117,7 @@ export class EvolutionIoRegistry extends Service {
     // P3 (v16): dual-scope guidance — published installs resolve @lmzhen, the
     // upstream overlay resolves @deepseek-ai (see the scope-occupancy note in
     // packages/README.md).
-    if (!first) throw new Error('no evolution IO provider registered — mount evolution-io-node (@lmzhen/dsh-evolution-io-node published, @deepseek-ai/dsh-evolution-core/io-registry-node in the dev overlay; ships with evolution-host/evolution-all) and retry')
+    if (!first) throw new Error('no evolution IO provider registered — mount evolution-io-node (@lmzhen/dsh-evolution-io-node published, @deepseek-ai/dsh-evolution-core/io-node in the dev overlay; ships with evolution-host/evolution-all) and retry')
     return first
   }
 }

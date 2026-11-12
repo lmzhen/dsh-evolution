@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import EvolutionCurator, { gateConsolidations } from '../src/index.ts'
 import { DEFAULT_SKILL_LIMITS, computeDedupGroups, computeLifecycleTransitions, computeScopeView, emptyRecord, getRecord, loadSuppressedNames, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, saveSuppressedNames, saveUsage, loadUsage } from '@deepseek-ai/dsh-evolution-core'
 import { parseHistoryIndex } from '@deepseek-ai/dsh-evolution-core/skills'

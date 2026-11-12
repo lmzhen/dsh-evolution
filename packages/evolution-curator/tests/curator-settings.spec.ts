@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import EvolutionCurator, { validateCuratorSettings } from '../src/index.ts'
 import { loadUsage, nodeEvolutionIo, saveUsage } from '@deepseek-ai/dsh-evolution-core'
 import type { UsageRecord } from '@deepseek-ai/dsh-evolution-core'

@@ -13,7 +13,7 @@
 import { expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import EvolutionCurator from '../src/index.ts'
 import { tempHome } from '../../test-support/temp-home.ts'
 

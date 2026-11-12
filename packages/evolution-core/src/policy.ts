@@ -29,17 +29,19 @@ import {
   DEFAULT_USER_CHAR_LIMIT,
   DEFAULT_SKILL_CONTENT_CHARS,
   DEFAULT_CURATOR_MODEL,
+} from './constants.ts'
+import {
   DEFAULT_CITATION_POLICY,
   DEFAULT_REFERENCE_REWRITE_POLICY,
   DEFAULT_ARCHIVE_RETENTION_POLICY,
   DEFAULT_SUPPORT_FILE_CHAR_POLICY,
   POLICY_STAGE_DEFAULTS,
-  clampedNumber,
   type ArchiveRetentionPolicy,
   type CitationPolicy,
   type ReferenceRewritePolicy,
   type SupportFileCharPolicy,
-} from './constants.ts'
+} from './limits.ts'
+import { clampedNumber } from './numeric.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {

@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import EvolutionCurator from '../src/index.ts'
 import { vol } from '../../test-support/volatile-config.ts'
 

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import * as Feedback from '../src/index.ts'
 import { appendEvolutionEvent, readEvolutionEvents } from '@deepseek-ai/dsh-evolution-core'

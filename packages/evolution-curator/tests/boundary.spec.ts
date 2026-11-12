@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
-import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-registry-node'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 // G4: the idleness gate reads the family's session projection, so the spec mounts the registry
 // the platform's base bundle mounts (a real host always has it).
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'

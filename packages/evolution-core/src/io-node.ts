@@ -6,7 +6,7 @@
  * exists(), made directories report absent and let re-archives overwrite
  * older archive folders). Only the provider's `name` is added here.
  *
- * @module @deepseek-ai/dsh-evolution-core/io-registry-node
+ * @module @deepseek-ai/dsh-evolution-core/io-node
  */
 
 import type { Context } from '@deepseek-ai/cordis'
