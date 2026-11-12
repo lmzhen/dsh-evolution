@@ -138,8 +138,6 @@
   # `skill` tool (the DSH catalog exposes it only). S1-A1: unlike the
   # host/all/preset-patch rows, this row deliberately omits
   # `sessionScoped: true` — see the skill-usage note above.
-  config:
-    reviewToolAllow: [skill]
 - id: evolution-curator
   name: '@deepseek-ai/dsh-evolution-curator'
 - id: evolution-commands

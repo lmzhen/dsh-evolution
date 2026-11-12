@@ -90,11 +90,6 @@
     - id: evolution-review
       name: '@deepseek-ai/dsh-evolution-review'
       config:
-        # Mirror evolution-host: the DSH tool catalog exposes the plain `skill`
-        # tool only, so review subagents load skills through it. Keeping the
-        # shared-row config byte-identical to host preserves the mutual exclusion
-        # between the host bundle and this preset bundle (E-33).
-        reviewToolAllow: [skill]
         # Shared with every bundle (byte-identical row): with the model rows at
         # profile root every session carries them, so the probe passes for all.
         sessionScoped: true

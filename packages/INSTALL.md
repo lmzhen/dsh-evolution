@@ -38,7 +38,7 @@ Validated line: **DSH 0.2.2-rc.1**.
 - Under variant, `/evolution` commands remain visible globally; automatic behavior is session-gated.
 - `skill-health` is disabled in the `all` bundle by default.
 - `merge/run` and `merge/runs` paths are declared but not implemented.
-- `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth`, and `reviewToolAllow` appear in the generated parameter table/bundle metadata but are not read by the review plugin. Do not rely on them for provider selection, context limits, delegation depth, or tool restrictions. `reviewTimeoutMs` is implemented.
+- `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth`, and `reviewToolAllow` were removed from the registry and the bundles: no code ever read them. The review subagent takes its provider/model from the parent session header, and its tool allowlist is the parent's tools intersected with the family allowlist (a derived guarantee, not a knob).
 - The local `evolution-io-node` backend guarantees same-path serialization only within one process. Cross-process read-modify-write over a shared home requires the platform `ctx.fs` provider; the Node backend alone is not a cross-process lock.
 
 ## Command fallbacks

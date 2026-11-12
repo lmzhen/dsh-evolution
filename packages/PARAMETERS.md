@@ -73,12 +73,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `reviewMode` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Run the review in the plugin-owned auxiliary loop (aux), or as a parent-session turn (inject; debugging only). |
 | `reviewWakeInject` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Deliver the deferred review as a waking follow-up message. |
 | `reviewNotice` | E3 | live | cordis | evolution-review | — | 卡：evolution-review | Deliver result notices into the parent conversation for inject mode; aux results are audit-only. |
-| `reviewProvider` | E2 | none | cordis | evolution-review | — | 无（identity） | LLM provider for review subagents (deployment identity). |
 | `reviewTimeoutMs` | E2 | none | cordis | evolution-review | — | 无（internal） | Bound on one review subagent run and its write leg. |
-| `reviewContextMessages` | E2 | none | cordis | evolution-review | — | 无（internal） | Messages of context handed to a review subagent. |
-| `reviewMessageChars` | E2 | none | cordis | evolution-review | — | 无（internal） | Per-message character budget of the review context. |
-| `reviewMaxDepth` | E2 | none | cordis | evolution-review | — | 无（internal） | Absolute delegation-depth cap of the review subagent. |
-| `reviewToolAllow` | E2 | none | cordis | evolution-review | — | 无（security） | Tools the review subagent may use (safety surface). NOT IMPLEMENTED: declared for the config surface, but no code reads it, so it protects nothing yet. |
 
 ## memory（记忆）
 

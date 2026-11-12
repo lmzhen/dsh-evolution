@@ -1045,11 +1045,6 @@
       "body": [
         "      name: '@deepseek-ai/dsh-evolution-review'",
         "      config:",
-        "        # The DSH tool catalog exposes the plain `skill` tool only — the",
-        "        # `skill_search`/`skill_load` discovery pair does not exist here, so",
-        "        # listing it would be dead configuration. Allow `skill` so review",
-        "        # subagents can load skills under the Anchored Standard preset family.",
-        "        reviewToolAllow: [skill]",
         "        # Shared with host/preset (byte-identical row); the model rows are at",
         "        # profile root here, so every session carries them.",
         "        sessionScoped: true"
@@ -1058,11 +1053,6 @@
         "all": [
           "      name: '@deepseek-ai/dsh-evolution-review'",
           "      config:",
-          "        # The DSH tool catalog exposes the plain `skill` tool only — the",
-          "        # `skill_search`/`skill_load` discovery pair does not exist here, so",
-          "        # listing it would be dead configuration. Allow `skill` so review",
-          "        # subagents can load skills under the Anchored Standard preset family.",
-          "        reviewToolAllow: [skill]",
           "        # Shared with host/preset (byte-identical row); the model rows are at",
           "        # profile root here, so every session carries them.",
           "        sessionScoped: true"
@@ -1070,11 +1060,6 @@
         "host": [
           "      name: '@deepseek-ai/dsh-evolution-review'",
           "      config:",
-          "        # The DSH tool catalog exposes the plain `skill` tool only — the",
-          "        # `skill_search`/`skill_load` discovery pair does not exist here, so",
-          "        # listing it would be dead configuration. Allow `skill` so review",
-          "        # subagents can load skills under the Anchored Standard preset family.",
-          "        reviewToolAllow: [skill]",
           "        # See the skill-usage row above: an original-preset session under a",
           "        # variant install carries no family tools and must not be injected. The",
           "        # host-only caveat there applies here too — a probe that never matches is",
@@ -1085,11 +1070,6 @@
         "preset": [
           "      name: '@deepseek-ai/dsh-evolution-review'",
           "      config:",
-          "        # Mirror evolution-host: the DSH tool catalog exposes the plain `skill`",
-          "        # tool only, so review subagents load skills through it. Keeping the",
-          "        # shared-row config byte-identical to host preserves the mutual exclusion",
-          "        # between the host bundle and this preset bundle (E-33).",
-          "        reviewToolAllow: [skill]",
           "        # Shared with every bundle (byte-identical row): with the model rows at",
           "        # profile root every session carries them, so the probe passes for all.",
           "        sessionScoped: true"
@@ -1099,9 +1079,7 @@
           "  # V5-24 (0.3.32): the tool allow-list narrows review subagents to the plain",
           "  # `skill` tool (the DSH catalog exposes it only). S1-A1: unlike the",
           "  # host/all/preset-patch rows, this row deliberately omits",
-          "  # `sessionScoped: true` — see the skill-usage note above.",
-          "  config:",
-          "    reviewToolAllow: [skill]"
+          "  # `sessionScoped: true` — see the skill-usage note above."
         ]
       },
       "leads": {

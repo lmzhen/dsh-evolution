@@ -24,10 +24,7 @@ const REVIEW_E3 = [
   'reviewSkillInterval', 'reviewMemoryInterval', 'skillReviewTrigger',
   'skillReviewCompletionMinToolCalls', 'reviewEnabled', 'reviewMode', 'reviewWakeInject', 'reviewNotice',
 ]
-const REVIEW_E2 = [
-  'reviewProvider', 'reviewTimeoutMs', 'reviewContextMessages', 'reviewMessageChars',
-  'reviewMaxDepth', 'reviewToolAllow',
-]
+const REVIEW_E2 = ['reviewTimeoutMs']
 
 // The generators ONE parser, imported rather than mirrored: the mirror this file used to carry went
 // stale the moment the declared ending grew a column (independent review P1-3), which is exactly the

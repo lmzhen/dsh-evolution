@@ -23,8 +23,7 @@ Subagent-origin, background-visibility, and review-child sessions are excluded. 
 
 The package emits `evolution/review-scheduled`, `evolution/review-completed`, `evolution/review-error`, and an aux `evolution/plan-applied` ledger entry. `reviewTimeoutMs` bounds the aux loop. Review cadence state is persisted when `evolution-state` is available; without it, cadence can reset between turns.
 
-**Unimplemented metadata:** `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth`, and `reviewToolAllow` may still appear in generated parameter/bundle metadata, but this plugin does not read them. Do not rely on them for provider selection, context limits, delegation depth, or tool restrictions. `reviewTimeoutMs` is implemented.
-
+**Removed metadata:** `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth` and `reviewToolAllow` were declared but never read, so they are gone from the registry and the bundles. Provider/model come from the parent session header; the tool allowlist is the parent's tools intersected with the family allowlist.
 `memoryInterval` and `skillInterval` remain readable deprecated aliases of `reviewMemoryInterval` and `reviewSkillInterval`; writes to the old names are refused (G0/S0.3).
 
 

@@ -113,11 +113,6 @@
     - id: evolution-review
       name: '@deepseek-ai/dsh-evolution-review'
       config:
-        # The DSH tool catalog exposes the plain `skill` tool only — the
-        # `skill_search`/`skill_load` discovery pair does not exist here, so
-        # listing it would be dead configuration. Allow `skill` so review
-        # subagents can load skills under the Anchored Standard preset family.
-        reviewToolAllow: [skill]
         # Shared with host/preset (byte-identical row); the model rows are at
         # profile root here, so every session carries them.
         sessionScoped: true
