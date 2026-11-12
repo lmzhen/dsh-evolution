@@ -309,25 +309,44 @@ if (probesWanted || listWanted) {
     probeResults.push({ id: probe.id, status, detail })
     if (!jsonMode) console.log('  ' + status.padEnd(18) + probe.id.padEnd(38) + detail)
   }
-  const proven = probeResults.filter((entry) => entry.status === 'PROVEN RED')
-  const failed = probeResults.filter((entry) => entry.status !== 'PROVEN RED')
+  // Three answers, not two (W9-gates §11): a probe whose unmutated baseline is not green here
+  // proves nothing about the mutation, and calling that a failure is how a real regression gets
+  // lost in environmental noise. Only "the mutation stayed green" is a defect.
+  const probeKind = (status) => status === 'PROVEN RED' ? 'proven-red' : status === 'NO GREEN BASELINE' ? 'cannot-decide' : 'failed'
+  const proven = probeResults.filter((entry) => probeKind(entry.status) === 'proven-red')
+  const cannotDecide = probeResults.filter((entry) => probeKind(entry.status) === 'cannot-decide')
+  const failed = probeResults.filter((entry) => probeKind(entry.status) === 'failed')
   let ledgerPath = null
-  if (!noStamp && failed.length === 0) {
+  if (!noStamp && proven.length > 0) {
     const mirrorReports = join(repoRoot, 'packages', 'scripts', 'reports')
     ledgerPath = ledgerTarget !== undefined ? resolvePath(ledgerTarget) : (existsSync(mirrorReports) ? join(mirrorReports, 'mutation-coverage.json') : join(PROBE_ROOT, 'scripts', 'reports', 'mutation-coverage.json'))
     let ledger = { schemaVersion: 1, generatedBy: 'packages/scripts/verify-mutations.mjs --probes', generatedAt: new Date().toISOString(), records: [] }
     if (existsSync(ledgerPath)) { try { const existing = JSON.parse(readBytes(ledgerPath, 'utf8')); if (Array.isArray(existing.records)) ledger = { ...ledger, ...existing, records: existing.records } } catch { /* a damaged ledger is replaced */ } }
     const byProbe = new Map(ledger.records.filter((record) => record !== null && typeof record === 'object').map((record) => [record.probe, record]))
-    for (const probe of selected) byProbe.set(probe.id, { probe: probe.id, signature: probeSignature(PROBE_ROOT, probe), provenAt: new Date().toISOString(), tree: 'overlay' })
+    // Stamp ONLY the probes that actually proved red: a signature on an unproven probe would
+    // describe a tree for a claim nobody demonstrated.
+    const provenIds = new Set(proven.map((entry) => entry.id))
+    for (const probe of selected) {
+      if (!provenIds.has(probe.id)) continue
+      byProbe.set(probe.id, { probe: probe.id, signature: probeSignature(PROBE_ROOT, probe), provenAt: new Date().toISOString(), tree: 'overlay' })
+    }
     ledger.records = [...byProbe.values()].sort((a, b) => String(a.probe).localeCompare(String(b.probe)))
     ledger.generatedAt = new Date().toISOString()
     mkdirSync(dirname(ledgerPath), { recursive: true })
     writeBytes(ledgerPath, JSON.stringify(ledger, null, 2) + String.fromCharCode(10))
   }
   releaseLock()
-  const summary = { ok: failed.length === 0, probes: probeResults, proven: proven.length, failed: failed.length, seconds: Math.round((Date.now() - startedAt) / 100) / 10, ledger: ledgerPath }
+  const summary = {
+    ok: failed.length === 0,
+    probes: probeResults.map((entry) => ({ ...entry, kind: probeKind(entry.status) })),
+    proven: proven.length,
+    cannotDecide: cannotDecide.length,
+    failed: failed.length,
+    seconds: Math.round((Date.now() - startedAt) / 100) / 10,
+    ledger: ledgerPath,
+  }
   if (jsonMode) console.log(JSON.stringify(summary, null, 2))
-  else console.log('verify-mutations --probes: ' + proven.length + '/' + probeResults.length + ' proven red' + (ledgerPath === null ? ' (ledger not written)' : '; ledger ' + ledgerPath))
+  else console.log('verify-mutations --probes: proven=' + String(proven.length) + ' cannotDecide=' + String(cannotDecide.length) + ' failed=' + String(failed.length) + (cannotDecide.length === 0 ? '' : ' (cannot decide: ' + cannotDecide.map((entry) => entry.id).join(', ') + ')') + (ledgerPath === null ? ' (ledger not written)' : '; ledger ' + ledgerPath))
   process.exit(failed.length === 0 ? 0 : 1)
 }
 

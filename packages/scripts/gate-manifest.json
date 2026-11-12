@@ -761,7 +761,8 @@
       ],
       "tree": "mirror",
       "profiles": [
-        "local"
+        "local",
+        "ci"
       ]
     },
     {

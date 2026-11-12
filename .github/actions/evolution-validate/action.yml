@@ -427,6 +427,16 @@ runs:
         node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check
         node packages/evolution/scripts/verify-requirements.mjs packages/evolution
         node packages/evolution/scripts/requirements.selftest.mjs
+    - name: Prove the mutation probes can still go red (W9 S4)
+      shell: bash
+      working-directory: upstream
+      timeout-minutes: 25
+      run: |
+        # Three-valued by design: a probe whose UNMUTATED baseline is not green in this job proves
+        # nothing about its mutation, so it is reported as cannot-decide and counted; a mutation that
+        # stays green is a real defect and fails here. This is the half CI never ran, which is why a
+        # stale probe signature could only be discovered by hand.
+        node packages/evolution/scripts/verify-mutations.mjs --probes --no-stamp --json
     - name: Assemble the release evidence planes (W10/W11)
       shell: bash
       working-directory: upstream
