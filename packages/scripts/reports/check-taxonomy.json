@@ -143,6 +143,7 @@
         "evolution-core::tests/skill-model.spec.ts",
         "evolution-core::tests/skill-store-authority-lock.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
+        "evolution-core::tests/write-outcome.spec.ts",
         "evolution-curator::tests/unit-undo-plan.spec.ts",
         "evolution-host::tests/decide-requires.spec.ts",
         "evolution-maintenance::tests/drift-scan.spec.ts",
@@ -502,6 +503,7 @@
         "evolution-core::tests/write-authority-origin.spec.ts",
         "evolution-core::tests/write-inventory-lazy-asset.spec.ts",
         "evolution-core::tests/write-inventory.spec.ts",
+        "evolution-core::tests/write-outcome.spec.ts",
         "evolution-core::tests/write-path-identity.spec.ts",
         "evolution-core::tests/write-receipt-health.spec.ts",
         "evolution-curator::tests/curator-clamp.spec.ts",
@@ -1218,6 +1220,7 @@
         "evolution-core::tests/write-authority-origin.spec.ts",
         "evolution-core::tests/write-inventory-lazy-asset.spec.ts",
         "evolution-core::tests/write-inventory.spec.ts",
+        "evolution-core::tests/write-outcome.spec.ts",
         "evolution-core::tests/write-path-identity.spec.ts",
         "evolution-core::tests/write-receipt-health.spec.ts",
         "evolution-curator::tests/curator-clamp.spec.ts",
@@ -1863,6 +1866,7 @@
         "evolution-core::tests/write-authority-origin.spec.ts",
         "evolution-core::tests/write-inventory-lazy-asset.spec.ts",
         "evolution-core::tests/write-inventory.spec.ts",
+        "evolution-core::tests/write-outcome.spec.ts",
         "evolution-core::tests/write-path-identity.spec.ts",
         "evolution-core::tests/write-receipt-health.spec.ts",
         "evolution-curator::tests/boundary.spec.ts",
@@ -2315,11 +2319,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 101
+      "specs": 102
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 457
+      "specs": 458
     },
     "ci-only": {
       "gates": 14,
@@ -2327,16 +2331,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 457
+      "specs": 458
     },
     "full(ci=on)": {
       "gates": 89,
-      "specs": 530
+      "specs": 531
     }
   },
   "specs": {
-    "total": 530,
-    "marked": 530,
+    "total": 531,
+    "marked": 531,
     "unmarked": 0
   }
 }

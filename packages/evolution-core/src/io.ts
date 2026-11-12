@@ -125,6 +125,57 @@ export async function transactIo(
 }
 
 /**
+ * The result of one durable write, in the shape W9-commit-protocol §3.3 requires: a caller may not
+ * retry an `unknown` (the bytes landed), and must roll back a `rejected` one.
+ */
+export type WriteOutcome =
+  | { readonly kind: 'landed' }
+  | { readonly kind: 'rejected'; readonly code: string; readonly message: string }
+  | { readonly kind: 'unknown'; readonly message: string }
+
+function outcomeFailure(error: unknown): WriteOutcome {
+  const message = error instanceof Error ? error.message : String(error)
+  if (isCommittedWarning(error)) return { kind: 'unknown', message }
+  const code = (error as { code?: unknown } | undefined)?.code
+  return { kind: 'rejected', code: typeof code === 'string' ? code : 'io', message }
+}
+
+/**
+ * Read-modify-commit that reports what actually happened instead of collapsing the two failure
+ * kinds. `transactIo` deliberately turns a committed-warning into success (the bytes are visible),
+ * which is right for callers that only need the write; a two-phase caller needs to know that its
+ * follow-up step is unconfirmed, so it uses this instead.
+ * @param io - the IO backend.
+ * @param path - the durable file.
+ * @param task - the read-modify-render step.
+ * @returns `landed`, `unknown` (written, durability unconfirmed) or `rejected`.
+ */
+export async function transactOutcome(
+  io: EvolutionIoLike,
+  path: string,
+  task: (current: string | null) => string | null | Promise<string | null>,
+): Promise<WriteOutcome> {
+  if (io.transact) {
+    try {
+      await io.transact(path, task)
+      return { kind: 'landed' }
+    } catch (error) {
+      return outcomeFailure(error)
+    }
+  }
+  try {
+    const current = await io.readText(path)
+    const next = await task(current)
+    if (next === null) await io.remove(path)
+    else if (next !== current) await io.writeText(path, next)
+    return { kind: 'landed' }
+  } catch (error) {
+    return outcomeFailure(error)
+  }
+}
+
+
+/**
  * V43 F-4 (S0-6): the shared "the transaction really invoked the task" guard.
  * A backend that implements `transact` but never calls `task` resolves
  * cleanly, so every caller that reads the outcome out of the task itself (a
@@ -392,8 +443,10 @@ export function isCommittedWarning(error: unknown): boolean {
 /**
  * Build the Node IO backend: plain fs promises, durable tmp + rename commits (crash atomicity) and
  * ONE concurrency guarantee of its own — writes to the same path are serialized in-process (see
- * `inProcessWrite`). G2 S4 removed the cross-process write lock and its takeover protocol; the
- * plugin path gets cross-process safety from the platform provider (`ctx.fs`).
+ * `inProcessWrite`). Cross-process exclusion is not this backend's job: every durable writer takes
+ * the home lock through `HomeAuthority` (W9-authority), which delegates to the platform's
+ * `withFileLock`. The earlier claim that a `ctx.fs` provider supplied it was never true — no such
+ * provider exists in the family source.
  */
 export function nodeEvolutionIo(): EvolutionIoLike {
   /**
@@ -411,13 +464,12 @@ export function nodeEvolutionIo(): EvolutionIoLike {
   const isAlive = isProcessAlive
 
   /**
-   * G2 S4: the family write-lock protocol is retired. Concurrency is the PLATFORM’s job now — the
-   * plugin path requires `ctx.fs`, whose writes are versioned — so this backend keeps exactly one
-   * guarantee of its own: writes to the SAME path inside THIS process are serialized (a promise
-   * chain per path: no timers, no lock files, no takeover windows). Cross-process RMW safety comes
-   * from the provider; a standalone caller sharing a directory across processes must not rely on
-   * this backend alone. The durable tmp + rename commit stays — crash atomicity and mutual
-   * exclusion are different concerns.
+   * This backend keeps exactly one concurrency guarantee of its own: writes to the SAME path inside
+   * THIS process are serialized (a promise chain per path: no timers, no lock files, no takeover
+   * windows). Cross-process exclusion belongs to `HomeAuthority` (W9-authority), which every
+   * durable writer takes and which delegates to the platform's `withFileLock`; a standalone caller
+   * that shares a directory across processes must take that lock too. The durable tmp + rename
+   * commit stays here — crash atomicity and mutual exclusion are different concerns.
    */
   const queues = new Map<string, Promise<unknown>>()
   const inProcessWrite = async <T>(path: string, run: () => Promise<T>): Promise<T> => {
