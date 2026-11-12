@@ -32,6 +32,7 @@
  * @module @deepseek-ai/dsh-evolution-core
  */
 
+export * from './authority.ts'
 export * from './citations.ts'
 // G1/1.1: the ONE authority behind a write (its type and the authorityFrom builder).
 export * from './tree-write.ts'

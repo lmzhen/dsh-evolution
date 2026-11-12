@@ -99,6 +99,7 @@
         "evolution-commands::tests/help-locale.spec.ts",
         "evolution-commands::tests/host-locale.spec.ts",
         "evolution-commands::tests/parse.spec.ts",
+        "evolution-core::tests/authority.spec.ts",
         "evolution-core::tests/citations.spec.ts",
         "evolution-core::tests/content-hash.spec.ts",
         "evolution-core::tests/contracts.spec.ts",
@@ -377,6 +378,7 @@
         "evolution-commands::tests/registry.spec.ts",
         "evolution-core::tests/archive-retention.spec.ts",
         "evolution-core::tests/audit-locked-baseline.spec.ts",
+        "evolution-core::tests/authority.spec.ts",
         "evolution-core::tests/citations.spec.ts",
         "evolution-core::tests/commit-merge-revision.spec.ts",
         "evolution-core::tests/commit-merge.spec.ts",
@@ -1095,6 +1097,7 @@
         "evolution-commands::tests/registry.spec.ts",
         "evolution-core::tests/archive-retention.spec.ts",
         "evolution-core::tests/audit-locked-baseline.spec.ts",
+        "evolution-core::tests/authority.spec.ts",
         "evolution-core::tests/citations.spec.ts",
         "evolution-core::tests/commit-merge-revision.spec.ts",
         "evolution-core::tests/commit-merge.spec.ts",
@@ -1738,6 +1741,7 @@
         "evolution-commands::tests/registry.spec.ts",
         "evolution-core::tests/archive-retention.spec.ts",
         "evolution-core::tests/audit-locked-baseline.spec.ts",
+        "evolution-core::tests/authority.spec.ts",
         "evolution-core::tests/citations.spec.ts",
         "evolution-core::tests/commit-merge-revision.spec.ts",
         "evolution-core::tests/commit-merge.spec.ts",
@@ -2321,11 +2325,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 101
+      "specs": 102
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 459
+      "specs": 460
     },
     "ci-only": {
       "gates": 14,
@@ -2333,16 +2337,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 459
+      "specs": 460
     },
     "full(ci=on)": {
       "gates": 89,
-      "specs": 532
+      "specs": 533
     }
   },
   "specs": {
-    "total": 532,
-    "marked": 532,
+    "total": 533,
+    "marked": 533,
     "unmarked": 0
   }
 }
