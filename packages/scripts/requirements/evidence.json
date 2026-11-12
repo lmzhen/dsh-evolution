@@ -986,7 +986,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/gates/rg4-curator.spec.ts#a real curator lock wrapper waits for the merge fence",
+      "ref": "evolution-core/tests/authority.spec.ts#serializes two concurrent calls on the real platform lock",
       "note": "audit re-anchor (54d4bcbe)"
     },
     {
@@ -1617,7 +1617,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-all/tests/all.spec.ts#evolution-all aggregates the host entry, the four model-tool entries, the preset container and the settings UI (0.3.54)",
+      "ref": "evolution-all/tests/all.spec.ts#evolution-all aggregates the host entry, the mounted row packages and the shipped bundles (0.3.54)",
       "note": "independent-review exact anchor"
     },
     {
