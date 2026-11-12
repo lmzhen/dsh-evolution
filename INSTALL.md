@@ -16,6 +16,8 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 # 重启 dsh
 ```
 
+安装和升级都走 `dsh plugin add`：平台把 add/remove 转发给 pnpm（桌面端用应用内置的 pnpm）。**不要手工 `npm install`** —— npm 会在 profile 里留下 `package-lock.json` 和扁平 `node_modules`，之后插件页的「更新」按钮走 pnpm 时会和它打架（锁文件双份、依赖树两套）。已经用 npm 装过的修法：关掉 dsh，删 `profiles/<profile>/package-lock.json`，在 profile 目录里用 pnpm 重新 `add` 一次同一版本，再重启。
+
 `all` 在每个会话挂载记忆和技能工具，并在 Web/桌面 GUI 提供进化工作台（技能历史/待批/合并/健康）。参数在 Web/桌面 GUI 的「设置 → 能力进化」里按功能分组编辑；安装和开关由平台的插件管理负责。
 
 安装后执行：
