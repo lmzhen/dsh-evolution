@@ -9,20 +9,16 @@
   "gates": [
     {
       "id": "gate-01",
-      "kind": "toolchain",
-      "human": "`node node_modules/typescript/lib/tsc.js -b tsconfig.host.json`",
+      "kind": "script",
+      "human": "`node packages/evolution/scripts/verify-family-types.mjs`",
       "argv": [
         "node",
-        "node_modules/typescript/lib/tsc.js",
-        "-b",
-        "tsconfig.host.json"
+        "packages/evolution/scripts/verify-family-types.mjs"
       ],
       "tree": "overlay",
       "profiles": [
         "local"
       ],
-      "reason": "declared local check: the D-9 test-file typecheck lives on the build line, not in this action (action.yml L168-171)",
-      "owner": "build-line",
       "registration": {
         "reason": "the bed platform tree fails its own tsc -b (cordis 4.0.5 vs the checked-in platform sources), so this row cannot judge the family here",
         "owner": "scripts/gates",

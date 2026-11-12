@@ -186,7 +186,7 @@
       ],
       "files": [
         "evolution-review/src/index.ts",
-        "skill-usage/src/index.ts"
+        "evolution-skill-discovery/src/usage/index.ts"
       ],
       "probes": [
         "beh-plugin-record-not-dispatch"
@@ -407,7 +407,7 @@
       ],
       "files": [
         "evolution-review/src/index.ts",
-        "skill-usage/src/index.ts"
+        "evolution-skill-discovery/src/usage/index.ts"
       ],
       "probes": [
         "beh-plugin-record-not-dispatch"
@@ -424,7 +424,7 @@
         "W8"
       ],
       "files": [
-        "tool-memory/src/index.ts",
+        "memory/src/tools/index.ts",
         "evolution-core/src/memory-store.ts"
       ],
       "probes": [
@@ -829,11 +829,11 @@
     }
   ],
   "budget": {
-    "newPackages": 5,
+    "newPackages": 0,
     "newProfileRows": 0,
     "newSlots": 0,
     "newPersistence": 0,
-    "newSubpaths": 6,
+    "newSubpaths": 11,
     "newErrorCodes": [
       "E-323",
       "E-324",

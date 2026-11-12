@@ -176,6 +176,11 @@
               "script": "verify-health-admission.mjs",
               "reason": "needs both local health corpora; on a machine without them it must report CANNOT DECIDE rather than pass",
               "expiry": "release gate: run it in the mirror local/pre-tag lane and record the reading; move into the action if a CI corpus is ever required"
+            },
+            {
+              "script": "verify-family-types.mjs",
+              "reason": "judges the family sources against the overlay platform project graph; when every diagnostic is outside packages/evolution the row is CANNOT DECIDE on this machine (the build line owns the platform graph), which needs the installed overlay",
+              "expiry": "release gate: the row can move into the action once the platform project graph typechecks in the released checkout"
             }
           ],
           "machineLocal": [
@@ -598,7 +603,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "7a7de103d42f9f44d425aa57857edf2dbf73b2b7bad8bc1ee591c943c58687e1",
+        "sha256": "8e729151bee3708ef6483414a866bfc9279c0feec56995651fa3ad639b56a5c6",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -613,7 +618,7 @@
           {
             "id": "gate-01",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "verify-family-types"
           },
           {
             "id": "gate-02",
@@ -2265,12 +2270,6 @@
           }
         ],
         "unknownCriterion": [
-          {
-            "id": "gate-01",
-            "reasonRef": "scripts/gate-manifest.json#gate-01",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
           {
             "id": "gate-02",
             "reasonRef": "scripts/gate-manifest.json#gate-02",
