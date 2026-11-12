@@ -244,7 +244,23 @@ if (probesWanted || listWanted) {
   const probeOnly = onlyIndex >= 0 ? process.argv[onlyIndex + 1] : undefined
   const selected = probeOnly === undefined ? probeRegistry : probeRegistry.filter((probe) => probe.id === probeOnly)
   if (selected.length === 0) { console.error('verify-mutations --probes: CANNOT DECIDE - no probe matches --only ' + String(probeOnly)); process.exit(2) }
-  if (!overlayAvailable(PROBE_ROOT)) { console.error('verify-mutations --probes: CANNOT DECIDE - this tree has no platform overlay (packages/boot/app-boot + node_modules/vitest): run the probe half on the build line; the mirror only lints the registry'); process.exit(2) }
+  if (!overlayAvailable(PROBE_ROOT)) {
+    // The probe half mutates and runs specs, so it needs the platform tree. A ledger signature
+    // describes the tree it was measured on: delegating to a stale default build line would stamp
+    // the wrong hashes, so delegation happens only when the caller names the tree explicitly.
+    const explicit = process.env.EVOLUTION_OVERLAY_ROOT
+    if (typeof explicit === 'string' && explicit !== '') {
+      const script = join(explicit, 'packages', 'evolution', 'scripts', 'verify-mutations.mjs')
+      if (!existsSync(script)) {
+        console.error('verify-mutations --probes: EVOLUTION_OVERLAY_ROOT does not hold this family (missing ' + script + ')')
+        process.exit(2)
+      }
+      const passed = spawnSync(process.execPath, [script, ...process.argv.slice(2)], { stdio: 'inherit', cwd: explicit })
+      process.exit(passed.status === null ? 2 : passed.status)
+    }
+    console.error('verify-mutations --probes: CANNOT DECIDE - this tree has no platform overlay (packages/boot/app-boot + node_modules/vitest). Two remedies: run this from the build line, or set EVOLUTION_OVERLAY_ROOT to a freshly synced build line (the signatures describe the tree they were measured on, so a stale line would stamp the wrong hashes). CI runs this half from its overlay.')
+    process.exit(2)
+  }
   const jsonMode = process.argv.includes('--json')
   const ledgerFlag = process.argv.indexOf('--ledger')
   const ledgerTarget = ledgerFlag >= 0 ? process.argv[ledgerFlag + 1] : undefined
