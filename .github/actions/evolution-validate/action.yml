@@ -438,7 +438,6 @@ runs:
     - name: Prove the mutation probes can still go red (W9 S4)
       shell: bash
       working-directory: upstream
-      timeout-minutes: 25
       run: |
         # Three-valued by design: a probe whose UNMUTATED baseline is not green in this job proves
         # nothing about its mutation, so it is reported as cannot-decide and counted; a mutation that
