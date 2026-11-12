@@ -53,7 +53,7 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 | Package | Role |
 |---|---|
 | `evolution-commands` | `/evolution` command face (27 entries), diagnostics route, run registry |
-| `evolution-ui` | Plugins page row config (approval/diagnostics/params) + skill history panel + 6 routes |
+| `evolution-ui` | Parameter cards in the family settings section (approval/diagnostics/params) + skill history panel + 6 routes |
 | `evolution-merge-ui` | Read-only merge sidebar panel |
 | `evolution-client-kit` | Sidebar registration, generated routes/contracts/states/tokens |
 

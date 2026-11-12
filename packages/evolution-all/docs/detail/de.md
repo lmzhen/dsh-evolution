@@ -12,7 +12,7 @@ Der Agent wird mit der Zeit besser in seiner Arbeit: Er merkt sich, was er geler
 
 ## Wo du es einstellst
 
-Die Einstellungen liegen bei der Funktion, die sie steuern: Öffne die Einstellungen einer Funktion, und du siehst den aktuellen Wert, den Standard und ob du ihn geändert hast. Die meisten Änderungen wirken sofort, ein paar erst nach einem Neustart. Was du nicht anfasst, bleibt auf dem Standardwert.
+Alle Parameter stehen an einer Stelle: Einstellungen → Fähigkeitsentwicklung, gruppiert nach dem, was sie steuern. Jede Karte zeigt den aktuellen Wert, den Standard und ob du ihn geändert hast. Die meisten Änderungen gelten sofort, einige erst nach einem Neustart. Was du nicht anfasst, bleibt beim Standard.
 
 ## Hinweise
 

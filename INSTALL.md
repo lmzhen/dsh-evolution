@@ -16,7 +16,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 # 重启 dsh
 ```
 
-`all` 在每个会话挂载记忆和技能工具，并在 Web/桌面 GUI 提供进化工作台（技能历史/待批/合并/健康）。参数在平台的插件管理 row 配置中编辑；安装和开关也由平台插件管理负责。
+`all` 在每个会话挂载记忆和技能工具，并在 Web/桌面 GUI 提供进化工作台（技能历史/待批/合并/健康）。参数在 Web/桌面 GUI 的「设置 → 能力进化」里按功能分组编辑；安装和开关由平台的插件管理负责。
 
 安装后执行：
 
@@ -75,12 +75,12 @@ node packages/scripts/build-lib.mjs
 node packages/scripts/install-layered.mjs --profile web --mode all --home "$DSH_HOME"
 ```
 
-默认源码 scope 下 installer 使用 `@deepseek-ai/dsh-evolution-all`；row config 同时覆盖产品 scope 与源码 scope。安装器完整参数以 `node packages/scripts/install-layered.mjs --help` 为准。
+默认源码 scope 下 installer 使用 `@deepseek-ai/dsh-evolution-all`；设置页对产品 scope 与源码 scope 都适用。安装器完整参数以 `node packages/scripts/install-layered.mjs --help` 为准。
 
 ## 安装问题
 
 - **`/evolution` 不存在**：确认 profile、安装命令和重启；此时先查 `dsh --profile <p> --dump-config` 与启动日志。
 - **没有 `memory` / `skill_manage`**：当前可能是 host；改回 all。
 - **UI 不出现**：确认使用 all + Web/桌面 GUI，并检查客户端与连接服务。
-- **设置面板不可用**：参数由平台插件管理的 row 配置页承载；不再有 `/evolution policy` 命令。
+- **设置面板不可用**：平台没有设置分区时（旧平台线）参数改不了，只能用 `/evolution params` 只读查看；不再有 `/evolution policy` 命令。
 - **启动报重复注册**：同一 profile 挂了多个家族形态；移除多余 bundle 后重启。

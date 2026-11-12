@@ -232,8 +232,8 @@
       "pt": "Parar a varredura de manutenção em andamento (omita o id só se a última execução for a que roda neste processo)"
     },
     "summary.migrate": {
-      "zh": "把旧设置文档里家族的旧分区迁进现在的行（幂等；已迁移过就报「已一致」）",
-      "en": "Move the family's old namespaces from the legacy settings document into the current rows (idempotent; reports “already consistent” when already migrated)",
+      "zh": "把旧设置文档里家族的旧分区迁进现在的设置（幂等；已迁移过就报「已一致」）",
+      "en": "Move the family's old namespaces from the legacy settings document into the current settings (idempotent; reports 'already aligned' when migrated)",
       "ja": "旧設定ドキュメントにあるファミリーの旧名前空間を現在の行へ移す（冪等。移行済みなら「整合済み」と報告）",
       "es": "Mover los espacios de nombres antiguos de la familia del documento de ajustes heredado a las filas actuales (idempotente; si ya se migró, informa de que «ya está alineado»)",
       "fr": "Déplacer les anciens espaces de noms de la famille du document de paramètres hérité vers les lignes actuelles (idempotent ; signale « déjà aligné » si la migration a déjà eu lieu)",
@@ -492,8 +492,8 @@
       "pt": "\n(as escritas pendentes expiram após {ttl} ms: ao expirar são encerradas como REJECTED e nunca são executadas; prepare novamente se ainda precisar)"
     },
     "command.pending.neverExpires": {
-      "zh": "\n（暂存写入不会过期 —— 窗口一直等决定；可在 evolution-approval 行设置 pendingTtlMs 来限定）",
-      "en": "\n(staged writes never expire — the window waits for a decision; set pendingTtlMs on the evolution-approval row to bound it)",
+      "zh": "（暂存写入不会过期 —— 窗口一直等决定；可在「设置 → 能力进化」的审批卡里设置 pendingTtlMs 来限定）",
+      "en": "(staged writes never expire — the window waits for a decision; set pendingTtlMs on the approval card under Settings → Capability evolution to bound it)",
       "ja": "\n（ステージ済みの書き込みは期限切れになりません。判断があるまで待機します。evolution-approval 行の pendingTtlMs で上限を設定できます）",
       "es": "\n(las escrituras en espera no caducan: la ventana espera una decisión; define pendingTtlMs en la fila evolution-approval para limitarla)",
       "fr": "\n(les écritures en attente n’expirent jamais : la fenêtre attend une décision ; définissez pendingTtlMs sur la ligne evolution-approval pour la borner)",

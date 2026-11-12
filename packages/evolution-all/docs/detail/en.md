@@ -12,7 +12,7 @@ Makes the agent better at its work over time: it remembers what it learned, keep
 
 ## Where to configure it
 
-Settings sit with the feature they control: open a feature's settings to see the current value, the default and whether you changed it. Most changes take effect right away; a few take effect only after a restart. Anything you leave alone keeps its default.
+Every parameter lives in one place: Settings → Capability evolution, grouped by what it controls. Each card shows the current value, the default and whether you changed it. Most changes take effect right away; a few take effect only after a restart. Anything you leave alone keeps its default.
 
 ## Notes
 

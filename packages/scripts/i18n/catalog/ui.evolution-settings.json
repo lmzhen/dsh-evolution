@@ -3,14 +3,14 @@
   "surface": "client",
   "messages": {
     "aboutPurpose": {
-      "zh": "自进化设置与技能历史",
-      "en": "Self-evolution settings and skill history",
-      "ja": "自己進化の設定とスキル履歴",
-      "es": "Ajustes de evolución e historial de skills",
-      "fr": "Paramètres d’auto-évolution et historique des skills",
-      "de": "Selbstevolution: Einstellungen und Skill-Historie",
-      "pt": "Configurações de autoevolução e histórico de skills",
-      "ru": "Настройки самоэволюции и история навыков"
+      "zh": "能力进化设置与技能历史",
+      "en": "Capability evolution settings and skill history",
+      "ja": "能力進化の設定とスキル履歴",
+      "es": "Ajustes de evolución de capacidades e historial de skills",
+      "fr": "Réglages d’évolution des capacités et historique des skills",
+      "de": "Fähigkeitsentwicklung: Einstellungen und Skill-Verlauf",
+      "pt": "Configurações de evolução de capacidades e histórico de skills",
+      "ru": "Настройки развития возможностей и история навыков"
     },
     "apply": {
       "zh": "保存",
@@ -613,14 +613,14 @@
       "ru": "по умолчанию"
     },
     "detailScope": {
-      "zh": "安装范围：整个插件包；参数、平台线与运行状态都在「设置 → 自进化」里。",
-      "en": "Install scope: the whole bundle; parameters, the platform line and runtime state live under Settings → Self-evolution.",
-      "ja": "インストール範囲：パッケージ全体。パラメータ・プラットフォームのライン・稼働状態は「設定 → 自己進化」にあります。",
-      "es": "Alcance de la instalación: el paquete completo; los parámetros, la línea de la plataforma y el estado de ejecución están en Ajustes → Evolución.",
-      "fr": "Périmètre d’installation : le paquet complet ; les réglages, la ligne de plateforme et l’état d’exécution sont dans Réglages → Auto-évolution.",
-      "de": "Installationsumfang: das gesamte Paket; Einstellungen, Plattform-Linie und Laufzeitstatus stehen unter Einstellungen → Selbstevolution.",
-      "pt": "Escopo da instalação: o pacote inteiro; ajustes, linha da plataforma e estado de execução ficam em Configurações → Autoevolução.",
-      "ru": "Область установки: весь пакет; параметры, линия платформы и состояние работы — в «Настройки → Самоэволюция»."
+      "zh": "安装范围：整个插件包；参数、平台线与运行状态都在「设置 → 能力进化」里。",
+      "en": "Install scope: the whole bundle; parameters, the platform line and runtime state live under Settings → Capability evolution.",
+      "ja": "インストール範囲：パッケージ全体。パラメータ・プラットフォームのライン・稼働状態は「設定 → 能力進化」にあります。",
+      "es": "Alcance de la instalación: el paquete completo; los parámetros, la línea de la plataforma y el estado de ejecución están en Ajustes → Evolución de capacidades.",
+      "fr": "Périmètre d’installation : le paquet complet ; les réglages, la ligne de plateforme et l’état d’exécution sont dans Réglages → Évolution des capacités.",
+      "de": "Installationsumfang: das gesamte Paket; Einstellungen, Plattform-Linie und Laufzeitstatus stehen unter Einstellungen → Fähigkeitsentwicklung.",
+      "pt": "Escopo da instalação: o pacote inteiro; ajustes, linha da plataforma e estado de execução ficam em Configurações → Evolução de capacidades.",
+      "ru": "Область установки: весь пакет; параметры, линия платформы и состояние работы — в «Настройки → Развитие возможностей»."
     },
     "diagComplete": {
       "zh": "没有需要处理的异常",
@@ -1213,14 +1213,14 @@
       "ru": "Сегодня"
     },
     "title": {
-      "zh": "自进化",
-      "en": "Self-evolution",
-      "ja": "自己進化",
-      "es": "Evolución",
-      "fr": "Auto-évolution",
-      "de": "Selbstevolution",
-      "pt": "Autoevolução",
-      "ru": "Самоэволюция"
+      "zh": "能力进化",
+      "en": "Capability evolution",
+      "ja": "能力進化",
+      "es": "Evolución de capacidades",
+      "fr": "Évolution des capacités",
+      "de": "Fähigkeitsentwicklung",
+      "pt": "Evolução de capacidades",
+      "ru": "Развитие возможностей"
     },
     "unavailable": {
       "zh": "这个功能没有启动（对应的插件没有安装）",

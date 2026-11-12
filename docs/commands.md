@@ -76,7 +76,7 @@
 |---|---|
 | `/evolution params [--group <name>] [--json]` | 查看参数、分组、档位、生效时机、来源和当前值 |
 
-参数写入走平台插件管理的 row 配置页；安装/卸载/更新也走平台插件管理。完整参数表见 [../packages/PARAMETERS.md](../packages/PARAMETERS.md)。
+参数在 Web/桌面 GUI 的「设置 → 能力进化」里写入；安装/卸载/更新走平台插件管理。完整参数表见 [../packages/PARAMETERS.md](../packages/PARAMETERS.md)。
 
 ## 技能合并
 

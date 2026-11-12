@@ -32,7 +32,7 @@ Each capability below has a corresponding code entry point. They have different 
 | Skill merge | Started with `/evolution merge scan` or `pair`. Scan requires local potion models and can fall back to stub without an LLM; ordinary pair does not require potion, but round 1/authoring requires a child-session model. Initiated runs are auto-approved by default, with `mergeApproval` available for manual approval |
 | Memory | Available in `all` sessions. Project memory and user-profile budgets default to 2200 and 1375 characters; new writes are refused at the limit rather than silently truncated |
 | Write approval and recovery | Ordinary write approval is off by default and stages memory and skill writes when enabled; curator and merge use their own controls. Skill history, body undo, unit undo and archive restore have different scopes, and execution-time failures do not guarantee complete rollback |
-| Diagnostics and UI | `/evolution doctor`, curation reports, skill health and a knowledge graph are available; `all` provides plugin-manager row configuration, skill history and a merge panel on Web/desktop GUI, while the health panel is disabled by default |
+| Diagnostics and UI | `/evolution doctor`, curation reports, skill health and a knowledge graph are available; `all` adds its parameters to Settings → Capability evolution and provides skill history and a merge panel on Web/desktop GUI, while the health panel is disabled by default |
 
 See [Feature reference](docs/features.md) for triggers, failure behavior and limits.
 

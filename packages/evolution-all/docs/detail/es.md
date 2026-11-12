@@ -12,7 +12,7 @@ Con el tiempo, el agente hace mejor su trabajo: recuerda lo que ha aprendido, ma
 
 ## Dónde se configura
 
-Los ajustes de Evolución aparecen junto a la función que controlan: al abrirlos ves el valor actual, el predeterminado y si lo has cambiado. La mayoría de los cambios se aplican al momento; unos pocos, solo después de reiniciar. Lo que dejes sin tocar se queda en el valor predeterminado.
+Todos los parámetros están en un solo sitio: Ajustes → Evolución de capacidades, agrupados por lo que controlan. Cada tarjeta muestra el valor actual, el predeterminado y si lo cambiaste. Casi todos los cambios se aplican al momento; unos pocos requieren reiniciar. Lo que no toques se queda en su valor predeterminado.
 
 ## Notas
 

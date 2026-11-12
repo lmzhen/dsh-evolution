@@ -12,7 +12,7 @@ Com o tempo, o agente faz o próprio trabalho cada vez melhor: lembra o que apre
 
 ## Onde configurar
 
-As configurações de autoevolução ficam junto ao recurso que controlam: abra as configurações de um recurso para ver o valor atual, o padrão e se você mudou alguma coisa. A maioria das mudanças passa a valer na hora; algumas só valem depois de reiniciar. O que você não mexer continua no padrão.
+Todos os parâmetros ficam num só lugar: Configurações → Evolução de capacidades, agrupados pelo que controlam. Cada cartão mostra o valor atual, o padrão e se você mudou. Quase tudo vale na hora; alguns exigem reiniciar. O que você não mexer fica no padrão.
 
 ## Observações
 

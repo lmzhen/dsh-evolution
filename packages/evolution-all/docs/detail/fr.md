@@ -12,7 +12,7 @@ Au fil du temps, l’agent s’améliore dans son travail : il retient ce qu’
 
 ## Où trouver les réglages
 
-Les réglages sont regroupés avec la fonction qu’ils concernent : ouvrez les réglages d’une fonction pour voir la valeur actuelle, la valeur par défaut et si vous l’avez modifiée. La plupart des changements prennent effet tout de suite ; quelques-uns seulement demandent un redémarrage. Les réglages que vous ne touchez pas gardent leur valeur par défaut.
+Tous les réglages sont au même endroit : Réglages → Évolution des capacités, groupés par ce qu’ils contrôlent. Chaque carte indique la valeur actuelle, la valeur par défaut et si vous l’avez modifiée. La plupart des changements s’appliquent tout de suite ; quelques-uns demandent un redémarrage. Ce que vous ne touchez pas garde sa valeur par défaut.
 
 ## Remarques
 
