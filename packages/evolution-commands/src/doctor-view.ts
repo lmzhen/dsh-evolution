@@ -185,6 +185,62 @@ function hostRow(host: DoctorInputs['host'], count: DoctorInputs['hostRouteCount
   return { key: 'host-surface', label: RUNTIME_LABELS['host-surface'] ?? '数据连接', status: 'ok', detail: mounted + '；' + remote }
 }
 
+/**
+ * Compare two platform versions, prerelease suffixes included (`0.2.2-rc.0 < 0.2.2-rc.1 <
+ * 0.2.2`). Returns null when either side cannot be read as a version: an unreadable version is
+ * UNKNOWN, never "compatible".
+ */
+export function compareVersionText(left: string, right: string): number | null {
+  const parse = (text: string): { core: readonly number[]; pre: readonly string[] } | null => {
+    const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/.exec(text.trim())
+    if (match === null) return null
+    return {
+      core: [Number(match[1]), Number(match[2]), Number(match[3])],
+      pre: match[4] === undefined ? [] : match[4].split('.'),
+    }
+  }
+  const a = parse(left)
+  const b = parse(right)
+  if (a === null || b === null) return null
+  for (let index = 0; index < 3; index += 1) {
+    const leftCore = a.core[index] ?? 0
+    const rightCore = b.core[index] ?? 0
+    if (leftCore !== rightCore) return leftCore - rightCore
+  }
+  // A release outranks its prereleases; two prereleases compare identifier by identifier.
+  if (a.pre.length === 0 && b.pre.length === 0) return 0
+  if (a.pre.length === 0) return 1
+  if (b.pre.length === 0) return -1
+  for (let index = 0; index < Math.max(a.pre.length, b.pre.length); index += 1) {
+    const leftPart = a.pre[index]
+    const rightPart = b.pre[index]
+    if (leftPart === undefined) return -1
+    if (rightPart === undefined) return 1
+    if (leftPart === rightPart) continue
+    const leftNumber = Number(leftPart)
+    const rightNumber = Number(rightPart)
+    const bothNumbers = Number.isFinite(leftNumber) && Number.isFinite(rightNumber)
+    return bothNumbers ? leftNumber - rightNumber : leftPart < rightPart ? -1 : 1
+  }
+  return 0
+}
+
+/**
+ * The version verdict against the frozen platform line: below the floor is out-of-window (the host
+ * is too old, the plugin cannot be made to work), above the declared line is host-newer, and the
+ * window between them is in-window. The old code compared equality only, so every older host read
+ * as "the host is newer" and `out-of-window` was unreachable.
+ */
+export function pairingOf(version: string | undefined, line: { readonly version: string; readonly floor: string }): PlatformPairing {
+  if (version === undefined) return 'unknown'
+  const againstFloor = compareVersionText(version, line.floor)
+  const againstVersion = compareVersionText(version, line.version)
+  if (againstFloor === null || againstVersion === null) return 'unknown'
+  if (againstFloor < 0) return 'out-of-window'
+  if (againstVersion > 0) return 'host-newer'
+  return 'in-window'
+}
+
 function pairingRow(inputs: DoctorInputs): DiagnosticRow {
   const status = inputs.platformPairing ?? 'unknown'
   switch (status) {
@@ -405,6 +461,6 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
     runs: extras.runs ?? { running: 0, orphaned: 0 },
     missingServices,
     sessionFoldClassifierPresent: typeof classifySessionEvent === 'function',
-    platformPairing: extras.platformPairing ?? (platformVersion === undefined ? 'unknown' : platformVersion === PLATFORM_LINE.version ? 'in-window' : 'host-newer'),
+    platformPairing: extras.platformPairing ?? pairingOf(extras.hostVersion ?? platformVersion, PLATFORM_LINE),
   }
 }

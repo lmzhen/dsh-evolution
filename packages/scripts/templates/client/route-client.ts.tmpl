@@ -59,12 +59,12 @@ export async function requestJson<T>(doFetch: typeof fetch, path: string, init?:
   return { ok: false, failure: { kind: 'server', status: response.status } }
 }
 
-/** The one-sentence rendering legacy callers attach to a classified failure. */
+/** Log-only rendering of a classified failure. User-facing copy belongs to the panel dictionary: the panels render the structured `RouteFailure`, never this string (W9-g9 A6). */
 export function failureMessage(failure: RouteFailure): string {
   switch (failure.kind) {
     case 'refused': return failure.message
     case 'server': return failure.status === 0
-      ? (failure.detail === undefined || failure.detail === '' ? '网络错误：无法连接宿主' : failure.detail)
+      ? (failure.detail === undefined || failure.detail === '' ? 'network error: the host did not answer' : failure.detail)
       : 'HTTP ' + String(failure.status)
     case 'unauthenticated': return 'HTTP 401'
     case 'forbidden': return 'HTTP 403'

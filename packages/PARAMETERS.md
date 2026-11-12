@@ -78,7 +78,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `reviewContextMessages` | E2 | none | cordis | evolution-review | — | 无（internal） | Messages of context handed to a review subagent. |
 | `reviewMessageChars` | E2 | none | cordis | evolution-review | — | 无（internal） | Per-message character budget of the review context. |
 | `reviewMaxDepth` | E2 | none | cordis | evolution-review | — | 无（internal） | Absolute delegation-depth cap of the review subagent. |
-| `reviewToolAllow` | E2 | none | cordis | evolution-review | — | 无（security） | Tools the review subagent may use (safety surface). |
+| `reviewToolAllow` | E2 | none | cordis | evolution-review | — | 无（security） | Tools the review subagent may use (safety surface). NOT IMPLEMENTED: declared for the config surface, but no code reads it, so it protects nothing yet. |
 
 ## memory（记忆）
 

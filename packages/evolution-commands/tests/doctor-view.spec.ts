@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { assembleDoctorInputs, buildDoctorView, unavailableDoctorView, type DoctorInputs } from '../src/doctor-view.ts'
+import { assembleDoctorInputs, buildDoctorView, pairingOf, unavailableDoctorView, type DoctorInputs } from '../src/doctor-view.ts'
 
 const AVAILABLE: ChannelState = { kind: 'available', provider: 'spawn' }
 const UNAVAILABLE: ChannelState = { kind: 'unavailable', code: 'E-323', reason: 'agentPresets not mounted' }
@@ -130,6 +130,19 @@ describe('buildDoctorView: unreadable providers become named rows, never silence
     expect(row(outside, 'platform-pairing').status).toBe('fail')
     const unknown = buildDoctorView(inputs({ platformPairing: 'unknown', hostVersion: undefined }))
     expect(row(unknown, 'platform-pairing').status).toBe('unknown')
+  })
+
+  it('derives the pairing verdict from the platform line', () => {
+    // W9-g9 A2: equality-only comparison reported an OLDER host as host-newer and left
+    // out-of-window unreachable. The derivation is pure, so it is tested directly.
+    const line = { version: '0.2.2-rc.1', floor: '0.2.2-rc.0' }
+    expect(pairingOf('0.2.1-rc.2', line)).toBe('out-of-window')
+    expect(pairingOf('0.2.2-rc.0', line)).toBe('in-window')
+    expect(pairingOf('0.2.2-rc.1', line)).toBe('in-window')
+    expect(pairingOf('0.2.3', line)).toBe('host-newer')
+    expect(pairingOf('0.3.0-rc.1', line)).toBe('host-newer')
+    expect(pairingOf('not-a-version', line)).toBe('unknown')
+    expect(pairingOf(undefined, line)).toBe('unknown')
   })
 
   it('marks an inferred install form as a warn with its evidence', () => {
