@@ -13,6 +13,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { ownerPackageOf } from './lib-param-owners.mjs'
 
 // Entry head (the 8 keys every row carries) plus the two legal endings: a plain
 // close, or the optional UI tail (0.7.0) in its fixed order. A row that matches
@@ -204,7 +205,7 @@ export function registryViolations(registry, root) {
     // The owner is the package DIRECTORY name (the family mixes evolution-* with bare
     // names such as memory-files/tool-memory), so existence is the real check.
     if (entry.owner.length === 0) violations.push(where + ': owner is empty')
-    else if (!existsSync(join(root, entry.owner))) violations.push(where + ': owner package ' + entry.owner + ' does not exist')
+    else if (!existsSync(join(root, ownerPackageOf(entry.owner)))) violations.push(where + ': owner package ' + entry.owner + ' does not exist')
     if (!entry.docAnchor.startsWith('PARAMETERS.md#')) violations.push(where + ': docAnchor must start with PARAMETERS.md# (the tracked parameter table)')
     if (entry.summary.length < 10) violations.push(where + ': summary is too short to be useful')
     const writable = entry.tier === 'E3' || entry.tier === 'E4'

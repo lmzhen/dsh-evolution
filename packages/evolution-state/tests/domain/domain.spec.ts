@@ -33,7 +33,7 @@ describe('evolution-state-domain', () => {
     }
     expect([...shape.kind.options]).toEqual([...PENDING_KINDS])
     expect([...shape.status.options]).toEqual([...PENDING_STATUSES])
-    const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+    const source = readFileSync(new URL('../../src/domain/index.ts', import.meta.url), 'utf8')
     expect(source).toContain('z.enum(PENDING_KINDS)')
     expect(source).toContain('z.enum(PENDING_STATUSES)')
   })

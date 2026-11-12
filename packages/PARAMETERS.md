@@ -34,13 +34,13 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `manageUnmanaged` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Let curation touch skills with no family metadata. |
 | `pruneBuiltins` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Let curation nominate bundled skills for pruning. |
 | `referencedSkillNames` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Names treated as referenced by external docs (never retired). |
-| `includeSkillNames` | E2 | none | cordis | evolution-skill-discovery | — | 无（deployment） | Allow-list of skills the catalog exposes. |
-| `skill-catalog.excludeSkillNames` | E2 | none | cordis | evolution-skill-discovery | — | 无（deployment） | Deny-list of skills the catalog hides (row-local name; see the collision note). |
-| `modelInvocable` | E2 | none | cordis | evolution-skill-discovery | — | 无（deployment） | Default for whether the model may invoke a catalog skill. |
-| `userInvocable` | E2 | none | cordis | evolution-skill-discovery | — | 无（deployment） | Default for whether the user may invoke a catalog skill. |
+| `includeSkillNames` | E2 | none | cordis | evolution-skill-catalog | — | 无（deployment） | Allow-list of skills the catalog exposes. |
+| `skill-catalog.excludeSkillNames` | E2 | none | cordis | evolution-skill-catalog | — | 无（deployment） | Deny-list of skills the catalog hides (row-local name; see the collision note). |
+| `modelInvocable` | E2 | none | cordis | evolution-skill-catalog | — | 无（deployment） | Default for whether the model may invoke a catalog skill. |
+| `userInvocable` | E2 | none | cordis | evolution-skill-catalog | — | 无（deployment） | Default for whether the user may invoke a catalog skill. |
 | `maxItems` | E2 | none | cordis | evolution-activity | — | 无（internal） | Entries kept in the activity sidecar window. |
 | `sessionScoped` | E2 | none | cordis | evolution-review | — | 无（deployment） | Act only on sessions carrying the family model tools. |
-| `skill-usage.sessionScoped` | E2 | none | cordis | evolution-skill-discovery | — | 无（deployment） | Keep the usage sidecar scoped per session (row-local name). |
+| `skill-usage.sessionScoped` | E2 | none | cordis | skill-usage | — | 无（deployment） | Keep the usage sidecar scoped per session (row-local name). |
 
 ## write-caps（写入上限）
 
@@ -79,12 +79,12 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
-| `memoryChars` | E3 | live | cordis | memory | memoryCharLimit | 卡：memory | Character budget the memory store enforces for MEMORY.md. |
-| `userChars` | E3 | live | cordis | memory | userCharLimit | 卡：memory | Character budget the memory store enforces for USER.md. |
-| `memoryEnabled` | E2 | none | cordis | memory | — | 无（deployment） | Register the memory tool and its prompt section at all (deployment switch). |
-| `entryPreviewChars` | E3 | live | cordis | memory | — | 卡：memory | Characters of one memory entry shown in a tool result preview. |
-| `addDatePrefix` | E3 | live | cordis | memory | — | 卡：memory | Prefix stored memory entries with their date heading. |
-| `maxConsolidationFailures` | E3 | live | cordis | memory | — | 卡：memory | Consolidation failures one turn tolerates before the tool gives up. |
+| `memoryChars` | E3 | live | cordis | memory-files | memoryCharLimit | 卡：memory-files | Character budget the memory store enforces for MEMORY.md. |
+| `userChars` | E3 | live | cordis | memory-files | userCharLimit | 卡：memory-files | Character budget the memory store enforces for USER.md. |
+| `memoryEnabled` | E2 | none | cordis | tool-memory | — | 无（deployment） | Register the memory tool and its prompt section at all (deployment switch). |
+| `entryPreviewChars` | E3 | live | cordis | tool-memory | — | 卡：tool-memory | Characters of one memory entry shown in a tool result preview. |
+| `addDatePrefix` | E3 | live | cordis | memory-files | — | 卡：memory-files | Prefix stored memory entries with their date heading. |
+| `maxConsolidationFailures` | E3 | live | cordis | memory-files | — | 卡：memory-files | Consolidation failures one turn tolerates before the tool gives up. |
 
 ## curator（技能整理）
 
@@ -119,32 +119,32 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `evolution-commands.skillsRoot` | E1 | none | cordis | evolution-commands | — | 无（path） | Retired alias of the commands root; a value here fails the load. |
 | `evolution-maintenance.root` | E1 | none | cordis | evolution-maintenance | — | 无（path） | Skill-tree root the maintenance probe scans. |
 | `evolution-maintenance.skillsRoot` | E1 | none | cordis | evolution-maintenance | — | 无（path） | Accepted skill-root spelling for the maintenance row. |
-| `evolution-skill-catalog.root` | E1 | none | cordis | evolution-skill-discovery | — | 无（path） | Skill-tree root the catalog lists. |
-| `evolution-learning-graph.root` | E1 | none | cordis | evolution-activity | — | 无（path） | Skill-tree root the learning graph reads. |
-| `skill-usage.root` | E1 | none | cordis | evolution-skill-discovery | — | 无（path） | Skill-tree root the usage store observes. |
-| `skill-usage.eventsHome` | E1 | none | cordis | evolution-skill-discovery | — | 无（path） | Directory holding the family event log the usage store reads. |
-| `memory-files.root` | E1 | none | cordis | memory | — | 无（path） | Directory holding MEMORY.md and USER.md (empty = $DSH_HOME/memories). |
-| `evolution-feedback.path` | E1 | none | cordis | evolution-activity | — | 无（path） | Event log the feedback scorer reads (empty = family events file). |
+| `evolution-skill-catalog.root` | E1 | none | cordis | evolution-skill-catalog | — | 无（path） | Skill-tree root the catalog lists. |
+| `evolution-learning-graph.root` | E1 | none | cordis | evolution-learning-graph | — | 无（path） | Skill-tree root the learning graph reads. |
+| `skill-usage.root` | E1 | none | cordis | skill-usage | — | 无（path） | Skill-tree root the usage store observes. |
+| `skill-usage.eventsHome` | E1 | none | cordis | skill-usage | — | 无（path） | Directory holding the family event log the usage store reads. |
+| `memory-files.root` | E1 | none | cordis | memory-files | — | 无（path） | Directory holding MEMORY.md and USER.md (empty = $DSH_HOME/memories). |
+| `evolution-feedback.path` | E1 | none | cordis | evolution-feedback | — | 无（path） | Event log the feedback scorer reads (empty = family events file). |
 | `evolution-state.provider` | E2 | none | cordis | evolution-state | — | 无（identity） | Registered state-store provider name. |
 | `memory.provider` | E2 | none | cordis | memory | — | 无（identity） | Registered memory provider name. |
-| `memory-files.providerName` | E2 | none | cordis | memory | — | 无（identity） | Name this package registers as the memory provider. |
+| `memory-files.providerName` | E2 | none | cordis | memory-files | — | 无（identity） | Name this package registers as the memory provider. |
 | `substantiveMinToolCalls` | E2 | none | cordis | evolution-review | — | 无（internal） | Tool calls that make a turn count as substantive. |
 | `substantiveMinUserChars` | E2 | none | cordis | evolution-review | — | 无（internal） | User characters that make a turn count as substantive. |
 | `substantiveMinAgentChars` | E2 | none | cordis | evolution-review | — | 无（internal） | Assistant characters that make a turn count as substantive. |
-| `threatExemptLabels` | E1 | none | cordis | evolution-activity | — | 无（security） | Threat labels the deployment declares benign (safety surface, never user-writable). |
-| `evolution-threat.enabled` | E2 | none | cordis | evolution-activity | — | 无（security） | Mount the write-time threat guard at all. |
-| `evolution-threat.maxScanChars` | E2 | none | cordis | evolution-activity | — | 无（security） | Scan window size of the threat guard. |
+| `threatExemptLabels` | E1 | none | cordis | evolution-threat | — | 无（security） | Threat labels the deployment declares benign (safety surface, never user-writable). |
+| `evolution-threat.enabled` | E2 | none | cordis | evolution-threat | — | 无（security） | Mount the write-time threat guard at all. |
+| `evolution-threat.maxScanChars` | E2 | none | cordis | evolution-threat | — | 无（security） | Scan window size of the threat guard. |
 | `evolution-approval.enabled` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | Master approval switch: run the approval pipeline for foreground writes. |
 | `evolution-approval.stageForeground` | E2 | none | cordis | evolution-approval | — | 无（security） | Stage foreground agent writes for approval too. |
 | `evolution-approval.pendingTtlMs` | E3 | live | cordis | evolution-approval | — | 卡：evolution-approval | How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires. |
-| `qualityWarnThreshold` | E2 | none | cordis | evolution-activity | — | 无（internal） | Feedback score below which a skill carries a warning. |
-| `replay.maxPlans` | E2 | none | cordis | evolution-activity | — | 无（internal） | Plans compared in one replay report. |
-| `replay.weights` | E2 | none | cordis | evolution-activity | — | 无（internal） | Scoring weights of the replay comparison. |
+| `qualityWarnThreshold` | E2 | none | cordis | evolution-feedback | — | 无（internal） | Feedback score below which a skill carries a warning. |
+| `replay.maxPlans` | E2 | none | cordis | evolution-replay | — | 无（internal） | Plans compared in one replay report. |
+| `replay.weights` | E2 | none | cordis | evolution-replay | — | 无（internal） | Scoring weights of the replay comparison. |
 | `evolution-commands.maintainCooldownMs` | E2 | none | cordis | evolution-commands | — | 无（internal） | Cooldown between maintenance runs from the command surface. |
 | `evolution-commands.maintainHandoffOnSettle` | E3 | live | cordis | evolution-commands | — | 卡：evolution-commands | Hand the maintenance report to the model automatically once a scan settles successfully (the same injection as maintain handoff); off by default — enabling it costs one extra model call per successful run. |
 | `evolution-commands.maintainTimeoutMs` | E2 | none | cordis | evolution-commands | — | 无（internal） | Timeout of one maintenance run started from the command surface. |
 | `evolution-maintenance.probeTimeoutMs` | E2 | none | cordis | evolution-maintenance | — | 无（internal） | Model-facing budget of one maintenance_probe call — a hang guard, not a latency budget. |
-| `skill-usage.supportReadToolNames` | E2 | none | cordis | evolution-skill-discovery | — | 无（internal） | Tool names whose file reads are attributed to support files. |
+| `skill-usage.supportReadToolNames` | E2 | none | cordis | skill-usage | — | 无（internal） | Tool names whose file reads are attributed to support files. |
 | `install.mode` | E4 | restart | install | scripts | — | 无（install） | Install target plane (values all / host; the legacy layered preset path is internal-only). |
 | `install.basePreset` | E4 | restart | install | scripts | — | 无（install） | Agent-preset base the layered install composes from (--base). |
 | `install.home` | E4 | restart | install | scripts | — | 无（install） | Harness home the installer writes into (--home). |

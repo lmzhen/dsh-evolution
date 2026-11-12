@@ -29,6 +29,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { readNamespaces, readRegistry } from './lib-param-registry.mjs'
+import { ownerPackageOf, ownerSourceOf } from './lib-param-owners.mjs'
 
 /** Quoted literals that look like a parameter name: camelCase or dotted, >= 6 chars. */
 const ID_SHAPED = /'([a-z][A-Za-z0-9]*(?:\.[a-z][A-Za-z0-9]*)?)'/g
@@ -194,7 +195,7 @@ for (const owner of e3Owners) {
   // Looking the qualified id up in the schema block reported a false "declares no such key" for every
   // qualified E3 row; the scope removal is what finally walked into one.
   const configKey = id => id.includes('.') ? id.slice(id.lastIndexOf('.') + 1) : id
-  const file = join(root, owner, 'src', 'index.ts')
+  const file = join(root, ownerSourceOf(owner), 'index.ts')
   if (!existsSync(file)) {
     problems.push('owner-config: ' + owner + ' owns ' + ownedIds.length + ' E3 row(s) but has no src/index.ts')
     continue

@@ -19,17 +19,20 @@ import { fileURLToPath } from 'node:url'
 import { readRegistry } from './lib-param-registry.mjs'
 import { familyVersion } from './lib-family-version.mjs'
 import { exemptionProblems } from './lib-exemptions.mjs'
+import { ownerSourceOf } from './lib-param-owners.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const root = resolve(process.argv[2] ?? join(HERE, '..'))
 const jsonMode = process.argv.includes('--json')
+
+
 
 /** Owners that live under `scripts/` rather than a package directory. */
 const OWNER_DIRS = { scripts: join(root, 'scripts') }
 
 /** Source files of one owner, excluding the registry itself and build output. */
 function sourcesOf(owner) {
-  const base = OWNER_DIRS[owner] ?? join(root, owner, 'src')
+  const base = OWNER_DIRS[owner] ?? join(root, ownerSourceOf(owner))
   if (!existsSync(base)) return null
   const files = []
   const walk = (dir) => {
