@@ -78,16 +78,8 @@
   name: '@deepseek-ai/dsh-evolution-state/storage'
 - id: evolution-state-domain
   name: '@deepseek-ai/dsh-evolution-state-domain'
-- id: evolution-state-json
-  name: '@deepseek-ai/dsh-evolution-state-json'
 - id: evolution-state
   name: '@deepseek-ai/dsh-evolution-state'
-  # P2-6 (V10-16): explicit provider pin. The storage registry's `provider()`
-  # has NO fallback logic — unpinned, the effective provider is whichever row
-  # registered first (fragile yml row order). `domain` is the primary medium;
-  # the json provider above stays mountable as an explicitly selectable
-  # alternative (an overlay re-pins `provider: json`), never an automatic
-  # failover. Both provider rows remain listed so the pinned name resolves.
   config:
     provider: domain
 

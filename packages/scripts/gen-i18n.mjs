@@ -160,7 +160,12 @@ const details = byPackage(await loadStrict('plugin-detail'))
  */
 const SUBPATH_MOUNTS = new Map([['evolution-core', 'runtime'], ['evolution-maintenance', 'tools']])
 const declared = [...new Set([...meta.keys(), ...details.keys()])].sort()
+// G8-B1/B2: packages absorbed into a surviving package. Their rows still mount, now as
+// SUBPATHS; moving their plugin metadata into the host package's locale tree is one batched
+// migration (designs/W9-structure.md §9), so the catalogs are skipped until then.
+const MERGED_AWAY = new Set(['evolution-contract', 'evolution-io', 'evolution-io-node', 'evolution-authority', 'evolution-policy', 'evolution-state-storage', 'evolution-state-json'])
 for (const directory of declared) {
+  if (MERGED_AWAY.has(directory)) continue
   const fields = meta.get(directory) ?? new Map()
   const detail = details.get(directory)
   const manifestPath = join(EVOLUTION_ROOT, directory, 'package.json')

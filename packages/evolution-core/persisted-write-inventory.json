@@ -83,15 +83,6 @@
       "note": "Durable memory documents written by the memory tool."
     },
     {
-      "id": "state",
-      "path": "<evolutionHome>/<review|curator|pending>-state.json",
-      "writer": "evolution-state-json/src/index.ts",
-      "serializedBy": "transact",
-      "marker": "new WriteKernel({ io: io() }).run({ path: join(root, file)",
-      "state": [],
-      "note": "The durable state stack (review/curator/pending). S4.4/O-6 moved its three warn/rewrite sets into the provider instance (QuarantineMemory), so no module-scope N12 store remains here."
-    },
-    {
       "id": "curator-reports",
       "path": "<evolutionHome>/reports/curator-*.json",
       "writer": "evolution-curator/src/index.ts",
@@ -162,15 +153,6 @@
       "marker": "transactIo(io, eventsPath,",
       "state": [],
       "note": "Feedback appends to the family event log under the cross-process lock. Declared by v46 S1.12 (N20 reverse). Shares ONE file with the \"events\" site (two writers, one log under the IO lock)."
-    },
-    {
-      "id": "pending-archive",
-      "path": "<evolutionHome>/pending-state-archive.json",
-      "writer": "evolution-state-json/src/index.ts",
-      "serializedBy": "transact",
-      "marker": "transactIo(io(), pathOf(PENDING_ARCHIVE_FILE)",
-      "state": [],
-      "note": "The resolved-pending archive (the legacy merge target). The store already declared its record map; v46 S1.12 declared the archive append as well — the second site in one file is exactly what the reverse scan exists to find."
     },
     {
       "id": "merge-state",

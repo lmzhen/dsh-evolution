@@ -8,8 +8,11 @@ import * as MemoryFiles from '@deepseek-ai/dsh-memory-files'
 import SkillUsageRegistry from '@deepseek-ai/dsh-skill-usage'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
+import { Storage, storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
+import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
+import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
+import * as DomainState from '@deepseek-ai/dsh-evolution-state-domain'
 import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state/storage'
-import * as JsonState from '@deepseek-ai/dsh-evolution-state-json'
 import EvolutionState from '@deepseek-ai/dsh-evolution-state'
 import EvolutionPolicy from '@deepseek-ai/dsh-evolution-core/policy'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
@@ -27,9 +30,14 @@ describe('layered installation matrix', () => {
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
+    await ctx.plugin(Storage)
+    const backend = new JsonStorageBackend(join(root, 'storage'))
+    ctx.storage.backend.register('test-json', backend)
+    ctx.provide(storageBackendServiceKey('test-json'), backend)
+    await ctx.plugin(DomainFacility, { backend: 'test-json' })
     await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(JsonState, { root: join(root, 'state') })
-    await ctx.plugin(EvolutionState)
+    await ctx.plugin(DomainState)
+    await ctx.plugin(EvolutionState, { provider: 'domain' })
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(MemoryFiles, { root: join(root, 'memories') })
     await ctx.plugin(SkillUsageRegistry, { root: join(root, 'skills') })
@@ -58,9 +66,14 @@ describe('layered installation matrix', () => {
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
+    await ctx.plugin(Storage)
+    const backend = new JsonStorageBackend(join(root, 'storage'))
+    ctx.storage.backend.register('test-json', backend)
+    ctx.provide(storageBackendServiceKey('test-json'), backend)
+    await ctx.plugin(DomainFacility, { backend: 'test-json' })
     await ctx.plugin(EvolutionStateStorageRegistry)
-    await ctx.plugin(JsonState, { root: join(root, 'state') })
-    await ctx.plugin(EvolutionState)
+    await ctx.plugin(DomainState)
+    await ctx.plugin(EvolutionState, { provider: 'domain' })
     await ctx.plugin(MemoryRegistry)
     await ctx.plugin(MemoryFiles, { root: join(root, 'memories') })
     await ctx.plugin(SkillUsageRegistry, { root: join(root, 'skills') })

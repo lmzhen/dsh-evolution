@@ -30,13 +30,9 @@
       name: '@deepseek-ai/dsh-evolution-state/storage'
     - id: evolution-state-domain
       name: '@deepseek-ai/dsh-evolution-state-domain'
-      # The storage-domain provider is opt-in. It is disabled by default so a
-      # profile without the host storage-domain facility boots deterministically
-      # and evolution-state-json remains the active portable backend. Enable it
-      # explicitly in a profile overlay only when storage-domain is mounted.
-      disabled: true
-    - id: evolution-state-json
-      name: '@deepseek-ai/dsh-evolution-state-json'
+      # G8-B2: shipped default. The platform base bundle mounts the storage-domain
+      # facility over its json backend, so this provider registers the KV domain
+      # without the family owning a second file medium.
     - id: evolution-state
       name: '@deepseek-ai/dsh-evolution-state'
       # S1-D1 (0.3.80): the medium is PINNED explicitly. The row used to carry
@@ -50,7 +46,7 @@
       # default; switching to domain is a deliberate overlay override of THIS
       # row's config (`provider: domain` — the config replaces wholesale).
       config:
-        provider: json
+        provider: domain
 
     # ── memory seam: registry and provider, no model tool ───────────────────
     - id: memory

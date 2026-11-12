@@ -108,12 +108,12 @@ describe('layered installer', () => {
     const builtMarker = fileURLToPath(new URL('../../evolution-core/lib/index.js', import.meta.url))
     if (existsSync(builtMarker)) expect(stdout).not.toContain('unbuilt:')
     else expect(stdout).toContain('unbuilt:')
-    const sourceTypes = fileURLToPath(new URL('../../evolution-state-json/lib/types/index.d.ts', import.meta.url))
+    const sourceTypes = fileURLToPath(new URL('../../evolution-state/lib/types/storage.d.ts', import.meta.url))
     if (existsSync(sourceTypes)) {
       await expect(readFile(
-        join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-state-json/lib/types/index.d.ts'),
+        join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-state/lib/types/storage.d.ts'),
         'utf8',
-      )).resolves.toContain('evolution-state-json')
+      )).resolves.toContain('evolution-state/storage')
     }
 
     // 0.2.x: the preset is a ROW in the profile's own patch layer, composed from

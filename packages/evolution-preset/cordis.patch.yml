@@ -7,8 +7,8 @@
 # The storage stack (`storage`, `storage-json`, `storage-domain`) is
 # HOST-plane in DSH, exactly like session persistence and the native approval
 # stack. A preset must not own it. `evolution-state-domain` below joins the
-# host's storage-domain facility when present; `evolution-state-json` is the
-# portable alternative — there is NO automatic fallback between providers
+# host's storage-domain facility when present. There is NO automatic fallback
+# between providers
 # (P2-6): the effective one is whichever registered first unless a profile
 # overlay pins `config: { provider: ... }` on the `evolution-state` row.
 - insert:
@@ -33,21 +33,15 @@
       name: '@deepseek-ai/dsh-evolution-state/storage'
     - id: evolution-state-domain
       name: '@deepseek-ai/dsh-evolution-state-domain'
-      # The storage-domain provider is opt-in. It is disabled by default so a
-      # profile without the host storage-domain facility boots deterministically
-      # and evolution-state-json remains the active portable backend. Enable it
-      # explicitly in a profile overlay only when storage-domain is mounted.
-      disabled: true
-    - id: evolution-state-json
-      name: '@deepseek-ai/dsh-evolution-state-json'
+      # G8-B2: shipped default. The platform base bundle mounts the storage-domain
+      # facility over its json backend, so this provider registers the KV domain
+      # without the family owning a second file medium.
     - id: evolution-state
       name: '@deepseek-ai/dsh-evolution-state'
-      # S1-D1 (0.3.80): json medium PINNED explicitly — byte-identical to the
-      # host bundle's row (three-way drift guard). See that file for the full
-      # rationale: the unpinned row let a domain-enabling overlay silently
-      # switch the family's state medium to an empty domain.
+      # S1-D1 (0.3.80) / G8-B2: the medium is PINNED to the platform storage-domain
+      # provider — the shipped default since evolution-state-json was retired.
       config:
-        provider: json
+        provider: domain
 
     # ── memory: registry, provider, model-facing tool ───────────────────────
     - id: memory

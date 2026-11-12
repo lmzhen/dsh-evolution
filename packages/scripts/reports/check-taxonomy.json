@@ -750,18 +750,6 @@
         "evolution-skill-health::tests/health-presentation.spec.ts",
         "evolution-skill-health::tests/routes.spec.ts",
         "evolution-state-domain::tests/compatibility.spec.ts",
-        "evolution-state-json::tests/boundary.spec.ts",
-        "evolution-state-json::tests/consistency-forge.spec.ts",
-        "evolution-state-json::tests/gate-drop-pending.spec.ts",
-        "evolution-state-json::tests/json.spec.ts",
-        "evolution-state-json::tests/pending-cap.spec.ts",
-        "evolution-state-json::tests/pending-growth-warning.spec.ts",
-        "evolution-state-json::tests/provider-consistency.spec.ts",
-        "evolution-state-json::tests/record-gate.spec.ts",
-        "evolution-state-json::tests/root-resolution.spec.ts",
-        "evolution-state-json::tests/shape-gate.spec.ts",
-        "evolution-state-json::tests/transact-guard.spec.ts",
-        "evolution-state-json::tests/transact.spec.ts",
         "evolution-state::tests/state.spec.ts",
         "evolution-ui::tests/diagnostics-presentation.spec.ts",
         "evolution-ui::tests/history-apply-order.spec.ts",
@@ -1460,18 +1448,6 @@
         "evolution-skill-health::tests/health-presentation.spec.ts",
         "evolution-skill-health::tests/routes.spec.ts",
         "evolution-state-domain::tests/compatibility.spec.ts",
-        "evolution-state-json::tests/boundary.spec.ts",
-        "evolution-state-json::tests/consistency-forge.spec.ts",
-        "evolution-state-json::tests/gate-drop-pending.spec.ts",
-        "evolution-state-json::tests/json.spec.ts",
-        "evolution-state-json::tests/pending-cap.spec.ts",
-        "evolution-state-json::tests/pending-growth-warning.spec.ts",
-        "evolution-state-json::tests/provider-consistency.spec.ts",
-        "evolution-state-json::tests/record-gate.spec.ts",
-        "evolution-state-json::tests/root-resolution.spec.ts",
-        "evolution-state-json::tests/shape-gate.spec.ts",
-        "evolution-state-json::tests/transact-guard.spec.ts",
-        "evolution-state-json::tests/transact.spec.ts",
         "evolution-state::tests/state.spec.ts",
         "evolution-ui::tests/diagnostics-presentation.spec.ts",
         "evolution-ui::tests/history-apply-order.spec.ts",
@@ -2146,18 +2122,6 @@
         "evolution-state-domain::tests/domain-state.spec.ts",
         "evolution-state-domain::tests/domain.spec.ts",
         "evolution-state-domain::tests/provider-consistency.spec.ts",
-        "evolution-state-json::tests/boundary.spec.ts",
-        "evolution-state-json::tests/consistency-forge.spec.ts",
-        "evolution-state-json::tests/gate-drop-pending.spec.ts",
-        "evolution-state-json::tests/json.spec.ts",
-        "evolution-state-json::tests/pending-cap.spec.ts",
-        "evolution-state-json::tests/pending-growth-warning.spec.ts",
-        "evolution-state-json::tests/provider-consistency.spec.ts",
-        "evolution-state-json::tests/record-gate.spec.ts",
-        "evolution-state-json::tests/root-resolution.spec.ts",
-        "evolution-state-json::tests/shape-gate.spec.ts",
-        "evolution-state-json::tests/transact-guard.spec.ts",
-        "evolution-state-json::tests/transact.spec.ts",
         "evolution-state::tests/state.spec.ts",
         "evolution-threat::tests/threat-guard.spec.ts",
         "evolution-ui::tests/diagnostics-presentation.spec.ts",
@@ -2298,7 +2262,7 @@
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 447
+      "specs": 435
     },
     "ci-only": {
       "gates": 18,
@@ -2306,16 +2270,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 447
+      "specs": 435
     },
     "full(ci=on)": {
       "gates": 93,
-      "specs": 520
+      "specs": 508
     }
   },
   "specs": {
-    "total": 520,
-    "marked": 520,
+    "total": 508,
+    "marked": 508,
     "unmarked": 0
   }
 }

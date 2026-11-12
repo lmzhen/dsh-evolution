@@ -5,7 +5,7 @@
  *
  * C-10: PATH HELPERS ONLY — despite the file name there is no store
  * here. Durable evolution state lives in the state stack (evolution-state over
- * evolution-state-json / -domain); skills and memories live in skill-store.ts
+ * evolution-state-domain); skills and memories live in skill-store.ts
  * / memory-store.ts. The file name is kept deliberately: renaming it would
  * touch every family import for zero behavior change, and the audit records
  * the mismatch as known naming debt.

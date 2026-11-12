@@ -1,5 +1,5 @@
 {
-  "pin": "d95ac242",
+  "pin": "a80c40ca",
   "bed": {
     "mono": "overlay"
   },
@@ -113,11 +113,6 @@
       "id": "@deepseek-ai/dsh-evolution-state-domain",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-state-domain"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-state-json",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-state-json"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-threat",

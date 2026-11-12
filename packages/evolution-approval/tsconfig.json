@@ -10,14 +10,8 @@
     {
       "path": "../evolution-core"
     },
-    
     {
       "path": "../evolution-state"
-    },
-    
-    
-    {
-      "path": "../evolution-state-json"
     }
   ]
 }

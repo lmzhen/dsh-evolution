@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-12T13:05:26.535Z",
-  "tree": "d95ac242",
+  "measuredAt": "2026-11-12T13:32:14.539Z",
+  "tree": "a80c40ca",
   "testLines": [
     {
       "spec": "packages/evolution-agent/tests/agent-composition.spec.ts",
@@ -576,6 +576,36 @@
     {
       "spec": "packages/evolution-host/tests/installation-matrix.spec.ts",
       "id": "@deepseek-ai/dsh-skill-usage",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-host"
+    },
+    {
+      "spec": "packages/evolution-host/tests/installation-matrix.spec.ts",
+      "id": "@deepseek-ai/dsh-storage",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-host"
+    },
+    {
+      "spec": "packages/evolution-host/tests/installation-matrix.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-host"
+    },
+    {
+      "spec": "packages/evolution-host/tests/installation-matrix.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-domain",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",

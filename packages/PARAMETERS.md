@@ -123,7 +123,6 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `evolution-learning-graph.root` | E1 | none | cordis | evolution-learning-graph | — | 无（path） | Skill-tree root the learning graph reads. |
 | `skill-usage.root` | E1 | none | cordis | skill-usage | — | 无（path） | Skill-tree root the usage store observes. |
 | `skill-usage.eventsHome` | E1 | none | cordis | skill-usage | — | 无（path） | Directory holding the family event log the usage store reads. |
-| `evolution-state-json.root` | E1 | none | cordis | evolution-state-json | — | 无（path） | Directory holding the JSON state store. |
 | `memory-files.root` | E1 | none | cordis | memory-files | — | 无（path） | Directory holding MEMORY.md and USER.md (empty = $DSH_HOME/memories). |
 | `evolution-feedback.path` | E1 | none | cordis | evolution-feedback | — | 无（path） | Event log the feedback scorer reads (empty = family events file). |
 | `evolution-state.provider` | E2 | none | cordis | evolution-state | — | 无（identity） | Registered state-store provider name. |

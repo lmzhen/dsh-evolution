@@ -9,8 +9,7 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 | Package | Role |
 |---|---|
 | `evolution-core` | SkillLibrary, MemoryStore, write kernel/unit transactions, prompts, projections, events, presets, `./restrictor` plugin; `./io-registry` + `./io-node` (IO seam), `./authority-plugin` (the `evolutionMutationAuthority` home lock service), `./policy`, `./contract` |
-| `evolution-state-json` | Default JSON state provider: transactions, quarantine, legacy retirement |
-| `evolution-state-domain` | Optional storage-domain provider (disabled by default) |
+| `evolution-state-domain` | Shipped storage-domain provider over the platform KV domain |
 | `evolution-state` | State facade and provider pinning |
 | `evolution-threat` | Write-time threat scan for memory/skill args |
 
@@ -71,7 +70,7 @@ Summary: `/evolution` (27 table entries), `/graph`, and `/skill-domain` (mode:on
 
 ## State and IO
 
-The default state provider is `evolution-state-json`; `evolution-state-domain` is optional and disabled in the shipped patches. `evolution-state` is a facade, not a medium. IO is a local `node:fs` provider; the honest process scope is **single-process**.
+The shipped state provider is `evolution-state-domain`, which registers a KV domain on the platform storage stack (base bundle: `storage` + `storage-json` + `storage-domain`). `evolution-state` is a facade, not a medium. IO is a local `node:fs` provider; the honest process scope is **single-process**.
 
 ## Generated surfaces
 
