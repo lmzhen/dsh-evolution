@@ -124,14 +124,13 @@ it('resumes settlement after a crash at pair-index write', async () => {
   expect((await readRunMeta(io, home, 'run-1'))?.phase).toBe('undone')
 })
 
-it('target restored/source not restored is typed partial and writes no receipt', async () => {
+it('completes a partially applied undo by planning the missing side only', async () => {
+  // W9-commit-protocol §3.2: a partial state used to be refused with "manual retry required",
+  // which was the one action the pass then rejected. A resumed pass now plans from the missing side.
   const { home, io, state } = await setup()
   state.target = 'body-0'
   const first = await runUndoOperation({ io, home, runId: 'run-1', port: port(state), now: () => 2 })
-  expect(first.ok).toBe(false)
-  expect(first.code).toBe('undo-partial-state')
-  expect(await readUndoReceipt(io, home, 'run-1', 'a\u0000b')).toBeNull()
-  const second = await runUndoOperation({ io, home, runId: 'run-1', port: port(state), now: () => 3 })
-  expect(second.ok).toBe(false)
-  expect(await readUndoReceipt(io, home, 'run-1', 'a\u0000b')).toBeNull()
+  expect(first.ok, first.ok ? '' : first.message).toBe(true)
+  expect(await readUndoReceipt(io, home, 'run-1', 'a\u0000b')).toMatchObject({ restoredTargetHash: contentHash('body-0') })
+  expect((await readRunMeta(io, home, 'run-1'))?.phase).toBe('undone')
 })

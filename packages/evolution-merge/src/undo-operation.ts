@@ -139,19 +139,17 @@ async function runUndoSteps(options: UndoOperationOptions): Promise<UndoResult> 
       await settleRun(options.io, options.home, options.runId, pairKey, allPairKeys, options.now())
       undone.push(pairKey); continue
     }
-    if (!checked.targetDone || !checked.sourcesDone) {
-      const targetStage = checked.targetDone ? 'skip' : 'restore'
-      const sourceStage = checked.sourcesDone ? 'skip' : 'restore'
-      if (targetStage === 'skip' && sourceStage === 'skip') { /* unreachable, done */ }
-    }
-    if (checked.targetDone !== checked.sourcesDone && (checked.targetDone || checked.sourcesDone)) {
-      return { ok: false, code: 'undo-partial-state', message: 'undo is partially applied; resume the pass to finish it', undone, resumable: true }
+    // A resumed pass continues from what the previous attempt already restored: the plan is built
+    // from the missing side only, so re-running the pass is idempotent instead of refused.
+    const skip = {
+      ...(checked.targetDone ? { skipTarget: true } : {}),
+      ...(checked.sourcesDone ? { skipSources: true } : {}),
     }
     const phase = (next: 'restore-target' | 'restore-source' | 'receipt'): UndoPairState => ({ pairKey, unitId: receipt.unitId, phase: next })
     await writeUndoJournal(options.io, options.home, { version: 1, runId: options.runId, phase: 'running', pairs: pairs.map(pair => pair.pairKey === pairKey ? phase('restore-target') : pair), updatedAt: new Date(options.now()).toISOString() })
     await options.onPhase?.('restore-target', pairKey)
-    const executed = await undoMergeReceipt(receipt, options.port)
-    if (!executed.ok) return { ok: false, message: executed.message, undone }
+    const executed = await undoMergeReceipt(receipt, options.port, skip)
+    if (!executed.ok) return { ok: false, message: executed.message, undone, resumable: true }
     await writeUndoJournal(options.io, options.home, { version: 1, runId: options.runId, phase: 'running', pairs: pairs.map(pair => pair.pairKey === pairKey ? phase('restore-source') : pair), updatedAt: new Date(options.now()).toISOString() })
     await options.onPhase?.('restore-source', pairKey)
     await writeUndoJournal(options.io, options.home, { version: 1, runId: options.runId, phase: 'running', pairs: pairs.map(pair => pair.pairKey === pairKey ? phase('receipt') : pair), updatedAt: new Date(options.now()).toISOString() })
