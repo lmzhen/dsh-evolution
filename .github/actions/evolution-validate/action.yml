@@ -72,10 +72,10 @@ runs:
         # 0.1.5 line, so this is the only overlay form left. Test-file typechecking
         # now lives in the family's own gate (`tsc -b tsconfig.host.json` on the build
         # line, where that graph does include `packages/evolution/**`).
+        cp -r packages/. upstream/packages/evolution/
         node packages/scripts/inject-evolution-paths.mjs \
           upstream/tsconfig.base.json \
           tsconfig.base.json
-        cp -r packages/. upstream/packages/evolution/
         # G1-S7: the ONE platform line travels with the overlay (prepare-release / range guard read it
         # from the overlay root; no workflow env carries version/floor).
         cp platform-line.json upstream/platform-line.json
