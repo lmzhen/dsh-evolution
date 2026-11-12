@@ -2,10 +2,7 @@
   "extends": "../tsconfig.pkg.json",
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../evolution-approval"
     },
     {
       "path": "../evolution-core"
@@ -14,7 +11,10 @@
       "path": "../evolution-skill-discovery"
     },
     {
-      "path": "../evolution-approval"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

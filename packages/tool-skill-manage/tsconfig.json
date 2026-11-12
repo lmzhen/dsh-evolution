@@ -5,13 +5,16 @@
       "path": "../evolution-approval"
     },
     {
+      "path": "../evolution-core"
+    },
+    {
+      "path": "../evolution-skill-discovery"
+    },
+    {
       "path": "../../../vendor/cordis"
     },
     {
       "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../evolution-core"
     },
     {
       "path": "../../core/tools"
@@ -21,9 +24,6 @@
     },
     {
       "path": "../../test-support/agent-loop-testkit"
-    },
-    {
-      "path": "../evolution-skill-discovery"
     }
   ]
 }

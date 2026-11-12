@@ -2,19 +2,16 @@
   "extends": "../tsconfig.pkg.json",
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../evolution-client-kit"
-    },
-    {
-      "path": "../evolution-client-kit"
-    },
-    {
       "path": "../evolution-core"
     },
     {
       "path": "../evolution-curator"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../evolution-client-kit"
     }
   ]
 }

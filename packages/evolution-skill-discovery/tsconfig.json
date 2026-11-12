@@ -2,6 +2,9 @@
   "extends": "../tsconfig.pkg.json",
   "references": [
     {
+      "path": "../evolution-core"
+    },
+    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -15,10 +18,6 @@
     },
     {
       "path": "../../llm/llm"
-    },
-    
-    {
-      "path": "../evolution-core"
     },
     {
       "path": "../../core/tools"
