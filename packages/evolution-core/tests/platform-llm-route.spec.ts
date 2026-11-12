@@ -4,10 +4,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import { modelRoute } from '../src/platform/llm.ts'
 
 /**
- * The platform publishes two selections (packages/core/agent/src/model-selection.ts): `lastUsed` — the
- * model the previous request actually used — and `pending`, a choice the user just made that no request
- * has carried yet. Reading `lastUsed` first leaves auxiliary calls (review, curator) on the old model
- * until the user sends another message, which is exactly the window this pins.
+ * `sessionProjections.snapshot()` hands out the projection's VIEW. For modelSelection that view is
+ * `{ lastUsed, next }` with `next = pending ?? lastUsed` (packages/core/agent/src/model-selection.ts
+ * :87-88) — the state face's `pending` is NOT visible here, so reading it would always be undefined
+ * and pin auxiliary calls to the model of the previous request.
  */
 
 const PROBE = { provider: 'deepseek', model: 'probe' }
@@ -24,21 +24,26 @@ function ctxWith(value: unknown, defaults: unknown = undefined): Context {
   } as unknown as Context
 }
 
-describe('modelRoute: the session selection the agent has not used yet still wins', () => {
-  it('prefers pending (a fresh user choice) over lastUsed', () => {
-    expect(modelRoute(ctxWith({ lastUsed: OLD, pending: NEXT }), undefined, {})).toEqual(NEXT)
+describe('modelRoute: the view field `next` (already pending ?? lastUsed) wins', () => {
+  it('takes the view next selection — a model the user just picked but no request has used yet', () => {
+    expect(modelRoute(ctxWith({ lastUsed: OLD, next: NEXT }), undefined, {})).toEqual(NEXT)
   })
 
-  it('falls back to lastUsed once the pending choice has been consumed', () => {
-    expect(modelRoute(ctxWith({ lastUsed: OLD, pending: null }), undefined, {})).toEqual(OLD)
+  it('falls back to lastUsed when the view carries no next selection', () => {
+    expect(modelRoute(ctxWith({ lastUsed: OLD }), undefined, {})).toEqual(OLD)
   })
 
-  it('ignores a session selection that carries neither field', () => {
+  it('ignores a view that carries neither field', () => {
     expect(modelRoute(ctxWith({}, PROBE), undefined, {})).toEqual(PROBE)
   })
 
   it('lets the agent-owned selection win over both', () => {
     const agent = { model: { current: () => OLD } }
-    expect(modelRoute(ctxWith({ lastUsed: NEXT, pending: NEXT }, PROBE), agent, {})).toEqual(OLD)
+    expect(modelRoute(ctxWith({ lastUsed: NEXT, next: NEXT }, PROBE), agent, {})).toEqual(OLD)
+  })
+
+  it('does not read the state field `pending`, which the view never exposes', () => {
+    // A state-shaped payload must not be mistaken for a view: pending alone leaves the route on defaults.
+    expect(modelRoute(ctxWith({ lastUsed: null, pending: NEXT }, PROBE), undefined, {})).toEqual(PROBE)
   })
 })
