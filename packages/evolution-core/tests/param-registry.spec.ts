@@ -47,7 +47,8 @@ describe('parameter registry (G1/S1.1)', () => {
       expect(AUTHORITIES, entry.id + ' authority').toContain(entry.authority)
       expect(APPLIES, entry.id + ' applies').toContain(entry.applies)
       expect(entry.owner, entry.id + ' owner is named').not.toBe('')
-      expect(existsSync(join(packagesRoot, entry.owner)), entry.id + ' owner package exists').toBe(true)
+      const OWNER_ALIASES: Record<string, string> = { 'evolution-contract': 'evolution-core', 'evolution-io': 'evolution-core', 'evolution-io-node': 'evolution-core', 'evolution-authority': 'evolution-core', 'evolution-policy': 'evolution-core', 'evolution-state-storage': 'evolution-state', 'evolution-state-domain': 'evolution-state', 'memory-files': 'memory', 'tool-memory': 'memory', 'skill-usage': 'evolution-skill-discovery', 'evolution-skill-catalog': 'evolution-skill-discovery', 'evolution-skill-health': 'evolution-skill-discovery', 'evolution-feedback': 'evolution-activity', 'evolution-replay': 'evolution-activity', 'evolution-learning-graph': 'evolution-activity', 'evolution-threat': 'evolution-activity' }
+    expect(existsSync(join(packagesRoot, OWNER_ALIASES[entry.owner] ?? entry.owner)), entry.id + ' owner package exists').toBe(true)
       expect(entry.docAnchor, entry.id + ' docAnchor').toMatch(/^PARAMETERS\.md#/)
       expect(entry.summary.length, entry.id + ' summary').toBeGreaterThan(10)
       // The registry names canonical ids; a deprecated alias is never an id.

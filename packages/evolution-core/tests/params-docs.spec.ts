@@ -21,6 +21,19 @@ const OWNER: Record<string, string> = {
   userChars: 'memory-files',
 }
 
+/** Absorbed rows keep their id; their docs and sources live under the host package. */
+const OWNER_DOCS: Record<string, { readme: string; source: string }> = {
+  'memory-files': { readme: 'memory/docs/files/README.md', source: 'memory/src/files/index.ts' },
+  'tool-memory': { readme: 'memory/docs/tools/README.md', source: 'memory/src/tools/index.ts' },
+  'skill-usage': { readme: 'evolution-skill-discovery/docs/usage/README.md', source: 'evolution-skill-discovery/src/usage/index.ts' },
+  'evolution-skill-catalog': { readme: 'evolution-skill-discovery/docs/catalog/README.md', source: 'evolution-skill-discovery/src/catalog/index.ts' },
+  'evolution-skill-health': { readme: 'evolution-skill-discovery/docs/health/README.md', source: 'evolution-skill-discovery/src/health/index.ts' },
+  'evolution-feedback': { readme: 'evolution-activity/docs/feedback/README.md', source: 'evolution-activity/src/feedback/index.ts' },
+  'evolution-replay': { readme: 'evolution-activity/docs/replay/README.md', source: 'evolution-activity/src/replay/index.ts' },
+  'evolution-learning-graph': { readme: 'evolution-activity/docs/learning-graph/README.md', source: 'evolution-activity/src/learning-graph/index.ts' },
+  'evolution-threat': { readme: 'evolution-activity/docs/threat/README.md', source: 'evolution-activity/src/threat/index.ts' },
+}
+
 const MARKER = /G0\/S0\.3/
 
 /** Owner package of a canonical id, or a loud failure when the map is stale. */
@@ -36,8 +49,9 @@ describe('deprecated parameter aliases are documented (G0/S0.3)', () => {
   it('covers every alias with an owning package that has both doc surfaces', () => {
     for (const canonical of Object.values(PARAM_ALIASES)) {
       const owner = ownerOf(canonical)
-      const readme = join(root, owner, 'README.md')
-      const source = join(root, owner, 'src', 'index.ts')
+      const docs = OWNER_DOCS[owner]
+      const readme = join(root, docs === undefined ? owner + '/README.md' : docs.readme)
+      const source = join(root, docs === undefined ? owner + '/src/index.ts' : docs.source)
       expect(() => readFileSync(readme, 'utf8'), readme).not.toThrow()
       expect(() => readFileSync(source, 'utf8'), source).not.toThrow()
     }
@@ -46,8 +60,9 @@ describe('deprecated parameter aliases are documented (G0/S0.3)', () => {
   it('names the alias, the canonical id and the marker in README and Config JSDoc', () => {
     for (const [alias, canonical] of Object.entries(PARAM_ALIASES)) {
       const owner = ownerOf(canonical)
-      const readme = readFileSync(join(root, owner, 'README.md'), 'utf8')
-      const source = readFileSync(join(root, owner, 'src', 'index.ts'), 'utf8')
+      const docs = OWNER_DOCS[owner]
+      const readme = readFileSync(join(root, docs === undefined ? owner + '/README.md' : docs.readme), 'utf8')
+      const source = readFileSync(join(root, docs === undefined ? owner + '/src/index.ts' : docs.source), 'utf8')
       for (const [label, text] of [['README', readme], ['src/index.ts', source]] as const) {
         expect(text, owner + ' ' + label + ' names ' + alias).toContain(alias)
         expect(text, owner + ' ' + label + ' names ' + canonical).toContain(canonical)

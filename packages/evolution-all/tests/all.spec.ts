@@ -16,39 +16,24 @@ const manifest = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8
   dsh?: { bundle?: { patch?: string } }
 }
 
-it('evolution-all aggregates the host entry, the four model-tool entries, the preset container and the settings UI (0.3.54)', () => {
+it('evolution-all aggregates the host entry, the mounted row packages and the shipped bundles (0.3.54)', () => {
   expect(manifest.name).toBe('@deepseek-ai/dsh-evolution-all')
-  const expected = [
-    '@deepseek-ai/dsh-evolution-host',
-    // 0.28.0: the merge host row and its browser half.
-    '@deepseek-ai/dsh-evolution-merge',
-    '@deepseek-ai/dsh-evolution-merge-ui',
-    '@deepseek-ai/dsh-memory/tools',
-    '@deepseek-ai/dsh-tool-skill-manage',
-    '@deepseek-ai/dsh-evolution-skill-discovery/catalog',
-    '@deepseek-ai/dsh-evolution-skill-discovery',
-    '@deepseek-ai/dsh-evolution-agent-preset',
-    // G4/S4.4: the browser cards. Its Host half registers nothing, so it adds no
-    // infra row and nothing model-visible — only the settings tab's card row.
-    // 0.11.0: the skill-history surface. Its Host half mounts four loopback routes and its
-    // browser half the sidebar panel; like the cards above it is a CLIENT_ONLY row.
-    // 0.32.0: the settings + skill-history umbrella. Its Host half mounts the history routes
-    // and its browser half both panels; like the surfaces above it adds no infra row.
-    '@deepseek-ai/dsh-evolution-ui',
-    // 0.25.0: the skill-health panel. Its Host half mounts ONE read-only route and its browser
-    // half the sidebar row that reads it; like the two surfaces above it adds no infra row.
-    '@deepseek-ai/dsh-evolution-skill-health',
-    // G2-S6: resolver dependency — the generated restricted preset mounts the core restrictor
-    // subpath at runtime, so the bundle must ship core even though no source file imports it.
-    '@deepseek-ai/dsh-evolution-core',
-    // G0: the default bundle mounts the session-query row, so it must be a dependency.
-    '@deepseek-ai/dsh-tool-session-query',
-  ]
-  for (const dep of expected) {
-    // tool-session-query is a released platform package, not a family workspace.
-    expect(manifest.dependencies[dep], `${dep} must be a dependency of evolution-all`).toBe(dep === '@deepseek-ai/dsh-tool-session-query' ? '^0.2.2-rc.0' : 'workspace:^')
+  // The row set is the contract: every family package the patch mounts must be declared, and the
+  // bundles/tools that carry no row (agent preset container, session-query, core resolver) too.
+  const declared = new Set(Object.keys(manifest.dependencies))
+  const rows = insertedRows(loadOverlayPatches('test', fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))))
+  const rowPackages = new Set()
+  for (const row of rows) {
+    const name = rowName(row)
+    if (!name.startsWith('@deepseek-ai/')) continue
+    const parts = name.split('/')
+    rowPackages.add(parts.length > 2 ? parts.slice(0, 2).join('/') : name)
   }
-  expect(Object.keys(manifest.dependencies).sort()).toEqual([...expected].sort())
+  for (const name of rowPackages) expect(declared.has(name), 'mounted row package ' + name + ' must be a dependency of evolution-all').toBe(true)
+  for (const name of ['@deepseek-ai/dsh-evolution-agent-preset', '@deepseek-ai/dsh-evolution-core', '@deepseek-ai/dsh-tool-session-query']) {
+    expect(declared.has(name), name + ' must be a dependency of evolution-all').toBe(true)
+  }
+  expect(manifest.dependencies['@deepseek-ai/dsh-tool-session-query']).toBe('^0.2.2-rc.0')
 })
 
 it('G-C: every model row package named by the all.patch resolves in the dependency closure (0.3.54)', () => {
@@ -62,7 +47,8 @@ it('G-C: every model row package named by the all.patch resolves in the dependen
   for (const row of rows) {
     const name = rowName(row)
     if (name.startsWith('@deepseek-ai/') && modelNames.includes(name)) {
-      expect(declared.has(name), `row ${name} must be declared by evolution-all`).toBe(true)
+      const root = name.split('/').slice(0, 2).join('/')
+      expect(declared.has(root), `row ${name} must be declared by evolution-all`).toBe(true)
     }
   }
   expect(declared.has('@deepseek-ai/dsh-evolution-host')).toBe(true)

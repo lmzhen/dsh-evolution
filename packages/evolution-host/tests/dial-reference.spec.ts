@@ -9,7 +9,7 @@ const devReadme = readFileSync(new URL('../../README.md', import.meta.url), 'utf
 // reference (README "Configuration dials") can never point at a ghost field.
 const dialFields: Array<[string, string]> = [
   ['reviewEnabled', '../../evolution-review/src/index.ts'],
-  ['memoryEnabled', '../../tool-memory/src/index.ts'],
+  ['memoryEnabled', '../../memory/src/tools/index.ts'],
   ['autoStart', '../../evolution-curator/src/index.ts'],
   ['intervalHours', '../../evolution-curator/src/index.ts'],
   ['minIdleHours', '../../evolution-curator/src/index.ts'],

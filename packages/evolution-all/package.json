@@ -48,6 +48,14 @@
     "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
     "@deepseek-ai/dsh-evolution-ui": "workspace:^",
     "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0",
-    "@deepseek-ai/dsh-memory": "workspace:^"
+    "@deepseek-ai/dsh-memory": "workspace:^",
+    "@deepseek-ai/dsh-evolution-state": "workspace:^",
+    "@deepseek-ai/dsh-evolution-approval": "workspace:^",
+    "@deepseek-ai/dsh-evolution-activity": "workspace:^",
+    "@deepseek-ai/dsh-evolution-review": "workspace:^",
+    "@deepseek-ai/dsh-evolution-curator": "workspace:^",
+    "@deepseek-ai/dsh-evolution-commands": "workspace:^",
+    "@deepseek-ai/dsh-evolution-maintenance": "workspace:^",
+    "@deepseek-ai/dsh-evolution-skill-health": "workspace:^"
   }
 }

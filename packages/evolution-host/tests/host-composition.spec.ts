@@ -26,8 +26,10 @@ describe('evolution-host composition', () => {
     expect(maintenanceRows).toHaveLength(1)
   })
 
-  it('keeps the storage-domain row dormant without a host storage-domain facility', () => {
+  it('ships the storage-domain provider enabled, pinned on the state row (G8-B2)', () => {
     const domain = rows.find(row => rowId(row) === 'evolution-state-domain')
-    expect(domain?.disabled).toBeDefined()
+    expect(domain?.disabled).toBeUndefined()
+    const state = rows.find(row => rowId(row) === 'evolution-state')
+    expect(JSON.stringify(state?.config)).toContain('domain')
   })
 })

@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-12T15:54:53.272Z",
-  "tree": "b387f2ab",
+  "measuredAt": "2026-11-12T16:39:22.564Z",
+  "tree": "5ea20c75",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -95,6 +95,16 @@
     },
     {
       "spec": "packages/evolution-all/tests/all.spec.ts",
+      "id": "@deepseek-ai/dsh-tool-session-query",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-all/tests/all.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-all"
+    },
+    {
+      "spec": "packages/evolution-all/tests/all.spec.ts",
       "id": "@deepseek-ai/dsh-memory/tools",
       "kind": "platform",
       "expectLine": "unknown",
@@ -106,16 +116,6 @@
     {
       "spec": "packages/evolution-all/tests/all.spec.ts",
       "id": "@deepseek-ai/dsh-tool-skill-manage",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-all/tests/all.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-all"
-    },
-    {
-      "spec": "packages/evolution-all/tests/all.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-session-query",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",

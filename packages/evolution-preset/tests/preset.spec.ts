@@ -38,9 +38,11 @@ describe('evolution-preset composition boundary', () => {
     expect(new Set(standaloneIds).size).toBe(standaloneIds.length)
   })
 
-  it('keeps the storage-domain row dormant when the host has no storage-domain facility', () => {
+  it('ships the storage-domain provider enabled, pinned on the state row (G8-B2)', () => {
     const domain = insert.find(row => rowId(row) === 'evolution-state-domain')
-    expect(domain?.disabled).toBeDefined()
+    expect(domain?.disabled).toBeUndefined()
+    const state = insert.find(row => rowId(row) === 'evolution-state')
+    expect(JSON.stringify(state?.config)).toContain('domain')
   })
 
   it('stays synchronized with the host and agent layer split', () => {

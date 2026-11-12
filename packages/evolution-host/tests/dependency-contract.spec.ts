@@ -72,7 +72,10 @@ describe('dependency contract (one suite, four subjects)', () => {
         const declaredName = name.split('/').slice(0, 2).join('/')
         expect(declared.has(declaredName), subject.id + ' must declare ' + declaredName).toBe(true)
       }
-      for (const name of Object.values(subject.toolVector ?? {})) expect(declared.has(name), subject.id + ' must declare ' + name).toBe(true)
+      for (const name of Object.values(subject.toolVector ?? {})) {
+        const declaredName = name.split('/').slice(0, 2).join('/')
+        expect(declared.has(declaredName), subject.id + ' must declare ' + declaredName).toBe(true)
+      }
     })
   }
   for (const subject of SUBJECTS) {
@@ -94,9 +97,12 @@ describe('dependency contract (one suite, four subjects)', () => {
       expect(manifest.dsh?.bundle?.patch).toBe(subject.bundlePatch)
     })
   }
-  it('evolution-agent: does not declare host-plane packages as runtime dependencies', () => {
-    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('../../evolution-agent/package.json', import.meta.url)), 'utf8')) as { dependencies?: Record<string, string> }
-    for (const name of HOST_PLANE_NOT_RUNTIME) expect(manifest.dependencies?.[name]).toBeUndefined()
+  it('evolution-agent: mounts no host-plane row', () => {
+    const agentRows = loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-agent/agent.cordis.yml', import.meta.url)))
+    const ids = new Set(rowIds(cordisRows(agentRows)))
+    for (const id of ['memory', 'memory-files', 'skill-usage', 'evolution-state', 'evolution-approval']) {
+      expect(ids.has(id), 'agent preset must not mount the host-plane row ' + id).toBe(false)
+    }
   })
   it('evolution-agent: keeps every row id unique in the full preset', () => {
     const rows = cordisRows(loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-agent/agent.cordis.yml', import.meta.url))))

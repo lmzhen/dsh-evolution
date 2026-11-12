@@ -22,7 +22,7 @@ const MIRROR = `{
   "compilerOptions": {
     "paths": {
       "@deepseek-ai/dsh-evolution-core": ["./packages/evolution/evolution-core/src/index.ts"],
-      "@deepseek-ai/dsh-memory/tools": ["./packages/evolution/tool-memory/src/index.ts"],
+      "@deepseek-ai/dsh-memory/tools": ["./packages/evolution/memory/src/tools/index.ts"],
       "zod": ["./node_modules/.pnpm/zod@4.4.3/node_modules/zod"]
     }
   }

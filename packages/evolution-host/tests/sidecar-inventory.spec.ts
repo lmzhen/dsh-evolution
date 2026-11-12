@@ -29,7 +29,7 @@ const INVENTORY: Array<{ file: string; marker: string }> = [
   { file: 'evolution-core/src/evolution-events.ts', marker: 'appendEvolutionEvent' },
   { file: 'evolution-core/src/mutations.ts', marker: 'recordMutation' },
   { file: 'evolution-activity/src/index.ts', marker: 'transactIo' },
-  { file: 'evolution-feedback/src/index.ts', marker: 'transactIo' },
+  { file: 'evolution-activity/src/feedback/index.ts', marker: 'transactIo' },
   { file: 'evolution-core/src/memory-store.ts', marker: 'transactIo' },
 ]
 
