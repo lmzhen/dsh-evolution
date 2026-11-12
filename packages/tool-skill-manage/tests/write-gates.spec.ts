@@ -416,7 +416,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
   it('T2-10/A25: with the approval seam staging this write, the confirmation is SKIPPED — one human gate, not two', async () => {
     const { ctx } = await setup({ skillWriteConfirm: 'ask' })
     // The approval stack (state → approval): the SAME foreground create now has two candidate gates.
-    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state-storage')).default
+    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state')).default
     const JsonState = await import('@deepseek-ai/dsh-evolution-state-json')
     const EvolutionState = (await import('@deepseek-ai/dsh-evolution-state')).default
     const home = process.env.DSH_HOME as string

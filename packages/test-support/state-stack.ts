@@ -6,7 +6,7 @@
  * arguments — the options select how far up the stack a test needs to go.
  */
 import { Context } from '@deepseek-ai/cordis'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
+import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state/storage'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import * as JsonState from '@deepseek-ai/dsh-evolution-state-json'

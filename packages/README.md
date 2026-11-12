@@ -9,7 +9,6 @@ This directory holds the 36 packages of the dsh-evolution family. For the user g
 | Package | Role |
 |---|---|
 | `evolution-core` | SkillLibrary, MemoryStore, write kernel/unit transactions, prompts, projections, events, presets, `./restrictor` plugin; `./io-registry` + `./io-node` (IO seam), `./authority-plugin` (the `evolutionMutationAuthority` home lock service), `./policy`, `./contract` |
-| `evolution-state-storage` | State provider registry, record contracts, claim/capacity rules, conformance suite |
 | `evolution-state-json` | Default JSON state provider: transactions, quarantine, legacy retirement |
 | `evolution-state-domain` | Optional storage-domain provider (disabled by default) |
 | `evolution-state` | State facade and provider pinning |

@@ -33,9 +33,9 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^"
+    "@deepseek-ai/dsh-evolution-state": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^"
+    "@deepseek-ai/dsh-evolution-state": "workspace:^"
   }
 }

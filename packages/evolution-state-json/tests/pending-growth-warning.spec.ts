@@ -12,7 +12,7 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { join } from 'node:path'
-import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state'
 import { mountStateStack } from '../../test-support/state-stack.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 

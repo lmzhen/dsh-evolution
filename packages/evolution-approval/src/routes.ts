@@ -15,8 +15,8 @@
  * @module @deepseek-ai/dsh-evolution-approval/routes
  */
 
-import { PENDING_STATUSES } from '@deepseek-ai/dsh-evolution-state-storage'
-import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
+import { PENDING_STATUSES } from '@deepseek-ai/dsh-evolution-state'
+import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state'
 import { elapsedSince, textDiffFacts } from '@deepseek-ai/dsh-evolution-core/skills'
 import { HOST_ROUTES, json, methodNotAllowed, readJsonObject } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'

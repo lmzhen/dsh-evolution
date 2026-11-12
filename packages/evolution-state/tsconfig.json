@@ -1,12 +1,11 @@
 {
   "extends": "../tsconfig.pkg.json",
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../../vendor/schemastery" },
-    { "path": "../evolution-state-storage" },
-    { "path": "../evolution-state-domain" },
-    
-    
-    { "path": "../evolution-state-json" }
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    }
   ]
 }

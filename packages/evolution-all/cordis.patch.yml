@@ -41,7 +41,7 @@
 
     # ── durable state: provider registry (json active; domain opt-in) ───────
     - id: evolution-state-storage
-      name: '@deepseek-ai/dsh-evolution-state-storage'
+      name: '@deepseek-ai/dsh-evolution-state/storage'
     - id: evolution-state-domain
       name: '@deepseek-ai/dsh-evolution-state-domain'
       # The storage-domain provider is opt-in. It is disabled by default so a

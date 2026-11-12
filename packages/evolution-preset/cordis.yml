@@ -75,7 +75,7 @@
   config:
     backend: json
 - id: evolution-state-storage
-  name: '@deepseek-ai/dsh-evolution-state-storage'
+  name: '@deepseek-ai/dsh-evolution-state/storage'
 - id: evolution-state-domain
   name: '@deepseek-ai/dsh-evolution-state-domain'
 - id: evolution-state-json

@@ -17,7 +17,7 @@
  *       in the tree: doctor probed `evolutionReview` for five releases with zero
  *       providers and the self-check silently lied (P0-1 class).
  *   N5. `evolution-core` is the kernel: it must not import any other family
- *       package except the L0 seams (state-storage, memory, contract). Dependency
+ *       package except the L0 seams (state, memory, contract). Dependency
  *       closure owns the full graph; this is the reverse-direction tripwire.
  *   N6. composition bundles (host/all/preset/agent) carry no runtime code —
  *       their substance is the manifest's YAML rows, so every src module
@@ -676,7 +676,7 @@ const FAMILY_IMPORT_RE = /from\s+['"](@deepseek-ai\/dsh-evolution-[a-z0-9-]+|@de
 const CORE_ALLOWED_FAMILY = new Set([
   '@deepseek-ai/dsh-evolution-core',
   '@deepseek-ai/dsh-evolution-core/contract',
-  '@deepseek-ai/dsh-evolution-state-storage',
+  '@deepseek-ai/dsh-evolution-state',
   '@deepseek-ai/dsh-memory',
 ])
 // N6 (v39): composition-only packages (see docblock).
@@ -765,7 +765,7 @@ const MUTABLE_STATE = new Map([
   ['evolution-core/src/preset-composition.ts :: overridesCache', 'WHY MODULE SCOPE (S4.4): the override table is IMMUTABLE data read from disk, so process scope changes no behaviour; the cache is keyed by PATH because the plugin side and the generated installer port each resolve their own root (G6.1/M1), and re-parsing the table on every composition buys nothing.'],
   ['evolution-core/src/signals.ts :: dispatchLedgers', 'WHY MODULE SCOPE (S4.4): the store is keyed by the SIGNAL OBJECT through a WeakMap (entries die with the object) and is reached from the core fold, which has no service instance to hang it on; a per-instance store would have to be threaded through the whole fold for no ownership gain. v37 P7a: the platform writes ONE dispatch vocabulary per mounted runtime mode, and the fold needs per-turn state the TurnSignals value cannot carry; lifecycle normalizerForSignal (get-or-create) with weak keys; evidence evolution-core/tests/tool-dispatch.spec.ts; validity single-process.'],
   ['evolution-core/src/skill-store.ts :: ROOT_SERIAL', 'WHY MODULE SCOPE (S4.4): the per-ROOT serial queue, shared by every SkillLibrary instance. Six services each build their own store over one skill tree, and the per-instance queue this replaced ordered nothing between them (S2-02/G1-1.4). The mutex cannot live on an instance because instances share nothing, and it cannot be a file lock because its job is to order in-process phases before the io transact layer. Keyed by resolved root so two roots stay independent.'],
-  ['evolution-io/src/index.ts :: mediumObservations', 'WHY MODULE SCOPE (S4.4): a WeakMap keyed by the registry object. The observation must stay readable AFTER preferProvider returns (a consumer asks later, from another call site) and its key IS the registry, so it cannot outlive the registry. Attaching it to the registry would mutate a caller-owned object; re-resolving per read would make the read face a second resolution path - and preferProvider documents itself as the ONE sanctioned place that turns not-registered into a fallback.'],
+  ['evolution-core/src/io-registry.ts :: mediumObservations', 'WHY MODULE SCOPE (S4.4): a WeakMap keyed by the registry object. The observation must stay readable AFTER preferProvider returns (a consumer asks later, from another call site) and its key IS the registry, so it cannot outlive the registry. Attaching it to the registry would mutate a caller-owned object; re-resolving per read would make the read face a second resolution path - and preferProvider documents itself as the ONE sanctioned place that turns not-registered into a fallback.'],
   ['evolution-client-kit/src/settings-seat.ts :: seats', 'WHY MODULE SCOPE (DSH evolution G4): the WeakMap key IS the client plugin context, so every consumer of one ctx (settings page, history pending card) shares one form and one describe; entries die with the context. Lifecycle: lazy get-or-create, no global teardown; evidence evolution-ui/tests/settings-section.client.spec.ts; validity single browser process.'],
 
 ])
@@ -1903,7 +1903,7 @@ const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
     ['H2', () => ghostServiceKeys(['evolutionReview'], new Set()).length === 1
       && ghostServiceKeys(['evolutionIo'], new Set(['evolutionIo'])).length === 0],
     ['N5', () => [...'import x from \'@deepseek-ai/dsh-evolution-review\''.matchAll(FAMILY_IMPORT_RE)].filter(m => !CORE_ALLOWED_FAMILY.has(m[1])).length === 1
-      && [...'import x from \'@deepseek-ai/dsh-evolution-state-storage\''.matchAll(FAMILY_IMPORT_RE)].filter(m => !CORE_ALLOWED_FAMILY.has(m[1])).length === 0],
+      && [...'import x from \'@deepseek-ai/dsh-evolution-state\''.matchAll(FAMILY_IMPORT_RE)].filter(m => !CORE_ALLOWED_FAMILY.has(m[1])).length === 0],
     ['N6', () => bundleRuntimeResidue('import x from \'y\'\nexport {}') === ''
       && bundleRuntimeResidue('export const LOADER = 1') !== ''
       && bundleRuntimeResidue('// prose only\nexport * from \'y\'') === ''],

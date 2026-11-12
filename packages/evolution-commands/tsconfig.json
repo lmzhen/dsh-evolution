@@ -1,11 +1,23 @@
 {
   "extends": "../tsconfig.pkg.json",
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../interaction/commands" },
-    { "path": "../evolution-approval" },
-    { "path": "../evolution-maintenance" },
-    { "path": "../evolution-state-storage" },
-    { "path": "../../../vendor/schemastery" }
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../interaction/commands"
+    },
+    {
+      "path": "../evolution-approval"
+    },
+    {
+      "path": "../evolution-maintenance"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../evolution-state"
+    }
   ]
 }

@@ -80,7 +80,7 @@ export const STORE_LEDGER: readonly StoreSpec[] = [
     cutoff: 'resolved records beyond the cap',
     trigger: 'write',
     artifact: 'resolved record count',
-    declare: [{ kind: 'named', module: 'evolution-state-storage/src/constants.ts', name: 'PENDING_RESOLVED_CAP', value: 200 }],
+    declare: [{ kind: 'named', module: 'evolution-state/src/constants.ts', name: 'PENDING_RESOLVED_CAP', value: 200 }],
   },
   {
     id: 'review-session',
@@ -90,7 +90,7 @@ export const STORE_LEDGER: readonly StoreSpec[] = [
     cutoff: 'rows beyond the session cap',
     trigger: 'write',
     artifact: 'review state row count',
-    declare: [{ kind: 'named', module: 'evolution-state-storage/src/constants.ts', name: 'REVIEW_STATE_SESSION_CAP', value: 500 }],
+    declare: [{ kind: 'named', module: 'evolution-state/src/constants.ts', name: 'REVIEW_STATE_SESSION_CAP', value: 500 }],
   },
   {
     id: 'reports',

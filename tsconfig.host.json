@@ -865,9 +865,7 @@
     {
       "path": "./packages/evolution/evolution-state"
     },
-    {
-      "path": "./packages/evolution/evolution-state-storage"
-    },
+    
     {
       "path": "./packages/evolution/evolution-state-json"
     },

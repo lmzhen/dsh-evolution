@@ -9,7 +9,7 @@
  * on-disk contracts, the provider names are registry keys, and the table
  * names are domain-spec keys — renaming any of them orphans data or breaks
  * the seam, never rename casually.
- * @module @deepseek-ai/dsh-evolution-state-storage/src/constants
+ * @module @deepseek-ai/dsh-evolution-state/storage/src/constants
  */
 
 /** Singleton curator-state record key in both providers (the json map key and

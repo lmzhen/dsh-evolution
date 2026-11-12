@@ -1210,13 +1210,13 @@
         "pendingAxes": [
           {
             "axis": "executability",
-            "rows": 24,
+            "rows": 23,
             "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action | 2026-11-12 re-measured: verify-param-consumers.mjs joined CI | 2026-11-12 re-measured: the anchor selftest row carries its own executable form"
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action | 2026-11-12 re-measured: verify-param-consumers.mjs joined CI | 2026-11-12 re-measured: the anchor selftest row carries its own executable form | 2026-11-12: 23 after the state-storage merge removed one registered row"
           },
           {
             "axis": "expiry-due",
@@ -1239,13 +1239,13 @@
           },
           {
             "axis": "mutation-coverage",
-            "rows": 7,
+            "rows": 9,
             "reason": "the beh-installer-layered probe suite hangs in the local overlay before its green baseline; CI probe owns it | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: decl-platform-contract and beh-installer-layered lack a fresh signature after the W9 script changes (the ledger keeps their stale records; the count is the debt size) | 2026-11-12 re-measured: params.ts/doctor-view edits invalidated five probe signatures (beh-doctor-view, decl-platform-contract, decl-configforms-seat, decl-platform-ranges, decl-doc-facts); re-sign on the next probe run | 2026-11-12 re-measured after the G3-c deletions: seven probe signatures predate the removed adapter/spec files; re-sign on the next probe run"
+            "note": "2026-11-12 re-measured: decl-platform-contract and beh-installer-layered lack a fresh signature after the W9 script changes (the ledger keeps their stale records; the count is the debt size) | 2026-11-12 re-measured: params.ts/doctor-view edits invalidated five probe signatures (beh-doctor-view, decl-platform-contract, decl-configforms-seat, decl-platform-ranges, decl-doc-facts); re-sign on the next probe run | 2026-11-12 re-measured after the G3-c deletions: seven probe signatures predate the removed adapter/spec files; re-sign on the next probe run | 2026-11-12: nine probe signatures predate the G8-B2 state merge; re-sign on the next probe run"
           }
         ],
         "checkMutations": {

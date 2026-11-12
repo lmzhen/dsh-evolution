@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state-storage'
+import type { PendingRecord } from '@deepseek-ai/dsh-evolution-state'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { mountStateStack } from '../../test-support/state-stack.ts'
 

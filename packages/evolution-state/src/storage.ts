@@ -4,7 +4,7 @@
  * The state CONSUMER (`@deepseek-ai/dsh-evolution-state`) never touches a
  * medium. Providers register here: `domain` (storage-domain KV) and `json`
  * (IO-seam files) are the two shipped providers.
- * @module @deepseek-ai/dsh-evolution-state-storage
+ * @module @deepseek-ai/dsh-evolution-state/storage
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'

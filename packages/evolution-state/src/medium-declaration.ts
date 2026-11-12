@@ -9,7 +9,7 @@
  * MIGRATION NOTE: when a platform backend carrying its own cross-process guarantee lands, name it here and
  * move the reasoning with it - one declaration, not two.
  *
- * @module @deepseek-ai/dsh-evolution-state-storage/medium-declaration
+ * @module @deepseek-ai/dsh-evolution-state/storage/medium-declaration
  */
 
 /** One record type: its medium, the process scope claimed for it, and why that is true. */

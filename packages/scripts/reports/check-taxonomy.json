@@ -177,9 +177,6 @@
         "evolution-skill-health::tests/api.client.spec.ts",
         "evolution-skill-health::tests/health-presentation.spec.ts",
         "evolution-skill-health::tests/routes.spec.ts",
-        "evolution-state-storage::tests/cap-rules.spec.ts",
-        "evolution-state-storage::tests/constants.spec.ts",
-        "evolution-state-storage::tests/record-contract.spec.ts",
         "evolution-ui::tests/diagnostics-presentation.spec.ts",
         "evolution-ui::tests/history-client-api.spec.ts",
         "evolution-ui::tests/history-markdown.client.spec.ts",
@@ -641,8 +638,6 @@
         "evolution-merge::tests/gates/rg3b-revision.spec.ts",
         "evolution-merge::tests/gates/rg3b-runtime-target.spec.ts",
         "evolution-merge::tests/gates/rg3b-selection.spec.ts",
-        "evolution-merge::tests/gates/rg4-curator.spec.ts",
-        "evolution-merge::tests/gates/rg4-fence.spec.ts",
         "evolution-merge::tests/gates/rg4-lock-order.spec.ts",
         "evolution-merge::tests/gates/rg4-pid-reuse.spec.ts",
         "evolution-merge::tests/gates/rg4-two-process.spec.ts",
@@ -767,13 +762,6 @@
         "evolution-state-json::tests/shape-gate.spec.ts",
         "evolution-state-json::tests/transact-guard.spec.ts",
         "evolution-state-json::tests/transact.spec.ts",
-        "evolution-state-storage::tests/cap-rules.spec.ts",
-        "evolution-state-storage::tests/conformance-publishable.spec.ts",
-        "evolution-state-storage::tests/constants.spec.ts",
-        "evolution-state-storage::tests/medium-comparison.spec.ts",
-        "evolution-state-storage::tests/medium-declaration.spec.ts",
-        "evolution-state-storage::tests/record-contract.spec.ts",
-        "evolution-state-storage::tests/storage.spec.ts",
         "evolution-state::tests/state.spec.ts",
         "evolution-ui::tests/diagnostics-presentation.spec.ts",
         "evolution-ui::tests/history-apply-order.spec.ts",
@@ -1360,8 +1348,6 @@
         "evolution-merge::tests/gates/rg3b-revision.spec.ts",
         "evolution-merge::tests/gates/rg3b-runtime-target.spec.ts",
         "evolution-merge::tests/gates/rg3b-selection.spec.ts",
-        "evolution-merge::tests/gates/rg4-curator.spec.ts",
-        "evolution-merge::tests/gates/rg4-fence.spec.ts",
         "evolution-merge::tests/gates/rg4-lock-order.spec.ts",
         "evolution-merge::tests/gates/rg4-pid-reuse.spec.ts",
         "evolution-merge::tests/gates/rg4-two-process.spec.ts",
@@ -1486,13 +1472,6 @@
         "evolution-state-json::tests/shape-gate.spec.ts",
         "evolution-state-json::tests/transact-guard.spec.ts",
         "evolution-state-json::tests/transact.spec.ts",
-        "evolution-state-storage::tests/cap-rules.spec.ts",
-        "evolution-state-storage::tests/conformance-publishable.spec.ts",
-        "evolution-state-storage::tests/constants.spec.ts",
-        "evolution-state-storage::tests/medium-comparison.spec.ts",
-        "evolution-state-storage::tests/medium-declaration.spec.ts",
-        "evolution-state-storage::tests/record-contract.spec.ts",
-        "evolution-state-storage::tests/storage.spec.ts",
         "evolution-state::tests/state.spec.ts",
         "evolution-ui::tests/diagnostics-presentation.spec.ts",
         "evolution-ui::tests/history-apply-order.spec.ts",
@@ -2021,8 +2000,6 @@
         "evolution-merge::tests/gates/rg3b-revision.spec.ts",
         "evolution-merge::tests/gates/rg3b-runtime-target.spec.ts",
         "evolution-merge::tests/gates/rg3b-selection.spec.ts",
-        "evolution-merge::tests/gates/rg4-curator.spec.ts",
-        "evolution-merge::tests/gates/rg4-fence.spec.ts",
         "evolution-merge::tests/gates/rg4-lock-order.spec.ts",
         "evolution-merge::tests/gates/rg4-pid-reuse.spec.ts",
         "evolution-merge::tests/gates/rg4-two-process.spec.ts",
@@ -2181,13 +2158,6 @@
         "evolution-state-json::tests/shape-gate.spec.ts",
         "evolution-state-json::tests/transact-guard.spec.ts",
         "evolution-state-json::tests/transact.spec.ts",
-        "evolution-state-storage::tests/cap-rules.spec.ts",
-        "evolution-state-storage::tests/conformance-publishable.spec.ts",
-        "evolution-state-storage::tests/constants.spec.ts",
-        "evolution-state-storage::tests/medium-comparison.spec.ts",
-        "evolution-state-storage::tests/medium-declaration.spec.ts",
-        "evolution-state-storage::tests/record-contract.spec.ts",
-        "evolution-state-storage::tests/storage.spec.ts",
         "evolution-state::tests/state.spec.ts",
         "evolution-threat::tests/threat-guard.spec.ts",
         "evolution-ui::tests/diagnostics-presentation.spec.ts",
@@ -2324,11 +2294,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 105
+      "specs": 102
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 456
+      "specs": 447
     },
     "ci-only": {
       "gates": 18,
@@ -2336,16 +2306,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 456
+      "specs": 447
     },
     "full(ci=on)": {
       "gates": 93,
-      "specs": 529
+      "specs": 520
     }
   },
   "specs": {
-    "total": 529,
-    "marked": 529,
+    "total": 520,
+    "marked": 520,
     "unmarked": 0
   }
 }

@@ -645,11 +645,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-state-storage'"
+        "      name: '@deepseek-ai/dsh-evolution-state/storage'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-state-storage'"
+          "  name: '@deepseek-ai/dsh-evolution-state/storage'"
         ]
       },
       "leads": {

@@ -41,7 +41,7 @@ import {
   type PendingStatus,
   type ReviewStateRecord,
   type SeamRecordTable,
-} from '@deepseek-ai/dsh-evolution-state-storage'
+} from '@deepseek-ai/dsh-evolution-state'
 import { basename, dirname, isAbsolute, join } from 'node:path'
 
 export const name = 'evolution-state-json'

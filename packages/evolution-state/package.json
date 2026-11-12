@@ -19,7 +19,11 @@
       "default": "./lib/index.js"
     },
     "./package.json": "./package.json",
-    "./locale/*.json": "./locale/*.json"
+    "./locale/*.json": "./locale/*.json",
+    "./storage": {
+      "types": "./lib/types/storage.d.ts",
+      "default": "./lib/storage.js"
+    }
   },
   "files": [
     "locale/*.json",
@@ -28,13 +32,11 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "workspace:^",
+    "@deepseek-ai/dsh-evolution-core": "workspace:^"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^"
   },
-  "devDependencies": {
-    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^"
-  }
+  "devDependencies": {}
 }

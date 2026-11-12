@@ -16,7 +16,9 @@ import type {
   PendingRecord,
   PendingStatus,
   ReviewStateRecord,
-} from '@deepseek-ai/dsh-evolution-state-storage'
+} from './storage.ts'
+
+export * from './storage.ts'
 
 export type {
   CuratorStateRecord,
@@ -24,7 +26,7 @@ export type {
   PendingRecord,
   PendingStatus,
   ReviewStateRecord,
-} from '@deepseek-ai/dsh-evolution-state-storage'
+} from './storage.ts'
 // 0.3.17 (E-11): the runtime re-export of the domain's zod schemas and
 // EVOLUTION_DOMAIN is gone — it dragged evolution-state-domain (zod stack +
 // dsh-storage-domain) into every deployment, even a pure-json one. The

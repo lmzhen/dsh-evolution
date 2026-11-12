@@ -133,7 +133,7 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     const { ctx, execute, cleanup, root } = await setup({ skillContentChars: contentCap.ref })
     // The approval seam must exist for the write to STAGE (this is the replay path, not the tool path).
     const EvolutionApproval = (await import('@deepseek-ai/dsh-evolution-approval')).default
-    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state-storage')).default
+    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state')).default
     const JsonState = await import('@deepseek-ai/dsh-evolution-state-json')
     const EvolutionState = (await import('@deepseek-ai/dsh-evolution-state')).default
     await ctx.plugin(EvolutionStateStorage)

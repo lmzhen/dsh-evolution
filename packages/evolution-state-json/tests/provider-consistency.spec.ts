@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state-storage'
+import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state/storage'
 import * as JsonState from '../src/index.ts'
-import { runStateProviderConsistency } from '@deepseek-ai/dsh-evolution-state-storage'
+import { runStateProviderConsistency } from '@deepseek-ai/dsh-evolution-state'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 describe('evolution-state-json cross-provider consistency (G7.4)', () => {

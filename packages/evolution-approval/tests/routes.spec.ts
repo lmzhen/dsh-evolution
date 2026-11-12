@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import type { PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
+import type { PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state'
 import type { DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { mountHostRoutes } from '../../test-support/host-route-harness.ts'
 import { APPROVAL_ROUTES, makeApprovalRoutes, type ApprovalFace } from '../src/routes.ts'

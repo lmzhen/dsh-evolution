@@ -10,9 +10,7 @@
     {
       "path": "../evolution-core"
     },
-    {
-      "path": "../evolution-state-storage"
-    },
+    
     {
       "path": "../evolution-state"
     },

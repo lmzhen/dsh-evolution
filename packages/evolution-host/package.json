@@ -28,7 +28,6 @@
     ]
   },
   "dependencies": {
-    "@deepseek-ai/dsh-evolution-state-storage": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-domain": "workspace:^",
     "@deepseek-ai/dsh-evolution-state-json": "workspace:^",
     "@deepseek-ai/dsh-evolution-state": "workspace:^",

@@ -26,7 +26,7 @@ import { randomUUID } from 'node:crypto'
 // the only remaining user — instead of keeping a lock parser alive in core for a non-lock caller.
 import { clampOnce, unwrapLive } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
-import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state-storage'
+import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state'
 import type { EvolutionState } from '@deepseek-ai/dsh-evolution-state'
 import { makeApprovalRoutes } from './routes.ts'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'

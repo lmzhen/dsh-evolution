@@ -13,7 +13,7 @@
  * survive a round-trip through an older provider, so unknown fields are kept
  * (json does this naturally; the domain schemas are `.loose()`).
  *
- * @module @deepseek-ai/dsh-evolution-state-storage/src/record-contract
+ * @module @deepseek-ai/dsh-evolution-state/storage/src/record-contract
  */
 
 import { CURATOR_STATE_TABLE, PENDING_TABLE, REVIEW_STATE_TABLE } from './constants.ts'
