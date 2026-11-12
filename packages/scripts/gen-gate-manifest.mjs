@@ -46,6 +46,15 @@ const GATE_REGISTERS = (() => {
     }
   } catch { return { ciOnly: new Map(), machineLocal: new Map() } }
 })()
+// Rows whose table cell cannot become one executable command carry an explicit registration
+// (owner + plan + version), so "cannot decide" is a recorded debt rather than a permanent red.
+const CANNOT_DECIDE_REGISTERED = (() => {
+  try {
+    const facts = JSON.parse(readFileSync(join(HERE, 'family-facts.json'), 'utf8'))
+    const checks = (facts.facts ?? []).find((f) => f?.machine?.kind === 'checks')
+    return checks?.machine?.cannotDecideRegistered ?? {}
+  } catch { return {} }
+})()
 const OUT = join(HERE, 'gate-manifest.json')
 const check = process.argv.includes('--check')
 
@@ -100,6 +109,8 @@ for (const line of tableSrc) {
       entry.expiry = REGISTER_EXPIRY
     }
   }
+  const registration = CANNOT_DECIDE_REGISTERED[entry.id]
+  if (registration !== undefined) entry.registration = registration
   gates.push(entry)
 }
 

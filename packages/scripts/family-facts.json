@@ -598,7 +598,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "875b46301e12b47d2e078cf8d0e343e5c0368c306545b5dc4bb7b4d83f027988",
+        "sha256": "c1074bc4ae2538d6fde10a8d1e16d5facad7e8f610f66a9413e539fe5ef99f0f",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1946,6 +1946,158 @@
             "expiry": "0.46.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if this row ever gains a --check form (the drift check the other generators carry), delete this exemption and prove it by hand-editing the artifact"
+          }
+        },
+        "cannotDecideRegistered": {
+          "gate-29": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-33": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-59": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-60": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-61": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-62": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-63": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-64": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-65": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-66": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-67": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-68": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-69": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-70": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-71": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-72": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-73": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-74": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-75": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-76": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-77": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-78": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-79": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-80": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-81": {
+            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+            "owner": "scripts/gate-manifest",
+            "expiry": "0.45.0",
+            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
           }
         },
         "unmappedTier": [

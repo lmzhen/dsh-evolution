@@ -96,6 +96,8 @@ function buildFact(carrier, asset) {
   // the mutation records are AUTHORED evidence (G5): regeneration must carry them too
   const checkMutations = previous && previous.machine && previous.machine.checkMutations !== undefined ? previous.machine.checkMutations : {}
   const mutationExempt = previous && previous.machine && previous.machine.mutationExempt !== undefined ? previous.machine.mutationExempt : {}
+  // authored too: the rows whose table cell cannot become one command, with owner + plan + expiry
+  const cannotDecideRegistered = previous && previous.machine && previous.machine.cannotDecideRegistered !== undefined ? previous.machine.cannotDecideRegistered : {}
   // authored too: the mutation-exemption register (reason + expiry per check)
   const written = new Map()
   const requiresOf = new Map()
@@ -144,6 +146,7 @@ function buildFact(carrier, asset) {
       pendingAxes: pendingAxes,
       checkMutations: checkMutations,
       mutationExempt: mutationExempt,
+    cannotDecideRegistered: cannotDecideRegistered,
       unmappedTier: unmappedTier,
       unknownCriterion: unknownCriterion,
       duplicateGroups: duplicateGroups

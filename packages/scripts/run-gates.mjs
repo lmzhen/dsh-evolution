@@ -15,6 +15,8 @@ import { fileURLToPath } from 'node:url'
 import { validate, counts, render, actionBlock } from './lib-verdict.mjs'
 import { createRunner, decideRequires } from './lib-run-gates.mjs'
 import { softOverlay } from './lib-env.mjs'
+import { familyVersion } from './lib-family-version.mjs'
+import { exemptionProblems } from './lib-exemptions.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MIRROR_ROOT = resolve(HERE, '..', '..')
@@ -223,13 +225,22 @@ if (records.length === 0) {
   })
 }
 
+const familyVersionValue = familyVersion(join(HERE, '..'))
+// W9-gates §3.1: "cannot decide" is a debt with an owner, not a permanent red. A row whose table
+// cell states a step in prose is registered (owner, plan, version); an unregistered one still fails.
+const unregisteredCannotDecide = records
+  .filter((record) => record.verdict === 'cannot-decide')
+  .filter((record) => {
+    const registration = (manifest.gates.find((row) => row.id === record.id) ?? {}).registration
+    return registration === undefined || exemptionProblems(registration, familyVersionValue).length > 0
+  })
 const c = counts(records)
 const violations = records.flatMap((r) => validate(r, r.id))
 if (has('--json')) {
   console.log(JSON.stringify({ schema: 1, profile, counts: c, gates: records, violations }, null, 2))
 } else {
   for (const r of records) { console.log(render(r)); for (const l of actionBlock(r)) console.log(l) }
-  console.log('run-gates [' + profile + '] counts: pass=' + c.pass + ' fail=' + c.fail + ' cannotDecide=' + c.cannotDecide + ' skipped=' + c.skipped)
+  console.log('run-gates [' + profile + '] counts: pass=' + c.pass + ' fail=' + c.fail + ' cannotDecide=' + c.cannotDecide + '(registered=' + (c.cannotDecide - unregisteredCannotDecide.length) + ', unregistered=' + unregisteredCannotDecide.length + ')' + ' skipped=' + c.skipped)
 }
 if (violations.length > 0) { console.error('run-gates: record contract violations: ' + violations.slice(0, 3).join(' | ')); process.exit(2) }
-process.exit(c.fail > 0 ? 1 : (c.cannotDecide > 0 || c.pass === 0) ? 2 : 0)
+process.exit(c.fail > 0 ? 1 : c.pass === 0 ? 2 : unregisteredCannotDecide.length > 0 ? 2 : 0)

@@ -463,7 +463,13 @@
       "profiles": [
         "local",
         "ci"
-      ]
+      ],
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-30",
@@ -520,7 +526,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "composite-cell: 6 commands in one table row"
+      "argvProblem": "composite-cell: 6 commands in one table row",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-34",
@@ -916,7 +928,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-60",
@@ -928,7 +946,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-61",
@@ -940,7 +964,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-62",
@@ -952,7 +982,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-63",
@@ -964,7 +1000,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-64",
@@ -976,7 +1018,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-65",
@@ -988,7 +1036,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-66",
@@ -1000,7 +1054,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-67",
@@ -1010,7 +1070,13 @@
       "tree": "mirror",
       "profiles": [],
       "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-68",
@@ -1020,7 +1086,13 @@
       "tree": "overlay",
       "profiles": [],
       "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-69",
@@ -1030,7 +1102,13 @@
       "tree": "overlay",
       "profiles": [],
       "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-70",
@@ -1040,7 +1118,13 @@
       "tree": "overlay",
       "profiles": [],
       "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-71",
@@ -1050,7 +1134,13 @@
       "tree": "overlay",
       "profiles": [],
       "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-72",
@@ -1062,7 +1152,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-73",
@@ -1072,7 +1168,13 @@
       "tree": "overlay",
       "profiles": [],
       "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-74",
@@ -1084,7 +1186,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-75",
@@ -1097,6 +1205,12 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      },
       "localSafe": false,
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
     },
@@ -1110,7 +1224,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-77",
@@ -1122,7 +1242,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-78",
@@ -1134,7 +1260,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-79",
@@ -1146,7 +1278,13 @@
         "local",
         "ci"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-80",
@@ -1159,6 +1297,12 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      },
       "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test"
     },
     {
@@ -1170,7 +1314,13 @@
       "profiles": [
         "local"
       ],
-      "argvProblem": "no-command-in-cell"
+      "argvProblem": "no-command-in-cell",
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.45.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+      }
     },
     {
       "id": "gate-82",
