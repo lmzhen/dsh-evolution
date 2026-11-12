@@ -1,128 +1,139 @@
 #!/usr/bin/env node
 /**
- * N-7 purity: inject ONLY the evolution alias paths into an upstream
- * tsconfig.base.json instead of overlaying a mirror copy over the released
- * tree.
- *
- * The mirror's tsconfig.base.json equals the pinned development baseline's
- * base plus the evolution paths block (it serves the baseline validate job as
- * a straight copy). The released-upstream compat job must validate the
- * RELEASED tree as shipped — its own base may have drifted (newly added dsh-*
- * path entries) — so this script:
- *   1. preserves the upstream file byte-for-byte apart from one insertion;
- *   2. inserts exactly the `@deepseek-ai/dsh-evolution*`/`@lmzhen`/`zod`
- *      alias lines extracted from the mirror base (single source);
- *   3. fails loudly when the upstream file ALREADY declares one of those keys
- *      (the platform absorbed the row — adapt the evolution alias set code).
+ * inject-evolution-paths.mjs — write the family alias block into an upstream tsconfig.
  *
  * Usage (CI overlay, from the upstream tree root):
- *   node packages/evolution/scripts/inject-evolution-paths.mjs \
- *     <target-tsconfig> <mirror-tsconfig>
+ *   node packages/evolution/scripts/inject-evolution-paths.mjs <target-tsconfig> [mirror-tsconfig]
+ *
+ * The alias set is DERIVED from the family packages present in the checkout
+ * (`packages/evolution/<dir>/package.json` `exports`), not copied from a mirror file: after the
+ * G8 merges the mirror base still named deleted packages and knew nothing about the new subpath
+ * exports (`state/storage`, `memory/files`, `activity/feedback`, ...), so copying it produced a
+ * base where CI could neither resolve a merged subpath nor trust the stale keys.
+ *
+ * Every export target of the form `./lib/<x>.js` / `./lib/<x>/index.js` maps to the package's
+ * source file `src/<x>.ts` / `src/<x>/index.ts`; aliases whose source is absent are dropped. The
+ * optional second argument is a mirror base that must agree with the derived set; it is only a
+ * cross-check, never the source.
  */
-import { readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 
-const [, , target, mirror] = process.argv
-if (!target || !mirror) {
-  console.error('usage: inject-evolution-paths.mjs <target-tsconfig> <mirror-tsconfig>')
+const [, , target, mirrorArg] = process.argv
+if (!target) {
+  console.error('usage: inject-evolution-paths.mjs <target-tsconfig> [mirror-tsconfig]')
   process.exit(1)
 }
 
-// `zod` is deliberately NOT in the evolution alias set (G5.6, F-345/F-353):
-// it is not an `@deepseek-ai/dsh-*` package, its dev-tree path value is a
-// machine-specific pnpm store path (`./node_modules/.pnpm/zod@4.4.3/...`),
-// and the released upstream resolves zod from its own node_modules. Injecting
-// that store path both breaks when the upstream's pnpm store differs and
-// trips the "already declares an evolution alias" guard the moment the
-// upstream carries its own `zod` key — so exclude it from the injection set.
-const EVOLUTION_KEY = /^\s*"(@deepseek-ai\/dsh-(evolution|memory|tool-memory|skill-usage|tool-skill-manage)[^"]*|@lmzhen[^"]*)"\s*:/
-
-const mirrorContent = readFileSync(mirror, 'utf8').replace(/^\uFEFF/, '')
-const evolutionLines = mirrorContent
-  .split(/\r?\n/)
-  .filter(line => EVOLUTION_KEY.test(line))
-
-if (evolutionLines.length === 0) {
-  console.error(`inject-evolution-paths: no evolution alias lines found in ${mirror}`)
+const targetPath = resolve(target)
+const root = resolve(targetPath, '..')
+const familyRoot = join(root, 'packages', 'evolution')
+if (!existsSync(familyRoot)) {
+  console.error('inject-evolution-paths: no packages/evolution tree under ' + root)
   process.exit(1)
 }
 
-let content = readFileSync(target, 'utf8')
-// Preserve the target's byte-level conventions (F-352): keep its BOM and reuse
-// its line ending so the single inserted block does not leave mixed EOLs.
+function sourceFor(dir, exportTarget) {
+  const bare = exportTarget.replace(/^\.\//, '')
+  if (!bare.startsWith('lib/')) return null
+  const rel = bare.slice('lib/'.length).replace(/\.js$/, '').replace(/\/index$/, '')
+  const candidates = [join(dir, 'src', rel + '.ts'), join(dir, 'src', rel, 'index.ts'), join(dir, 'src', rel + '.tsx')]
+  return candidates.find((candidate) => existsSync(candidate)) ?? null
+}
+
+const aliases = new Map()
+for (const dirName of readdirSync(familyRoot)) {
+  const dir = join(familyRoot, dirName)
+  const manifestPath = join(dir, 'package.json')
+  if (!existsSync(manifestPath)) continue
+  let manifest
+  try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) } catch { continue }
+  if (typeof manifest.name !== 'string') continue
+  const exportsField = manifest.exports
+  if (exportsField === undefined) continue
+  const entries = typeof exportsField === 'string' ? [['.', exportsField]] : Object.entries(exportsField)
+  for (const [key, value] of entries) {
+    const exportTarget = typeof value === 'string' ? value : value?.default
+    if (typeof exportTarget !== 'string' || !exportTarget.startsWith('./')) continue
+    const source = sourceFor(dir, exportTarget)
+    if (source === null) continue
+    const specifier = key === '.' ? manifest.name : manifest.name + key.slice(1)
+    aliases.set(specifier, './' + source.slice(root.length + 1).replace(/\\/g, '/'))
+  }
+}
+if (aliases.size === 0) {
+  console.error('inject-evolution-paths: no family export alias could be derived under ' + familyRoot)
+  process.exit(1)
+}
+
+const content = readFileSync(targetPath, 'utf8')
 const hasBom = content.startsWith('\uFEFF')
 const eol = content.includes('\r\n') ? '\r\n' : '\n'
-const noBom = content.replace(/^\uFEFF/, '')
+const lines = content.replace(/^\uFEFF/, '').split(/\r?\n/)
 
-// Existing evolution keys in the UPSTREAM file mean the platform absorbed the
-// row (or the mirror drifted) — fail loud instead of mounting a duplicate
-// path key.
-for (const line of noBom.split(/\r?\n/)) {
-  if (EVOLUTION_KEY.test(line)) {
-    console.error(`inject-evolution-paths: ${target} already declares an evolution alias line: ${line.trim()}`)
+const FAMILY_KEY = /^\s*"(@deepseek-ai\/(dsh-evolution|dsh-memory|dsh-tool-memory|dsh-skill-usage|dsh-tool-skill-manage)[^"]*|@lmzhen[^"]*)"\s*:/
+for (const line of lines) {
+  if (FAMILY_KEY.test(line)) {
+    console.error('inject-evolution-paths: ' + target + ' already declares a family alias line: ' + line.trim())
     console.error('inject-evolution-paths: the platform absorbed this row — adapt the alias set (N-7)')
     process.exit(1)
   }
 }
 
-const marker = '"paths": {'
-const index = noBom.indexOf(marker)
-if (index < 0) {
-  console.error(`inject-evolution-paths: no "paths" block found in ${target}`)
+const start = lines.findIndex((line) => /^\s*"paths"\s*:\s*\{/.test(line))
+if (start < 0) {
+  console.error('inject-evolution-paths: no "paths" block found in ' + target)
   process.exit(1)
 }
-
-const injected = evolutionLines.map(line => `      ${line.trim()}`).join(eol)
-const next = noBom.slice(0, index + marker.length) + eol + injected + eol + noBom.slice(index + marker.length)
-
-// R-04: smoke-parse the composed JSONC BEFORE writing. The insertion
-// silently assumed every injected line carries a trailing comma — an alias
-// that is the LAST entry of the mirror's paths block would land mid-block
-// without one and produce invalid JSONC. Strip comments (string-aware) and
-// trailing commas, then JSON.parse; any failure is loud and leaves the target
-// untouched.
-function jsoncParse(text) {
-  let out = ''
-  let inString = false
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i]
-    if (inString) {
-      out += ch
-      if (ch === '\\') {
-        out += text[i + 1] ?? ''
-        i += 1
-      } else if (ch === '"') {
-        inString = false
-      }
-      continue
-    }
-    if (ch === '"') {
-      inString = true
-      out += ch
-    } else if (ch === '/' && text[i + 1] === '/') {
-      while (i < text.length && text[i] !== '\n') i += 1
-      out += '\n'
-    } else if (ch === '/' && text[i + 1] === '*') {
-      i += 2
-      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1
-      i += 1
-    } else {
-      out += ch
-    }
+let depth = 0
+let end = -1
+for (let index = start; index < lines.length; index += 1) {
+  for (const char of lines[index]) {
+    if (char === '{') depth += 1
+    else if (char === '}') depth -= 1
   }
-  return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'))
+  if (depth === 0 && index > start) { end = index; break }
 }
-try {
-  jsoncParse(next)
-} catch (error) {
-  console.error(`inject-evolution-paths: composed ${target} is not valid JSONC after injection (${error instanceof Error ? error.message : String(error)})`)
-  console.error('inject-evolution-paths: an injected alias line is likely missing a trailing comma — fix the mirror base instead of shipping a broken tsconfig')
+if (end < 0) {
+  console.error('inject-evolution-paths: could not find the end of the paths block in ' + target)
   process.exit(1)
 }
+// The released base maps most platform packages to a SYMBOL directory (e.g. `./vendor/cordis/src`).
+// Vite 8 resolves such a directory through the package manifest instead of trying `index.ts`,
+// so a platform package whose main is the not-yet-built `lib/index.js` fails ("Failed to resolve
+// entry for package ..."). Pinning the same mapping to the directory's `index.ts` is an equivalent
+// resolution (the file TypeScript itself picks) for the test plane only.
+const PINNED_INDEX = /^\s*"([^"]+)"\s*:\s*\[\s*"(\.\/[^"]+)"\s*\],?\s*$/
+const pinIndex = (line) => {
+  const match = PINNED_INDEX.exec(line)
+  if (match === null) return line
+  const dir = join(root, match[2])
+  if (existsSync(join(dir, 'package.json'))) return line
+  if (existsSync(join(dir, 'index.ts'))) return line.replace('"' + match[2] + '"', '"' + match[2] + '/index.ts"')
+  return line
+}
 
-// Atomic write (F-352): write a sibling temp and rename so a crash never
-// leaves a half-written tsconfig, and re-attach the original BOM.
-const tmp = `${target}.tmp`
-writeFileSync(tmp, (hasBom ? '\uFEFF' : '') + next)
-renameSync(tmp, target)
+// Keep comments and platform entries untouched; only the LAST entry before our block needs a
+// comma, and every inserted entry carries one (the closing brace follows the block).
+const inner = lines.slice(start + 1, end).map(pinIndex)
+const lastEntry = [...inner].reverse().find((line) => /^\s*"([^"]+)"\s*:/.test(line))
+const innerFixed = inner.map((line) => {
+  if (line !== lastEntry) return line
+  return /,\s*$/.test(line) ? line : line.replace(/\s*$/, ',')
+})
 
-console.log(`inject-evolution-paths: injected ${evolutionLines.length} evolution alias line(s) into ${target} (N-7); composed JSONC smoke-parsed OK`)
+const block = [...aliases.entries()]
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([specifier, source]) => `      "${specifier}": ["${source}"],`)
+const rebuilt = [...lines.slice(0, start + 1), ...innerFixed, ...block, ...lines.slice(end)]
+writeFileSync(targetPath + '.tmp', (hasBom ? '\uFEFF' : '') + rebuilt.join(eol))
+renameSync(targetPath + '.tmp', targetPath)
+
+if (mirrorArg !== undefined) {
+  const derived = [...aliases.keys()].sort().join('\n')
+  const mirrorKeys = [...readFileSync(resolve(mirrorArg), 'utf8').matchAll(/^\s*"(@deepseek-ai\/(?:dsh-evolution|dsh-memory|dsh-tool-memory|dsh-skill-usage|dsh-tool-skill-manage)[^"]*|@lmzhen[^"]*)"\s*:/gm)].map((match) => match[1]).sort().join('\n')
+  if (mirrorKeys !== derived) {
+    console.warn('inject-evolution-paths: the mirror base alias set differs from the derived set; the derived set is authoritative')
+  }
+}
+console.log('inject-evolution-paths: wrote ' + aliases.size + ' family alias(es) into ' + target)

@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-12T20:42:28.776Z",
-  "tree": "67218343",
+  "measuredAt": "2026-11-12T21:26:27.350Z",
+  "tree": "f4deaaae",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -536,6 +536,16 @@
     {
       "spec": "packages/evolution-host/tests/inject-paths.spec.ts",
       "id": "@deepseek-ai/dsh-session",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-host/tests/inject-paths.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-host"
+    },
+    {
+      "spec": "packages/evolution-host/tests/inject-paths.spec.ts",
+      "id": "@deepseek-ai/dsh-memory",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
