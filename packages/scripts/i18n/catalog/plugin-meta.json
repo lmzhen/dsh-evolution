@@ -13,14 +13,14 @@
       "pt": "Adiciona memória, gerenciamento de skills, revisão, merge e limpeza a cada sessão."
     },
     "evolution-all.title": {
-      "zh": "越用越顺手的智能体",
-      "en": "Self-improving agent",
-      "ja": "自己進化エージェント",
-      "es": "Agente que mejora solo",
-      "fr": "Agent en auto-évolution",
-      "de": "Selbstevolution",
-      "ru": "Самоулучшающийся агент",
-      "pt": "Agente que se aprimora"
+      "zh": "能力进化插件",
+      "en": "Capability evolution plugin",
+      "ja": "能力進化プラグイン",
+      "es": "Plugin de evolución de capacidades",
+      "fr": "Plugin d’évolution des capacités",
+      "de": "Plugin für Fähigkeitsentwicklung",
+      "ru": "Плагин развития возможностей",
+      "pt": "Plugin de evolução de capacidades"
     },
     "evolution-activity.description": {
       "zh": "计划和审查都会记下来，重启之后还在。",

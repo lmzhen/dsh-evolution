@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Agent en auto-évolution",
+    "title": "Plugin d’évolution des capacités",
     "description": "Ajoute à chaque session la mémoire, la gestion des skills, la revue, la fusion et le nettoyage.",
     "detail": "docs/detail/fr.md"
   }

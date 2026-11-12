@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Agente que mejora solo",
+    "title": "Plugin de evolución de capacidades",
     "description": "Añade memoria, gestión de skills, revisión, merge y limpieza a cada sesión.",
     "detail": "docs/detail/es.md"
   }

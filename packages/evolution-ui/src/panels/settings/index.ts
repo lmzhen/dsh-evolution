@@ -120,7 +120,7 @@ export function apply(ctx: ClientContext): void {
       if (subject?.kind !== 'bundle' || subject.pkg?.name === undefined || !PRODUCT_BUNDLE_NAMES.has(subject.pkg.name)) return null
       return createElement('div', { className: 'evolution-settings-detail', 'data-role': 'evolution-install-scope' },
         createElement('p', { className: 'evolution-params-about' }, FAMILY_VERSION + ' · ' + t('aboutPurpose')),
-        createElement('p', { className: 'evolution-param-note', 'data-role': 'evolution-scope' }, t('detailScope', { rows: cards.length })))
+        createElement('p', { className: 'evolution-param-note', 'data-role': 'evolution-scope' }, t('detailScope')))
     }) as unknown as (props: never) => unknown)
   })
 }

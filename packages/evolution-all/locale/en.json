@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Self-improving agent",
+    "title": "Capability evolution plugin",
     "description": "Adds memory, skill management, self-review, skill merging and cleanup to every session.",
     "detail": "docs/detail/en.md"
   }

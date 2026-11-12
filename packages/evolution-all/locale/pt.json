@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Agente que se aprimora",
+    "title": "Plugin de evolução de capacidades",
     "description": "Adiciona memória, gerenciamento de skills, revisão, merge e limpeza a cada sessão.",
     "detail": "docs/detail/pt.md"
   }

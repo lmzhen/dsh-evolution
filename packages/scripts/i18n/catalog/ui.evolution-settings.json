@@ -613,14 +613,14 @@
       "ru": "по умолчанию"
     },
     "detailScope": {
-      "zh": "安装范围：整个插件包（{rows} 个组件行）；平台线与运行状态在「设置 → 自进化」里。",
-      "en": "Install scope: the whole bundle ({rows} component rows); the platform line and runtime state live under Settings → Self-evolution.",
-      "ja": "インストール範囲：パッケージ全体（{rows} 個のコンポーネント行）。プラットフォームのラインと稼働状態は「設定 → 自己進化」にあります。",
-      "es": "Alcance de la instalación: el paquete completo ({rows} filas de componentes); la línea de la plataforma y el estado de ejecución están en Ajustes → Evolución.",
-      "fr": "Périmètre d’installation : le paquet complet ({rows} lignes de composants) ; la ligne de plateforme et l’état d’exécution sont dans Réglages → Auto-évolution.",
-      "de": "Installationsumfang: das gesamte Paket ({rows} Komponentenzeilen); Plattform-Linie und Laufzeitstatus stehen unter Einstellungen → Selbstevolution.",
-      "pt": "Escopo da instalação: o pacote inteiro ({rows} linhas de componentes); a linha da plataforma e o estado de execução ficam em Configurações → Autoevolução.",
-      "ru": "Область установки: весь пакет ({rows} строк компонентов); линия платформы и состояние работы — в «Настройки → Самоэволюция»."
+      "zh": "安装范围：整个插件包；参数、平台线与运行状态都在「设置 → 自进化」里。",
+      "en": "Install scope: the whole bundle; parameters, the platform line and runtime state live under Settings → Self-evolution.",
+      "ja": "インストール範囲：パッケージ全体。パラメータ・プラットフォームのライン・稼働状態は「設定 → 自己進化」にあります。",
+      "es": "Alcance de la instalación: el paquete completo; los parámetros, la línea de la plataforma y el estado de ejecución están en Ajustes → Evolución.",
+      "fr": "Périmètre d’installation : le paquet complet ; les réglages, la ligne de plateforme et l’état d’exécution sont dans Réglages → Auto-évolution.",
+      "de": "Installationsumfang: das gesamte Paket; Einstellungen, Plattform-Linie und Laufzeitstatus stehen unter Einstellungen → Selbstevolution.",
+      "pt": "Escopo da instalação: o pacote inteiro; ajustes, linha da plataforma e estado de execução ficam em Configurações → Autoevolução.",
+      "ru": "Область установки: весь пакет; параметры, линия платформы и состояние работы — в «Настройки → Самоэволюция»."
     },
     "diagComplete": {
       "zh": "没有需要处理的异常",
