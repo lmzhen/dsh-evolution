@@ -293,39 +293,11 @@ export const PARAM_EXPOSURE: readonly ParamExposure[] = Object.freeze([
   { id: 'mergePairTimeoutMinutes', group: 'merge', tier: 'E2', authority: 'cordis', owner: 'evolution-merge', applies: 'none', docAnchor: 'PARAMETERS.md#merge', summary: 'Wall-clock budget of one pair round (a stuck child guard).', why: 'internal' },
 ])
 
-/**
- * Register one family row's user layer on the platform settings service.
- *
- * The 0.2.x platform no longer turns a plugin Config into a settings section implicitly:
- * every row that exposes a card must call `settings.register` with its Loader entry id.
- * The owner argument is the row id, which is also the namespace the generated card binds.
- * @param ctx - host plugin context.
- * @param owner - Loader entry id / settings namespace.
- * @param schema - the row's Config schema (schemastery).
- */
-export function registerOwnerSettings(
-  ctx: { inject?: (names: readonly string[], callback: (scope: unknown) => void) => unknown },
-  owner: string,
-  schema: unknown,
-): void {
-  const register = (scope: unknown): void => {
-    const settings = (scope as { settings?: { register?: (namespace: string, schema: unknown) => unknown } }).settings
-    if (typeof settings?.register !== 'function') return
-    try { settings.register(owner, schema) } catch (error) {
-      const logger = (ctx as { logger?: { warn?: (message: string) => void } }).logger
-      logger?.warn?.(`evolution settings: register(${owner}) failed: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-  const direct = (ctx as { get?: (name: string) => unknown }).get?.('settings')
-  if (direct !== undefined) { register({ settings: direct }); return }
-  ctx.inject?.(['settings'], register)
-}
 
 /** The settings namespace each OWNER PACKAGE registers (design §7.2).
  *
- * Keyed by owner rather than by group because a namespace has exactly one
- * registrant (the platform refuses a second registration of the same name),
- * while a group may span packages — group 'memory' is served by memory-files and
+ * Keyed by owner rather than by group: a namespace is the settings card's scope (served by the
+ * platform's configForms), while a group may span packages — group 'memory' is served by memory-files and
  * tool-memory, each owning its own section. A package without an entry has no
  * user layer (its knobs stay deployment-only). */
 export const PARAM_NAMESPACES: Readonly<Record<string, string>> = Object.freeze({

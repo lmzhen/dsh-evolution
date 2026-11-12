@@ -10,7 +10,6 @@ import { defineTool, registerEvolutionTool, type PromptContext, type PromptSecti
 import type {} from '@deepseek-ai/dsh-memory'
 import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText } from '@deepseek-ai/dsh-evolution-core'
 import { resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core/skills'
-import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 
 export const name = 'tool-memory'
 
@@ -108,7 +107,6 @@ export const Config = z.object({
 })
 
 export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void> {
-  registerOwnerSettings(ctx, 'tool-memory', Config)
 
   // G1: suppress the platform's auto-generated settings page for this row (the
   // family renders its own card from the registry). Probed, not assumed: a host

@@ -10,7 +10,6 @@
 // `/evolution doctor` reports it.
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { createSubagentChannel, authorityFrom, mutationLockFrom } from '@deepseek-ai/dsh-evolution-core'
-import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
 import { makeDiagnosticsRoutes } from './diagnostics-route.ts'
@@ -303,7 +302,6 @@ async function readRunReport(io: EvolutionIoLike, record: RunRecord): Promise<{ 
 
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  registerOwnerSettings(ctx, 'evolution-commands', Config)
 
   const config = rawConfig
   // E-7 (v18) → V27 G2.4 (M-08): one root key for the whole family. The

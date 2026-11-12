@@ -4,7 +4,6 @@
  */
 
 import type {} from '@deepseek-ai/dsh-evolution-io'
-import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { authorityFrom, withTreeWrite, type SnapshotView } from '@deepseek-ai/dsh-evolution-core'
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'
@@ -380,7 +379,6 @@ export class EvolutionCurator extends Service {
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionCurator')
-  registerOwnerSettings(this.ctx, 'evolution-curator', EvolutionCurator.Config)
 
     // G1: suppress the platform auto-generated page for this row (the family renders
     // its own card). Probed, not assumed: a host without the capability still loads.

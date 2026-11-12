@@ -17,7 +17,7 @@
  * @module @deepseek-ai/dsh-evolution-approval
  */
 
-import { registerOwnerSettings, type MutationAuthority } from '@deepseek-ai/dsh-evolution-core'
+import { type MutationAuthority } from '@deepseek-ai/dsh-evolution-core'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
@@ -269,7 +269,6 @@ export class EvolutionApproval extends Service {
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionApproval')
-  registerOwnerSettings(this.ctx, 'evolution-approval', EvolutionApproval.Config)
 
     this.enabledConfig = config.enabled
     this.stageForegroundConfig = config.stageForeground ?? true

@@ -21,7 +21,6 @@ import { SessionId } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-evolution-core/platform'
 import { advanceReview, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, withReviewContext, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import { assertSkillsRootAliasRetired } from '@deepseek-ai/dsh-evolution-core/skills'
-import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, INJECT_COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
 import type { LiveValue } from '@deepseek-ai/dsh-evolution-core'
@@ -320,7 +319,6 @@ export function resolveReviewRowSettings(rawConfig: Config, warn: (message: stri
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  registerOwnerSettings(ctx, 'evolution-review', Config)
 
   // G1: suppress the platform's auto-generated settings page for this row (the
   // family renders its own card from the registry). Probed, not assumed: a host

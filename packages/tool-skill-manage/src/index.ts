@@ -20,7 +20,6 @@
 
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { skillWriteGateContext, protectedSkillNamesOf, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
-import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool, registerEvolutionTool, type PromptSection } from '@deepseek-ai/dsh-evolution-core/platform'
@@ -511,7 +510,6 @@ function confirmedBy(
 }
 
 export function apply(ctx: Context, rawConfig: Config = {}): void {
-  registerOwnerSettings(ctx, 'tool-skill-manage', Config)
 
   // G1: suppress the platform's auto-generated settings page for this row (the
   // family renders its own card from the registry). Probed, not assumed: a host

@@ -804,7 +804,6 @@
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card-read-race.client.spec.ts",
         "evolution-ui::tests/settings-pending-card.spec.ts",
-        "evolution-ui::tests/settings-refused-verdict-via-write-face.client.spec.ts",
         "evolution-ui::tests/settings-refused-verdict.client.spec.ts",
         "evolution-ui::tests/settings-registration.client.spec.ts",
         "evolution-ui::tests/settings-row-config.client.spec.ts",
@@ -818,7 +817,6 @@
         "evolution-ui::tests/settings-u6-danger-weight.client.spec.ts",
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
-        "evolution-ui::tests/settings-write-face-verdict.client.spec.ts",
         "memory::tests/memory.spec.ts",
         "skill-usage::tests/io-evidence.spec.ts",
         "tool-memory::tests/memory-interpolation-contract.spec.ts"
@@ -1531,7 +1529,6 @@
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card-read-race.client.spec.ts",
         "evolution-ui::tests/settings-pending-card.spec.ts",
-        "evolution-ui::tests/settings-refused-verdict-via-write-face.client.spec.ts",
         "evolution-ui::tests/settings-refused-verdict.client.spec.ts",
         "evolution-ui::tests/settings-registration.client.spec.ts",
         "evolution-ui::tests/settings-row-config.client.spec.ts",
@@ -1545,7 +1542,6 @@
         "evolution-ui::tests/settings-u6-danger-weight.client.spec.ts",
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
-        "evolution-ui::tests/settings-write-face-verdict.client.spec.ts",
         "memory::tests/memory.spec.ts",
         "skill-usage::tests/io-evidence.spec.ts",
         "tool-memory::tests/memory-interpolation-contract.spec.ts"
@@ -2235,7 +2231,6 @@
         "evolution-ui::tests/settings-locale-fallback.client.spec.ts",
         "evolution-ui::tests/settings-pending-card-read-race.client.spec.ts",
         "evolution-ui::tests/settings-pending-card.spec.ts",
-        "evolution-ui::tests/settings-refused-verdict-via-write-face.client.spec.ts",
         "evolution-ui::tests/settings-refused-verdict.client.spec.ts",
         "evolution-ui::tests/settings-registration.client.spec.ts",
         "evolution-ui::tests/settings-row-config.client.spec.ts",
@@ -2249,7 +2244,6 @@
         "evolution-ui::tests/settings-u6-danger-weight.client.spec.ts",
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
-        "evolution-ui::tests/settings-write-face-verdict.client.spec.ts",
         "memory-files::tests/memory-budget-surfaces.spec.ts",
         "memory-files::tests/memory-files-clamp.spec.ts",
         "memory-files::tests/provider.spec.ts",
@@ -2354,7 +2348,7 @@
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 464
+      "specs": 462
     },
     "ci-only": {
       "gates": 18,
@@ -2362,16 +2356,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 464
+      "specs": 462
     },
     "full(ci=on)": {
       "gates": 93,
-      "specs": 537
+      "specs": 535
     }
   },
   "specs": {
-    "total": 537,
-    "marked": 537,
+    "total": 535,
+    "marked": 535,
     "unmarked": 0
   }
 }

@@ -11,7 +11,6 @@ import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runn
 import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type HomeFence } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type MutationLockPort } from '@deepseek-ai/dsh-evolution-core/write'
-import { registerOwnerSettings } from '@deepseek-ai/dsh-evolution-core'
 import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState } from './state.ts'
@@ -167,7 +166,6 @@ function formatUnreadyError(): string {
 export const inject: string[] = []
 
 export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): void {
-  registerOwnerSettings(ctx, 'evolution-merge', Config)
 
   configureMergePresentation(ctx as unknown as MergePresentationContext)
   const startupParams = resolveMergeParams(rawConfig)
