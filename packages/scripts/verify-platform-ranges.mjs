@@ -60,8 +60,8 @@ function field(section, name) { return section + '.' + name }
 
 let entries = []
 try { entries = readdirSync(manifestDir, { withFileTypes: true }) } catch {
-  console.error('verify-platform-ranges: cannot read manifest dir ' + manifestDir)
-  process.exit(1)
+  console.error('verify-platform-ranges: CANNOT DECIDE - cannot read manifest dir ' + manifestDir + ' (run prepare-release --dev-build first, or register this row as cannot-decide on this machine)')
+  process.exit(2)
 }
 for (const entry of entries) {
   if (!entry.isDirectory()) continue

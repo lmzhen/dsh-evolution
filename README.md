@@ -65,7 +65,7 @@ Use `all` for normal installs. The old `preset` and layered forms are internal m
 
 | Command | When to use it |
 |---|---|
-| `/evolution doctor` | Check installation form, versions and service state |
+| `/evolution doctor` | Check the installation form, versions and service state |
 | `/evolution pending` | List ordinary writes waiting for approval |
 | `/evolution skill history <name>` | Inspect body and support-file history |
 | `/evolution skill undo <name>` | Revert the skill body; support files are not restored |

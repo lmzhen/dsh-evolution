@@ -163,11 +163,6 @@
               "expiry": "release-phase wiring: add the step to the action or mark the row local-only"
             },
             {
-              "script": "verify-mutations.mjs",
-              "reason": "the mutation ledger is still being filled (3 of 68 checks have a proven record): --coverage is legitimately CANNOT DECIDE, so CI would read a cannot-decide as a failure; the records accrue per check as their retirements land",
-              "expiry": "release gate: --coverage must reach exit 0 (every check carries a proven red record) before the tag, or this row is re-registered with the remaining count named"
-            },
-            {
               "script": "gen-health-baseline.mjs",
               "reason": "the health-baseline corpus is produced from the TARGET machine's user skills (the family maintains it per machine); the CI overlay carries no user skills, so a CI run would produce an empty corpus rather than the real one",
               "expiry": "release gate: the corpus is refreshed on the machine that owns it and its digest is recorded in the release readings; if a CI-side corpus is ever required, this row moves into the action"
@@ -298,6 +293,11 @@
               "script": "verify-requirements.mjs",
               "reason": "requirements matrix coverage; the CI job executes it after gen-requirements",
               "owner": "ci"
+            },
+            {
+              "script": "verify-mutations.mjs",
+              "reason": "CI runs the PROBE half (--probes --no-stamp --json, three-valued); the COVERAGE half stays local-only until every check carries a proven red record",
+              "expiry": "0.45.0"
             }
           ]
         }
@@ -598,7 +598,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "c1074bc4ae2538d6fde10a8d1e16d5facad7e8f610f66a9413e539fe5ef99f0f",
+        "sha256": "21953bebd4a14e6019eacd7ee0829c100dd982a30b4b3354a8deca6294e89a2f",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1195,12 +1195,13 @@
         "pendingAxes": [
           {
             "axis": "executability",
-            "rows": 23,
+            "rows": 24,
             "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
-            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused"
+            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd"
           },
           {
             "axis": "expiry-due",
@@ -1213,21 +1214,23 @@
           },
           {
             "axis": "falsifiability-carrier",
-            "rows": 3,
+            "rows": 4,
             "reason": "three rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
-            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused"
+            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row"
           },
           {
             "axis": "mutation-coverage",
-            "rows": 1,
+            "rows": 3,
             "reason": "the beh-installer-layered probe suite hangs in the local overlay before its green baseline; CI probe owns it | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
-            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused"
+            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
+            "note": "2026-11-12 re-measured: decl-platform-contract and beh-installer-layered lack a fresh signature after the W9 script changes (the ledger keeps their stale records; the count is the debt size)"
           }
         ],
         "checkMutations": {
@@ -2098,6 +2101,60 @@
             "owner": "scripts/gate-manifest",
             "expiry": "0.45.0",
             "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
+          },
+          "gate-01": {
+            "reason": "the row runs tsc with no project argument, so it prints usage and exits 2",
+            "owner": "scripts/gates",
+            "expiry": "0.45.0",
+            "plan": "toolchain row needs -p <config>; the D-9 typecheck lives on the build line"
+          },
+          "gate-02": {
+            "reason": "oxlint is not installed in this machine tree; the overlay bed carries it on the build line",
+            "owner": "scripts/gates",
+            "expiry": "0.45.0",
+            "plan": "install oxlint in the bed (or run the lint row on CI)"
+          },
+          "gate-03": {
+            "reason": "the full family vitest suite does not return on this machine within the 180 s budget",
+            "owner": "scripts/gates",
+            "expiry": "0.45.0",
+            "plan": "CI owns the full suite; local runs use targeted specs"
+          },
+          "gate-05": {
+            "reason": "smoke-built-entries needs built lib artifacts that a source checkout does not carry",
+            "owner": "scripts/gates",
+            "expiry": "0.45.0",
+            "plan": "run after build-lib on the build line"
+          },
+          "gate-27": {
+            "reason": "platform version ranges are checked against .release-staging, which only exists after prepare-release packs",
+            "owner": "scripts/gates",
+            "expiry": "0.45.0",
+            "plan": "run after prepare-release --dev-build"
+          },
+          "gate-49": {
+            "reason": "the mutation ledger is still being filled: 29 of 109 checks carry a proven red record",
+            "owner": "scripts/gates",
+            "expiry": "0.45.0",
+            "plan": "close records per check; coverage exits 0 once every check is proven"
+          },
+          "gate-56": {
+            "reason": "release evidence needs packages/evolution/dist/release-evidence.json, produced by the release assembly",
+            "owner": "scripts/gates",
+            "expiry": "0.45.0",
+            "plan": "run on the build line after assemble-release-evidence"
+          },
+          "gate-57": {
+            "reason": "the evidence assembler needs a staging evidence file that only the build line produces",
+            "owner": "scripts/gates",
+            "expiry": "0.45.0",
+            "plan": "run on the build line"
+          },
+          "health-admission": {
+            "reason": "no user or platform corpora on this machine, so admission cannot be judged",
+            "owner": "scripts/gates",
+            "expiry": "0.45.0",
+            "plan": "run where the corpora exist (CI or a real profile)"
           }
         },
         "unmappedTier": [

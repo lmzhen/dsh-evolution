@@ -322,6 +322,11 @@ const RAW_WRITE_REGISTER = new Set([
   // The preset installer writes DEPLOYMENT assets (not the state medium) with its own
   // atomic stage→rename protocol and an injectable FsOps surface (F-211); routing it
   // through ctx.evolutionIo would couple a one-shot installer to the runtime seam.
+  // W9-authority: the authority creates the lock directory and removes a stale lock file after a
+  // failed release. Both are lock protocol, not the durable state medium (the platform
+  // withFileLock owns the lock file it creates), so routing them through the IO seam would put the
+  // seam inside the lock it exists to take.
+  'evolution-core/src/authority.ts',
   'evolution-commands/src/index.ts',
   'evolution-merge/src/domain/state-v3.ts',
   'evolution-merge/src/target-claim.ts',

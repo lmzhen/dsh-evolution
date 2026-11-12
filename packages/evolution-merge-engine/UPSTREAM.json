@@ -94,8 +94,9 @@
     },
     {
       "path": "node/parity/align.js",
-      "bytes": 714,
-      "sha256": "7e8fbd327dabef4ce0a6e7ed1c50e752b5d9b2b8870f7d80c9ae44f4d40e4382"
+      "bytes": 1410,
+      "sha256": "0b2f5b4b0a5bfc770ef710a2fb7f5c5cae97062f6a249aac685862ca2ff5093d",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/cases/e2e_int8.js",
@@ -119,13 +120,15 @@
     },
     {
       "path": "node/parity/cases/stage4.js",
-      "bytes": 2396,
-      "sha256": "1bc6b5fb9ca01cabf3fb2979e3966fcce0d66d3f8ae41674cfa00e19d393c9f5"
+      "bytes": 2478,
+      "sha256": "6c1823c234015203f3a6b96a785a3298485a1b55aea876061f726d60fc7fc855",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/cases/stages123.js",
-      "bytes": 2691,
-      "sha256": "bbe80ed58484a0b7c62448e661df6dec71cb39ec030215088c86f58bc80167b9"
+      "bytes": 2761,
+      "sha256": "885ad65a600da93f2bf1c7571e7a93bcc080694ae3f7ba02f0e70b74665d531f",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/cases/tokenizer.js",
@@ -294,8 +297,9 @@
     },
     {
       "path": "node/parity/fixtures/build/base/config.json",
-      "bytes": 254,
-      "sha256": "ee8341a813f52e23bc5c2c2dc5c22a289e3300ffc2513172c53758e45f3e4a58"
+      "bytes": 242,
+      "sha256": "2badbb148749d7a7c68ecf82637e404f8ae80afc3c2d4a57ac08aa3e55c7c466",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/fixtures/build/base/model.safetensors",
@@ -309,13 +313,15 @@
     },
     {
       "path": "node/parity/fixtures/build/base/tokenizer.json",
-      "bytes": 40,
-      "sha256": "f969ee010136770680aab124ec9196a8f334f49e0b1c0fdec14336e3c8de943d"
+      "bytes": 37,
+      "sha256": "4aa20b68842fe14efa7cf07716817f8c61cec14d62ebea2a9586fa5aa21775ea",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/fixtures/build/expected/f16_config.json",
-      "bytes": 287,
-      "sha256": "a327d87fe63337a15fb3bc364ec9bca20866665857f43355f283815fcf331c8f"
+      "bytes": 274,
+      "sha256": "24ddbdc9c9bb56d5faf394860e2d9c8c773901cfb778866be0ed55eb26a10e9c",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/fixtures/build/expected/f16_model.safetensors",
@@ -324,8 +330,9 @@
     },
     {
       "path": "node/parity/fixtures/build/expected/int8_config.json",
-      "bytes": 407,
-      "sha256": "6b384a30297c67ef7833e92cbcd79693e738254b183308d432c12992b1475b6d"
+      "bytes": 391,
+      "sha256": "8755b0fb6e4f132778481eb0774755b12c00e4aeb4a3d12fb7ad26231e8ba2d5",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/fixtures/build/expected/int8_model.safetensors",
@@ -339,13 +346,15 @@
     },
     {
       "path": "node/parity/fixtures/build/expected/meta.json",
-      "bytes": 1259,
-      "sha256": "7aa1eb9f317c66e24b82835e3fb9b42f9c5160fd0d2d3be566917c57a9ae6b9b"
+      "bytes": 1132,
+      "sha256": "6ca54520c3d0f84d4edff24d35b60784a063a109a3c6f93ff12fcc2cfe27cf7d",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/fixtures/build/expected/pca_config.json",
-      "bytes": 511,
-      "sha256": "51dd2159291183616be7934bad5e75e971f3584dd8912ce6175f31b48c5ac1a7"
+      "bytes": 491,
+      "sha256": "69e4a443d05db6bb2abec5338585cc4a61857fd88b2e598b0ee2425ca24d056b",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/fixtures/build/expected/pca_model.safetensors",
@@ -494,8 +503,9 @@
     },
     {
       "path": "node/parity/fixtures/corpus/flyai/SKILL.md",
-      "bytes": 8513,
-      "sha256": "0a4a308370d16930f8982feafc53dc17d2d230879d20faf53fa57234dff16330"
+      "bytes": 8365,
+      "sha256": "2f7d2d6c91d3b7ca974aca6e226ca5c8e6d113ce528e7ec213d8a4f8f9e93e96",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/fixtures/corpus/gate-mutation-probing/SKILL.md",
@@ -539,8 +549,9 @@
     },
     {
       "path": "node/parity/fixtures/corpus/officecli-docx/SKILL.md",
-      "bytes": 43509,
-      "sha256": "3949e1e14d3aee1406a8d8dba7c41bc3008e97fff32129639147de433c6c85a9"
+      "bytes": 42947,
+      "sha256": "4dbeacba4bd107417fc31204ce22e91b37e5747d0541090d75ebb0ed14e02559",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/fixtures/corpus/platform-plugin-port-verification/SKILL.md",
@@ -624,138 +635,165 @@
     },
     {
       "path": "node/parity/golden/prompts/001_agent-team-design-synthesis__dsh-plugin-compatibility_L0.md",
-      "bytes": 806,
-      "sha256": "515869ee2fdc68ac15902e27cd86ebf4126f1a5eb00715ca8aa7e119dcd4c0b5"
+      "bytes": 777,
+      "sha256": "c97500cb25c159c25f0f720184aaf78b8074b0c1bb0c4639d0afaba56dcdf833",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/002_agent-team-design-synthesis__dsh-plugin-extension-design_L0.md",
-      "bytes": 806,
-      "sha256": "bbf9389a0ecdd747245cac1acc08e4b0217fe2d5afb9416dbe3f1d4daf1018bd"
+      "bytes": 777,
+      "sha256": "25a35a5e229244617eb6b40d8b9940b00b047fead08a7b4704ababe1b79e0731",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/003_agent-team-design-synthesis__gate-mutation-probing_L0.md",
-      "bytes": 795,
-      "sha256": "e0f9ddb022ca2744d0ddd023419d0ecf472060f210f33b3321f1dbe21fefeda9"
+      "bytes": 766,
+      "sha256": "d565f916c487e622a68cf70b97c58db1c1197d244a23db5722a6c2fc0da7f570",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/004_capability-claim-audit__capability-replication-audit_L0.md",
-      "bytes": 837,
-      "sha256": "9e4a0df99c68dc707b68089e262b85d537a0e04b16365503da756ba5d9abbdb0"
+      "bytes": 807,
+      "sha256": "1ecb829e5dae895d2ac7c7cc534d286cd71dbcd823e7c6ac147ae296c5e38f66",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/004_capability-claim-audit__capability-replication-audit_L1.md",
-      "bytes": 7015,
-      "sha256": "66615d5f39e720d918e87d283dba2b3dc6bb27de80e5b755b99bf96b860753ef"
+      "bytes": 6985,
+      "sha256": "05bee6b42bd5c133ad62e748bb03f1768cb45e1dc247136b84369eb24b14a2c2",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/005_codebase-defect-audit__codebase-inventory-survey_L0.md",
-      "bytes": 827,
-      "sha256": "fe71c0bb5d1c7dc3327180b9f9f725a57aca6dd455c29f130db1b10e5d1821b3"
+      "bytes": 797,
+      "sha256": "ac30f446b8458a0ecd9dfde9a63ed4b5b69514d404b4abd475c35ad4d9c67f51",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/005_codebase-defect-audit__codebase-inventory-survey_L1.md",
-      "bytes": 5871,
-      "sha256": "0ff447a14f5316bedfedc110c9228e26c18ae35d7304879a307ecf489879591a"
+      "bytes": 5841,
+      "sha256": "650a3b45f9639c5dfea5f1199062c7db8886f0e12fe1d41d4a0adeaa2c4257e8",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/006_docx-layout-and-figures__officecli-docx_L0.md",
-      "bytes": 1210,
-      "sha256": "dbfdd4505809742aef3ad86a1bb7eabb3549a4477facaea547eb3d03caee341d"
+      "bytes": 1181,
+      "sha256": "c73e4e1ba5886d4ba542232dbf06fbf82a007c90065d087cd739354ee93c5f40",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/006_docx-layout-and-figures__officecli-docx_L1.md",
-      "bytes": 6548,
-      "sha256": "83d3da1f83c4e7992f78bca9e64841e03a79c1a7d12a803f069d27802fe3da03"
+      "bytes": 6519,
+      "sha256": "49858079941e7f97627208b151378572b01e4bdb61c8e4363b9f894be0a5bfb1",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/007_dsh-context-visibility__dsh-plugin-compatibility_L0.md",
-      "bytes": 807,
-      "sha256": "ff8d968f1355caf562dae7ab1f50a2a63a48d05e70594ecd710eddf4b96dfe44"
+      "bytes": 778,
+      "sha256": "aa4b3e98b6b4ae8788b519d124e96854a43dbbe60d37d5da2887ac6f0e8f5555",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/008_dsh-context-visibility__dsh-plugin-extension-design_L0.md",
-      "bytes": 800,
-      "sha256": "d9682e0c527807f938a3de789fb0731bb085ccba8c2246ee9be6635e053341a2"
+      "bytes": 771,
+      "sha256": "aee5b25a8d823743ac098e5163d48f33d817d08a5dc9226e4fc28f277e9cffdd",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/009_dsh-desktop-source-build__windows-computer-use_L0.md",
-      "bytes": 796,
-      "sha256": "c1f0fc02b17daedeceb94f258c6efa169466adeba9a0567b7c90b5b74aec4a6b"
+      "bytes": 767,
+      "sha256": "fd73b3e3a5878a03f056cb742ecf9837189770c12c26389a08829ee22dc55cde",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/009_dsh-desktop-source-build__windows-computer-use_L1.md",
-      "bytes": 5706,
-      "sha256": "2f5fd472a0ecdeaf678ede17905b8a5ce1d08df5eb707b6b70424a317edbe9e3"
+      "bytes": 5677,
+      "sha256": "8f5a570ba197ff6b011a7fdc204fdaada10fd8fe96269e6bd2c76dce9ccab371",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/010_dsh-evolution-defect-patterns__dsh-evolution-gates_L0.md",
-      "bytes": 836,
-      "sha256": "ddeaa211618323da931a45aa26873461946045d47ea7ec5ccb4361d703128ab7"
+      "bytes": 807,
+      "sha256": "65e61cc42d6a8f366ca01ad8031ce9e0114b2073f0a58f0bc92a88403fd8ed02",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/011_dsh-evolution-gates__dsh-evolution-release_L0.md",
-      "bytes": 777,
-      "sha256": "d4025612cf086e30f833c6b961f1f0ea3fe767df30b903dee42526d9bcf025ee"
+      "bytes": 748,
+      "sha256": "0031d5d748b38837641e59c959ed1c50ec8542b5109b88b2f01e09c0c52d3769",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/012_dsh-evolution-maintenance__dsh-evolution-release_L0.md",
-      "bytes": 871,
-      "sha256": "9f531d27bff1c347d326813d984ad89de89c336072716b44c573a39dfb5c7b96"
+      "bytes": 841,
+      "sha256": "4797bb3e186f7821189aa0779422dc7726085d74781efcda80b099b2552556fc",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/012_dsh-evolution-maintenance__dsh-evolution-release_L1.md",
-      "bytes": 8444,
-      "sha256": "b5413e048876d1d0a42b7c8468071cefbdb482100793d85290c195b604f25df5"
+      "bytes": 8414,
+      "sha256": "8b0e1780baa72609553430708f4d282b6a29322f1978338317f547d3435ffc7d",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/013_dsh-plugin-compatibility__dsh-plugin-discovery_L0.md",
-      "bytes": 806,
-      "sha256": "9936b232a834c7e3efbad6fd2a32e91d2eefe015d0dabe56fd2ab23c9c15b835"
+      "bytes": 777,
+      "sha256": "8b8ee904080b3e85ef51b3e1c8ee16f81c4b6ddaad2fb8f4628f03ac498916b8",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/013_dsh-plugin-compatibility__dsh-plugin-discovery_L1.md",
-      "bytes": 3624,
-      "sha256": "f3a78246ff0a4dfff0bc6bbffd870fb51bd2826291fd5cdd8a222996c8378486"
+      "bytes": 3595,
+      "sha256": "0a03fca59427f770c89c88929607d5369233e8f9ea0266dc0e423e1e778164b3",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/014_dsh-plugin-compatibility__platform-plugin-port-verification_L0.md",
-      "bytes": 826,
-      "sha256": "cf03d629460bc9830cf0a960ddd18a5665f78c4796657970318cba646f6e56df"
+      "bytes": 797,
+      "sha256": "3dc888c70e5233c15d8000dad3c9538d21ca3cfd4ab5b466b9f8195e210ff525",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/014_dsh-plugin-compatibility__platform-plugin-port-verification_L1.md",
-      "bytes": 5671,
-      "sha256": "749d3b27d534aefb03d44c55924c0674f3cdcd415b70a3ccaa2f5431792fe430"
+      "bytes": 5642,
+      "sha256": "d2318a8498517fe2748ec1ad888cb6921d58db091d8a5665097871bf0aefe637",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/015_dsh-plugin-discovery__dsh-plugin-extension-design_L0.md",
-      "bytes": 801,
-      "sha256": "bbfce6d94f8eb76c927cb65e5013f20055b409a62620351157fbb7e03d04ddc0"
+      "bytes": 772,
+      "sha256": "511f3663f45e47822895ce5d8cb2b034d9658b796db46145766b1e53b5e15b03",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/015_dsh-plugin-discovery__dsh-plugin-extension-design_L1.md",
-      "bytes": 6443,
-      "sha256": "48ad474cacb262f91079f294a686f73079363b4c872b8080b686ee490a32f417"
+      "bytes": 6414,
+      "sha256": "1ed7a551ef621dd15f2b0204af26aafc5ff0c98b138aa8a32f2bc83760a84cfc",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/016_dsh-plugin-discovery__platform-plugin-port-verification_L0.md",
-      "bytes": 813,
-      "sha256": "55fabdf99df02564a3ac220eac65ce86c50c89e5fddb58fbcc5eb7ef0f7f0014"
+      "bytes": 784,
+      "sha256": "28aafb0ca43ec2f7d231d8a4f48e43a0cdea9db225a116a133ec5093be7b6593",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/016_dsh-plugin-discovery__platform-plugin-port-verification_L1.md",
-      "bytes": 3592,
-      "sha256": "e16b84422a52e32b7029f5f258c0815667648141c616d25c3b6b8cfb1dc7db5b"
+      "bytes": 3563,
+      "sha256": "58bea8beded1994aef4cb8695156cf5730dab03433308aaea89e11856ed76663",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/017_literature-artifact-triage__research-artifact-dependency-audit_L0.md",
-      "bytes": 854,
-      "sha256": "5793605e6dc570974ef06a0671da2ff6d4fe25dcfaf26fa78e401218279fb3e6"
+      "bytes": 825,
+      "sha256": "92b5fcb24f8aa86a49086cccb2a4850593ca5056236ee1ce97a64bbe1076adec",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/prompts/017_literature-artifact-triage__research-artifact-dependency-audit_L1.md",
-      "bytes": 5785,
-      "sha256": "3c40ba36a8bf12bdee19fd5ba14f64c76b3ec131642978fc1619421d403f2257"
+      "bytes": 5756,
+      "sha256": "42b814d21ffb632a872ff06a5f8fcbe4a804598083cebfe150401b4a7149abd7",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/ref_corpus_full.json",
@@ -789,13 +827,15 @@
     },
     {
       "path": "node/parity/golden/ref_rng.json",
-      "bytes": 3016,
-      "sha256": "b771901fd10863fdb2c98030c7034471bae111264a432704c118d09d0d421796"
+      "bytes": 2707,
+      "sha256": "e61418f14e92c0e6245c9e99bc0c999a1881dd8537e02120d1253cfbed63ecd2",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/ref_stage4.json",
-      "bytes": 17672,
-      "sha256": "7ff7556d8680ffb3b2b990b3a1bdb45b69f549fedaa231e8e78866de75f575a4"
+      "bytes": 17105,
+      "sha256": "b2050b2fb579d5484b7b92d6c0185fb240efcf788461bc0f0f66072d5274c95f",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/parity/golden/ref_stages.json",
@@ -879,13 +919,15 @@
     },
     {
       "path": "node/src/corpus.js",
-      "bytes": 3810,
-      "sha256": "f6afaea267a28d734ca1d81bc886e41d90300bd21ca927079689d22a02df3aa0"
+      "bytes": 3920,
+      "sha256": "6210baa0439c10d50f4729b38822b0706c6dd0fb742dfdc3063083bc87cfe442",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/src/data/minhash_params.json",
-      "bytes": 8039,
-      "sha256": "b0f792b2b7af95cb90e0b6727733ba69b12795e3ea477fbe6ca46add37fafe84"
+      "bytes": 6977,
+      "sha256": "f638ae97a3a02091901b57f63feecdf9494744631c45a2e4525b8793187daca1",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/src/degrade.js",
@@ -939,8 +981,9 @@
     },
     {
       "path": "node/src/extract.js",
-      "bytes": 1274,
-      "sha256": "21cdaa7303e3c618a591dfbe5dfb44664f38669160669fcb7005dfbbd5ab31d7"
+      "bytes": 1341,
+      "sha256": "df90f4d7dd1022f6906329bbb859d91ad3906e2be15dad050ee429e3930d3a96",
+      "note": "re-recorded from the committed vendor tree (2026-11-12): the fixture set was regenerated after vendoring, so the manifest described the pre-generation bytes"
     },
     {
       "path": "node/src/index.js",
@@ -1677,5 +1720,7 @@
       "bytes": 8183,
       "sha256": "8b816acc40e359cdd9079d769f29cdef1742e5d8cdd536550dba5e9dacb1e9b4"
     }
-  ]
+  ],
+  "manifestReconciledAt": "2026-11-12",
+  "manifestReconcileNote": "parity fixtures regenerated after vendoring; their recorded bytes now describe the committed tree (see the per-file note)"
 }

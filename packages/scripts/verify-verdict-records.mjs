@@ -28,7 +28,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 // 遗留⑤ follow-up: run-gates now resolves its platform tree through lib-env.mjs (env -> workspace
 // candidates -> layout parent), so the probe tree must copy that module too; a missing import here
 // produced empty stdout and four vacuous envelope failures in CI (0.27.1 tag run).
-const NEEDED = ['run-gates.mjs', 'lib-verdict.mjs', 'lib-run-gates.mjs', 'lib-family-version.mjs', 'lib-env.mjs', 'family-facts.json', 'gate-manifest.json']
+const NEEDED = ['run-gates.mjs', 'lib-verdict.mjs', 'lib-run-gates.mjs', 'lib-family-version.mjs', 'lib-exemptions.mjs', 'lib-env.mjs', 'family-facts.json', 'gate-manifest.json']
 const failures = []
 const note = (message) => failures.push(message)
 

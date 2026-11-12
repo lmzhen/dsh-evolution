@@ -116,7 +116,7 @@ export function modelRoute(ctx: Context, agent?: unknown, session?: unknown): Mo
   if (owned !== undefined) return { provider: owned.provider, model: owned.model }
   // `sessionProjections.snapshot()` returns the projection's VIEW, not its state: the platform's
   // modelSelection view is `{ lastUsed, next }` where `next` is already `pending ?? lastUsed`
-  // (packages/core/agent/src/model-selection.ts:87-88). Reading the state field `pending` here would
+  // (packages/core/agent/src/model-selection.ts, viewSchema/view). Reading the state field `pending` here would
   // always be undefined and silently pin auxiliary calls to `lastUsed`.
   if (session !== undefined) {
     const registry = ctx.get('sessionProjections') as {

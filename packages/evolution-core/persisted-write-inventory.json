@@ -283,20 +283,20 @@
     {
       "id": "merge-tree-lock-acquire",
       "path": "<evolutionHome>/merge/.tree-lock",
-      "writer": "evolution-core/src/tree-lock.ts",
-      "serializedBy": "transact",
-      "marker": "transactIo(io, path",
+      "writer": "evolution-core/src/authority.ts",
+      "serializedBy": "platform-file-lock",
+      "marker": "readFile(join(home, '.authority', 'home.lock')",
       "state": [],
-      "note": "The cooperative merge/curator tree lock create/replace. Two processes must not both win; the transaction is the lock."
+      "note": "The home writer lock record (W9-authority): the platform withFileLock owns exclusion and the record is read for diagnostics and takeover checks."
     },
     {
       "id": "merge-tree-lock-release",
       "path": "<evolutionHome>/merge/.tree-lock",
-      "writer": "evolution-core/src/tree-lock.ts",
-      "serializedBy": "transact",
-      "marker": "transactIo(options.io, path",
+      "writer": "evolution-core/src/authority.ts",
+      "serializedBy": "platform-file-lock",
+      "marker": "rm(lockPath",
       "state": [],
-      "note": "The release half of the same lock: delete only when the recorded token still matches."
+      "note": "Stale-lock removal after a failed release (W9-authority): repair() only removes a lock whose holder is gone; the release itself is the platform lock."
     },
     {
       "id": "merge-pair-index",

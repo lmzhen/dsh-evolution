@@ -22,7 +22,13 @@
         "local"
       ],
       "reason": "declared local check: the D-9 test-file typecheck lives on the build line, not in this action (action.yml L168-171)",
-      "owner": "build-line"
+      "owner": "build-line",
+      "registration": {
+        "reason": "the row runs tsc with no project argument, so it prints usage and exits 2",
+        "owner": "scripts/gates",
+        "expiry": "0.45.0",
+        "plan": "toolchain row needs -p <config>; the D-9 typecheck lives on the build line"
+      }
     },
     {
       "id": "gate-02",
@@ -37,7 +43,13 @@
       "profiles": [
         "local",
         "ci"
-      ]
+      ],
+      "registration": {
+        "reason": "oxlint is not installed in this machine tree; the overlay bed carries it on the build line",
+        "owner": "scripts/gates",
+        "expiry": "0.45.0",
+        "plan": "install oxlint in the bed (or run the lint row on CI)"
+      }
     },
     {
       "id": "gate-03",
@@ -55,7 +67,13 @@
       "profiles": [
         "local",
         "ci"
-      ]
+      ],
+      "registration": {
+        "reason": "the full family vitest suite does not return on this machine within the 180 s budget",
+        "owner": "scripts/gates",
+        "expiry": "0.45.0",
+        "plan": "CI owns the full suite; local runs use targeted specs"
+      }
     },
     {
       "id": "gate-04",
@@ -81,7 +99,13 @@
       "tree": "overlay",
       "profiles": [
         "local"
-      ]
+      ],
+      "registration": {
+        "reason": "smoke-built-entries needs built lib artifacts that a source checkout does not carry",
+        "owner": "scripts/gates",
+        "expiry": "0.45.0",
+        "plan": "run after build-lib on the build line"
+      }
     },
     {
       "id": "gate-06",
@@ -428,7 +452,13 @@
       "profiles": [
         "local",
         "ci"
-      ]
+      ],
+      "registration": {
+        "reason": "platform version ranges are checked against .release-staging, which only exists after prepare-release packs",
+        "owner": "scripts/gates",
+        "expiry": "0.45.0",
+        "plan": "run after prepare-release --dev-build"
+      }
     },
     {
       "id": "gate-28",
@@ -775,7 +805,13 @@
       "profiles": [
         "local",
         "ci"
-      ]
+      ],
+      "registration": {
+        "reason": "the mutation ledger is still being filled: 29 of 109 checks carry a proven red record",
+        "owner": "scripts/gates",
+        "expiry": "0.45.0",
+        "plan": "close records per check; coverage exits 0 once every check is proven"
+      }
     },
     {
       "id": "gate-50",
@@ -880,7 +916,13 @@
       "profiles": [
         "local",
         "ci"
-      ]
+      ],
+      "registration": {
+        "reason": "release evidence needs packages/evolution/dist/release-evidence.json, produced by the release assembly",
+        "owner": "scripts/gates",
+        "expiry": "0.45.0",
+        "plan": "run on the build line after assemble-release-evidence"
+      }
     },
     {
       "id": "gate-57",
@@ -903,7 +945,13 @@
       "profiles": [
         "local",
         "ci"
-      ]
+      ],
+      "registration": {
+        "reason": "the evidence assembler needs a staging evidence file that only the build line produces",
+        "owner": "scripts/gates",
+        "expiry": "0.45.0",
+        "plan": "run on the build line"
+      }
     },
     {
       "id": "gate-58",
@@ -1205,14 +1253,14 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "localSafe": false,
+      "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine",
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
         "expiry": "0.45.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
-      },
-      "localSafe": false,
-      "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
+      }
     },
     {
       "id": "gate-76",
@@ -1297,13 +1345,13 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test",
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
         "expiry": "0.45.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
-      },
-      "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test"
+      }
     },
     {
       "id": "gate-81",
@@ -1781,7 +1829,13 @@
         "node",
         "packages/scripts/verify-health-admission.mjs"
       ],
-      "reason": "needs both local corpora; on a machine without them it must report CANNOT DECIDE rather than pass"
+      "reason": "needs both local corpora; on a machine without them it must report CANNOT DECIDE rather than pass",
+      "registration": {
+        "reason": "no user or platform corpora on this machine, so admission cannot be judged",
+        "owner": "scripts/gates",
+        "expiry": "0.45.0",
+        "plan": "run where the corpora exist (CI or a real profile)"
+      }
     }
   ],
   "probes": [

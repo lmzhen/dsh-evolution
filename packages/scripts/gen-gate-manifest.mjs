@@ -109,8 +109,6 @@ for (const line of tableSrc) {
       entry.expiry = REGISTER_EXPIRY
     }
   }
-  const registration = CANNOT_DECIDE_REGISTERED[entry.id]
-  if (registration !== undefined) entry.registration = registration
   gates.push(entry)
 }
 
@@ -253,6 +251,12 @@ const out = {
   sources: ['CONTRIBUTING.md (gate table)', '.github/actions/evolution-validate/action.yml (CI run steps)', 'packages/scripts/probes.json (probe registry)'],
   gates,
   probes,
+}
+// Rows built outside the table loop (toolchain/external/step) carry registrations too: the debt
+// belongs to the row id, not to whichever source produced it.
+for (const row of gates) {
+  const registration = CANNOT_DECIDE_REGISTERED[row.id]
+  if (registration !== undefined) row.registration = registration
 }
 const text = JSON.stringify(out, null, 2) + '\n'
 

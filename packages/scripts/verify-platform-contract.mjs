@@ -69,6 +69,13 @@ if (!argv[0] || upstream === '' || argv[upstreamArg + 1] === undefined || argv[u
  */
 const CONTRACT_ANCHORS = [
   {
+    id: 'atomic-write-file-lock',
+    file: 'packages/util/atomic-write/src/index.ts',
+    anchor: 'export async function withFileLock<T>(',
+    consumer: 'evolution-core/authority.ts — the one home writer lock (W9-authority G1)',
+    finding: 'G1',
+  },
+  {
     id: 'session-events-accessor',
     file: 'packages/core/session/src/index.ts',
     anchor: 'snapshotEvents(',
@@ -347,7 +354,7 @@ function platformPackages() {
 function exportedNames(dir) {
   const names = new Set()
   walkSources(join(dir, 'src'), (_path, text) => {
-    for (const match of text.matchAll(/^export\s+(?:declare\s+)?(?:abstract\s+)?(?:class|function|const|let|var|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm)) {
+    for (const match of text.matchAll(/^export\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:class|function|const|let|var|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm)) {
       names.add(match[1])
     }
     for (const match of text.matchAll(/^export\s+\{([^}]*)\}/gm)) {

@@ -11,7 +11,9 @@
 export const STATES = ["pass", "fail", "cannot-decide", "skipped"];
 export const FAIL_UNEVALUATED_KINDS = ["budget-timeout", "requires-abort"];
 export const FAIL_EVALUATED_KINDS = ["invariant-violation", "non-zero-exit"];
-export const CANNOT_DECIDE_KINDS = ["target-not-built", "filter-no-match", "artifact-absent", "field-absent", "unknown-combination", "unknown-errno", "external-signal", "adapter-absent", "external-missing", "produced-missing", "schema-inconsistent", "no-release-tag"];
+// `timeout` is the ROW's own budget: the gate ran past it, so nothing was judged and no input is
+// missing. The prerequisite case keeps its own `budget-timeout`, which lives in the fail set.
+export const CANNOT_DECIDE_KINDS = ["target-not-built", "filter-no-match", "artifact-absent", "field-absent", "unknown-combination", "unknown-errno", "external-signal", "adapter-absent", "external-missing", "produced-missing", "schema-inconsistent", "no-release-tag", "timeout"];
 export const IDENTITY_FIELDS = ["face", "channel", "platformLine", "adapterSha", "policySha", "familyVersion", "readerSha", "scope", "tree", "lane", "ci"];
 export const CI = ["on", "off"];
 export const CISC = ["on", "off", "mixed"];

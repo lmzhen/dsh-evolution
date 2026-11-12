@@ -182,7 +182,9 @@ for (const g of list) {
   const declared = argv[0] === 'node' ? argv.slice(1) : argv
   const [script, ...rest] = declared
   // the seam owns the spawn and reports killedBy explicitly; this file never infers it
-  const observed = runner.run([process.execPath, script, ...rest], { cwd, stdio: 'pipe' })
+  // A gate that never returns must not stop the whole local chain: budget it, and let the verdict
+  // read cannot-decide (killedBy=budget) instead of hanging the runner forever.
+  const observed = runner.run([process.execPath, script, ...rest], { cwd, stdio: 'pipe', timeoutMs: 180000 })
   const ms = observed.ms
   const status = observed.status === undefined ? null : observed.status
   // G0-fix (2026-10-15): the on-disk check below is a PATH check, so it may only run when the token
@@ -192,6 +194,7 @@ for (const g of list) {
   // fixture exists to catch. A token starting with `-` is an option, not a script.
   const scriptPath = script.startsWith('-') ? null : resolve(cwd, script)
   if (scriptPath !== null && !existsSync(scriptPath)) records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [script], next: 'the declared script is not on disk - fix the row, or register this check as cannot-decide on this machine', evidence: script + ' absent' }))
+  else if (observed.killedBy === 'budget' || observed.errorCode === 'ETIMEDOUT') records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'timeout' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'the gate ran past its 180 s local budget - run it on the build line, or register it as cannot-decide on this machine', evidence: script + ' killed at the 180 s budget' }))
   else if (status === 0) records.push(base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms }))
   else if (status === 2) {
     // The family's CLI convention is 0 = pass / 1 = fail / 2 = CANNOT DECIDE. Collapsing 2 into

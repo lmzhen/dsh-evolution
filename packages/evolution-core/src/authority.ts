@@ -38,8 +38,10 @@ export async function authorityHolder(home: string): Promise<{ readonly pid: num
     const raw = await readFile(join(home, '.authority', 'home.lock'), 'utf8')
     const pid = Number.parseInt(raw.trim(), 10)
     return Number.isInteger(pid) && pid > 0 ? { pid } : undefined
-  } catch {
-    return undefined
+  } catch (error) {
+    // ENOENT means free; anything else means we could not read the lock and must not call it free.
+    if ((error as { code?: unknown }).code === 'ENOENT') return undefined
+    throw error
   }
 }
 
@@ -255,7 +257,8 @@ export class HomeAuthority {
       const raw = await readFile(lockPath, 'utf8')
       const pid = Number.parseInt(raw.trim(), 10)
       holder = Number.isInteger(pid) && pid > 0 ? pid : undefined
-    } catch {
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== 'ENOENT') throw error
       holder = undefined
     }
     if (holder !== undefined && holder !== process.pid && isProcessAlive(holder)) return 'noop'
