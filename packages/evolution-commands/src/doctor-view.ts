@@ -397,6 +397,23 @@ async function installedFamilyBundles(ctx: Context): Promise<readonly string[]> 
  * @param ctx - the host context.
  * @param extras - call-site facts the context cannot answer (runs, host version, install form).
  */
+/**
+ * Services that exist but answer `degraded`: they are reported in the SAME platform-services row as
+ * a missing one, with the reason attached. A registered service whose reads are silently empty (the
+ * old projection-port fallback) looked healthy on this row while every projection unit was blank.
+ * @param get - the host's service lookup.
+ * @returns one `name (reason)` note per degraded family service.
+ */
+export function degradedServiceNotes(get: (name: string) => unknown): string[] {
+  const notes: string[] = []
+  const projections = get('evolutionProjections') as { status?: () => string; reason?: () => string | undefined } | undefined
+  if (projections !== undefined && typeof projections.status === 'function' && projections.status() === 'degraded') {
+    const reason = typeof projections.reason === 'function' ? projections.reason() : undefined
+    notes.push('evolutionProjections' + (reason === undefined ? '' : ' (' + reason + ')'))
+  }
+  return notes
+}
+
 export async function assembleDoctorInputs(ctx: Context, extras: {
   readonly runs?: { readonly running: number; readonly orphaned: number } | undefined
   readonly hostVersion?: string | undefined
@@ -441,7 +458,10 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
         : { id: 'M3', evidence: ['bundle dsh-evolution-host installed'], confidence: 'declared' }
       : { id: 'M3', evidence: ['no family bundle was reported by the platform manager'], confidence: 'inferred' }
   const platformVersion = hostRuntimeVersion()
-  const missingServices = SERVICES_PROBED.filter(name => get(name) === undefined)
+  const missingServices = [
+    ...SERVICES_PROBED.filter(name => get(name) === undefined),
+    ...degradedServiceNotes((name) => get(name)),
+  ]
   const host = hostSurface(ctx)
   const hostMounted = host.available
   return {

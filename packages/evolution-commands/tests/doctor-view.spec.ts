@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { assembleDoctorInputs, buildDoctorView, pairingOf, unavailableDoctorView, type DoctorInputs } from '../src/doctor-view.ts'
+import { assembleDoctorInputs, buildDoctorView, degradedServiceNotes, pairingOf, unavailableDoctorView, type DoctorInputs } from '../src/doctor-view.ts'
 
 const AVAILABLE: ChannelState = { kind: 'available', provider: 'spawn' }
 const UNAVAILABLE: ChannelState = { kind: 'unavailable', code: 'E-323', reason: 'agentPresets not mounted' }
@@ -132,6 +132,20 @@ describe('buildDoctorView: unreadable providers become named rows, never silence
     expect(row(unknown, 'platform-pairing').status).toBe('unknown')
   })
 
+  it('reports a DEGRADED family service in the platform-services row (W9-g3)', () => {
+    // A registered service whose reads are silently empty used to look healthy on this row.
+    expect(degradedServiceNotes(() => undefined)).toEqual([])
+    expect(degradedServiceNotes(name => (name === 'evolutionProjections' ? { status: () => 'ready' } : undefined))).toEqual([])
+    expect(degradedServiceNotes(name => (name === 'evolutionProjections'
+      ? { status: () => 'degraded', reason: () => 'port shape not recognised' }
+      : undefined))).toEqual(['evolutionProjections (port shape not recognised)'])
+    expect(degradedServiceNotes(name => (name === 'evolutionProjections' ? { status: () => 'degraded' } : undefined))).toEqual(['evolutionProjections'])
+    // The visible half: the note reaches the row's detail.
+    const view = buildDoctorView(inputs({ missingServices: ['evolutionProjections (port shape not recognised)'] }))
+    const row = view.runtime.find(entry => entry.key === 'platform-services')
+    expect(row?.status).toBe('warn')
+    expect(row?.detail).toContain('port shape not recognised')
+  })
   it('derives the pairing verdict from the platform line', () => {
     // W9-g9 A2: equality-only comparison reported an OLDER host as host-newer and left
     // out-of-window unreachable. The derivation is pure, so it is tested directly.

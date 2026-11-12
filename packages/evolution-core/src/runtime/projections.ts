@@ -53,6 +53,15 @@ export class EvolutionProjections extends Service {
       partial.reads = await port.register(evolutionReadsProjection)
       partial.history = await port.register(evolutionProjectionHistoryProjection)
       partial.signals = await port.register(evolutionSignalsProjection)
+      if (port.shape === 'unrecognised') {
+        // A registered service whose reads are silently empty is DEGRADED, not "no projection data":
+        // roll the registrations back and say why (audit 06-P1).
+        for (const handle of Object.values(partial).reverse()) {
+          try { await handle.dispose() } catch { /* best-effort rollback */ }
+        }
+        this.markDegraded('projection port shape not recognised: ' + (port.reason ?? 'no reason reported'))
+        return
+      }
       this.handles = partial as Handles
     } catch (error) {
       for (const handle of Object.values(partial).reverse()) {

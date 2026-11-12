@@ -25,7 +25,7 @@ describe('persisted write inventory (B3 / G4)', () => {
     const ids = persistedWriteSites().map(site => site.id)
     expect(new Set(ids).size).toBe(ids.length)
     for (const site of persistedWriteSites()) {
-      expect(['transact', 'write-lock', 'instance-claim']).toContain(site.serializedBy)
+      expect(['transact', 'write-lock', 'instance-claim', 'platform-file-lock']).toContain(site.serializedBy)
       expect(site.note.length).toBeGreaterThan(0)
     }
   })

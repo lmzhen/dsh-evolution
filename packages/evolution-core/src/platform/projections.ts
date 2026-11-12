@@ -1,10 +1,10 @@
 /**
  * The session-projection half of the family's host platform boundary.
  *
- * The target 0.2.2 registry returns an awaitable callable-thenable handle;
- * the 0.2.1 registry returns a disposer function and reads through
- * registry.stateOf. Both forms are adapted here; the legacy branch is deleted
- * when platform-line moves to 0.2.2.
+ * The platform moved this port from "a disposer plus a registry read" to an awaitable handle. Both
+ * are accepted here, and the port NAMES which shape it found: an unrecognised shape used to fall
+ * through to the legacy read and return undefined for every unit without an error (audit 06-P1),
+ * which reads as "the sessions have no projection data" instead of "this build cannot read them".
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ZodType } from 'zod'
@@ -25,7 +25,14 @@ export interface ProjectionHandleLike<S> {
   dispose(): Promise<void>
 }
 
+/** Which registration contract the live registry speaks. */
+export type ProjectionPortShape = 'handle' | 'legacy' | 'unrecognised'
+
 export interface ProjectionPort {
+  /** The shape this port adapted to; `unrecognised` means reads will be empty and why. */
+  readonly shape: ProjectionPortShape
+  /** Why the port is `unrecognised`; absent while a usable shape was found. */
+  readonly reason?: string | undefined
   register<K extends string, S>(definition: EvolutionProjectionDefinition<K, S>): Promise<ProjectionHandleLike<S>>
 }
 
@@ -34,36 +41,52 @@ interface LegacyRegistry {
   stateOf?(session: Session, key: string): unknown
 }
 
-function isCallableThenable(value: unknown): value is PromiseLike<unknown> {
-  return typeof value === 'function' && typeof (value as { then?: unknown }).then === 'function'
-}
+const isThenable = (value: unknown): value is PromiseLike<unknown> =>
+  // A callable-thenable is a FUNCTION with \	hen\ (the deprecated shape); a plain Promise is an
+  // object. Both must be awaited, or the callable one falls into the legacy branch by accident.
+  (typeof value === 'object' || typeof value === 'function') && value !== null && typeof (value as { then?: unknown }).then === 'function'
+
+const isHandle = (value: unknown): value is { stateOf(session: Session): unknown; dispose(): Promise<void> } =>
+  value !== null && typeof value === 'object'
+  && typeof (value as { stateOf?: unknown }).stateOf === 'function'
+  && typeof (value as { dispose?: unknown }).dispose === 'function'
 
 /** Resolve the projection port; undefined means the host has no projection registry. */
 export function projectionPort(ctx: Context): ProjectionPort | undefined {
   // platform-declaration anchor: sessionProjections is declared in core PLATFORM_SERVICE_PROBES.
   const registry = ctx.get('sessionProjections') as LegacyRegistry | undefined
   if (registry === undefined) return undefined
+  let shape: ProjectionPortShape = 'unrecognised'
+  let reason: string | undefined = 'sessionProjections.register has not answered yet'
   return {
+    get shape() { return shape },
+    get reason() { return shape === 'unrecognised' ? reason : undefined },
     async register<K extends string, S>(definition: EvolutionProjectionDefinition<K, S>): Promise<ProjectionHandleLike<S>> {
       const raw = registry.register(definition)
-      if (isCallableThenable(raw)) {
-        const resolved = await raw as unknown
-        if (resolved !== null && typeof resolved === 'object' && typeof (resolved as { stateOf?: unknown }).stateOf === 'function') {
-          const handle = resolved as {
-            stateOf(session: Session): unknown
-            dispose(): Promise<void>
-          }
-          return {
-            stateOf: (session) => handle.stateOf(session) as S | undefined,
-            dispose: () => handle.dispose(),
-          }
+      // A callable-thenable and a plain Promise are the same contract from the caller's side.
+      const resolved = isThenable(raw) ? await raw : raw
+      if (isHandle(resolved)) {
+        shape = 'handle'
+        reason = undefined
+        return {
+          stateOf: (session) => resolved.stateOf(session) as S | undefined,
+          dispose: () => resolved.dispose(),
         }
       }
-      const dispose = raw as () => void
-      return {
-        stateOf: (session) => registry.stateOf?.(session, definition.key) as S | undefined,
-        dispose: async () => { dispose() },
+      if (resolved === raw && typeof raw === 'function' && typeof registry.stateOf === 'function') {
+        shape = 'legacy'
+        reason = undefined
+        return {
+          stateOf: (session) => registry.stateOf?.(session, definition.key) as S | undefined,
+          dispose: async () => { (raw as () => void)() },
+        }
       }
+      // Neither contract: keep reads empty, but say so through `shape`/`reason` instead of
+      // pretending the units have no data.
+      shape = 'unrecognised'
+      reason = 'sessionProjections.register returned ' + (resolved === null ? 'null' : typeof resolved)
+        + ' with neither a projection handle nor a legacy disposer'
+      return { stateOf: () => undefined, dispose: async () => {} }
     },
   }
 }

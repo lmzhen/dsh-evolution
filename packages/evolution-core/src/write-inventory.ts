@@ -43,7 +43,9 @@ export interface PersistedWriteSite {
 }
 
 const SITES_URL = new URL('../persisted-write-inventory.json', import.meta.url)
-const SERIALIZATIONS: readonly string[] = ['transact', 'write-lock', 'instance-claim']
+// `platform-file-lock` = the platform's withFileLock (W9-authority): the home lock record is
+// owned by the platform writer, not by the family transact seam, so it is its own serialization kind.
+const SERIALIZATIONS: readonly string[] = ['transact', 'write-lock', 'instance-claim', 'platform-file-lock']
 
 /** One root symbol of the inventory's own legend. `segments` is the path tail the symbol appends to
  * its base (empty for the home itself), and `basedOn` names the symbol it extends. The gate
