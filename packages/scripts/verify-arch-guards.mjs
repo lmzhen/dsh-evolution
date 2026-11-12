@@ -703,7 +703,7 @@ const PLATFORM_GET_BASELINE = new Map([
   ['evolution-curator/src/index.ts', 2],
   ['tool-skill-manage/src/index.ts', 2],
   ['evolution-activity/src/learning-graph/index.ts', 2],
-  ['evolution-state-domain/src/index.ts', 1],
+  ['evolution-state/src/domain/index.ts', 1],
   ['evolution-review/src/index.ts', 9],
   ['evolution-maintenance/src/orchestrate.ts', 1],
   ['evolution-maintenance/src/enrichment.ts', 1],

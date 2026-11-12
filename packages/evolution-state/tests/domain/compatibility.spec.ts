@@ -3,7 +3,7 @@
  * dropping a table entry, or declaring both `compatibleVersions` and `layout` turns this red - which is
  * what "声明缺省即红" means for a surface whose absence used to be silent. */
 import { expect, it } from 'vitest'
-import { EVOLUTION_DOMAIN, EVOLUTION_DOMAIN_COMPATIBILITY } from '../src/index.ts'
+import { EVOLUTION_DOMAIN, EVOLUTION_DOMAIN_COMPATIBILITY } from '../../src/domain/index.ts'
 
 it('G2b/2b.4: every declared table carries an invalid-record tier, and the version axis is declared', () => {
   const declared = EVOLUTION_DOMAIN_COMPATIBILITY

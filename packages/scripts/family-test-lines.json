@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-12T14:37:22.306Z",
-  "tree": "42272606",
+  "measuredAt": "2026-11-12T14:38:55.675Z",
+  "tree": "bcb33f17",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -1374,94 +1374,94 @@
       "owner": "evolution-skill-discovery"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/domain-state.spec.ts",
+      "spec": "packages/evolution-state/tests/domain/domain-state.spec.ts",
       "id": "@deepseek-ai/dsh-storage",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:1",
+      "reasonRef": "packages/evolution-state/tests/domain/domain-state.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
+      "owner": "evolution-state"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/domain-state.spec.ts",
+      "spec": "packages/evolution-state/tests/domain/domain-state.spec.ts",
       "id": "@deepseek-ai/dsh-storage-json",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:1",
+      "reasonRef": "packages/evolution-state/tests/domain/domain-state.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
+      "owner": "evolution-state"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/domain-state.spec.ts",
+      "spec": "packages/evolution-state/tests/domain/domain-state.spec.ts",
       "id": "@deepseek-ai/dsh-storage-domain",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain-state.spec.ts:1",
+      "reasonRef": "packages/evolution-state/tests/domain/domain-state.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
+      "owner": "evolution-state"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/domain.spec.ts",
+      "spec": "packages/evolution-state/tests/domain/domain.spec.ts",
       "id": "@deepseek-ai/dsh-storage",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain.spec.ts:1",
+      "reasonRef": "packages/evolution-state/tests/domain/domain.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
+      "owner": "evolution-state"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/domain.spec.ts",
+      "spec": "packages/evolution-state/tests/domain/domain.spec.ts",
       "id": "@deepseek-ai/dsh-storage-json",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain.spec.ts:1",
+      "reasonRef": "packages/evolution-state/tests/domain/domain.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
+      "owner": "evolution-state"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/domain.spec.ts",
+      "spec": "packages/evolution-state/tests/domain/domain.spec.ts",
       "id": "@deepseek-ai/dsh-storage-domain",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/domain.spec.ts:1",
+      "reasonRef": "packages/evolution-state/tests/domain/domain.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
+      "owner": "evolution-state"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/provider-consistency.spec.ts",
+      "spec": "packages/evolution-state/tests/domain/provider-consistency.spec.ts",
       "id": "@deepseek-ai/dsh-storage",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/provider-consistency.spec.ts:1",
+      "reasonRef": "packages/evolution-state/tests/domain/provider-consistency.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
+      "owner": "evolution-state"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/provider-consistency.spec.ts",
+      "spec": "packages/evolution-state/tests/domain/provider-consistency.spec.ts",
       "id": "@deepseek-ai/dsh-storage-json",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/provider-consistency.spec.ts:1",
+      "reasonRef": "packages/evolution-state/tests/domain/provider-consistency.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
+      "owner": "evolution-state"
     },
     {
-      "spec": "packages/evolution-state-domain/tests/provider-consistency.spec.ts",
+      "spec": "packages/evolution-state/tests/domain/provider-consistency.spec.ts",
       "id": "@deepseek-ai/dsh-storage-domain",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",
-      "reasonRef": "packages/evolution-state-domain/tests/provider-consistency.spec.ts:1",
+      "reasonRef": "packages/evolution-state/tests/domain/provider-consistency.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-state-domain"
+      "owner": "evolution-state"
     },
     {
       "spec": "packages/memory/tests/files/memory-budget-surfaces.spec.ts",

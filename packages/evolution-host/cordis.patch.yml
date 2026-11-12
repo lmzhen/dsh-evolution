@@ -29,7 +29,7 @@
     - id: evolution-state-storage
       name: '@deepseek-ai/dsh-evolution-state/storage'
     - id: evolution-state-domain
-      name: '@deepseek-ai/dsh-evolution-state-domain'
+      name: '@deepseek-ai/dsh-evolution-state/domain'
       # G8-B2: shipped default. The platform base bundle mounts the storage-domain
       # facility over its json backend, so this provider registers the KV domain
       # without the family owning a second file medium.

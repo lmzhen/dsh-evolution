@@ -6,8 +6,8 @@ import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
 import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state/storage'
 import { PENDING_TABLE, REVIEW_STATE_SESSION_CAP } from '@deepseek-ai/dsh-evolution-state'
-import * as DomainState from '../src/index.ts'
-import { tempRoot } from '../../test-support/temp-home.ts'
+import * as DomainState from '../../src/domain/index.ts'
+import { tempRoot } from '../../../test-support/temp-home.ts'
 
 // Every case mounts the upstream storage domain (Storage + DomainFacility), which
 // is slow enough that the 5s default times out under a full-suite pool — the same

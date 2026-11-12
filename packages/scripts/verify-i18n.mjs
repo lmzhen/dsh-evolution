@@ -75,7 +75,7 @@ const catalogPackages = new Set(Object.keys(pluginMeta.messages ?? {}).map(key =
 // Moving their metadata into the host package's locale tree (and teaching the resolver about it)
 // is one batched migration — designs/W9-structure.md §9 owns it — so these directories are
 // neither required nor orphaned until then.
-const MERGED_AWAY = new Set(['evolution-contract', 'evolution-io', 'evolution-io-node', 'evolution-authority', 'evolution-policy', 'evolution-state-storage', 'evolution-state-json', 'evolution-skill-catalog', 'skill-usage', 'memory-files', 'tool-memory', 'evolution-feedback', 'evolution-replay', 'evolution-learning-graph', 'evolution-threat'])
+const MERGED_AWAY = new Set(['evolution-contract', 'evolution-io', 'evolution-io-node', 'evolution-authority', 'evolution-policy', 'evolution-state-storage', 'evolution-state-json', 'evolution-skill-catalog', 'skill-usage', 'memory-files', 'tool-memory', 'evolution-feedback', 'evolution-replay', 'evolution-learning-graph', 'evolution-threat', 'evolution-state-domain'])
 for (const directory of MERGED_AWAY) catalogPackages.delete(directory)
 const published = publishableDirs(EVOLUTION_ROOT)
 const missingRows = published.filter(directory => !catalogPackages.has(directory))

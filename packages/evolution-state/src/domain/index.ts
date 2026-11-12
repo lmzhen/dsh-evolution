@@ -35,7 +35,7 @@ import {
   type PendingResolution,
   type PendingStatus,
   type ReviewStateRecord,
-} from '@deepseek-ai/dsh-evolution-state'
+} from '../index.ts'
 
 export const name = 'evolution-state-domain'
 export const inject = ['evolutionStateStorage', 'storageDomain']

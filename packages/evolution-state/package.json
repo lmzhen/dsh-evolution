@@ -23,7 +23,12 @@
     "./storage": {
       "types": "./lib/types/storage.d.ts",
       "default": "./lib/storage.js"
-    }
+    },
+    "./domain": {
+      "types": "./lib/types/domain/index.d.ts",
+      "default": "./lib/domain/index.js"
+    },
+    "./domain/locale/*.json": "./locale/domain/*.json"
   },
   "files": [
     "locale/*.json",

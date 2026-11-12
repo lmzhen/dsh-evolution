@@ -43,7 +43,7 @@ export const HOST_ROW_NAMES = {
   'evolution-io-node': scoped('@deepseek-ai/dsh-evolution-core/io-node'),
   'evolution-authority': scoped('@deepseek-ai/dsh-evolution-core/authority-plugin'),
   'evolution-state-storage': scoped('@deepseek-ai/dsh-evolution-state'),
-  'evolution-state-domain': scoped('@deepseek-ai/dsh-evolution-state-domain'),
+  'evolution-state-domain': scoped('@deepseek-ai/dsh-evolution-state/domain'),
   'evolution-state': scoped('@deepseek-ai/dsh-evolution-state'),
   memory: scoped('@deepseek-ai/dsh-memory'),
   'memory-files': scoped('@deepseek-ai/dsh-memory/files'),

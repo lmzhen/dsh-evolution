@@ -18,7 +18,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import { MutationAuthority } from '@deepseek-ai/dsh-evolution-core'
 import EvolutionState from '@deepseek-ai/dsh-evolution-state'
-import * as DomainState from '@deepseek-ai/dsh-evolution-state-domain'
+import * as DomainState from '@deepseek-ai/dsh-evolution-state/domain'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 
 /**
