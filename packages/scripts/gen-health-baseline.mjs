@@ -15,7 +15,7 @@
  *
  * Usage: node <scripts-dir>/gen-health-baseline.mjs [--out <path>]
  */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { collectCorpusSkills } from './lib-health-corpus.mjs'
@@ -42,6 +42,14 @@ if (typeof engine.buildHealthBaseline !== 'function') {
 const baseline = engine.buildHealthBaseline(skills)
 const text = JSON.stringify(baseline, null, 2) + '\n'
 mkdirSync(dirname(out), { recursive: true })
+// A gate row must be able to VERIFY this artifact without rewriting it: the chain used to
+// regenerate a version-controlled product on every run, so "green" meant "someone just wrote it".
+if (argv.includes('--check')) {
+  const existing = existsSync(out) ? readFileSync(out, 'utf8') : ''
+  if (existing === text) { console.log('gen-health-baseline --check: OK (' + out + ')'); process.exit(0) }
+  console.error('gen-health-baseline --check: ' + out + ' is stale — regenerate it deliberately (rerun without --check)')
+  process.exit(1)
+}
 writeFileSync(out, text)
 const face = HERE.split(/[\\/]/).includes('evolution') ? 'overlay' : 'mirror'
 console.log('gen-health-baseline: face=' + face + ' tree=' + TREE + ' corpora=user:' + String(baseline.corpora.user) + '/platform:' + String(baseline.corpora.platform) + ' rules=' + String(Object.keys(baseline.values).length) + ' root(s)=' + roots.map((entry) => entry.corpus + ':' + entry.root).join(',') + ' -> wrote ' + out + ' (' + text.length + ' bytes)')

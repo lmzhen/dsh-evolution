@@ -814,11 +814,12 @@
     {
       "id": "gate-50",
       "kind": "script",
-      "human": "`node packages/scripts/gen-health-baseline.mjs packages`（G4/① 生产者：健康基线语料的**唯一作者**；消费侧缺产物一律 cannot-decide，不许绿色兜底）",
+      "human": "`node packages/scripts/gen-health-baseline.mjs packages --check`（G4/① 生产者：健康基线语料的**唯一作者**；消费侧缺产物一律 cannot-decide，不许绿色兜底）",
       "argv": [
         "node",
         "packages/scripts/gen-health-baseline.mjs",
-        "packages"
+        "packages",
+        "--check"
       ],
       "tree": "mirror",
       "profiles": [
@@ -1495,6 +1496,22 @@
     {
       "id": "ci-only-08",
       "kind": "script",
+      "human": "node packages/evolution/scripts/gen-protection-view.mjs --check",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/gen-protection-view.mjs",
+        "--check"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.45.0"
+    },
+    {
+      "id": "ci-only-09",
+      "kind": "script",
       "human": "node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check",
       "argv": [
         "node",
@@ -1510,7 +1527,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-09",
+      "id": "ci-only-10",
       "kind": "step",
       "human": "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
       "argv": [
@@ -1525,7 +1542,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-10",
+      "id": "ci-only-11",
       "kind": "step",
       "human": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
       "argv": [
@@ -1544,7 +1561,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-11",
+      "id": "ci-only-12",
       "kind": "step",
       "human": "node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json",
       "argv": [
@@ -1560,7 +1577,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-12",
+      "id": "ci-only-13",
       "kind": "step",
       "human": "node packages/evolution/scripts/prepare-packed-platform.mjs packages/evolution/dist \"$PLATFORM_VERSION\" | tail -n 1)\"",
       "argv": [
@@ -1579,7 +1596,7 @@
       "expiry": "0.45.0"
     },
     {
-      "id": "ci-only-13",
+      "id": "ci-only-14",
       "kind": "step",
       "human": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
       "argv": [
@@ -1593,7 +1610,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-14",
+      "id": "ci-only-15",
       "kind": "step",
       "human": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
       "argv": [
@@ -1608,7 +1625,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-15",
+      "id": "ci-only-16",
       "kind": "step",
       "human": "node packages/evolution/scripts/requirements.selftest.mjs",
       "argv": [
@@ -1621,7 +1638,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-16",
+      "id": "ci-only-17",
       "kind": "step",
       "human": "node packages/evolution/scripts/run-load-sensitive.mjs .",
       "argv": [
@@ -1635,7 +1652,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-17",
+      "id": "ci-only-18",
       "kind": "step",
       "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules \"$PLATFORM_DIR\"",
       "argv": [
@@ -1651,7 +1668,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-18",
+      "id": "ci-only-19",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-core-surface.mjs packages/evolution",
       "argv": [
@@ -1667,7 +1684,7 @@
       "expiry": "0.45.0"
     },
     {
-      "id": "ci-only-19",
+      "id": "ci-only-20",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-exemptions.mjs packages/evolution",
       "argv": [
@@ -1683,7 +1700,7 @@
       "expiry": "0.45.0"
     },
     {
-      "id": "ci-only-20",
+      "id": "ci-only-21",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
       "argv": [
@@ -1702,7 +1719,7 @@
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
     },
     {
-      "id": "ci-only-21",
+      "id": "ci-only-22",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
       "argv": [
@@ -1718,7 +1735,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-22",
+      "id": "ci-only-23",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
       "argv": [
@@ -1734,7 +1751,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-23",
+      "id": "ci-only-24",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-test-lines.mjs packages/evolution --strict",
       "argv": [

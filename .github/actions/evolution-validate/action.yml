@@ -383,6 +383,9 @@ runs:
         node packages/evolution/scripts/verify-error-codes.mjs packages/evolution
         # G4.1/C5: the package map must name exactly what the tree publishes.
         node packages/evolution/scripts/verify-exemptions.mjs packages/evolution
+        # G7-f: a row that cannot execute is only acceptable while it carries a registration;
+        # 109 rows collapse to 82 distinct protections, and that number is now derived, not asserted.
+        node packages/evolution/scripts/gen-protection-view.mjs --check
         node packages/evolution/scripts/verify-package-map.mjs packages/evolution
         # G6-②: profile-patch writes must call the platform HMR lock (and keep its degrade shape).
         node packages/evolution/scripts/verify-lock-usage.mjs packages/evolution

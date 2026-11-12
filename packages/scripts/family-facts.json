@@ -598,7 +598,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "cd446fc9fc34b40b44bd9cedff79b72fa79c7d6f6ef55fa99a3f5a4eb214a919",
+        "sha256": "46ffc4b74ddf04042382114d2c5db6603da1c71a08c34957a48862373b16e8b7",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1067,80 +1067,85 @@
           {
             "id": "ci-only-08",
             "tier": "ci-only",
-            "criterion": "gen-requirements"
+            "criterion": "gen-protection-view"
           },
           {
             "id": "ci-only-09",
-            "tier": "unmapped",
-            "criterion": "inject-evolution-paths"
+            "tier": "ci-only",
+            "criterion": "gen-requirements"
           },
           {
             "id": "ci-only-10",
             "tier": "unmapped",
-            "criterion": "install-layered"
+            "criterion": "inject-evolution-paths"
           },
           {
             "id": "ci-only-11",
             "tier": "unmapped",
-            "criterion": "lib-line-header"
+            "criterion": "install-layered"
           },
           {
             "id": "ci-only-12",
             "tier": "unmapped",
-            "criterion": "prepare-packed-platform"
+            "criterion": "lib-line-header"
           },
           {
             "id": "ci-only-13",
             "tier": "unmapped",
-            "criterion": "prepare-release"
+            "criterion": "prepare-packed-platform"
           },
           {
             "id": "ci-only-14",
             "tier": "unmapped",
-            "criterion": "publish-scoped"
+            "criterion": "prepare-release"
           },
           {
             "id": "ci-only-15",
             "tier": "unmapped",
-            "criterion": "requirements.selftest"
+            "criterion": "publish-scoped"
           },
           {
             "id": "ci-only-16",
             "tier": "unmapped",
-            "criterion": "run-load-sensitive"
+            "criterion": "requirements.selftest"
           },
           {
             "id": "ci-only-17",
             "tier": "unmapped",
-            "criterion": "smoke-packed-install"
+            "criterion": "run-load-sensitive"
           },
           {
             "id": "ci-only-18",
-            "tier": "ci-only",
-            "criterion": "verify-core-surface"
+            "tier": "unmapped",
+            "criterion": "smoke-packed-install"
           },
           {
             "id": "ci-only-19",
             "tier": "ci-only",
-            "criterion": "verify-exemptions"
+            "criterion": "verify-core-surface"
           },
           {
             "id": "ci-only-20",
             "tier": "ci-only",
-            "criterion": "verify-layout-sync"
+            "criterion": "verify-exemptions"
           },
           {
             "id": "ci-only-21",
             "tier": "ci-only",
-            "criterion": "verify-probes"
+            "criterion": "verify-layout-sync"
           },
           {
             "id": "ci-only-22",
             "tier": "ci-only",
-            "criterion": "verify-requirements"
+            "criterion": "verify-probes"
           },
           {
             "id": "ci-only-23",
+            "tier": "ci-only",
+            "criterion": "verify-requirements"
+          },
+          {
+            "id": "ci-only-24",
             "tier": "ci-only",
             "criterion": "verify-test-lines"
           },
@@ -1186,7 +1191,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 109,
+            "rowsWithoutIt": 110,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -1195,13 +1200,13 @@
         "pendingAxes": [
           {
             "axis": "executability",
-            "rows": 23,
+            "rows": 24,
             "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags)"
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action"
           },
           {
             "axis": "expiry-due",
@@ -1214,13 +1219,13 @@
           },
           {
             "axis": "falsifiability-carrier",
-            "rows": 4,
+            "rows": 5,
             "reason": "three rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row"
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition"
           },
           {
             "axis": "mutation-coverage",
@@ -2195,12 +2200,6 @@
             "owner": "scripts"
           },
           {
-            "id": "ci-only-09",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-09",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
             "id": "ci-only-10",
             "reasonRef": "scripts/gate-manifest.json#ci-only-10",
             "expiry": "0.26.0",
@@ -2245,6 +2244,12 @@
           {
             "id": "ci-only-17",
             "reasonRef": "scripts/gate-manifest.json#ci-only-17",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-18",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-18",
             "expiry": "0.26.0",
             "owner": "scripts"
           }
@@ -2493,7 +2498,7 @@
             "key": "node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check",
             "ids": [
               "gate-66",
-              "ci-only-08"
+              "ci-only-09"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2503,7 +2508,7 @@
             "key": "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
             "ids": [
               "gate-67",
-              "ci-only-09"
+              "ci-only-10"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2513,7 +2518,7 @@
             "key": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
             "ids": [
               "gate-68",
-              "ci-only-10"
+              "ci-only-11"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2523,7 +2528,7 @@
             "key": "node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json",
             "ids": [
               "gate-69",
-              "ci-only-11"
+              "ci-only-12"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2533,7 +2538,7 @@
             "key": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
             "ids": [
               "gate-70",
-              "ci-only-13"
+              "ci-only-14"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2543,7 +2548,7 @@
             "key": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
             "ids": [
               "gate-71",
-              "ci-only-14"
+              "ci-only-15"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2553,7 +2558,7 @@
             "key": "node packages/evolution/scripts/requirements.selftest.mjs",
             "ids": [
               "gate-72",
-              "ci-only-15"
+              "ci-only-16"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2563,7 +2568,7 @@
             "key": "node packages/evolution/scripts/run-load-sensitive.mjs .",
             "ids": [
               "gate-73",
-              "ci-only-16"
+              "ci-only-17"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2573,7 +2578,7 @@
             "key": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
             "ids": [
               "gate-75",
-              "ci-only-20"
+              "ci-only-21"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2583,7 +2588,7 @@
             "key": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
             "ids": [
               "gate-76",
-              "ci-only-21"
+              "ci-only-22"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2593,7 +2598,7 @@
             "key": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
             "ids": [
               "gate-77",
-              "ci-only-22"
+              "ci-only-23"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "packages/scripts/gen-protection-view.mjs",
+  "generatedAt": "2026-11-12T04:04:34.373Z",
+  "rows": 109,
+  "distinctProtections": 82,
+  "noIndependentProtection": 24,
+  "duplicateGroups": 2,
+  "rowsInDuplicateGroups": 5,
+  "unexecutable": [
+    "gate-33",
+    "gate-59",
+    "gate-60",
+    "gate-61",
+    "gate-62",
+    "gate-63",
+    "gate-64",
+    "gate-65",
+    "gate-66",
+    "gate-67",
+    "gate-68",
+    "gate-69",
+    "gate-70",
+    "gate-71",
+    "gate-72",
+    "gate-73",
+    "gate-74",
+    "gate-75",
+    "gate-76",
+    "gate-77",
+    "gate-78",
+    "gate-79",
+    "gate-80",
+    "gate-81"
+  ],
+  "duplicates": [
+    {
+      "key": "script:packages/scripts/verify-line-identity.mjs",
+      "ids": [
+        "gate-23",
+        "line-identity-ci",
+        "line-identity-bed"
+      ]
+    },
+    {
+      "key": "script:packages/scripts/verify-graph-edges.mjs",
+      "ids": [
+        "gate-45",
+        "graph-edges-live"
+      ]
+    }
+  ]
+}
