@@ -22,6 +22,27 @@ import { dirname, join } from 'node:path'
 import { withFileLock as platformFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { isProcessAlive } from './io.ts'
 
+/** The lock handle a serialized body receives; `release` is a no-op when a scope owns it. */
+export interface TreeLock {
+  readonly token: string
+  readonly epoch: number
+  readonly path: string
+  readonly acquiredAt: number
+  release(): Promise<void>
+  assertHeld(): Promise<boolean>
+}
+
+/** Who holds the home lock right now, for doctor rows; `undefined` means free or unreadable. */
+export async function authorityHolder(home: string): Promise<{ readonly pid: number } | undefined> {
+  try {
+    const raw = await readFile(join(home, '.authority', 'home.lock'), 'utf8')
+    const pid = Number.parseInt(raw.trim(), 10)
+    return Number.isInteger(pid) && pid > 0 ? { pid } : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** The write scopes the family serializes. `tree` is the outer scope, `state` the inner one. */
 export type LockScope = 'tree' | 'state'
 
@@ -241,5 +262,17 @@ export class HomeAuthority {
     await rm(lockPath, { force: true })
     this.pending = undefined
     return 'repaired'
+  }
+}
+
+/** Adapt an authority lease to the `TreeLock` handle older call sites use. */
+export function leaseAsTreeLock(lease: AuthorityLease): TreeLock {
+  return {
+    token: 'authority',
+    epoch: 0,
+    path: 'authority:tree',
+    acquiredAt: Date.now(),
+    assertHeld: async () => lease.assertHeld(),
+    release: async () => { await lease.release() },
   }
 }

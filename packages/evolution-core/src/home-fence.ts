@@ -7,8 +7,7 @@
  * release is recorded on the authority instead of poisoning every later writer.
  * @module @deepseek-ai/dsh-evolution-core/home-fence
  */
-import { AuthorityBusyError, HomeAuthority, type AuthorityReleaseFailure } from './authority.ts'
-import type { TreeLock } from './tree-lock.ts'
+import { AuthorityBusyError, HomeAuthority, type AuthorityReleaseFailure, type TreeLock } from './authority.ts'
 
 export interface HomeFenceOptions {
   /** Evolution home; the authority's lock lives under `<home>/.authority/`. */

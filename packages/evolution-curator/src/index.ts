@@ -47,7 +47,7 @@ import { type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core/skills'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillActionResult } from '@deepseek-ai/dsh-evolution-core/skills'
 import { DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core/skills'
-import { INSTANCE_KEYS, acquireTreeWriteLock, claimInstance, contentHash, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { INSTANCE_KEYS, HomeAuthority, claimInstance, contentHash, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { entryTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
 import { WriteAnchor } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -1044,15 +1044,8 @@ export class EvolutionCurator extends Service {
   /** Cross-process tree lock shared with merge runs; curator mutations take it only around apply. */
   private async withMergeTreeLock<T>(body: () => Promise<T>): Promise<T> {
     if (this.homeFence !== undefined) return await this.homeFence.run(body)
-    const acquired = await acquireTreeWriteLock({ io: this.io, home: evolutionHome() })
-    if (!acquired.ok) {
-      throw new Error('evolution-curator: merge tree lock unavailable (' + acquired.reason + ')' + (acquired.holder === undefined ? '' : '; holder pid ' + String(acquired.holder.pid)))
-    }
-    try {
-      return await body()
-    } finally {
-      await acquired.lock.release()
-    }
+    const authority = new HomeAuthority({ home: evolutionHome() })
+    return await authority.runExclusive('tree', body)
   }
 
   private acquireMutex(): Promise<() => void> {

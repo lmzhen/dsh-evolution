@@ -1,7 +1,7 @@
 /** G2 opaque UnitTransaction. Core owns prepare/commit/verify/rollback lifecycle. */
 import { createHash } from "node:crypto";
 import type { EvolutionIoLike, SkillLimits } from '@deepseek-ai/dsh-evolution-core';
-import { acquireTreeWriteLock, type TreeLock } from '@deepseek-ai/dsh-evolution-core';
+import { HomeAuthority, leaseAsTreeLock, type AuthorityLease, type TreeLock } from '@deepseek-ai/dsh-evolution-core';
 import type { HomeFence, HomeFenceLease } from '@deepseek-ai/dsh-evolution-core';
 import {
   readUnitEvidence,
@@ -293,9 +293,11 @@ export class MergeUnitTransactions implements UnitTransaction {
         lock = fenceLease.lock;
         this.options.onLock?.("tree");
       } else {
-        const acquired = await acquireTreeWriteLock({ io: this.options.io, home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
-        if (!acquired.ok) return { ok: false as const, code: "unit-fence-failed" as const, message: acquired.message ?? acquired.reason };
-        lock = acquired.lock;
+        const fallback = new HomeAuthority({ home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
+        const fallbackLease: AuthorityLease | undefined = await fallback.lease("tree").catch(() => undefined);
+        if (fallbackLease === undefined) return { ok: false as const, code: "unit-fence-failed" as const, message: "tree lock unavailable" };
+        fenceLease = { lock: leaseAsTreeLock(fallbackLease), release: async () => { await fallbackLease.release() } };
+        lock = fenceLease.lock
         this.options.onLock?.("tree");
       }
       if (!(await lock.assertHeld())) return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost" };
@@ -601,9 +603,11 @@ export class MergeUnitTransactions implements UnitTransaction {
         fenceLease = await this.options.fence.acquire()
         lock = fenceLease.lock
       } else {
-        const acquired = await acquireTreeWriteLock({ io: this.options.io, home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
-        if (!acquired.ok) return { ok: false as const, code: "unit-fence-failed" as const, message: acquired.message ?? acquired.reason };
-        lock = acquired.lock
+        const fallback = new HomeAuthority({ home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
+        const fallbackLease: AuthorityLease | undefined = await fallback.lease("tree").catch(() => undefined);
+        if (fallbackLease === undefined) return { ok: false as const, code: "unit-fence-failed" as const, message: "tree lock unavailable" };
+        fenceLease = { lock: leaseAsTreeLock(fallbackLease), release: async () => { await fallbackLease.release() } };
+        lock = fenceLease.lock
       }
       this.options.onLock?.("tree");
       if (!(await lock.assertHeld()))

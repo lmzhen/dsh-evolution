@@ -7,7 +7,7 @@ import { readTextOrNull } from './domain/read-probe.ts'
 import { createHash } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { probeList, readTreeLock, runsFile, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { authorityHolder, probeList, runsFile, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { readUnitJournal } from '@deepseek-ai/dsh-evolution-core/write'
 import { migrationJournalPath, migrationReportPath, v2BackupPath } from './domain/state-bootstrap.ts'
 import { readMergeSnapshot } from './domain/merge-snapshot.ts'
@@ -102,8 +102,8 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
   let quarantineCount = 0
   try { const qraw = await io.readText(join(home, 'merge', 'merge-state.quarantine.json')); if (qraw !== null) { const parsed = JSON.parse(qraw) as unknown; quarantineCount = Array.isArray(parsed) ? parsed.length : 0 } } catch { quarantineCount = -1 }
   rows.push({ key: 'quarantine', label: 'quarantine', status: quarantineCount < 0 ? 'unknown' : quarantineCount === 0 ? 'ok' : 'warn', detail: quarantineCount < 0 ? 'quarantine 不可读' : quarantineCount + ' 行待人工检查' })
-  const holder = await readTreeLock(io, home).catch(() => null)
-  rows.push({ key: 'tree-lock', label: 'tree lock', status: holder == null ? 'ok' : 'warn', detail: holder == null ? 'free' : 'holder pid=' + String(holder.pid) + ' epoch=' + String(holder.epoch) + ' token=' + holder.token.slice(0, 8) })
+  const holder = await authorityHolder(home).catch(() => null)
+  rows.push({ key: 'tree-lock', label: 'tree lock', status: holder == null ? 'ok' : 'warn', detail: holder == null ? 'free' : 'holder pid=' + String(holder.pid) })
   const backupPath = v2BackupPath(home)
   const backupRaw = await readTextOrNull(io, backupPath)
   const backupMode = await stat(backupPath).then(value => value.mode).catch(() => null)

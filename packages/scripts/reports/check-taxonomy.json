@@ -112,7 +112,6 @@
         "evolution-core::tests/hard-cap-event.spec.ts",
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/home-fence.spec.ts",
-        "evolution-core::tests/home-owner.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
         "evolution-core::tests/learn-prompt.spec.ts",
         "evolution-core::tests/lease-store.spec.ts",
@@ -405,7 +404,6 @@
         "evolution-core::tests/hard-cap-event.spec.ts",
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/home-fence.spec.ts",
-        "evolution-core::tests/home-owner.spec.ts",
         "evolution-core::tests/host-routes.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
         "evolution-core::tests/io.spec.ts",
@@ -485,8 +483,6 @@
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
         "evolution-core::tests/threats.spec.ts",
-        "evolution-core::tests/tree-lock-epoch.spec.ts",
-        "evolution-core::tests/tree-lock.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
         "evolution-core::tests/unit-crash-final.spec.ts",
@@ -1124,7 +1120,6 @@
         "evolution-core::tests/hard-cap-event.spec.ts",
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/home-fence.spec.ts",
-        "evolution-core::tests/home-owner.spec.ts",
         "evolution-core::tests/host-routes.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
         "evolution-core::tests/io.spec.ts",
@@ -1204,8 +1199,6 @@
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
         "evolution-core::tests/threats.spec.ts",
-        "evolution-core::tests/tree-lock-epoch.spec.ts",
-        "evolution-core::tests/tree-lock.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
         "evolution-core::tests/unit-crash-final.spec.ts",
@@ -1769,7 +1762,6 @@
         "evolution-core::tests/hard-cap-event.spec.ts",
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/home-fence.spec.ts",
-        "evolution-core::tests/home-owner.spec.ts",
         "evolution-core::tests/host-routes.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
         "evolution-core::tests/io.spec.ts",
@@ -1852,8 +1844,6 @@
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
         "evolution-core::tests/threats.spec.ts",
-        "evolution-core::tests/tree-lock-epoch.spec.ts",
-        "evolution-core::tests/tree-lock.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
         "evolution-core::tests/unit-crash-final.spec.ts",
@@ -2325,11 +2315,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 102
+      "specs": 101
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 460
+      "specs": 457
     },
     "ci-only": {
       "gates": 14,
@@ -2337,16 +2327,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 460
+      "specs": 457
     },
     "full(ci=on)": {
       "gates": 89,
-      "specs": 533
+      "specs": 530
     }
   },
   "specs": {
-    "total": 533,
-    "marked": 533,
+    "total": 530,
+    "marked": 530,
     "unmarked": 0
   }
 }
