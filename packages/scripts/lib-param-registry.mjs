@@ -32,6 +32,8 @@ const ENTRY_PLAIN = /^ \},$/
 // row appears on) or `why` (the registered reason it has none). It sits after the UI tail when
 // there is one, and directly after the head otherwise, so both endings have two shapes.
 const EXPOSURE_CARD = /, card: '([^']+)' \},$/
+/** G4 ledger: the symbol that reads a declaration whose reader is not named by its id. */
+const EXPOSURE_CONSUMER = /, consumer: '([^']+)'/
 const EXPOSURE_WHY = /, why: '([^']+)' \},$/
 const ALIAS = /^\s*([A-Za-z][A-Za-z0-9]*): '([A-Za-z][A-Za-z0-9]*)',$/
 
@@ -144,10 +146,12 @@ export function readRegistry(root) {
       for (;;) {
         const card = EXPOSURE_CARD.exec(rest)
         const why = EXPOSURE_WHY.exec(rest)
-        const hit = card ?? why
+        const consumer = EXPOSURE_CONSUMER.exec(rest)
+        const hit = card ?? why ?? consumer
         if (hit === null) break
         if (card !== null) exposure.card = card[1]
-        else exposure.why = why[1]
+        else if (why !== null) exposure.why = why[1]
+        else exposure.consumer = consumer[1]
         rest = rest.slice(0, hit.index) + ' },'
       }
       const tail = ENTRY_TAIL.exec(rest)

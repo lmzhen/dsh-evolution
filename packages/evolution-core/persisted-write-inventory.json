@@ -134,16 +134,7 @@
       "serializedBy": "transact",
       "marker": "transactIo(io, path, task)",
       "state": [],
-      "note": "The same activity sidecar through the authority-fence wrapper; the helper is the one transactIo call site."
-    },
-    {
-      "id": "activity-log",
-      "path": "<evolutionHome>/activity.json",
-      "writer": "evolution-activity/src/index.ts",
-      "serializedBy": "transact",
-      "marker": "transactIo(io, activityFile(root)",
-      "state": [],
-      "note": "The plan-applied activity sidecar. Declared by v46 S1.12: the file carried a transactional write that no inventory row vouched for, and the N20 reverse scan is what named it."
+      "note": "Both activity events (plan-applied and review-completed) fold through this ONE fenced writer (W9/02-P1.3); the helper is the one transactIo call site."
     },
     {
       "id": "skill-history-index",

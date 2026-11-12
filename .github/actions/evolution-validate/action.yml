@@ -382,6 +382,8 @@ runs:
         # G4.3/C5: the error-code table and README must be the same set, and the stated range must match.
         node packages/evolution/scripts/verify-error-codes.mjs packages/evolution
         # G4.1/C5: the package map must name exactly what the tree publishes.
+        # G4: a declared parameter must name a reader (or be deleted).
+        node packages/evolution/scripts/verify-param-consumers.mjs packages/evolution
         node packages/evolution/scripts/verify-exemptions.mjs packages/evolution
         # G7-f: a row that cannot execute is only acceptable while it carries a registration;
         # 109 rows collapse to 82 distinct protections, and that number is now derived, not asserted.

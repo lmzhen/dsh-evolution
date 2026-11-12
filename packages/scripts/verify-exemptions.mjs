@@ -39,6 +39,7 @@ const registries = {
   mutationExempt: machine.mutationExempt ?? {},
   pendingAxes: Object.fromEntries((machine.pendingAxes ?? []).map((axis) => [String(axis.axis), axis])),
   cannotDecideRegistered: machine.cannotDecideRegistered ?? {},
+  paramConsumerExempt: machine.paramConsumerExempt ?? {},
 }
 let failures = 0
 let checked = 0

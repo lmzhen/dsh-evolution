@@ -919,6 +919,7 @@
         "ci-only-22",
         "ci-only-23",
         "ci-only-24",
+        "ci-only-25",
         "line-identity-ci"
       ],
       "specs": [
@@ -1645,6 +1646,7 @@
         "ci-only-22",
         "ci-only-23",
         "ci-only-24",
+        "ci-only-25",
         "gate-01",
         "gate-02",
         "gate-03",
@@ -2349,7 +2351,7 @@
       "specs": 463
     },
     "ci-only": {
-      "gates": 16,
+      "gates": 17,
       "specs": 73
     },
     "full(ci=off)": {
@@ -2357,7 +2359,7 @@
       "specs": 463
     },
     "full(ci=on)": {
-      "gates": 91,
+      "gates": 92,
       "specs": 536
     }
   },

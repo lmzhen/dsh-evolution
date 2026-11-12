@@ -30,7 +30,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
-| `protectedSkillNames` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Skills the lifecycle never archives or rewrites. |
+| `protectedSkillNames` | E2 | none | cordis | evolution-policy | — | 无（deployment） | Skills the lifecycle never archives or rewrites. |
 | `manageUnmanaged` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Let curation touch skills with no family metadata. |
 | `pruneBuiltins` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Let curation nominate bundled skills for pruning. |
 | `referencedSkillNames` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Names treated as referenced by external docs (never retired). |
@@ -150,8 +150,6 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `install.basePreset` | E4 | restart | install | scripts | — | 无（install） | Agent-preset base the layered install composes from (--base). |
 | `install.home` | E4 | restart | install | scripts | — | 无（install） | Harness home the installer writes into (--home). |
 | `install.presetRowOverrides` | E4 | restart | install | scripts | — | 无（install） | Preset row overrides the installer injects (row-overrides.json). |
-| `timeout.gateDefault` | E2 | none | install | scripts | — | 无（internal） | Gate budget: the vitest --testTimeout the gate table and the CI step carry (the number lives in testing-policy.timeouts). |
-| `timeout.specDefault` | E2 | none | install | scripts | — | 无（internal） | Local spec budget: the vitest testTimeout the family config generates per leaf tier (the number lives in testing-policy.timeouts). |
 
 ## merge（技能合并）
 

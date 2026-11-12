@@ -598,7 +598,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "46ffc4b74ddf04042382114d2c5db6603da1c71a08c34957a48862373b16e8b7",
+        "sha256": "1761fe17b9fa6fe9728e9304cda37452719737d4c0e7b6ac1afdf12d25b51024",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1137,15 +1137,20 @@
           {
             "id": "ci-only-22",
             "tier": "ci-only",
-            "criterion": "verify-probes"
+            "criterion": "verify-param-consumers"
           },
           {
             "id": "ci-only-23",
             "tier": "ci-only",
-            "criterion": "verify-requirements"
+            "criterion": "verify-probes"
           },
           {
             "id": "ci-only-24",
+            "tier": "ci-only",
+            "criterion": "verify-requirements"
+          },
+          {
+            "id": "ci-only-25",
             "tier": "ci-only",
             "criterion": "verify-test-lines"
           },
@@ -1191,7 +1196,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 110,
+            "rowsWithoutIt": 111,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -1200,13 +1205,13 @@
         "pendingAxes": [
           {
             "axis": "executability",
-            "rows": 24,
+            "rows": 25,
             "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action"
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action | 2026-11-12 re-measured: verify-param-consumers.mjs joined CI"
           },
           {
             "axis": "expiry-due",
@@ -1219,23 +1224,23 @@
           },
           {
             "axis": "falsifiability-carrier",
-            "rows": 5,
+            "rows": 6,
             "reason": "three rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition"
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition | 2026-11-12 re-measured: the consumer ledger adds one axis definition row"
           },
           {
             "axis": "mutation-coverage",
-            "rows": 3,
+            "rows": 5,
             "reason": "the beh-installer-layered probe suite hangs in the local overlay before its green baseline; CI probe owns it | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: decl-platform-contract and beh-installer-layered lack a fresh signature after the W9 script changes (the ledger keeps their stale records; the count is the debt size)"
+            "note": "2026-11-12 re-measured: decl-platform-contract and beh-installer-layered lack a fresh signature after the W9 script changes (the ledger keeps their stale records; the count is the debt size) | 2026-11-12 re-measured: params.ts/doctor-view edits invalidated five probe signatures (beh-doctor-view, decl-platform-contract, decl-configforms-seat, decl-platform-ranges, decl-doc-facts); re-sign on the next probe run"
           }
         ],
         "checkMutations": {
@@ -2588,7 +2593,7 @@
             "key": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
             "ids": [
               "gate-76",
-              "ci-only-22"
+              "ci-only-23"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2598,7 +2603,7 @@
             "key": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
             "ids": [
               "gate-77",
-              "ci-only-23"
+              "ci-only-24"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",

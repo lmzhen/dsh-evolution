@@ -1721,6 +1721,22 @@
     {
       "id": "ci-only-22",
       "kind": "script",
+      "human": "node packages/evolution/scripts/verify-param-consumers.mjs packages/evolution",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-param-consumers.mjs",
+        "packages/evolution"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.45.0"
+    },
+    {
+      "id": "ci-only-23",
+      "kind": "script",
       "human": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
       "argv": [
         "node",
@@ -1735,7 +1751,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-23",
+      "id": "ci-only-24",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
       "argv": [
@@ -1751,7 +1767,7 @@
       "owner": "ci"
     },
     {
-      "id": "ci-only-24",
+      "id": "ci-only-25",
       "kind": "script",
       "human": "node packages/evolution/scripts/verify-test-lines.mjs packages/evolution --strict",
       "argv": [
