@@ -116,7 +116,7 @@ export function readMutationFixture(root, entry) {
     else fixture.edits.forEach((edit, index) => {
       const where = 'edits[' + String(index) + ']'
       if (edit === null || typeof edit !== 'object') { problems.push(where + ' is not an object'); return }
-      if (typeof edit.file !== 'string' || !/^packages\/(evolution|tool-memory|scripts)/.test(edit.file)) problems.push(where + '.file must be under packages/evolution/**, packages/tool-memory/**, or packages/scripts/**')
+      if (typeof edit.file !== 'string' || !/^packages\/(evolution|tool-memory|scripts)/.test(edit.file)) problems.push(where + '.file must be under packages/evolution/**, packages/memory/src/tools/**, or packages/scripts/**')
       else if (resolveLayoutPath(root, edit.file) === null) problems.push(where + '.file does not exist: ' + edit.file)
       if (typeof edit.find !== 'string' || edit.find === '') problems.push(where + '.find must be a non-empty string')
       if (typeof edit.replace !== 'string') problems.push(where + '.replace must be a string')

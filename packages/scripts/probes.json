@@ -117,9 +117,9 @@
       "kind": "beh",
       "owner": "platform-backend-01",
       "files": [
-        "packages/tool-memory/tests/memory-interpolation-contract.spec.ts"
+        "packages/memory/tests/tools/memory-interpolation-contract.spec.ts"
       ],
-      "mutation": "packages/tool-memory/tests/memory-interpolation.mutation.json",
+      "mutation": "packages/memory/tests/tools/memory-interpolation.mutation.json",
       "evidence": "A",
       "note": "memory snapshot and guidance register interpolate:false; stored braces stay verbatim through mount and refresh"
     },
@@ -229,7 +229,7 @@
       "files": [
         "packages/evolution-core/tests/plugin-record-not-dispatch.spec.ts"
       ],
-      "mutation": "packages/skill-usage/tests/plugin-record-not-dispatch.mutation.json",
+      "mutation": "packages/evolution-skill-discovery/tests/usage/plugin-record-not-dispatch.mutation.json",
       "evidence": "A",
       "note": "plugin records are never normalized as dispatches, so consumers cannot count them"
     },

@@ -603,7 +603,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "bd67e12822b0444e8d45bac95c10be1b7ba440ec4641c791dd6835e091c2f212",
+        "sha256": "3bfbdda5155684dc94db93a7230c83b41ad0967a8cf8108f9f34a96727b5cb2e",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1287,7 +1287,7 @@
           "gate-08": [
             {
               "mutate": {
-                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "file": "packages/evolution-skill-discovery/src/catalog/index.ts",
                 "find": "ctx.on('evolution/skill-mutated', () => {",
                 "replace": "ctx.on('evolution/skill-mutated-typo', () => {"
               },
@@ -1339,7 +1339,7 @@
           "gate-06": [
             {
               "mutate": {
-                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "file": "packages/evolution-skill-discovery/src/catalog/index.ts",
                 "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
                 "replace": "import type {} from '@deepseek-ai/dsh-evolution-core-typo'"
               },
@@ -1352,7 +1352,7 @@
           "gate-07": [
             {
               "mutate": {
-                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "file": "packages/evolution-skill-discovery/src/catalog/index.ts",
                 "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
                 "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst DSH_HOME_PROBE = process.env.DSH_HOME"
               },
@@ -1365,7 +1365,7 @@
           "gate-43": [
             {
               "mutate": {
-                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "file": "packages/evolution-skill-discovery/src/catalog/index.ts",
                 "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
                 "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst IO_DISCIPLINE_PROBE = writeFileSync('/tmp/nope', 'x')"
               },
@@ -1378,7 +1378,7 @@
           "gate-38": [
             {
               "mutate": {
-                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "file": "packages/evolution-skill-discovery/src/catalog/index.ts",
                 "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
                 "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst ATOMIC_PROBE = renameSync('.tmp/probe', 'probe')"
               },
@@ -1443,7 +1443,7 @@
           "gate-39": [
             {
               "mutate": {
-                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "file": "packages/evolution-skill-discovery/src/catalog/index.ts",
                 "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
                 "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst PLAIN_PROBE = typeof v === 'object' && v !== null && !Array.isArray(v)"
               },
@@ -1456,7 +1456,7 @@
           "gate-40": [
             {
               "mutate": {
-                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "file": "packages/evolution-skill-discovery/src/catalog/index.ts",
                 "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
                 "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst READONLY_PROBE = action !== 'list' && action !== 'unpin'"
               },
@@ -1469,7 +1469,7 @@
           "gate-42": [
             {
               "mutate": {
-                "file": "packages/evolution-skill-catalog/src/index.ts",
+                "file": "packages/evolution-skill-discovery/src/catalog/index.ts",
                 "find": "import type {} from '@deepseek-ai/dsh-evolution-core'",
                 "replace": "import type {} from '@deepseek-ai/dsh-evolution-core'\nconst TIMER_PROBE = setTimeout(fn, 5000)"
               },
@@ -1660,7 +1660,7 @@
           "gate-19": [
             {
               "mutate": {
-                "file": "packages/evolution-skill-catalog/package.json",
+                "file": "packages/evolution-skill-discovery/package.json",
                 "find": "\"name\": \"@deepseek-ai/dsh-evolution-skill-catalog\"",
                 "replace": "\"name\": \"@probe/not-a-family-package\""
               },

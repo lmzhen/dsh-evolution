@@ -2,7 +2,7 @@
   "probe": "beh-memory-interpolation",
   "edits": [
     {
-      "file": "packages/tool-memory/src/index.ts",
+      "file": "packages/memory/src/tools/index.ts",
       "find": "text: () => snapshotText,\n      interpolate: false,",
       "replace": "text: () => snapshotText,\n      interpolate: true,"
     }
