@@ -421,7 +421,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
     const { JsonStorageBackend } = await import('@deepseek-ai/dsh-storage-json')
     const DomainFacility = await import('@deepseek-ai/dsh-storage-domain')
     const DomainState = await import('@deepseek-ai/dsh-evolution-state-domain')
-    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state')).default
+    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state/storage')).default
     const EvolutionState = (await import('@deepseek-ai/dsh-evolution-state')).default
     await ctx.plugin(Storage)
     const backend = new JsonStorageBackend(join(home, 'storage'))
