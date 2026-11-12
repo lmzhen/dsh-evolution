@@ -609,32 +609,21 @@ writeFileSync(join(distNext, 'manifest.json'), JSON.stringify(Object.fromEntries
 
 const nameByDir = Object.fromEntries(tarballs.map(item => [item.dir, item.name]))
 const publishGroups = [
-  ['evolution-contract'],
+  // G8 structure batches: the table is the publish ORDER (dependencies first). Every published
+  // package appears exactly once; the consistency check below fails loud if it drifts.
   ['evolution-core'],
-  // 0.23.0: the byte-seat implementation (G2 S4). It implements the `evolution-io` seat, so it
-  // rides that group; the table must cover every staged tarball (P2-39 above).
-  ['evolution-io', 'evolution-state-storage'],
-  // G2: the mutation authority implements the io peer; publish after io.
-  ['evolution-authority'],
-  ['evolution-io-node', 'evolution-state-domain', 'evolution-state-json'],
   ['evolution-state'],
-  ['memory', 'memory-files', 'skill-usage'],
-  ['evolution-policy', 'evolution-approval', 'evolution-threat'],
-  ['evolution-maintenance'],
-  ['tool-memory', 'tool-skill-manage'],
-  ['evolution-review', 'evolution-curator', 'evolution-commands'],
-  ['evolution-activity', 'evolution-feedback', 'evolution-learning-graph', 'evolution-replay', 'evolution-skill-catalog'],
-  // G1: the shared browser kit. Client-only and dependency-free in the family;
-  // every sidebar panel depends on it, so it publishes before them.
+  ['evolution-merge-engine'],
+  ['memory', 'evolution-activity', 'evolution-skill-discovery', 'evolution-skill-health', 'tool-skill-manage'],
+  ['evolution-approval', 'evolution-curator', 'evolution-review', 'evolution-commands'],
+  // client kit ships before every package whose client half imports its generated surfaces.
   ['evolution-client-kit'],
-  // 0.25.0: the skill-health surface. Client-only in order too (one read-only route, no infra row).
-  ['evolution-skill-health'],
-  ['evolution-skill-discovery'],
-  // 0.28.0: the merge host + client surfaces. Both depend only on core/cordis; the bundle below
-  // mounts their rows.
-  ['evolution-merge-engine', 'evolution-merge', 'evolution-merge-ui'],
+  ['evolution-maintenance'],
+  ['evolution-merge', 'evolution-merge-ui'],
   ['evolution-ui'],
-  ['evolution-host', 'evolution-agent', 'evolution-all'],
+  // install forms last: they mount the rows above.
+  // evolution-preset is RETIRED from the publish surface (retained for migration only).
+  ['evolution-all', 'evolution-host', 'evolution-agent'],
 ]
 // P2-39 (v11): the hardcoded table MUST equal the staged tarballs — a stale
 // entry previously wrote `null` into publish-order.json (and the downstream
