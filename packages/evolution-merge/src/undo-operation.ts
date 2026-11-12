@@ -5,7 +5,7 @@ import { contentHash } from '@deepseek-ai/dsh-evolution-core'
 import type { CommitReceipt } from './commit-receipt.ts'
 import { readCommitReceipts } from './commit-receipt.ts'
 import { undoMergeReceipt, type MergeUndoPort } from './undo-merge.ts'
-import { writeUndoJournal, type UndoPairState } from './domain/undo-journal.ts'
+import { readUndoJournal, writeUndoJournal, type UndoPairPhase, type UndoPairState } from './domain/undo-journal.ts'
 import { readUndoReceipt, writeUndoReceipt } from './domain/undo-receipt.ts'
 import { recordPair } from './domain/pair-index-store.ts'
 import { readRunMeta, writeRunMeta } from './domain/run-coordinator.ts'
@@ -13,7 +13,7 @@ import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core/write'
 import { evidenceSha256 as unitEvidenceDigest } from './domain/evidence-hash.ts'
 
 export type UndoErrorCode = 'undo-unavailable-legacy-receipt' | 'undo-evidence-expired' | 'undo-evidence-hash-mismatch' | 'undo-target-drift' | 'undo-source-drift' | 'undo-partial-state' | 'undo-unit-not-committed'
-export interface UndoResult { readonly ok: boolean; readonly code?: UndoErrorCode; readonly message: string; readonly undone: readonly string[] }
+export interface UndoResult { readonly ok: boolean; readonly code?: UndoErrorCode; readonly message: string; readonly undone: readonly string[]; /** True when a journal phase remains and `resumeUndo` can continue. */ readonly resumable?: boolean }
 interface PlanPair { readonly receipt: CommitReceipt; readonly evidence: UnitEvidenceRecord; readonly targetNow: string | null; readonly sourcesNow: Readonly<Record<string, string | null>>; readonly done: boolean; readonly targetDone: boolean; readonly sourcesDone: boolean }
 
 function digest(value: string | null): string | null { return value === null ? null : contentHash(value) }
@@ -74,7 +74,23 @@ async function settleRun(io: EvolutionIoLike, home: string, runId: string, pairK
     createdAt: current?.createdAt ?? new Date(at).toISOString(), updatedAt: new Date(at).toISOString(),
   })
 }
-export async function runUndoOperation(options: { readonly io: EvolutionIoLike; readonly home: string; readonly runId: string; readonly port: MergeUndoPort; readonly now: () => number; readonly pairKey?: string; readonly target?: string; readonly finalizeUnit?: (unitId: string) => Promise<{ readonly ok: boolean; readonly message?: string }>; readonly onPhase?: (phase: string, pairKey: string) => void | Promise<void>; readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> } }): Promise<UndoResult> {
+type UndoOperationOptions = { readonly io: EvolutionIoLike; readonly home: string; readonly runId: string; readonly port: MergeUndoPort; readonly now: () => number; readonly pairKey?: string; readonly target?: string; readonly finalizeUnit?: (unitId: string) => Promise<{ readonly ok: boolean; readonly message?: string }>; readonly onPhase?: (phase: string, pairKey: string) => void | Promise<void>; readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> } }
+
+/**
+ * Run one merge-undo pass.
+ *
+ * The fence, when the caller supplies one, covers the WHOLE pass: undo writes the skill tree, the
+ * undo receipt, the pair index and run metadata, so a pass that lost exclusion halfway would
+ * interleave with the commit it is undoing (W9-commit-protocol §3.2). A partially applied pair is
+ * reported as `resumable` rather than refused: the journal records the phase, and
+ * `resumeUndo` continues from it.
+ */
+export async function runUndoOperation(options: UndoOperationOptions): Promise<UndoResult> {
+  const run = async (): Promise<UndoResult> => await runUndoSteps(options)
+  return options.fence === undefined ? await run() : await options.fence.run(run)
+}
+
+async function runUndoSteps(options: UndoOperationOptions): Promise<UndoResult> {
   const runReceipts = (await readCommitReceipts(options.io, options.home)).filter(receipt => (receipt.parentRunId ?? receipt.runId) === options.runId)
   const allPairKeys = runReceipts.map(receipt => receipt.pairKey ?? receipt.unitId)
   const allReceipts = runReceipts.filter(receipt => options.target === undefined || receipt.target === options.target)
@@ -85,14 +101,27 @@ export async function runUndoOperation(options: { readonly io: EvolutionIoLike; 
   const undone: string[] = []
   for (const receipt of sortReceipts(receipts)) {
     const pairKey = receipt.pairKey ?? receipt.unitId
+    /** Record the durable phase before the step it names (W9-commit-protocol §3.1). */
+    const markPhase = async (next: UndoPairPhase): Promise<void> => {
+      const current = await readUndoJournal(options.io, options.home, options.runId)
+      if (current === null) return
+      await writeUndoJournal(options.io, options.home, {
+        ...current,
+        phase: 'running',
+        pairs: current.pairs.map(pair => (pair.pairKey === pairKey ? { ...pair, phase: next } : pair)),
+        updatedAt: new Date(options.now()).toISOString(),
+      })
+    }
     if (options.finalizeUnit !== undefined) {
       const finalized = await options.finalizeUnit(receipt.unitId)
       if (!finalized.ok) return { ok: false, message: finalized.message ?? 'unit finalize failed', undone }
     }
     const existing = await readUndoReceipt(options.io, options.home, options.runId, pairKey)
     if (existing !== null) {
+      await markPhase('pair-index')
       await options.onPhase?.('pair-index', pairKey)
       await recordPair(options.io, options.home, { pairKey, runId: options.runId, result: 'undone', target: receipt.target })
+      await markPhase('run-meta')
       await options.onPhase?.('run-meta', pairKey)
       await settleRun(options.io, options.home, options.runId, pairKey, allPairKeys, options.now())
       undone.push(pairKey); continue
@@ -102,8 +131,10 @@ export async function runUndoOperation(options: { readonly io: EvolutionIoLike; 
     if (checked.done) {
       await options.onPhase?.('receipt', pairKey)
     await writeUndoReceipt(options.io, options.home, { version: 1, runId: options.runId, ...(receipt.parentRunId === undefined ? {} : { parentRunId: receipt.parentRunId }), pairKey, unitId: receipt.unitId, evidenceSha256: receipt.evidenceSha256 ?? unitEvidenceDigest(checked.evidence), target: receipt.target, sources: checked.evidence.sources.map(source => source.name), restoredTargetHash: receipt.create ? null : digest(checked.evidence.target.before), restoredSourceHashes: Object.fromEntries(checked.evidence.sources.map(source => [source.name, contentHash(source.before)])), at: options.now() })
+      await markPhase('pair-index')
       await options.onPhase?.('pair-index', pairKey)
       await recordPair(options.io, options.home, { pairKey, runId: options.runId, result: 'undone', target: receipt.target })
+      await markPhase('run-meta')
       await options.onPhase?.('run-meta', pairKey)
       await settleRun(options.io, options.home, options.runId, pairKey, allPairKeys, options.now())
       undone.push(pairKey); continue
@@ -114,7 +145,7 @@ export async function runUndoOperation(options: { readonly io: EvolutionIoLike; 
       if (targetStage === 'skip' && sourceStage === 'skip') { /* unreachable, done */ }
     }
     if (checked.targetDone !== checked.sourcesDone && (checked.targetDone || checked.sourcesDone)) {
-      return { ok: false, code: 'undo-partial-state', message: 'undo is partially applied; manual retry required', undone }
+      return { ok: false, code: 'undo-partial-state', message: 'undo is partially applied; resume the pass to finish it', undone, resumable: true }
     }
     const phase = (next: 'restore-target' | 'restore-source' | 'receipt'): UndoPairState => ({ pairKey, unitId: receipt.unitId, phase: next })
     await writeUndoJournal(options.io, options.home, { version: 1, runId: options.runId, phase: 'running', pairs: pairs.map(pair => pair.pairKey === pairKey ? phase('restore-target') : pair), updatedAt: new Date(options.now()).toISOString() })

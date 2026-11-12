@@ -163,6 +163,8 @@
         "evolution-merge::tests/authoring-manifest.spec.ts",
         "evolution-merge::tests/run-meta-merge.spec.ts",
         "evolution-merge::tests/runtime-busy-target.spec.ts",
+        "evolution-merge::tests/undo-fence.spec.ts",
+        "evolution-merge::tests/undo-journal-protocol.spec.ts",
         "evolution-policy::tests/protected-skills.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
@@ -732,6 +734,8 @@
         "evolution-merge::tests/target-claim.spec.ts",
         "evolution-merge::tests/undo-adapter.spec.ts",
         "evolution-merge::tests/undo-evidence.spec.ts",
+        "evolution-merge::tests/undo-fence.spec.ts",
+        "evolution-merge::tests/undo-journal-protocol.spec.ts",
         "evolution-merge::tests/undo-merge.spec.ts",
         "evolution-merge::tests/unit-claim.spec.ts",
         "evolution-merge::tests/unit-recovery-report.spec.ts",
@@ -1449,6 +1453,8 @@
         "evolution-merge::tests/target-claim.spec.ts",
         "evolution-merge::tests/undo-adapter.spec.ts",
         "evolution-merge::tests/undo-evidence.spec.ts",
+        "evolution-merge::tests/undo-fence.spec.ts",
+        "evolution-merge::tests/undo-journal-protocol.spec.ts",
         "evolution-merge::tests/undo-merge.spec.ts",
         "evolution-merge::tests/unit-claim.spec.ts",
         "evolution-merge::tests/unit-recovery-report.spec.ts",
@@ -2108,6 +2114,8 @@
         "evolution-merge::tests/target-claim.spec.ts",
         "evolution-merge::tests/undo-adapter.spec.ts",
         "evolution-merge::tests/undo-evidence.spec.ts",
+        "evolution-merge::tests/undo-fence.spec.ts",
+        "evolution-merge::tests/undo-journal-protocol.spec.ts",
         "evolution-merge::tests/undo-merge.spec.ts",
         "evolution-merge::tests/unit-claim.spec.ts",
         "evolution-merge::tests/unit-recovery-report.spec.ts",
@@ -2319,11 +2327,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 102
+      "specs": 104
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 458
+      "specs": 460
     },
     "ci-only": {
       "gates": 14,
@@ -2331,16 +2339,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 458
+      "specs": 460
     },
     "full(ci=on)": {
       "gates": 89,
-      "specs": 531
+      "specs": 533
     }
   },
   "specs": {
-    "total": 531,
-    "marked": 531,
+    "total": 533,
+    "marked": 533,
     "unmarked": 0
   }
 }
