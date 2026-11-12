@@ -34,7 +34,7 @@ The local profile runs the family gate runner (see [docs/developer/development.m
 | # | Command | Working tree |
 |---|---|---|
 | 1 | `node node_modules/typescript/lib/tsc.js -b tsconfig.host.json` | overlay |
-| 2 | `node node_modules/oxlint/bin/oxlint packages/evolution` | overlay |
+| 2 | `node node_modules/oxlint/bin/oxlint -c packages/evolution/oxlint.release.json packages/evolution --ignore-pattern '**/tests/**' --ignore-pattern '**/vendor/**' --ignore-pattern '**/scripts/**' -A style` | overlay |
 | 3 | `node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000` | overlay |
 | 4 | `node packages/evolution/scripts/build-lib.mjs` | overlay |
 | 5 | `node packages/evolution/scripts/smoke-built-entries.mjs packages/evolution` | overlay |

@@ -118,10 +118,23 @@ const declared = (() => {
 const declaredRequires = declared.requires
 const criterionOf = (id) => declared.criteria.get(id) ?? 'undeclared'
 const treeRootFor = (tree) => (tree === 'overlay' ? overlayRoot : MIRROR_ROOT)
+/**
+ * Rows are written for the overlay layout (`packages/evolution/<pkg>`); the mirror publishes the
+ * same tree flat (`packages/<pkg>`). A token is rewritten ONLY when the flat path exists and the
+ * written one does not, so a genuinely absent artifact still reads as absent (G7-e1).
+ */
+const flatLayout = !existsSync(join(MIRROR_ROOT, 'packages', 'evolution'))
+const resolveLayoutToken = (token, tree) => {
+  // Only the tree that is actually FLAT may be rewritten: an overlay row runs under the nested
+  // layout, where \packages/scripts/...\ does not exist at all.
+  if (tree !== 'mirror' || !flatLayout || !token.startsWith('packages/evolution/')) return token
+  const flat = 'packages/' + token.slice('packages/evolution/'.length)
+  return !existsSync(join(MIRROR_ROOT, token)) && existsSync(join(MIRROR_ROOT, flat)) ? flat : token
+}
 const evaluateRequires = (gate) => {
   for (const req of declaredRequires.get(gate.id) ?? []) {
     if (req.mode === 'present') {
-      const product = /^[A-Za-z]:[\\/]/.test(req.path) ? req.path : join(treeRootFor(gate.tree), req.path)
+      const product = /^[A-Za-z]:[\\/]/.test(req.path) ? req.path : join(treeRootFor(gate.tree), resolveLayoutToken(req.path, gate.tree))
       const decision = decideRequires({ present: existsSync(product), path: product }, 'in-repo', 'present')
       if (decision.verdict !== 'pass') return { req, decision }
       continue
@@ -180,7 +193,7 @@ for (const g of list) {
   // always spawns through process.execPath, so the leading token is dropped here - keeping it
   // would spawn `node node script` and every spawning gate would read as a broken check.
   const declared = argv[0] === 'node' ? argv.slice(1) : argv
-  const [script, ...rest] = declared
+  const [script, ...rest] = declared.map((token) => resolveLayoutToken(token, g.tree))
   // the seam owns the spawn and reports killedBy explicitly; this file never infers it
   // A gate that never returns must not stop the whole local chain: budget it, and let the verdict
   // read cannot-decide (killedBy=budget) instead of hanging the runner forever.

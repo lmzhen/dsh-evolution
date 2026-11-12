@@ -24,32 +24,36 @@
       "reason": "declared local check: the D-9 test-file typecheck lives on the build line, not in this action (action.yml L168-171)",
       "owner": "build-line",
       "registration": {
-        "reason": "the row runs tsc with no project argument, so it prints usage and exits 2",
+        "reason": "the bed platform tree fails its own tsc -b (cordis 4.0.5 vs the checked-in platform sources), so this row cannot judge the family here",
         "owner": "scripts/gates",
         "expiry": "0.45.0",
-        "plan": "toolchain row needs -p <config>; the D-9 typecheck lives on the build line"
+        "plan": "run on the build line whose platform tree typechecks; the family half is covered by tsc -p per package"
       }
     },
     {
       "id": "gate-02",
       "kind": "toolchain",
-      "human": "`node node_modules/oxlint/bin/oxlint packages/evolution`",
+      "human": "`node node_modules/oxlint/bin/oxlint -c packages/evolution/oxlint.release.json packages/evolution --ignore-pattern '**/tests/**' --ignore-pattern '**/vendor/**' --ignore-pattern '**/scripts/**' -A style`",
       "argv": [
         "node",
         "node_modules/oxlint/bin/oxlint",
-        "packages/evolution"
+        "-c",
+        "packages/evolution/oxlint.release.json",
+        "packages/evolution",
+        "--ignore-pattern",
+        "'**/tests/**'",
+        "--ignore-pattern",
+        "'**/vendor/**'",
+        "--ignore-pattern",
+        "'**/scripts/**'",
+        "-A",
+        "style"
       ],
       "tree": "overlay",
       "profiles": [
         "local",
         "ci"
-      ],
-      "registration": {
-        "reason": "oxlint is not installed in this machine tree; the overlay bed carries it on the build line",
-        "owner": "scripts/gates",
-        "expiry": "0.45.0",
-        "plan": "install oxlint in the bed (or run the lint row on CI)"
-      }
+      ]
     },
     {
       "id": "gate-03",
@@ -452,13 +456,7 @@
       "profiles": [
         "local",
         "ci"
-      ],
-      "registration": {
-        "reason": "platform version ranges are checked against .release-staging, which only exists after prepare-release packs",
-        "owner": "scripts/gates",
-        "expiry": "0.45.0",
-        "plan": "run after prepare-release --dev-build"
-      }
+      ]
     },
     {
       "id": "gate-28",
@@ -916,13 +914,7 @@
       "profiles": [
         "local",
         "ci"
-      ],
-      "registration": {
-        "reason": "release evidence needs packages/evolution/dist/release-evidence.json, produced by the release assembly",
-        "owner": "scripts/gates",
-        "expiry": "0.45.0",
-        "plan": "run on the build line after assemble-release-evidence"
-      }
+      ]
     },
     {
       "id": "gate-57",
@@ -945,13 +937,7 @@
       "profiles": [
         "local",
         "ci"
-      ],
-      "registration": {
-        "reason": "the evidence assembler needs a staging evidence file that only the build line produces",
-        "owner": "scripts/gates",
-        "expiry": "0.45.0",
-        "plan": "run on the build line"
-      }
+      ]
     },
     {
       "id": "gate-58",

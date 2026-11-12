@@ -598,7 +598,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "21953bebd4a14e6019eacd7ee0829c100dd982a30b4b3354a8deca6294e89a2f",
+        "sha256": "cd446fc9fc34b40b44bd9cedff79b72fa79c7d6f6ef55fa99a3f5a4eb214a919",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1195,13 +1195,13 @@
         "pendingAxes": [
           {
             "axis": "executability",
-            "rows": 24,
+            "rows": 23,
             "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd"
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags)"
           },
           {
             "axis": "expiry-due",
@@ -2103,16 +2103,10 @@
             "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration"
           },
           "gate-01": {
-            "reason": "the row runs tsc with no project argument, so it prints usage and exits 2",
+            "reason": "the bed platform tree fails its own tsc -b (cordis 4.0.5 vs the checked-in platform sources), so this row cannot judge the family here",
             "owner": "scripts/gates",
             "expiry": "0.45.0",
-            "plan": "toolchain row needs -p <config>; the D-9 typecheck lives on the build line"
-          },
-          "gate-02": {
-            "reason": "oxlint is not installed in this machine tree; the overlay bed carries it on the build line",
-            "owner": "scripts/gates",
-            "expiry": "0.45.0",
-            "plan": "install oxlint in the bed (or run the lint row on CI)"
+            "plan": "run on the build line whose platform tree typechecks; the family half is covered by tsc -p per package"
           },
           "gate-03": {
             "reason": "the full family vitest suite does not return on this machine within the 180 s budget",
@@ -2126,29 +2120,11 @@
             "expiry": "0.45.0",
             "plan": "run after build-lib on the build line"
           },
-          "gate-27": {
-            "reason": "platform version ranges are checked against .release-staging, which only exists after prepare-release packs",
-            "owner": "scripts/gates",
-            "expiry": "0.45.0",
-            "plan": "run after prepare-release --dev-build"
-          },
           "gate-49": {
             "reason": "the mutation ledger is still being filled: 29 of 109 checks carry a proven red record",
             "owner": "scripts/gates",
             "expiry": "0.45.0",
             "plan": "close records per check; coverage exits 0 once every check is proven"
-          },
-          "gate-56": {
-            "reason": "release evidence needs packages/evolution/dist/release-evidence.json, produced by the release assembly",
-            "owner": "scripts/gates",
-            "expiry": "0.45.0",
-            "plan": "run on the build line after assemble-release-evidence"
-          },
-          "gate-57": {
-            "reason": "the evidence assembler needs a staging evidence file that only the build line produces",
-            "owner": "scripts/gates",
-            "expiry": "0.45.0",
-            "plan": "run on the build line"
           },
           "health-admission": {
             "reason": "no user or platform corpora on this machine, so admission cannot be judged",
