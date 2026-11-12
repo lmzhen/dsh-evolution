@@ -24,6 +24,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { softOverlay } from './lib-env.mjs'
+import { familyVersion } from './lib-family-version.mjs'
+import { exemptionProblems } from './lib-exemptions.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MANIFEST = join(HERE, 'gate-manifest.json')
@@ -48,12 +50,19 @@ const records = checksFact?.machine?.checkMutations ?? {}
 // "pending" makes exit 0 unreachable by construction, so it is EXEMPT - registered with a reason
 // and an expiry, printed on every run. An exemption missing either field is NOT honoured (the
 // loophole guard): an exemption is a debt with an owner, not a way to silence the ledger.
+const FAMILY_VERSION = familyVersion(join(HERE, ".."))
 const exemptions = checksFact?.machine?.mutationExempt ?? {}
 const exemptionOf = (id) => {
   const entry = exemptions[id]
   if (entry === undefined || entry === null) return null
-  const valid = typeof entry.reason === 'string' && entry.reason.trim().length > 0 && typeof entry.expiry === 'string' && entry.expiry.trim().length > 0
-  return valid ? entry : null
+  // W9-gates §3.2: an exemption is a debt with an owner, a plan and a version. The old check only
+  // asked for two non-empty strings, so free prose ("revisit when…") was honoured forever.
+  const problems = exemptionProblems(entry, FAMILY_VERSION)
+  if (problems.length > 0) {
+    console.log('verify-mutations: exemption ' + id + ' is NOT honoured: ' + problems.join('; '))
+    return null
+  }
+  return entry
 }
 // G0/0.7 review fix (2026-10-15): redProven used to count a record whose anchor no longer occurs
 // in its file - "recording is not reproducibility". Measured: two records anchored on a COUNT went

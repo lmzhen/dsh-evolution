@@ -598,7 +598,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "bb413761e04e917225f13f0849420855b015ca6b5780aa56056b1d7587b0722f",
+        "sha256": "875b46301e12b47d2e078cf8d0e343e5c0368c306545b5dc4bb7b4d83f027988",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1122,20 +1122,25 @@
           {
             "id": "ci-only-19",
             "tier": "ci-only",
-            "criterion": "verify-layout-sync"
+            "criterion": "verify-exemptions"
           },
           {
             "id": "ci-only-20",
             "tier": "ci-only",
-            "criterion": "verify-probes"
+            "criterion": "verify-layout-sync"
           },
           {
             "id": "ci-only-21",
             "tier": "ci-only",
-            "criterion": "verify-requirements"
+            "criterion": "verify-probes"
           },
           {
             "id": "ci-only-22",
+            "tier": "ci-only",
+            "criterion": "verify-requirements"
+          },
+          {
+            "id": "ci-only-23",
             "tier": "ci-only",
             "criterion": "verify-test-lines"
           },
@@ -1181,7 +1186,7 @@
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 108,
+            "rowsWithoutIt": 109,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
@@ -1194,7 +1199,8 @@
             "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
-            "reasonRef": "scripts/family-facts.json checks.pendingAxes"
+            "reasonRef": "scripts/family-facts.json checks.pendingAxes",
+            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused"
           },
           {
             "axis": "expiry-due",
@@ -1202,7 +1208,8 @@
             "reason": "three gate rows carry a due expiry on the 0.41 line; retirement is scheduled | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
-            "reasonRef": "scripts/family-facts.json checks.pendingAxes"
+            "reasonRef": "scripts/family-facts.json checks.pendingAxes",
+            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused"
           },
           {
             "axis": "falsifiability-carrier",
@@ -1210,7 +1217,8 @@
             "reason": "three rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
-            "reasonRef": "scripts/family-facts.json checks.pendingAxes"
+            "reasonRef": "scripts/family-facts.json checks.pendingAxes",
+            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused"
           },
           {
             "axis": "mutation-coverage",
@@ -1218,7 +1226,8 @@
             "reason": "the beh-installer-layered probe suite hangs in the local overlay before its green baseline; CI probe owns it | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.45.0",
             "owner": "scripts",
-            "reasonRef": "scripts/family-facts.json checks.pendingAxes"
+            "reasonRef": "scripts/family-facts.json checks.pendingAxes",
+            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused"
           }
         ],
         "checkMutations": {
@@ -1716,131 +1725,227 @@
         "mutationExempt": {
           "gate-49": {
             "reason": "the ledger itself: its declared state is cannot-decide while records are missing, so a mutation cannot flip it to red",
-            "expiry": "release gate: revisit when every other check carries a stamped record"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: revisit when every other check carries a stamped record"
           },
           "gate-33": {
             "reason": "this row declares no single command (composite cell: several commands in one table row), so there is no argv a mutation could run - it cannot be mutation-proven",
-            "expiry": "release gate: either split the row into real argv rows or keep the exemption; the executability axis already counts it"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: either split the row into real argv rows or keep the exemption; the executability axis already counts it"
           },
           "gate-13": {
             "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
-            "expiry": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
           },
           "gate-14": {
             "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
-            "expiry": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
           },
           "gate-15": {
             "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
-            "expiry": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted"
           },
           "gate-16": {
             "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
-            "expiry": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation"
           },
           "gate-45": {
             "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
-            "expiry": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation"
           },
           "ci-only-08": {
             "reason": "its TARGET path (upstream/tsconfig.base.json) exists only in the CI overlay job, never in this repo: the row injects alias lines into the upstream tree that the compat job checks out, so no mutation inside this repo can change what it judges",
-            "expiry": "release gate: if the row ever names an in-repo target, delete this exemption and prove it by mutation"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if the row ever names an in-repo target, delete this exemption and prove it by mutation"
           },
           "gate-18": {
             "reason": "its subject is the PLATFORM tree outside this repo: the receipts name packages/core/... files and the argv points at an out-of-repo upstream checkout, so the reviewed repo carries neither the files it judges nor a way to change them",
-            "expiry": "release gate: if the row ever judges in-repo files, delete this exemption and prove it by mutation"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if the row ever judges in-repo files, delete this exemption and prove it by mutation"
           },
           "gate-01": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "gate-02": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "gate-03": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "gate-04": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "gate-05": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-01": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-02": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-03": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-04": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-05": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-06": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-07": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-09": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-10": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-11": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-12": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-13": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "ci-only-14": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "graph-edges-live": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "expiry": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.45.0",
+            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them"
           },
           "line-identity-bed": {
             "reason": "ABSENT-LOCALLY SUBJECT: its argv names packages/scripts/line-manifest.json as the bed manifest, and that file does not exist in this repo (it is produced on the bed tree it describes, from machine state this repo does not carry), so no mutation inside the repo can change what it judges",
-            "expiry": "release gate: if the manifest ever becomes a tracked file here, delete this exemption and prove it by mutation (the CI and policy-only rows on the same script are already proven by a non-string policy reason)"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if the manifest ever becomes a tracked file here, delete this exemption and prove it by mutation (the CI and policy-only rows on the same script are already proven by a non-string policy reason)"
           },
           "gate-27": {
             "reason": "BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mutation in this repo can red it without first building",
-            "expiry": "release gate: if the row gains a source-level subject or dist becomes part of the reviewed tree, delete this exemption and prove it by mutation"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if the row gains a source-level subject or dist becomes part of the reviewed tree, delete this exemption and prove it by mutation"
           },
           "health-admission": {
             "reason": "CANNOT-DECIDE BY DESIGN: run as registered it reports CANNOT DECIDE (user=46 platform=0) because a 0-hit count over an EMPTY corpus would admit every rule - the guard refuses rather than pass, so it has no green baseline a mutation could turn red; its enforcement branch is also empty by design (the policy inForce list is empty until a rule is measured on both corpora)",
-            "expiry": "release gate: if a platform corpus is supplied in-tree and a rule is registered inForce, delete this exemption and prove it by making that rule fail admission on the baseline"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if a platform corpus is supplied in-tree and a rule is registered inForce, delete this exemption and prove it by making that rule fail admission on the baseline"
           },
           "gate-50": {
             "reason": "PRODUCER ROW, NOT A CHECK: its registered argv carries no --check, and the script only READS the machine skill corpora and WRITES scripts/reports/health-baseline.json through the engine - it has no verdict to turn red, and its corpus is machine state (the reader that judges the artifact is health-admission, registered separately and cannot-decide without a platform corpus)",
-            "expiry": "release gate: if this row ever gains a --check form (the drift check the other generators carry), delete this exemption and prove it by hand-editing the artifact"
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.46.0",
+            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
+            "condition": "release gate: if this row ever gains a --check form (the drift check the other generators carry), delete this exemption and prove it by hand-editing the artifact"
           }
         },
         "unmappedTier": [
@@ -2283,7 +2388,7 @@
             "key": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
             "ids": [
               "gate-75",
-              "ci-only-19"
+              "ci-only-20"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2293,7 +2398,7 @@
             "key": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
             "ids": [
               "gate-76",
-              "ci-only-20"
+              "ci-only-21"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
@@ -2303,7 +2408,7 @@
             "key": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
             "ids": [
               "gate-77",
-              "ci-only-21"
+              "ci-only-22"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
