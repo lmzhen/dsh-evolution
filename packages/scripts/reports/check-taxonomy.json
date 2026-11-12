@@ -126,6 +126,7 @@
         "evolution-core::tests/owner-resolver.spec.ts",
         "evolution-core::tests/params.spec.ts",
         "evolution-core::tests/platform-line.spec.ts",
+        "evolution-core::tests/platform-llm-route.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/prompts.spec.ts",
         "evolution-core::tests/proposal-report.spec.ts",
@@ -433,6 +434,7 @@
         "evolution-core::tests/params-docs.spec.ts",
         "evolution-core::tests/params.spec.ts",
         "evolution-core::tests/platform-line.spec.ts",
+        "evolution-core::tests/platform-llm-route.spec.ts",
         "evolution-core::tests/plugin-record-not-dispatch.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
@@ -1150,6 +1152,7 @@
         "evolution-core::tests/params-docs.spec.ts",
         "evolution-core::tests/params.spec.ts",
         "evolution-core::tests/platform-line.spec.ts",
+        "evolution-core::tests/platform-llm-route.spec.ts",
         "evolution-core::tests/plugin-record-not-dispatch.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/probe-io.spec.ts",
@@ -1794,6 +1797,7 @@
         "evolution-core::tests/params-docs.spec.ts",
         "evolution-core::tests/params.spec.ts",
         "evolution-core::tests/platform-line.spec.ts",
+        "evolution-core::tests/platform-llm-route.spec.ts",
         "evolution-core::tests/plugin-record-not-dispatch.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
         "evolution-core::tests/preset-composition.spec.ts",
@@ -2317,11 +2321,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 100
+      "specs": 101
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 458
+      "specs": 459
     },
     "ci-only": {
       "gates": 14,
@@ -2329,16 +2333,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 458
+      "specs": 459
     },
     "full(ci=on)": {
       "gates": 89,
-      "specs": 531
+      "specs": 532
     }
   },
   "specs": {
-    "total": 531,
-    "marked": 531,
+    "total": 532,
+    "marked": 532,
     "unmarked": 0
   }
 }

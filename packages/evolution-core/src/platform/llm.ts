@@ -114,15 +114,17 @@ export function llmPort(ctx: Context): LlmPort | undefined {
 export function modelRoute(ctx: Context, agent?: unknown, session?: unknown): ModelRoute | undefined {
   const owned = (agent as { model?: { current?(): ModelRoute | undefined } } | undefined)?.model?.current?.()
   if (owned !== undefined) return { provider: owned.provider, model: owned.model }
-  // 0.2.2 modelSelection is client-visible: snapshot() returns lastUsed/next.
+  // 0.2.2 modelSelection publishes `lastUsed` and `pending` (packages/core/agent/src/model-selection.ts):
+  // a selection the user just made has not been used by any request yet, so it lives in `pending`.
+  // Prefer it — the platform's own AgentModel.current() is `pending ?? lastUsed` for the same reason.
   if (session !== undefined) {
     const registry = ctx.get('sessionProjections') as {
       snapshot?(target: unknown, keys?: readonly string[]): { values?: Record<string, unknown> }
     } | undefined
     const value = registry?.snapshot?.(session, ['modelSelection'])?.values?.modelSelection as
-      | { lastUsed?: ModelRoute | null; next?: ModelRoute | null }
+      | { lastUsed?: ModelRoute | null; pending?: ModelRoute | null }
       | undefined
-    const chosen = value?.next ?? value?.lastUsed
+    const chosen = value?.pending ?? value?.lastUsed
     if (chosen !== undefined && chosen !== null) return { provider: chosen.provider, model: chosen.model }
   }
   const fallback = (ctx.get('agentDefaultModel') as { currentSelection?(): ModelRoute | undefined } | undefined)?.currentSelection?.()
