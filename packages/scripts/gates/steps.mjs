@@ -13,6 +13,7 @@ export const steps = [
     title: "`node packages/evolution/scripts/build-lib.mjs`",
     command: "node packages/evolution/scripts/build-lib.mjs",
     lanes: ["local","ci-unit","ci-release","ci-windows"],
+    runBy: "action",
     reason: "mutating/helper step — registered, not run by run-gates (contract 5c)",
   }),
 
@@ -22,6 +23,7 @@ export const steps = [
     title: "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
     command: "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
     lanes: ["ci-setup"],
+    runBy: "action",
     reason: "mutating/helper step — registered, not run by run-gates (contract 5c)",
   }),
 
@@ -49,6 +51,7 @@ export const steps = [
     title: "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
     command: "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
     lanes: ["ci-release"],
+    runBy: "action",
     reason: "mutating/helper step — registered, not run by run-gates (contract 5c)",
   }),
 
@@ -58,6 +61,7 @@ export const steps = [
     title: "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
     command: "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
     lanes: ["ci-release"],
+    runBy: "action",
     reason: "mutating/helper step — registered, not run by run-gates (contract 5c)",
   }),
 
@@ -76,6 +80,7 @@ export const steps = [
     title: "node packages/evolution/scripts/prepare-packed-platform.mjs packages/evolution/dist \"$PLATFORM_VERSION\" | tail -n 1)\"",
     command: "node packages/evolution/scripts/prepare-packed-platform.mjs packages/evolution/dist \"$PLATFORM_VERSION\" | tail -n 1)\"",
     lanes: ["ci-release","ci-windows"],
+    runBy: "action",
     reason: "mutating/helper step — registered, not run by run-gates (contract 5c)",
 
   }),
@@ -86,6 +91,7 @@ export const steps = [
     title: "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules \"$PLATFORM_DIR\"",
     command: "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules \"$PLATFORM_DIR\"",
     lanes: ["ci-release","ci-windows"],
+    runBy: "action",
     reason: "P2-33 packed-tarball consumer smoke: unpacks dist tarballs and imports every declared entry",
     owner: "ci",
   }),

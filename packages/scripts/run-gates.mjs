@@ -126,12 +126,14 @@ if (has('--drill')) {
 
 if (!profile) { console.error('run-gates: usage: run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--json-out <path>] [--lane <name>] [--only <id>] [--drill <id>] [--overlay <path>] [--concurrency <n>] [--fail-fast]'); process.exit(2) }
 let list = byProfile[profile]
+if (laneName !== undefined) {
+  // An explicit lane is the CI control plane: step rows (shell commands executed by the lane) join
+  // the runnable rows there, while profiles (local/pre-tag) stay runnable-only.
+  list = manifest.gates.filter((g) => (RUNNABLE.has(g.kind) || (g.kind === 'step' && g.runBy !== 'action')) && Array.isArray(g.lanes) && g.lanes.includes(laneName))
+  if (list.length === 0) { console.error('run-gates: --lane ' + laneName + ' selects no gate — an empty lane is not a pass'); process.exit(2) }
+}
 const only = flag('--only')
 if (only !== undefined) { list = list.filter((g) => g.id === only); if (list.length === 0) { console.error('run-gates: --only ' + only + ' not in profile ' + profile); process.exit(2) } }
-if (laneName !== undefined) {
-  list = list.filter((g) => Array.isArray(g.lanes) && g.lanes.includes(laneName))
-  if (list.length === 0) { console.error('run-gates: --lane ' + laneName + ' selects no runnable gate in profile ' + profile + ' — an empty lane is not a pass'); process.exit(2) }
-}
 if (has('--list')) { emitList(list, laneName === undefined ? profile : profile + ' lane=' + laneName); process.exit(0) }
 
 const runner = createAsyncRunner({ spawn })
@@ -223,6 +225,24 @@ async function executeGate(g) {
   // CI override (W10 §16.8.2): only on a runner, only for rows that declare one. It replaces the
   // argv/env/cwd the table form carries (machine paths, $RUNNER_TEMP homes, the probe baseline).
   const ciOverride = process.env.CI && g.ci !== undefined && g.ci !== null ? g.ci : null
+  // Step rows are shell command text executed by an explicit lane (W11 A3). They are never part of
+  // a profile: local/pre-tag cannot satisfy their action environment, and the CI lanes own them.
+  if (g.kind === 'step') {
+    const command = typeof g.command === 'string' ? g.command : ''
+    if (command.trim() === '') return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: ['command'], path: 'UNRESOLVED', next: 'give the step its shell command (or drop the row)', evidence: MANIFEST + ':' + g.id + ' carries no command' })
+    const cwd = g.tree === 'overlay' ? overlayRoot : FAMILY_CHECKOUT
+    if (g.tree === 'overlay' && !existsSync(overlayRoot)) return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, missing: [overlayRoot], path: overlayRoot, next: 'clone the overlay tree before running this lane', evidence: 'overlayRoot=' + overlayRoot })
+    const budgetMs = g.timeoutMs === undefined ? 180000 : g.timeoutMs
+    const shell = process.platform === 'win32'
+      ? [process.env.ComSpec ?? 'cmd.exe', '/d', '/s', '/c', command]
+      : ['/bin/sh', '-c', command]
+    const observed = await runner.run(shell, { cwd, timeoutMs: budgetMs, env: process.env })
+    const ms = observed.ms
+    if (observed.killedBy === 'budget' || observed.errorCode === 'ETIMEDOUT') return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'timeout' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'the step ran past its ' + String(budgetMs) + ' ms budget - run it on the runner it was written for', evidence: command + ' killed at the ' + String(budgetMs) + ' ms budget' })
+    if (observed.errorCode !== null) return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'unknown-errno' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [String(observed.errorCode)], next: 'the shell could not start the step - fix the runner environment', evidence: command + ' errno=' + String(observed.errorCode) })
+    if (observed.status === 0) return base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms, evidence: command + ' exit=0' })
+    return base(g, { verdict: 'fail', criterionEvaluated: true, cause: { kind: 'non-zero-exit' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'read the step output above and fix the command or the tree it judges', evidence: command + ' exit=' + String(observed.status) })
+  }
   const argv = ciOverride !== null && Array.isArray(ciOverride.argv) ? ciOverride.argv : (Array.isArray(g.argv) ? g.argv : null)
   const executable = argv === null ? '' : argv.join(' ')
   const placeholder = (executable.match(/<[^>]*>/) || [])[0]

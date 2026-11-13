@@ -460,8 +460,11 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
         const gates = JSON.parse(readFileSync(join(root, 'scripts', 'gate-manifest.json'), 'utf8')).gates ?? []
         for (const gate of gates) {
           if (!laneRuns.some((lane) => Array.isArray(gate.lanes) && gate.lanes.includes(lane))) continue
-          const tokens = gate.ci !== undefined && Array.isArray(gate.ci.argv) ? gate.ci.argv : gate.argv
-          for (const token of tokens ?? []) if (/scripts\//.test(token) && /\.mjs$/.test(token)) executed.add(token.replace(/^.*[\\/]/, ''))
+          const declared = gate.ci !== undefined && Array.isArray(gate.ci.argv) ? gate.ci.argv : gate.argv
+          // Step rows carry shell `command` text (A1b/A3b): the lane executes it, so its scripts
+          // belong to the executed set too.
+          const tokens = [...(declared ?? []), ...(typeof gate.command === 'string' ? gate.command.split(/[\s|&;()]+/) : [])]
+          for (const token of tokens) if (/scripts\//.test(token) && /\.mjs$/.test(token)) executed.add(token.replace(/^.*[\\/]/, ''))
         }
       } catch { /* unreadable manifest: the manifest gate names it; executed stays literal here */ }
     }

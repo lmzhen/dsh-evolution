@@ -1543,7 +1543,8 @@
         "ci"
       ],
       "after": [
-        "gate-16"
+        "gate-16",
+        "gate-74"
       ],
       "lanes": [
         "ci-release"
@@ -1654,6 +1655,9 @@
       "profiles": [],
       "command": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
       "reason": "action step — executed by its lane/action step, not by run-gates",
+      "needs": [
+        "gate-59"
+      ],
       "lanes": [
         "ci-release",
         "ci-windows"
@@ -1667,6 +1671,7 @@
       "tree": "overlay",
       "profiles": [],
       "command": "node packages/evolution/scripts/build-lib.mjs",
+      "runBy": "action",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
       "lanes": [
         "local",
@@ -1683,6 +1688,7 @@
       "tree": "mirror",
       "profiles": [],
       "command": "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
+      "runBy": "action",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
       "lanes": [
         "ci-setup"
@@ -1722,6 +1728,7 @@
       "tree": "overlay",
       "profiles": [],
       "command": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
+      "runBy": "action",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
       "lanes": [
         "ci-release"
@@ -1735,6 +1742,7 @@
       "tree": "overlay",
       "profiles": [],
       "command": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
+      "runBy": "action",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
       "lanes": [
         "ci-release"
@@ -1761,6 +1769,7 @@
       "tree": "overlay",
       "profiles": [],
       "command": "node packages/evolution/scripts/prepare-packed-platform.mjs packages/evolution/dist \"$PLATFORM_VERSION\" | tail -n 1)\"",
+      "runBy": "action",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
       "lanes": [
         "ci-release",
@@ -1775,6 +1784,7 @@
       "tree": "overlay",
       "profiles": [],
       "command": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules \"$PLATFORM_DIR\"",
+      "runBy": "action",
       "reason": "P2-33 packed-tarball consumer smoke: unpacks dist tarballs and imports every declared entry",
       "owner": "ci",
       "lanes": [

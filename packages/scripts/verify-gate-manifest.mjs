@@ -209,8 +209,11 @@ const laneCoveredScripts = new Set()
 const laneCoveredTools = new Set()
 for (const gate of manifestGates) {
   if (!ACTION_LANE_RUNS.some((lane) => Array.isArray(gate.lanes) && gate.lanes.includes(lane))) continue
-  const tokens = gate.ci !== undefined && Array.isArray(gate.ci.argv) ? gate.ci.argv : gate.argv
-  for (const token of tokens ?? []) {
+  const declared = gate.ci !== undefined && Array.isArray(gate.ci.argv) ? gate.ci.argv : gate.argv
+  // Step rows carry shell `command` text (A1b/A3b); the lane executes it, so its scripts are
+  // covered too. Tokenise on shell separators so `a.mjs && b.mjs` counts both.
+  const tokens = [...(declared ?? []), ...(typeof gate.command === 'string' ? gate.command.split(/[\s|&;()]+/) : [])]
+  for (const token of tokens) {
     if (/scripts\//.test(token) && /\.mjs$/.test(token)) laneCoveredScripts.add(token.replace(/^.*[\\/]/, ''))
     if (token.includes('oxlint/bin/oxlint')) laneCoveredTools.add('oxlint/bin/oxlint')
     if (token.includes('vitest/vitest.mjs')) laneCoveredTools.add('vitest/vitest.mjs')

@@ -88,6 +88,14 @@ runs:
         rm -rf upstream/packages/evolution/.release-staging.next \
                upstream/packages/evolution/.release-staging.previous
 
+    - name: Run the setup gate lane (registry ci-setup)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # W11 A3b: setup step rows are lane-executed now. gate-69 declares the line this run
+        # measured; the inject/copy step above stays hand-written because it also stages the overlay.
+        node packages/evolution/scripts/run-gates.mjs ci --lane ci-setup --json-out "$RUNNER_TEMP/gates-setup.json"
+
     - name: Verify layout sync and version alignment (P2-15, V9-01 guard)
       shell: bash
       working-directory: upstream
@@ -203,22 +211,6 @@ runs:
         if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then ARGS+=(--dev-build); fi
         node packages/evolution/scripts/prepare-release.mjs "${ARGS[@]}"
 
-    - name: Audit the packed tarballs (what a user installs)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # The pack step proves pnpm can produce tarballs and the range guard reads their
-        # MANIFESTS; neither one opens a tarball. This reads the payloads: every entry file a
-        # consumer resolves exists, the scoped release dropped its ./src/* shim, the platform
-        # ranges are exactly the floor, no @deepseek-ai/dsh-evolution- literal survived the
-        # rescope, each browser half carries lib/client.js plus dsh.client, and no test /
-        # node_modules / tarball residue rode along.
-        # G1-S7: the floor comes from the overlay platform-line.json (the same file prepare-release and
-        # the range guard read) — not from an action input that could drift.
-        RANGE="$(node -p "require('./platform-line.json').floor")"
-        node packages/evolution/scripts/audit-release-tarballs.mjs \
-          packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "^$RANGE"
-
     - name: Run the static gate lane (registry ci-static)
       shell: bash
       working-directory: upstream
@@ -234,16 +226,12 @@ runs:
       env:
         NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
-        # W11 A3: release rows run only after pack. gate-27 judges the packed .release-staging tree,
-        # gate-48 the seven-axis registry ledger, gate-49 the mutation coverage (registered cannot).
+        # W11 A3b: the release lane owns the post-pack audit (gate-59) and packed smoke (gate-74)
+        # plus the range/registry/mutation rows; gate-74 needs gate-59, so the audit always judges
+        # the tarballs before the smoke reads them.
+        RANGE="$(node -p "require('./platform-line.json').floor")"
+        export RANGE
         node packages/evolution/scripts/run-gates.mjs ci --lane ci-release --concurrency 1 --json-out "$RUNNER_TEMP/gates-release.json"
-
-    - name: Declare the line this CI run measured (G1.5)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # A setup step, not a gate (lane ci-setup): every conclusion names its line.
-        node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json
 
     - name: Prove the mutation probes can still go red (W9 S4)
       shell: bash
@@ -288,17 +276,6 @@ runs:
         PLATFORM_DIR="$(node packages/evolution/scripts/prepare-packed-platform.mjs packages/evolution/dist "$PLATFORM_VERSION" | tail -n 1)"
         test -d "$PLATFORM_DIR"
         node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules "$PLATFORM_DIR"
-
-    - name: "Install smoke: packed tarballs into a throwaway consumer"
-      shell: bash
-      working-directory: upstream
-      run: |
-        # P2-33: install the PACKED family, not the source overlay. Every tarball is unpacked
-        # into a consumer node_modules and its export target/bundle patch is checked before
-        # publish. --assets-only is deliberate: the CI checkout's platform packages are source
-        # only, so a runtime import cannot resolve @deepseek-ai/*; the full import path is
-        # exercised on the real host and in the local gate where the platform is built.
-        node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only
 
     - name: Source-overlay installer guard (Windows install path)
       if: inputs.install_smoke == 'true'

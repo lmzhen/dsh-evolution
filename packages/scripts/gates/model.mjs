@@ -82,6 +82,9 @@ export function validateRegistry(entries) {
     if (entry.kind === 'step') {
       if (typeof entry.command !== 'string' || entry.command.trim() === '') problems.push(id + ': step row needs command (executed by its lane/action, not by run-gates)')
       if (entry.argv !== undefined && entry.argv !== null) problems.push(id + ': step row carries argv (steps are command text, not spawn argv)')
+      // A step still executed by a hand-written action step (build/pack/publish) declares it, so the
+      // lane selector does not run it a second time. Default lane = the lane owns the command.
+      if (entry.runBy !== undefined && !['lane', 'action'].includes(entry.runBy)) problems.push(id + ': step runBy must be lane|action')
     }
     if (entry.kind === 'external') {
       // External rows document a command the family does not execute (another tool owns it). argv may
