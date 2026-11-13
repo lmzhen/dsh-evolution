@@ -483,8 +483,6 @@ describe('skill-history: which artifact a version holds (0.10.1)', () => {
       expect(grown.versions[0]?.summary).toBeUndefined()
     })
 
-    // G5 step 5 (audit F1): the two summarizer helpers below this line were retired with their
-    // assertions - `normalizeVersionSummary` / `versionSummaryPrompt` have no non-test consumer.
   })
 
   it('splits the two chains, so the body keeps its content order when a support file shares the index', () => {

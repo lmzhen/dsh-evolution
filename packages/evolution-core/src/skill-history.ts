@@ -818,47 +818,6 @@ export function textDiffFacts(before: string, after: string, path: string, maxLi
   }
 }
 
-/** Characters one generated summary may carry. */
-export const VERSION_SUMMARY_MAX_CHARS = 80
-
-/**
- * The fixed prompt the optional per-write summarizer runs (registry `skillVersionSummary`).
- *
- * Model-visible, so it is written from the model’s perspective and pinned: the tests assert that it
- * carries the skill name, the character cap and both bodies, because a silent change to a prompt is a
- * silent change to what every recorded version says.
- * @param input - the skill, the action, and the two bodies (null when absent).
- * @returns the prompt text.
- */
-export function versionSummaryPrompt(input: { name: string; action: string; before: string | null; after: string | null }): string {
-  return [
-    'You are writing ONE line that tells a reader what this single edit to the agent skill',
-    '"' + input.name + '" changed. The edit action was "' + input.action + '".',
-    'Rules: at most ' + String(VERSION_SUMMARY_MAX_CHARS) + ' characters; the same language as the body;',
-    'name the decision, number or section that moved (for example "keeps 30 days instead of 90 days");',
-    'never say merely that something changed; no preamble, quotes, markdown or trailing period.',
-    '',
-    'Body BEFORE the edit:',
-    input.before ?? '(the skill did not exist before this edit)',
-    '',
-    'Body AFTER the edit:',
-    input.after ?? '(the skill does not exist after this edit)',
-  ].join('\n')
-}
-
-/**
- * Reduce a model answer to the one line the index stores.
- * @param raw - the model’s answer, whatever shape it came in.
- * @param maxChars - the character cap.
- * @returns the one line, or undefined when there is nothing usable (callers store no summary).
- */
-export function normalizeVersionSummary(raw: string, maxChars: number = VERSION_SUMMARY_MAX_CHARS): string | undefined {
-  const firstLine = raw.split('\n').map(line => line.trim()).find(line => line !== '')
-  if (firstLine === undefined) return undefined
-  const stripped = firstLine.replace(/^["'`*•s]+/u, '').replace(/["'`*s]+$/u, '').replace(/[。.]$/u, '').trim()
-  if (stripped === '') return undefined
-  return stripped.length > maxChars ? stripped.slice(0, maxChars - 1) + '…' : stripped
-}
 /** A relative age, in the shape the platform’s own `relativeTime(at, now)` returns. */
 export interface RelativeAge {
   readonly unit: 'now' | 'minutes' | 'hours' | 'days' | 'months' | 'years'

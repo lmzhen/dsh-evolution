@@ -182,7 +182,7 @@ const readsStateSchema = z.object({
     failed: z.boolean(),
     file: z.string().nullable().optional(),
     tool: z.string().optional(),
-  }).strict()),
+  }).strict()).max(512),
 }).strict()
 
 const signalsStateSchema = z.object({
@@ -272,7 +272,7 @@ export const evolutionReadsProjection: EvolutionProjectionDefinition<'evolutionR
       arguments: step.arguments,
       ok: step.outcome?.ok,
     }) ?? null
-    return { reads: [...state.reads, { key: step.key, skill, failed: step.outcome?.ok === false }] }
+    return { reads: [...state.reads.slice(-511), { key: step.key, skill, failed: step.outcome?.ok === false }] }
   },
 }
 

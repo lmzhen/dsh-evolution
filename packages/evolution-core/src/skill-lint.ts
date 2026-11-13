@@ -165,14 +165,4 @@ export function diffFindings(
   return { introduced, worsened, resolved }
 }
 
-/** Support files = markdown files under references/ (contract §4: unit frozen, underscore-prefixed
- * excluded). Paths are supplied by the caller — this module never touches the filesystem. */
-export function countReferenceFiles(paths: readonly string[]): number {
-  return paths.filter((p) => {
-    const n = p.replace(/\\/g, '/')
-    const inReferences = n.includes('/references/') || n.startsWith('references/')
-    if (!inReferences || !n.endsWith('.md')) return false
-    const base = n.slice(n.lastIndexOf('/') + 1)
-    return !base.startsWith('_')
-  }).length
-}
+

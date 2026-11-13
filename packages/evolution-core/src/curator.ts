@@ -11,7 +11,6 @@ import { daysSinceIso, idleDays } from './usage.ts'
 import { EvolutionGateSet, createGateSet } from './gates.ts'
 import { PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE } from './constants.ts'
 
-export { PROTECTED_BUILTIN_SKILLS } from './constants.ts'
 
 export interface CuratorConfig {
   staleAfterDays: number

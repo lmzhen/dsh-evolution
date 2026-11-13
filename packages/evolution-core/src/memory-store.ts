@@ -11,7 +11,6 @@ import { payloadText } from './payload.ts'
 import { scanMemoryThreats, type ScanOptions } from './threats.ts'
 import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_CONSOLIDATION_FAILURES } from './constants.ts'
 
-export { ENTRY_DELIMITER } from './constants.ts'
 
 /**
  * Read-guard factor: a memory file larger than this multiple of its target's

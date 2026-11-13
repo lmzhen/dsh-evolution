@@ -9,9 +9,7 @@
  */
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-
-/** 技能名文法（与平台 `isSkillName` 等价：kebab-case，点前缀与下划线一律不是技能名）。 */
-export const SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]*$/
+import { SKILL_NAME_RE } from './constants.ts'
 
 /** 名字是否是技能名 —— `._x`、`Bad_Name`、`.archive` 都返回 false。 */
 export function isSkillName(name: string): boolean {

@@ -91,24 +91,3 @@ export function h2Sections(body: string): H2Section[] {
   for (const row of rows) row.count = rows.filter(other => other.title === row.title).length
   return rows
 }
-
-/** One move the panel can hand to `restructure` without the store refusing it. */
-export interface RestructureCandidate {
-  heading: string
-  toFile: string
-}
-
-/**
- * The sections a restructure proposal may name: heading unique, section non-empty. Derived from
- * `h2Sections`, i.e. from the SAME scan the store validates against.
- * @param body - the markdown after the frontmatter block.
- * @returns move-ready pairs in document order; empty when nothing qualifies.
- */
-export function restructureCandidates(body: string): RestructureCandidate[] {
-  return h2Sections(body)
-    .filter(section => section.count === 1 && section.end > section.start + 1)
-    .map(section => ({
-      heading: section.title,
-      toFile: 'references/' + section.title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-').replace(/^-+|-+$/g, '') + '.md',
-    }))
-}

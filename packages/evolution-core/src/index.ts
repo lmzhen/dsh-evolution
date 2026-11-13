@@ -18,8 +18,6 @@
  *   `payload.ts` (which of `facts`/`content` is the payload — one rule for the whole family).
  * - **Security primitives** — `threats.ts` (content threat scanner),
  *   `redact.ts` (credential masking at model boundaries),
- *   `fold-untrusted.ts` (untrusted text must not become prompt structure). Consumers:
- *   evolution-policy/threat, both stores, review, maintenance.
  * - **Core domain stores/logic** — `skill-store.ts` (skill tree engine +
  *   IO-seam consumer), `memory-store.ts`, `usage.ts`, `curator.ts`,
  *   `quality.ts`, `signals.ts`, `skill-reads.ts` (the read-before-write rule, shared by the
@@ -101,7 +99,6 @@ export * from './live.ts'
 export * from './numeric.ts'
 export * from './opt-in.ts'
 export * from './payload.ts'
-export * from './fold-untrusted.ts'
 
 // G0 contract surface: /subagent types + state probe, /composition preset constants.
 export * from './subagent/index.ts'

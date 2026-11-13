@@ -290,6 +290,14 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
     return [...live, ...[...perKind.values()].flat()].sort((a, b) => b.startedAt - a.startedAt)
   }
 
+  /** One serialization for every run-index write (live first, then terminal, then foreign rows). */
+  const serializeIndex = (records: readonly unknown[], foreignRows: readonly unknown[]): string => {
+    const kept = capped(records as readonly RunRecord[])
+    const live = kept.filter(row => row.state === 'running')
+    const done = kept.filter(row => TERMINAL.has(row.state))
+    return JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: [...live, ...done, ...foreignRows] }, null, 2)
+  }
+
   /**
    * Update a surviving foreign row in place (identity stable), or add it.
    *
@@ -344,12 +352,9 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         for (const [id, row] of merged) {
           if (row.state === 'running' && !owned.has(id) && ownerIsGone(row)) merged.set(id, orphanOf(row))
         }
-        const kept = capped([...merged.values()])
-        const live = kept.filter(row => row.state === 'running')
-        const done = kept.filter(row => TERMINAL.has(row.state))
         // Rows this build does not understand ride along untouched (P2-5): it cannot
         // judge them, and dropping them would erase another writer's record.
-        return JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: [...live, ...done, ...onDisk.foreign] }, null, 2)
+        return serializeIndex([...merged.values()], onDisk.foreign)
       })
     } catch (error) {
       warn(`evolution-core: could not persist the run index (${error instanceof Error ? error.message : String(error)})`)
@@ -498,10 +503,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
           row.supersededAt = now()
           marked += 1
         }
-        const kept = capped([...merged.values()])
-        const live = kept.filter(row => row.state === 'running')
-        const done = kept.filter(row => TERMINAL.has(row.state))
-        return JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: [...live, ...done, ...onDisk.foreign] }, null, 2)
+        return serializeIndex([...merged.values()], onDisk.foreign)
       })
       return marked
     },
@@ -544,10 +546,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
           ...(outcome.resultRef === undefined ? {} : { resultRef: outcome.resultRef }),
           ...(outcome.failure === undefined ? {} : { failure: outcome.failure }),
         }
-        const kept = capped(onDisk.records.map(item => item.id === id ? next : item))
-        const live = kept.filter(item => item.state === 'running')
-        const done = kept.filter(item => TERMINAL.has(item.state))
-        return JSON.stringify({ schemaVersion: RUNS_SCHEMA_VERSION, runs: [...live, ...done, ...onDisk.foreign] }, null, 2)
+        return serializeIndex(onDisk.records.map(item => item.id === id ? next : item), onDisk.foreign)
       })
       // Rebuild the foreign view so this process answers the upgraded verdict at once.
       if (changed) await this.load()

@@ -15,8 +15,6 @@ export type SessionEventClass = 'model' | 'plugin-record' | 'unknown'
 /** Frames the model authored/saw (the only frames evidence, reads and usage accounting may consume). */
 import { MODEL_SESSION_EVENT_TYPES } from './tool-dispatch.ts'
 
-export { MODEL_SESSION_EVENT_TYPES as MODEL_SESSION_EVENTS }
-
 const MODEL_EVENT_TYPES: ReadonlySet<string> = new Set<string>(MODEL_SESSION_EVENT_TYPES)
 
 /** Classify one session event WITHOUT interpreting it (pure). */
@@ -26,9 +24,4 @@ export function classifySessionEvent(event: { readonly type?: unknown; readonly 
     return event.ignorable === true ? 'plugin-record' : 'unknown'
   }
   return MODEL_EVENT_TYPES.has(type) ? 'model' : 'unknown'
-}
-
-/** True when the event must be skipped by evidence/usage readers (tolerant, never fatal). */
-export function isIgnorableEvent(event: { readonly type?: unknown; readonly ignorable?: unknown }): boolean {
-  return classifySessionEvent(event) !== 'model'
 }

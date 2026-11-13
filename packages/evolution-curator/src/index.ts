@@ -1976,7 +1976,13 @@ export class EvolutionCurator extends Service {
     await sweepRunReports({
       io: this.io,
       dir: join(evolutionHome(), 'reports'),
-      buckets: [{ prefix: 'curator-error-', keep: errorKeep }, { prefix: 'curator-', keep }],
+      buckets: [
+        { prefix: 'curator-error-', keep: errorKeep },
+        { prefix: 'curator-', keep },
+        // Proposal reports (extract-proposal-*.json) share this directory; without a bucket they
+        // were written forever while the comment claimed retention swept them (audit 02 P1-1).
+        { prefix: 'extract-proposal-', keep: 20 },
+      ],
       warn: (message) => { this.ctx.logger.warn(message) },
       owner: 'evolution-curator',
     })
