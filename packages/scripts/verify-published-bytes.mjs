@@ -8,14 +8,20 @@
  * owned it. Pre-publish audits (audit-release-tarballs) look at the local dist dir only.
  *
  * A fresh publish is not instantly readable from every edge: v0.26.26 and v0.27.0 both published all
- * packages and then saw fetches fail while the registry propagated / rate-limited. Two passes with
- * bounded exponential backoff keep the check honest (cannot-decide never counts as pass) without
- * turning a propagation window into a red release.
+ * packages and then saw fetches fail while the registry propagated / rate-limited. The old shape
+ * re-ran a fixed global pass schedule; a single slow package therefore held the whole check for
+ * minutes and the release job (which now has its own independent verify job, W10 M4) could be seen as
+ * a red publish.
  *
- * Usage: node verify-published-bytes.mjs <dist-dir> --version <x.y.z>
+ * Current shape: EVERY package polls on its own budget (default 5 min) with bounded exponential
+ * backoff and a small concurrency pool. A byte mismatch fails immediately (a mismatch is decided,
+ * not a propagation delay); packages still unreadable when their budget expires are cannot-decide
+ * (exit 2) and named. Use the independent `verify-published` CI job to re-run only this check.
+ *
+ * Usage: node verify-published-bytes.mjs <dist-dir> --version <x.y.z> [--budget-ms <n>] [--concurrency <n>]
  *
  * Exit: 0 all compared bytes match; 1 a byte mismatch (named); 2 cannot decide (a package could not
- * be fetched after all passes - offline or not on the registry yet).
+ * be fetched within its budget - offline or not on the registry yet).
  */
 import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -26,8 +32,14 @@ const argv = process.argv.slice(2)
 const distDir = argv.find((entry) => !entry.startsWith('--'))
 const flag = (name) => { const i = argv.indexOf(name); return i < 0 ? undefined : argv[i + 1] }
 const version = flag('--version')
-if (distDir === undefined || version === undefined) { console.error('usage: verify-published-bytes.mjs <dist-dir> --version <x.y.z>'); process.exit(2) }
+const budgetRaw = flag('--budget-ms')
+const concurrencyRaw = flag('--concurrency')
+if (distDir === undefined || version === undefined) { console.error('usage: verify-published-bytes.mjs <dist-dir> --version <x.y.z> [--budget-ms <n>] [--concurrency <n>]'); process.exit(2) }
 if (!existsSync(distDir)) { console.error('verify-published-bytes: no such dist dir ' + distDir + ' - pass the directory the release packed into'); process.exit(2) }
+const budgetMs = budgetRaw === undefined ? 300000 : Number(budgetRaw)
+if (!Number.isFinite(budgetMs) || budgetMs <= 0) { console.error('verify-published-bytes: --budget-ms must be a positive number (a non-positive budget decides nothing)'); process.exit(2) }
+const concurrency = concurrencyRaw === undefined ? 4 : Number(concurrencyRaw)
+if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 16) { console.error('verify-published-bytes: --concurrency must be an integer in [1,16]'); process.exit(2) }
 const tgz = readdirSync(distDir).filter((name) => name.endsWith('.tgz')).sort()
 if (tgz.length === 0) { console.error('verify-published-bytes: no .tgz under ' + distDir); process.exit(2) }
 const sha = (path) => createHash('sha256').update(readFileSync(path)).digest('hex')
@@ -41,64 +53,68 @@ const packageOf = (file) => {
 }
 const registryBase = (process.env.REGISTRY_BASE ?? 'https://registry.npmjs.org').replace(/\/$/, '')
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-const problems = []
+const mismatches = []
+const unresolved = []
 let compared = 0
 
 /**
- * Fetch one published tarball with bounded exponential backoff.
- * @returns undefined on success, else the captured failure text (stderr tail included).
+ * Verify ONE package within its own budget. A mismatch returns immediately (decided); a fetch that
+ * keeps failing is retried with bounded exponential backoff until the budget expires.
  */
-async function fetchPublished(name, scratch, attempts, backoff) {
+async function verifyOne(file) {
+  const name = packageOf(file)
   const short = name.slice(name.indexOf('/') + 1)
   const url = registryBase + '/' + name + '/-/' + short + '-' + version + '.tgz'
+  const deadline = Date.now() + budgetMs
+  const delays = [2000, 5000, 10000, 20000, 30000]
+  let attempt = 0
   let last = 'fetch-failed'
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+  while (Date.now() < deadline) {
+    attempt += 1
+    const scratch = mkdtempSync(join(tmpdir(), 'published-bytes-'))
     try {
       const response = await fetch(url)
       if (!response.ok) throw new Error('HTTP ' + response.status)
-      writeFileSync(join(scratch, short + '-' + version + '.tgz'), Buffer.from(await response.arrayBuffer()))
-      return undefined
+      const fetched = short + '-' + version + '.tgz'
+      writeFileSync(join(scratch, fetched), Buffer.from(await response.arrayBuffer()))
+      const localSha = sha(join(distDir, file))
+      const publishedSha = sha(join(scratch, fetched))
+      compared += 1
+      if (localSha !== publishedSha) {
+        mismatches.push(name + '@' + version + ': published bytes differ - local ' + localSha.slice(0, 12) + ' vs registry ' + publishedSha.slice(0, 12))
+        console.error('FAIL ' + name + '@' + version + ' - ' + localSha.slice(0, 12) + ' vs ' + publishedSha.slice(0, 12))
+      } else console.log('PASS ' + name + '@' + version + ' - ' + localSha.slice(0, 12))
+      return
     } catch (error) {
       last = String((error && error.message) ?? 'fetch-failed').slice(0, 200)
-      if (attempt < attempts) await sleep(backoff[attempt - 1] ?? 30000)
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
     }
+    const wait = Math.min(delays[Math.min(attempt - 1, delays.length - 1)] ?? 30000, Math.max(0, deadline - Date.now()))
+    if (wait > 0) await sleep(wait)
   }
-  return last
+  unresolved.push(name + '@' + version + ': not readable within ' + Math.round(budgetMs / 1000) + 's (' + attempt + ' attempt(s), last: ' + last + ')')
+  console.error('UNVERIFIED ' + name + '@' + version + ' - ' + last)
 }
 
-const pending = [...tgz]
-for (let round = 1; round <= 3 && pending.length > 0; round += 1) {
-  const attempts = round === 1 ? 5 : round === 2 ? 2 : 1
-  const backoff = round === 1 ? [3000, 8000, 20000, 45000] : round === 2 ? [20000] : []
-  const stillPending = []
-  for (const file of pending) {
-    const name = packageOf(file)
-    const scratch = mkdtempSync(join(tmpdir(), 'published-bytes-'))
-    const failure = await fetchPublished(name, scratch, attempts, backoff)
-    if (failure !== undefined) {
-      stillPending.push(file)
-      rmSync(scratch, { recursive: true, force: true })
-      continue
-    }
-    const fetched = readdirSync(scratch).filter((entry) => entry.endsWith('.tgz'))[0]
-    const local = join(distDir, file)
-    const published = join(scratch, String(fetched))
-    const localSha = sha(local)
-    const publishedSha = sha(published)
-    compared += 1
-    if (localSha !== publishedSha) problems.push(name + '@' + version + ': published bytes differ - local ' + localSha.slice(0, 12) + ' vs registry ' + publishedSha.slice(0, 12))
-    else console.log('PASS ' + name + '@' + version + ' - ' + localSha.slice(0, 12))
-    rmSync(scratch, { recursive: true, force: true })
-    await sleep(250)
+let cursor = 0
+const workers = Array.from({ length: Math.min(concurrency, tgz.length) }, async () => {
+  while (cursor < tgz.length) {
+    const file = tgz[cursor]
+    cursor += 1
+    await verifyOne(file)
   }
-  pending.length = 0
-  pending.push(...stillPending)
-  if (round < 3 && pending.length > 0) {
-    const wait = round === 1 ? 30000 : 60000
-    console.error('verify-published-bytes: ' + pending.length + ' package(s) not readable yet - one more pass after ' + String(wait / 1000) + 's')
-    await sleep(wait)
-  }
+})
+await Promise.all(workers)
+
+if (mismatches.length > 0) {
+  console.error('verify-published-bytes: FAIL - ' + mismatches.length + ' byte difference(s):')
+  for (const problem of mismatches) console.error('  - ' + problem)
+  process.exit(1)
 }
-if (problems.length > 0) { console.error('verify-published-bytes: FAIL - ' + problems.length + ' byte difference(s):'); for (const problem of problems) console.error('  - ' + problem); process.exit(1) }
-if (pending.length > 0) { console.error('verify-published-bytes: NOT VERIFIED - ' + pending.length + ' package(s) could not be decided after 3 passes (compared ' + compared + ')'); process.exit(2) }
+if (unresolved.length > 0) {
+  console.error('verify-published-bytes: NOT VERIFIED - ' + unresolved.length + ' package(s) not readable within their budget (compared ' + compared + '):')
+  for (const problem of unresolved) console.error('  - ' + problem)
+  process.exit(2)
+}
 console.log('verify-published-bytes: OK - ' + compared + ' package(s) match the published bytes')

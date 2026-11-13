@@ -608,37 +608,35 @@ writeFileSync(join(stagingNext, '.staging-manifest.json'), JSON.stringify({
 writeFileSync(join(distNext, 'manifest.json'), JSON.stringify(Object.fromEntries(tarballs.map(item => [item.name, item.file])), null, 2) + '\n')
 
 const nameByDir = Object.fromEntries(tarballs.map(item => [item.dir, item.name]))
-const publishGroups = [
-  // G8 structure batches: the table is the publish ORDER (dependencies first). Every published
-  // package appears exactly once; the consistency check below fails loud if it drifts.
-  ['evolution-core'],
-  ['evolution-state'],
-  ['evolution-merge-engine'],
-  ['memory', 'evolution-activity', 'evolution-skill-discovery', 'evolution-skill-health', 'tool-skill-manage'],
-  ['evolution-approval', 'evolution-curator', 'evolution-review', 'evolution-commands'],
-  // client kit ships before every package whose client half imports its generated surfaces.
-  ['evolution-client-kit'],
-  ['evolution-maintenance'],
-  ['evolution-merge', 'evolution-merge-ui'],
-  ['evolution-ui'],
-  // install forms last: they mount the rows above.
-  // evolution-preset is RETIRED from the publish surface (retained for migration only).
-  ['evolution-all', 'evolution-host', 'evolution-agent'],
-]
-// P2-39 (v11): the hardcoded table MUST equal the staged tarballs — a stale
-// entry previously wrote `null` into publish-order.json (and the downstream
-// consistency check blamed the wrong root cause). Fail loud naming both sides.
-const stagedDirs = tarballs.map(item => item.dir)
-const publishGroupDirs = publishGroups.flat()
-const stagedButUnlisted = stagedDirs.filter(dir => !publishGroupDirs.includes(dir))
-const listedButUnstaged = publishGroupDirs.filter(dir => !stagedDirs.includes(dir))
-if (stagedButUnlisted.length > 0 || listedButUnstaged.length > 0) {
-  throw new Error(
-    `prepare-release: publish-order tables out of sync — staged-but-unlisted: ${stagedButUnlisted.join(', ') || '(none)'}; `
-    + `listed-but-unstaged: ${listedButUnstaged.join(', ') || '(none)'}. Update the publishGroups table in prepare-release.mjs.`,
-  )
+// W10 M4: the publish order is DERIVED from the workspace dependency graph (dependencies first),
+// not a hand-maintained table. The old table drifted once already ("publish-order tables out of
+// sync"); a derived order cannot disagree with the published set, and a cycle fails loudly here
+// instead of surfacing as an npm 404 mid-publish.
+//   layering = repeatedly take the packages whose family deps were all published in earlier
+//   layers; ties sort by package name so dist/publish-order.json is deterministic.
+const familyNames = new Set(tarballs.map(item => item.name))
+const dirByName = Object.fromEntries(tarballs.map(item => [item.name, item.dir]))
+const depsOfDir = new Map()
+for (const item of tarballs) {
+  const manifest = readJson(join(stagingNext, item.dir, 'package.json'))
+  const declared = new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})])
+  depsOfDir.set(item.dir, new Set([...declared].filter(name => familyNames.has(name) && name !== item.name)))
 }
-writeFileSync(join(distNext, 'publish-order.json'), JSON.stringify(publishGroups.map(group => group.map(dir => nameByDir[dir])), null, 2) + '\n')
+const remainingDirs = new Set(tarballs.map(item => item.dir))
+const publishGroups = []
+while (remainingDirs.size > 0) {
+  const layer = [...remainingDirs].filter(dir => [...depsOfDir.get(dir)].every(name => !remainingDirs.has(dirByName[name])))
+  if (layer.length === 0) {
+    throw new Error('prepare-release: the workspace dependency graph has a cycle among ' + [...remainingDirs].join(', ') + ' — a publish order does not exist')
+  }
+  layer.sort((left, right) => nameByDir[left].localeCompare(nameByDir[right]))
+  publishGroups.push(layer.map(dir => nameByDir[dir]))
+  for (const dir of layer) remainingDirs.delete(dir)
+}
+if (publishGroups.flat().length !== tarballs.length) {
+  throw new Error('prepare-release: derived publish order covers ' + publishGroups.flat().length + ' package(s), the staged set has ' + tarballs.length)
+}
+writeFileSync(join(distNext, 'publish-order.json'), JSON.stringify(publishGroups, null, 2) + '\n')
 
 // P3 (v15): the `smoke-package.json` artifact was removed — nothing in the
 // repo (workflows, scripts, docs) ever read it; it was residue of a
