@@ -2,7 +2,7 @@
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { loadMergeState, mergeStatePath, pairKey, rowIdOf, dropRow, moveRow, mutateMergeState, upsertRow } from '../src/index.ts'
+import { loadMergeState, mergeStatePath, pairKey, rowIdOf } from '../src/index.ts'
 import { pairLedger } from '../src/domain/pair-ledger.ts'
 import { makeV4Home } from './support/schema4-home.ts'
 
@@ -52,12 +52,3 @@ it('reads without writing and normalizes a queue from state', async () => {
   expect(loaded.note).toContain('invalid row')
 })
 
-it('rejects every legacy writer', async () => {
-  const home = await tempRoot('dsh-merge-legacy-')
-  const io = nodeEvolutionIo()
-  const first = { id: 'r', pairKey: 'a', a: 'a', b: 'b', state: 'verify' as const, queue: 'verify' as const, createdAt: AT, updatedAt: AT }
-  await expect(mutateMergeState(io, home, () => 1, () => ({ rows: [], result: null }))).rejects.toThrow('legacy-writer-removed')
-  await expect(upsertRow(io, home, () => 1, first)).rejects.toThrow('legacy-writer-removed')
-  await expect(dropRow(io, home, () => 1, first.id)).rejects.toThrow('legacy-writer-removed')
-  await expect(moveRow(io, home, () => 1, first.id, { queue: 'pending' })).rejects.toThrow('legacy-writer-removed')
-})

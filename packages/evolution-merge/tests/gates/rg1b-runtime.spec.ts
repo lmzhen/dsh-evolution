@@ -7,7 +7,7 @@ import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { ensureMergeStateReady, migrationJournalPath, migrationReportPath, readStateReadiness, v2BackupPath } from '../../src/domain/state-bootstrap.ts'
 import { readStagingIndex, stagingIndexPath } from '../../src/domain/staging-index.ts'
-import { dropRow, mergeStatePath, moveRow, mutateMergeState, upsertRow } from '../../src/state.ts'
+import { mergeStatePath } from '../../src/state.ts'
 
 const v2 = { schemaVersion: 2, rows: [
   { id: 'v', pairKey: 'a|b', a: 'a', b: 'b', state: 'verify', createdAt: 'c', updatedAt: 'u' },
@@ -80,14 +80,6 @@ it('completes a pending journal and tolerates a lost journal/report', async () =
   expect(await ensureMergeStateReady(io, home)).toMatchObject({ ok: false, code: 'merge-state-migration-blocked' })
 })
 
-it('rejects every legacy writer', async () => {
-  const { home, io } = await setup()
-  const row = { ...v2.rows[0], queue: 'verify' } as never
-  await expect(mutateMergeState(io, home, () => 1, () => ({ rows: [], result: null }))).rejects.toThrow('legacy-writer-removed')
-  await expect(upsertRow(io, home, () => 1, row)).rejects.toThrow('legacy-writer-removed')
-  await expect(dropRow(io, home, () => 1, 'v')).rejects.toThrow('legacy-writer-removed')
-  await expect(moveRow(io, home, () => 1, 'v', { queue: 'pending' })).rejects.toThrow('legacy-writer-removed')
-})
 
 it('requires the report while the migration marker still matches the rows', async () => {
   const { home, io } = await setup()

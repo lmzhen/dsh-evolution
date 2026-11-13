@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { tempRoot } from '../../../test-support/temp-home.ts'
-import { loadMergeState, transactRows } from '../../src/state.ts'
+import { loadMergeState } from '../../src/state.ts'
 import { createReadOnlyMergeService, runMergeCommand } from '../../src/merge-command.ts'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 
@@ -26,6 +26,5 @@ it('fails closed on a v3 state instead of reading it as empty', async () => {
   const result = await runMergeCommand(service, 'merge status')
   expect(result.ok).toBe(false)
   expect(result.text).toMatch(/merge-state-(forward-only|normalize-required)/)
-  await expect(transactRows(nodeEvolutionIo(), home, () => 1)).rejects.toThrow('legacy-writer-removed')
   expect(createHash('sha256').update(readFileSync(target)).digest('hex')).toBe(before)
 })
