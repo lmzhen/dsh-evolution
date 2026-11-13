@@ -212,8 +212,8 @@ export const guards = [
   gate("gate-28", {
     kind: "script",
     tree: "mirror",
-    title: "`node packages/scripts/verify-release-artifacts.mjs .github --strict`（发布面产物：CI 工作流与发布脚本的一致性）",
-    argv: ["node","packages/scripts/verify-release-artifacts.mjs",".github","--strict"],
+    title: "`node packages/scripts/verify-release-artifacts.mjs .github --strict --self-test`（发布面产物：CI 工作流与发布脚本的一致性 + 检查器自检）",
+    argv: ["node","packages/scripts/verify-release-artifacts.mjs",".github","--strict","--self-test"],
     lanes: ["local","ci-static"],
   }),
 

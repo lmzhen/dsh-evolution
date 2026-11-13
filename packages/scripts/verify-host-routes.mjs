@@ -3,7 +3,7 @@
  * G4/W6 host-route guard: ONE path table, ONE carrier, no second admission path.
  *
  * Checks (static, so it runs in the mirror without a build):
- *   1. HOST_ROUTES is the only home of '/api/dsh-evolution/' literals (6 surfaces / 21 endpoints).
+ *   1. HOST_ROUTES is the only home of '/api/dsh-evolution/' literals (5 surfaces / 19 endpoints).
  *   2. Business sources carry no loopback fence / webServer registration and no hand-copied route paths.
  *   3. The three migrated host packages import HOST_ROUTES from core/http-routes.
  *   4. Generated client route constants (G5), when present, carry the GENERATED header and only paths

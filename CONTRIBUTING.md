@@ -62,7 +62,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 25 | `node packages/scripts/verify-client-seats.mjs packages --strict`（客户端半的座位读取与平台席位一致性） | mirror |
 | 26 | `node packages/scripts/verify-client-tokens.mjs packages --strict`（客户端 token 使用） | mirror |
 | 27 | `node packages/scripts/verify-platform-ranges.mjs --manifest-dir packages/evolution/.release-staging`（**发布期**：每个 staged manifest 的 `@deepseek-ai/dsh-*` 必须逐字等于 platform-line.json 派生的 peers 范围、`engines.dsh` 必须等于 engines 窗口；vendored 范围由 `lib-vendored-ranges.mjs` 单源钉住；同时打印双谓词窗口网格两表读数 ✓） | mirror |
-| 28 | `node packages/scripts/verify-release-artifacts.mjs .github --strict`（发布面产物：CI 工作流与发布脚本的一致性） | mirror |
+| 28 | `node packages/scripts/verify-release-artifacts.mjs .github --strict --self-test`（发布面产物：CI 工作流与发布脚本的一致性 + 检查器自检） | mirror |
 | 29 | `node packages/scripts/verify-write-inventory.mjs packages --strict --home <plane home>`（写清单落地：**CI 形态**用 `$RUNNER_TEMP/plane-home`） | mirror |
 | 30 | `node packages/scripts/verify-client-ui-i18n.mjs packages`（U-8/G5.9：客户端半的可见文案必须走字典——① 不许把裸字符串当子节点（任何实参位）；② 不许在字符串里写跨面指令 `dsh web`／`/evolution …`；注释先行剥离且**保留行号**。drill：注入一个第 4 实参裸串＋一个跨面串 ⇒ 必红，撤回即绿 ✓） | mirror |
 | 31 | `node packages/scripts/verify-error-codes.mjs packages`（G4.3/C5：错误码表与文档必须**同集**——源码新增码未入档、或文档留着一个已删除的码，都必红；并校验文档里的**区间**与表实际一致。drill：给源码塞一个 E-322 ⇒ 必红；删掉一行文档码 ⇒ 必红；撤回即绿 ✓） | mirror |

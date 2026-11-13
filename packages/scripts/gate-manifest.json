@@ -516,12 +516,13 @@
     {
       "id": "gate-28",
       "kind": "script",
-      "human": "`node packages/scripts/verify-release-artifacts.mjs .github --strict`（发布面产物：CI 工作流与发布脚本的一致性）",
+      "human": "`node packages/scripts/verify-release-artifacts.mjs .github --strict --self-test`（发布面产物：CI 工作流与发布脚本的一致性 + 检查器自检）",
       "argv": [
         "node",
         "packages/scripts/verify-release-artifacts.mjs",
         ".github",
-        "--strict"
+        "--strict",
+        "--self-test"
       ],
       "tree": "mirror",
       "profiles": [
@@ -1749,7 +1750,8 @@
       "tree": "overlay",
       "profiles": [],
       "command": "node packages/evolution/scripts/run-load-sensitive.mjs .",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "runBy": "action",
+      "reason": "mutating/helper step — run by the CI action, not by run-gates (contract 5c)",
       "lanes": [
         "ci-unit"
       ]

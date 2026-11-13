@@ -677,7 +677,7 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
       }
       const tier = row.tier
       if (typeof tier !== 'string' || tier === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier is missing - every check states the lane the policy requires it at')
-      else if (!tiers.includes(tier)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier "' + tier + '" is neither one of the ' + String(machine.tierSource) + ' tiers [' + tiers.join(', ') + '] nor the sentinel ' + String(sentinelTier) + ' - a tier outside the policy closed set')
+      else if (!tiers.includes(tier)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier "' + tier + '" is neither one of the ' + String(machine.tierSource) + ' tiers [' + tiers.join(', ') + '] - a tier outside the policy closed set')
       if (typeof row.criterion !== 'string' || row.criterion === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.criterion is missing - every check names what judges it')
       else if (!cmd.includes(row.criterion)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.criterion "' + row.criterion + '" does not occur in the command the table runs (' + cmd + ') - the declaration and the table disagree')
     }

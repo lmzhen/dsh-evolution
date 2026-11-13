@@ -71,7 +71,10 @@ export const steps = [
     title: "node packages/evolution/scripts/run-load-sensitive.mjs .",
     command: "node packages/evolution/scripts/run-load-sensitive.mjs .",
     lanes: ["ci-unit"],
-    reason: "mutating/helper step — registered, not run by run-gates (contract 5c)",
+    // The action runs this step by hand (once); marking it action-owned keeps the lane from
+    // running the same load-sensitive group a second time.
+    runBy: "action",
+    reason: "mutating/helper step — run by the CI action, not by run-gates (contract 5c)",
   }),
 
   gate("ci-only-13", {
