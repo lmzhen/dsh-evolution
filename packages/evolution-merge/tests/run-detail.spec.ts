@@ -41,6 +41,21 @@ it('CLI status consumes buildRunDetail with the current pair and per-pair outcom
   expect(answer.text).toContain('resultRef=/tmp/report.json')
 })
 
+it('maps an undone pair to undone, not merged (W11 D)', () => {
+  const snapshot = {
+    readAt: 1,
+    runs: [{
+      record: { ...run, state: 'undone' },
+      meta: null,
+      pairs: [{ pairKey: 'a-skill\u0000b-skill', runId: 'run-1', result: 'undone' }],
+      report: null,
+      reportRef: null,
+    }],
+  } as never
+  const detail = buildRunDetail(snapshot, 'run-1')
+  expect(detail?.pairs).toEqual([expect.objectContaining({ a: 'a-skill', b: 'b-skill', outcome: 'undone' })])
+})
+
 it('status with an unknown id answers the three-line row-not-found error', async () => {
   const v4 = await makeV4Home([])
   const registry = { async begin() { throw new Error('unused') }, runs() { return [] }, find() { return undefined } } as unknown as MergeRuntimeDeps['registry']
