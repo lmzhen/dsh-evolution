@@ -1,25 +1,25 @@
 {
-  "note": "0.45.0 release rehearsal: S1-S3 measured on the packed 0.45.0 candidate installed in an isolated web profile (D:/dsh-homes/acc045, port 3103, platform 0.2.2-rc.1) at commit ffc8052a1207ab5bc3c37e26ac8c4edb6cd6dee8; S4 is the HMR double-apply suite on the same frozen source tree. artifactSha256 is the digest of the 20 packed 0.45.0 dist tarballs (sorted \"<name>  <sha256>\" lines); inputsSha256 pins commit/platform/artifact digest/node/profile/fixture. SKILL-HISTORY FIXTURE: the candidate home was seeded with a copy of the web home skills tree (845 files) so the listing exercises the real read path.",
-  "familyVersion": "0.45.0",
+  "note": "0.46.0 release rehearsal: S1-S3 measured on the packed 0.46.0 candidate (20 dist tarballs, artifact digest pinned) installed in an isolated web profile D:/dsh-homes/acc046 (port 3106, platform 0.2.2-rc.1, node v26.4.0) at commit c109fda10132d509474c9581f5bfd9b39d82b10a; the profile was cloned from the 0.45 candidate home and the 20 family package directories were replaced with the 0.46.0 tarball payloads, so platform deps and the 845-file skills fixture are the same measurement inputs. S4 is the HMR double-apply suite (2/2) on the same frozen source tree. inputsSha256 = sha256(canonical JSON {commit, platformVersion, artifactSha256, node, profile, fixture}). Raw S1-S3 reading: audit-2026-11-12/evidence/w10-release-0.46.0/measure-candidate-s1s3.json.",
+  "familyVersion": "0.46.0",
   "spikes": [
     {
       "spike": "S1",
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.45.0",
-      "startedAt": "2026-11-12T23:32:17.524Z",
-      "artifactSha256": "fc4021bb4bc47c74570edae9ae3904e9760864d58ef4ae774545ce8ea4af5031",
-      "commit": "ffc8052a1207ab5bc3c37e26ac8c4edb6cd6dee8",
-      "inputsSha256": "251608c102efb4633e57e8ef775ad8e38d1ff4ffffff23cf5bc12d90db51e883",
+      "familyVersion": "0.46.0",
+      "startedAt": "2026-11-13T07:01:48.087Z",
+      "artifactSha256": "9f59787b20e56fae3e4a0adcfb5cd758a697a854b23d27d3c0459782dabb8e78",
+      "commit": "c109fda10132d509474c9581f5bfd9b39d82b10a",
+      "inputsSha256": "4ba3a3089e52e2751c9e2f364343f59de9e6ac21251c6d258b3252064e98b491",
       "readings": {
         "skillHistoryRows": 29,
         "skillHistoryBytes": 22999,
         "threeReadsStable": true,
         "readMs": [
-          162,
-          185,
-          118
+          260,
+          167,
+          299
         ],
         "ownerStatus": 200
       }
@@ -29,16 +29,16 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.45.0",
-      "startedAt": "2026-11-12T23:32:17.524Z",
-      "artifactSha256": "fc4021bb4bc47c74570edae9ae3904e9760864d58ef4ae774545ce8ea4af5031",
-      "commit": "ffc8052a1207ab5bc3c37e26ac8c4edb6cd6dee8",
-      "inputsSha256": "251608c102efb4633e57e8ef775ad8e38d1ff4ffffff23cf5bc12d90db51e883",
+      "familyVersion": "0.46.0",
+      "startedAt": "2026-11-13T07:01:48.087Z",
+      "artifactSha256": "9f59787b20e56fae3e4a0adcfb5cd758a697a854b23d27d3c0459782dabb8e78",
+      "commit": "c109fda10132d509474c9581f5bfd9b39d82b10a",
+      "inputsSha256": "4ba3a3089e52e2751c9e2f364343f59de9e6ac21251c6d258b3252064e98b491",
       "readings": {
         "ownerDiagnostics": 200,
         "anonymous": 401,
         "anonymousBody": "unauthorized",
-        "diagnosticsReadMs": 34,
+        "diagnosticsReadMs": 98,
         "carrier": "connection.fetch"
       }
     },
@@ -47,14 +47,14 @@
       "verdict": "pass",
       "face": "web",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.45.0",
-      "startedAt": "2026-11-12T23:32:17.524Z",
-      "artifactSha256": "fc4021bb4bc47c74570edae9ae3904e9760864d58ef4ae774545ce8ea4af5031",
-      "commit": "ffc8052a1207ab5bc3c37e26ac8c4edb6cd6dee8",
-      "inputsSha256": "251608c102efb4633e57e8ef775ad8e38d1ff4ffffff23cf5bc12d90db51e883",
+      "familyVersion": "0.46.0",
+      "startedAt": "2026-11-13T07:01:48.087Z",
+      "artifactSha256": "9f59787b20e56fae3e4a0adcfb5cd758a697a854b23d27d3c0459782dabb8e78",
+      "commit": "c109fda10132d509474c9581f5bfd9b39d82b10a",
+      "inputsSha256": "4ba3a3089e52e2751c9e2f364343f59de9e6ac21251c6d258b3252064e98b491",
       "readings": {
         "semverVersion": "0.2.2-rc.1",
-        "familyVersion": "0.45.0",
+        "familyVersion": "0.46.0",
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
@@ -66,11 +66,11 @@
       "verdict": "pass",
       "face": "headless",
       "hostVersion": "0.2.2-rc.1",
-      "familyVersion": "0.45.0",
-      "startedAt": "2026-11-12T23:32:17.524Z",
-      "artifactSha256": "fc4021bb4bc47c74570edae9ae3904e9760864d58ef4ae774545ce8ea4af5031",
-      "commit": "ffc8052a1207ab5bc3c37e26ac8c4edb6cd6dee8",
-      "inputsSha256": "251608c102efb4633e57e8ef775ad8e38d1ff4ffffff23cf5bc12d90db51e883",
+      "familyVersion": "0.46.0",
+      "startedAt": "2026-11-13T07:02:06.000Z",
+      "artifactSha256": "9f59787b20e56fae3e4a0adcfb5cd758a697a854b23d27d3c0459782dabb8e78",
+      "commit": "c109fda10132d509474c9581f5bfd9b39d82b10a",
+      "inputsSha256": "4ba3a3089e52e2751c9e2f364343f59de9e6ac21251c6d258b3252064e98b491",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
@@ -87,7 +87,7 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on ffc8052a (OK 52/52)"
+    "source": "verify-traceability --strict on c109fda1 (OK 52/52)"
   },
   "faces": {
     "web": {
@@ -96,5 +96,5 @@
       "runtime": 8
     }
   },
-  "generatedAt": "2026-11-12T23:33:23.015Z"
+  "generatedAt": "2026-11-13T07:03:29.313Z"
 }
