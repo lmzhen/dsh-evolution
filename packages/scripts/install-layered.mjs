@@ -15,13 +15,19 @@
  * bundle package.
  */
 
-import { familyVersion as familyVersionOf } from './lib-family-version.mjs'
+import { DIST_SOURCE_ROOT, EVOLUTION_SCOPE, PACKAGES_DIR, STAGING_DIR, familyVersion, packageSourceRoot } from './install/source-tree.mjs'
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
+
+const BUNDLES = {
+  host: `${EVOLUTION_SCOPE}/dsh-evolution-host`,
+  oneclick: `${EVOLUTION_SCOPE}/dsh-evolution-preset`,
+  all: `${EVOLUTION_SCOPE}/dsh-evolution-all`,
+}
 
 const MODES = new Set(['all', 'host', 'agent', 'layered', 'oneclick'])
 // 0.3.77 (C axis): the two PRODUCT forms get first-class names. `variant` is
@@ -47,79 +53,6 @@ import { EVOLUTION_BUNDLE_TAILS, EVOLUTION_PREFIXES, RETIRED_PACKAGE_NAMES } fro
 // G2-S2: the ONE composer lives in evolution-core. The source installer consumes the BUILT
 // artifact (CI runs build-lib before tests/publish); a missing build fails loud with the fix.
 //
-// W10 M4d: `--from-dist <dir>` installs the PACKED tarballs instead of the source tree. The
-// composer is then read from the packed core tarball's lib/composition/index.js, and the copy
-// source root is the extracted tarball tree — the same bytes a user receives, with no build step.
-const FROM_DIST_ARG = (() => {
-  const index = process.argv.indexOf('--from-dist')
-  if (index < 0) return undefined
-  const value = process.argv[index + 1]
-  if (value === undefined || value.startsWith('--')) {
-    console.error('install-layered: --from-dist needs the dist directory prepare-release wrote')
-    process.exit(2)
-  }
-  return value
-})()
-/** Extract every packed tarball into <tmp>/<bareName>/ and return that source root. */
-function prepareDistSourceRoot(distDir) {
-  const resolved = resolve(distDir)
-  const manifestPath = join(resolved, 'manifest.json')
-  if (!existsSync(manifestPath)) {
-    console.error('install-layered: --from-dist ' + resolved + ' has no manifest.json (pass the prepare-release dist directory)')
-    process.exit(2)
-  }
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  // Audit 06 P0-3: the packed path used to check only that manifest.json exists. The source/staging
-  // paths verify version+scope; the packed path must judge the same two facts from the bytes it is
-  // about to install: the evidence's familyVersion (when the dist carries it) and one scope for
-  // every tarball name.
-  const distScope = process.env.EVOLUTION_SCOPE?.trim() || '@lmzhen'
-  const scopes = new Set(Object.keys(manifest).map((name) => name.split('/')[0]))
-  if (scopes.size !== 1 || !scopes.has(distScope)) {
-    console.error('install-layered: --from-dist manifest names ' + JSON.stringify([...scopes]) + ' but this install resolves under "' + distScope + '" — rebuild the dist with the same scope')
-    process.exit(2)
-  }
-  const evidencePath = join(resolved, 'release-evidence.json')
-  // Extract INSIDE the family tree so the packed composer's own imports (js-yaml et al) resolve
-  // through the checkout's node_modules — a system-temp extraction has no dependency tree.
-  const familyRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-  const root = mkdtempSync(join(familyRoot, '.from-dist-'))
-  process.on('exit', () => { try { rmSync(root, { recursive: true, force: true }) } catch { /* Windows may still hold a file; the dot dir is ignored */ } })
-  // The extraction uses ONLY relative paths: cwd = the dist directory (archive argument is a bare
-  // file name) and -C is the relative path to the destination. An absolute `D:\...` argument makes
-  // GNU tar read the drive letter as a REMOTE host (Git-for-Windows tar), and the MSYS path forms
-  // are not stable across runners; relative paths sidestep both.
-  const distRelative = (target) => relative(resolved, target).split(sep).join('/')
-  for (const [name, file] of Object.entries(manifest)) {
-    const bare = name.startsWith('@') ? (name.split('/')[1] ?? '') : name
-    const destination = join(root, bare)
-    mkdirSync(destination, { recursive: true })
-    try {
-      execFileSync('tar', ['-xzf', String(file), '-C', distRelative(destination), '--strip-components=1'], { stdio: 'pipe', cwd: resolved })
-    } catch (error) {
-      const detail = error !== null && typeof error === 'object' && error.stderr !== undefined && error.stderr !== null ? String(error.stderr) : (error instanceof Error ? error.message : String(error))
-      console.error('install-layered: cannot unpack ' + file + ' from --from-dist (' + detail.trim().slice(0, 240) + ')')
-      process.exit(2)
-    }
-  }
-  // The evidence describes the PACKED tree (a dev build packs RELEASE_VERSION=0.0.0-main while the
-  // source checkout stays 0.46.0), so it is compared with the extracted tile — not with the source
-  // tree. A mismatch means the dist directory mixes a pack and an evidence file from other bytes.
-  if (existsSync(evidencePath)) {
-    let evidence
-    try { evidence = JSON.parse(readFileSync(evidencePath, 'utf8')) } catch (error) {
-      console.error('install-layered: --from-dist release-evidence.json is unreadable (' + (error instanceof Error ? error.message : String(error)) + ')')
-      process.exit(2)
-    }
-    const packedVersion = familyVersionOf(root, root)
-    if (typeof evidence.familyVersion !== 'string' || evidence.familyVersion !== packedVersion) {
-      console.error('install-layered: --from-dist evidence familyVersion ' + String(evidence.familyVersion) + ' does not match the packed tree ' + String(packedVersion) + ' — the dist mixes bytes from different builds')
-      process.exit(2)
-    }
-  }
-  return root
-}
-const DIST_SOURCE_ROOT = FROM_DIST_ARG === undefined ? null : prepareDistSourceRoot(FROM_DIST_ARG)
 const COMPOSER_LIB_URL = DIST_SOURCE_ROOT === null
   ? new URL('../evolution-core/lib/composition/index.js', import.meta.url)
   : pathToFileURL(join(DIST_SOURCE_ROOT, 'dsh-evolution-core', 'lib', 'composition', 'index.js'))
@@ -149,77 +82,6 @@ const {
   compositionRowIds,
   composePresetComposition,
 } = composer
-const PACKAGES_DIR = fileURLToPath(new URL('../', import.meta.url))
-// A packed install only exists under the release scope; default to it when --from-dist is used.
-const EVOLUTION_SCOPE = process.env.EVOLUTION_SCOPE?.trim() || (FROM_DIST_ARG !== undefined ? '@lmzhen' : '@deepseek-ai')
-const BUNDLES = {
-  host: `${EVOLUTION_SCOPE}/dsh-evolution-host`,
-  oneclick: `${EVOLUTION_SCOPE}/dsh-evolution-preset`,
-  all: `${EVOLUTION_SCOPE}/dsh-evolution-all`,
-}
-const STAGING_DIR = join(PACKAGES_DIR, '.release-staging')
-
-/** P2-22 (v19): the version to pin is the FAMILY's. The ancestor walk below
- * reaches the HOST repo's root package.json in an overlay/dev checkout (0.1.x)
- * and pinned the bundle to a range that has nothing to do with the family; the
- * bundle package's own manifest is the authority. The ancestor walk stays as a
- * fallback for trees that ship no bundle source.
- * V24-17 (v24): the source root is a parameter so the staging-freshness check
- * inside `packageSourceRoot()` can call this WITHOUT re-entering
- * `packageSourceRoot()` (the no-argument form resolves the root through the
- * staging branch, which would recurse). */
-function familyVersion(sourceRoot = packageSourceRoot()) {
-  // one reader (G0/S0.4): the body lives in lib-family-version.mjs so the expiry evaluator,
-  // the pre-tag three-way check and this path cannot drift apart.
-  return familyVersionOf(sourceRoot, sourceRoot)
-}
-
-function packageSourceRoot() {
-  // W10 M4d: the packed install copies the extracted tarball tree, never a staging tree.
-  if (DIST_SOURCE_ROOT !== null) return DIST_SOURCE_ROOT
-  if (EVOLUTION_SCOPE === '@deepseek-ai') return PACKAGES_DIR
-  if (existsSync(STAGING_DIR)) {
-    // F-213: refuse a stale staging built for an older release. The persistent
-    // .release-staging has historically leaked old package code (0.3.1-test)
-    // into a new install, and the old check only tested that the dir exists.
-    const manifestPath = join(STAGING_DIR, '.staging-manifest.json')
-    if (!existsSync(manifestPath)) {
-      throw new Error(`scoped installer: ${STAGING_DIR} is not a fresh prepare-release staging — missing .staging-manifest.json; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
-    }
-    const stagingManifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-    const stagingVersion = stagingManifest.version
-    // V24-17 (v24): the freshness baseline is the FAMILY version read from
-    // the FAMILY SOURCE tree (PACKAGES_DIR), the same authority the
-    // dependency pin's `familyVersion()` uses. The old `rootPackageVersion()`
-    // walks ancestors and lands on the HOST root manifest in an overlay/dev
-    // tree (0.1.x) — so a freshly built 0.3.x staging was rejected as "stale"
-    // against a host version it has nothing to do with. P2-22 fixed the pin
-    // in v19 but left this姊妹 call site on the ancestor walk; the two
-    // version notions have diverged here ever since. PACKAGES_DIR is passed
-    // explicitly: the default-argument form re-enters `packageSourceRoot()`
-    // and would recurse.
-    const expected = familyVersion(PACKAGES_DIR)
-    if (!expected || stagingVersion !== expected) {
-      throw new Error(`scoped installer: ${STAGING_DIR} was built for ${stagingVersion || '(unknown)'} but this tree is ${expected || '(unknown)'} — the staging is stale; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
-    }
-    // PLAN S5.8 (2026-09-16, audit P2-26): the staging scope must equal the
-    // scope this install resolves names under. The version check alone passed
-    // a staging whose package names were rewritten for @deepseek-ai to an
-    // EVOLUTION_SCOPE=@lmzhen install (and vice versa) — every copied
-    // manifest/dependency then names a package the profile never mounted.
-    // Missing field = pre-S5.8 staging: refused with the same strength as a
-    // stale version (a scope we cannot verify is a scope we cannot install).
-    const stagingScope = stagingManifest.scope
-    if (typeof stagingScope !== 'string' || stagingScope === '') {
-      throw new Error(`scoped installer: ${manifestPath} has no "scope" field — this staging predates scope recording and cannot be scope-verified; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild it`)
-    }
-    if (stagingScope !== EVOLUTION_SCOPE) {
-      throw new Error(`scoped installer: ${STAGING_DIR} was built under scope "${stagingScope}" but EVOLUTION_SCOPE is "${EVOLUTION_SCOPE}" — the staged package names do not match this install's scope. Re-run prepare-release.mjs --scope ${EVOLUTION_SCOPE} to rebuild the staging, or set EVOLUTION_SCOPE=${stagingScope} to install the existing one`)
-    }
-    return STAGING_DIR
-  }
-  throw new Error(`scoped installer requires ${STAGING_DIR}; run prepare-release.mjs --scope ${EVOLUTION_SCOPE} first`)
-}
 
 export function resolveHome(env = process.env) {
   // v21 (D-5): the installer must land packages in the SAME tree the runtime

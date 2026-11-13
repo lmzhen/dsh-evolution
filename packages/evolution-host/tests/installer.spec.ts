@@ -581,6 +581,8 @@ describe('layered installer', () => {
     for (const entry of await readdir(scriptsDir)) {
       if (entry.endsWith('.mjs')) await cp(join(scriptsDir, entry), join(scripts, entry))
     }
+    // W11 C2: the resolver lives in scripts/install/; a shipped tarball carries that directory too.
+    await cp(join(scriptsDir, 'install'), join(scripts, 'install'), { recursive: true })
     const shippedRoot = join(tree, 'packages', 'bundle', 'web-app', 'presets')
     await mkdir(shippedRoot, { recursive: true })
     const shippedPatch = [
