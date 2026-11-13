@@ -238,7 +238,10 @@ const actionFamilyScripts = new Set([...actionText.matchAll(/scripts\/([A-Za-z0-
 const registryCiScripts = new Set()
 for (const gate of renderedGates) {
   if (!gate.lanes.some((lane) => lane.startsWith('ci-'))) continue
-  for (const token of gate.argv ?? []) {
+  // Runnable rows carry argv; step rows carry a shell `command` (A1b). Both name family scripts:
+  // tokenise command text on shell separators so `a.mjs && b.mjs` counts both.
+  const tokens = [...(gate.argv ?? []), ...(typeof gate.command === 'string' ? gate.command.split(/[\s|&;()]+/) : [])]
+  for (const token of tokens) {
     if (!/scripts\//.test(token) || !/\.mjs$/.test(token)) continue
     registryCiScripts.add(token.replace(/^.*[\\/]/, ''))
   }
@@ -350,6 +353,9 @@ const note = (criterion, subject, detail) => {
   observations.push({ criterion, subject, detail })
 }
 for (const gate of manifestGates) {
+  // Step rows are command text executed by their lane/action; external rows document another
+  // owner's command. Neither is a runnable check, so the executability axis does not judge them.
+  if (gate.kind === 'step' || gate.kind === 'external') continue
   const human = String(gate.human ?? '')
   const argvRow = Array.isArray(gate.argv) ? gate.argv : null
   // (R1) executability: the row must declare ONE executable command, and the script it names must
@@ -433,8 +439,6 @@ const ARGV_CI_SUBSTITUTIONS = {
   'gate-25': 'ci adds --upstream: it additionally requires upstream alignment',
   'gate-27': 'ci adds --our-scope: it narrows the platform range check further',
   'gate-28': 'ci runs the --self-test form of the same verifier',
-  'line-identity-bed': 'ci runs --policy-only (the step is Verify the line-identity policy)',
-  'graph-edges-live': 'ci runs --self-test; the manifest form is the local read-only one',
 }
 let paritySubstituted = 0
 for (const gate of manifestGates) {

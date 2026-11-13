@@ -395,7 +395,7 @@ if (selfTest) {
   // Two synthetic cases, both must be caught: an equal-value patch (nothing changed) and an
   // expectation that contradicts reality (the harness must not call that a pass).
   const equal = runRecord('gate-17', { mutate: { file: 'packages/scripts/family-facts.json', find: '"id": "gate-17"', replace: '"id": "gate-17"' }, expect: 'red', note: 'self-test: equal value' })
-  const contradiction = runRecord('health-admission', { mutate: { file: 'packages/scripts/family-facts.json', find: '"id": "gate-17"', replace: '"id": "gate-17x"' }, expect: 'green', note: 'self-test: expect green on a check that cannot pass here' })
+  const contradiction = runRecord('gate-81', { mutate: { file: 'packages/scripts/family-facts.json', find: '"id": "gate-17"', replace: '"id": "gate-17x"' }, expect: 'green', note: 'self-test: expect green on a check that cannot pass here' })
   const caught = [equal, contradiction].filter((r) => !r.status.startsWith('PROVEN'))
   for (const result of [equal, contradiction]) console.log('  ' + result.status.padEnd(28) + result.detail)
   console.log('verify-mutations --self-test: ' + caught.length + '/2 mismatch(es) caught' + (caught.length === 2 ? ' - the harness refuses both a no-op patch and a contradicted expectation' : ' - THE HARNESS IS BLIND to at least one'))

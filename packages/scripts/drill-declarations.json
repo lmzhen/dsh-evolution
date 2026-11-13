@@ -166,11 +166,6 @@
       "evidence": "a profileHoist entry whose reason is not a string: in policy-only form the guard requires every hoist entry to carry a reason, so a non-string reason is its sub",
       "provenAt": "2026-10-14T08:33:35.644Z"
     },
-    "line-identity-ci": {
-      "drillCmd": "node packages/scripts/verify-mutations.mjs --only line-identity-ci",
-      "evidence": "the CI row runs the same script in the same policy-only form, so the same non-string-reason mutation is its red too; two rows sharing one script still carry the",
-      "provenAt": "2026-10-14T08:33:45.995Z"
-    },
     "gate-28": {
       "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-28",
       "evidence": "a download-artifact name no producer anywhere carries: with a cross-run download the name only has to exist somewhere in the repository workflows, so a name tha",
@@ -237,72 +232,12 @@
       "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
       "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
     },
-    "ci-only-01": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-02": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-03": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-04": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-05": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-06": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-07": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-09": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-10": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-11": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "ci-only-12": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
     "ci-only-13": {
       "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
       "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
     },
-    "ci-only-14": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "graph-edges-live": {
-      "noDrillReason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an ove",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "line-identity-bed": {
-      "noDrillReason": "ABSENT-LOCALLY SUBJECT: its argv names packages/scripts/line-manifest.json as the bed manifest, and that file does not exist in this repo (it is produced on the bed tree it describes, from machine sta",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
     "gate-27": {
       "noDrillReason": "BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mu",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "health-admission": {
-      "noDrillReason": "CANNOT-DECIDE BY DESIGN: run as registered it reports CANNOT DECIDE (user=46 platform=0) because a 0-hit count over an EMPTY corpus would admit every rule - the guard refuses rather than pass, so it h",
       "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
     },
     "gate-50": {
@@ -337,17 +272,8 @@
     "gate-58": {
       "noDrillReason": "engine upstream parity gate: red via byte/sha mismatch; no additional mutation fixture"
     },
-    "ci-only-16": {
-      "noDrillReason": "layout-sync release gate: red via drift; no mutation fixture"
-    },
-    "ci-only-17": {
-      "noDrillReason": "probe registration release gate: red via unregistered probe; no mutation fixture"
-    },
     "ci-only-18": {
       "noDrillReason": "requirements coverage release gate: red via missing requirement; no mutation fixture"
-    },
-    "ci-only-15": {
-      "noDrillReason": "load-sensitive execution gate: the pinned-concurrency run is itself the falsifiable probe; a separate mutation fixture would duplicate it"
     },
     "gate-59": {
       "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",

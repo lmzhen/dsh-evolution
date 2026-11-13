@@ -35,6 +35,9 @@ function protectionKey(row) {
 const groups = new Map()
 const unexecutable = []
 for (const row of rows) {
+  // Step rows execute as action/lane command text and external rows document another owner's
+  // command: neither is a spawn-run protection, so they are not counted as unexecutable (A1b).
+  if (row.kind === 'step' || row.kind === 'external') continue
   const key = protectionKey(row)
   if (key === null) { unexecutable.push(row.id); continue }
   if (!groups.has(key)) groups.set(key, [])

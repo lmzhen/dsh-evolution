@@ -40,7 +40,6 @@
         "gate-30",
         "gate-31",
         "gate-32",
-        "gate-33",
         "gate-34",
         "gate-35",
         "gate-36",
@@ -64,7 +63,6 @@
         "gate-54",
         "gate-55",
         "gate-58",
-        "gate-59",
         "gate-60",
         "gate-61",
         "gate-62",
@@ -73,18 +71,13 @@
         "gate-65",
         "gate-66",
         "gate-72",
-        "gate-74",
         "gate-75",
         "gate-76",
         "gate-77",
-        "gate-78",
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82",
-        "graph-edges-live",
-        "health-admission",
-        "line-identity-bed"
+        "gate-82"
       ],
       "specs": [
         "evolution-client-kit::tests/format.spec.ts",
@@ -220,7 +213,6 @@
         "gate-30",
         "gate-31",
         "gate-32",
-        "gate-33",
         "gate-34",
         "gate-35",
         "gate-36",
@@ -244,7 +236,6 @@
         "gate-54",
         "gate-55",
         "gate-58",
-        "gate-59",
         "gate-60",
         "gate-61",
         "gate-62",
@@ -253,18 +244,13 @@
         "gate-65",
         "gate-66",
         "gate-72",
-        "gate-74",
         "gate-75",
         "gate-76",
         "gate-77",
-        "gate-78",
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82",
-        "graph-edges-live",
-        "health-admission",
-        "line-identity-bed"
+        "gate-82"
       ]
     },
     "pre-tag": {
@@ -301,7 +287,6 @@
         "gate-30",
         "gate-31",
         "gate-32",
-        "gate-33",
         "gate-34",
         "gate-35",
         "gate-36",
@@ -325,7 +310,6 @@
         "gate-54",
         "gate-55",
         "gate-58",
-        "gate-59",
         "gate-60",
         "gate-61",
         "gate-62",
@@ -334,18 +318,13 @@
         "gate-65",
         "gate-66",
         "gate-72",
-        "gate-74",
         "gate-75",
         "gate-76",
         "gate-77",
-        "gate-78",
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82",
-        "graph-edges-live",
-        "health-admission",
-        "line-identity-bed"
+        "gate-82"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -814,7 +793,6 @@
         "gate-30",
         "gate-31",
         "gate-32",
-        "gate-33",
         "gate-34",
         "gate-35",
         "gate-36",
@@ -838,7 +816,6 @@
         "gate-54",
         "gate-55",
         "gate-58",
-        "gate-59",
         "gate-60",
         "gate-61",
         "gate-62",
@@ -847,18 +824,13 @@
         "gate-65",
         "gate-66",
         "gate-72",
-        "gate-74",
         "gate-75",
         "gate-76",
         "gate-77",
-        "gate-78",
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82",
-        "graph-edges-live",
-        "health-admission",
-        "line-identity-bed"
+        "gate-82"
       ]
     },
     "ci-only": {
@@ -866,26 +838,14 @@
         "ci-only"
       ],
       "gates": [
-        "ci-only-01",
-        "ci-only-02",
-        "ci-only-03",
-        "ci-only-04",
-        "ci-only-05",
-        "ci-only-06",
-        "ci-only-07",
         "ci-only-08",
-        "ci-only-09",
         "ci-only-19",
         "ci-only-20",
         "ci-only-21",
-        "ci-only-22",
         "ci-only-23",
-        "ci-only-24",
-        "ci-only-25",
         "ci-only-26",
         "gate-56",
-        "gate-57",
-        "line-identity-ci"
+        "gate-57"
       ],
       "specs": [
         "evolution-activity::tests/feedback/feedback.spec.ts",
@@ -998,7 +958,6 @@
         "gate-30",
         "gate-31",
         "gate-32",
-        "gate-33",
         "gate-34",
         "gate-35",
         "gate-36",
@@ -1022,7 +981,6 @@
         "gate-54",
         "gate-55",
         "gate-58",
-        "gate-59",
         "gate-60",
         "gate-61",
         "gate-62",
@@ -1031,18 +989,13 @@
         "gate-65",
         "gate-66",
         "gate-72",
-        "gate-74",
         "gate-75",
         "gate-76",
         "gate-77",
-        "gate-78",
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82",
-        "graph-edges-live",
-        "health-admission",
-        "line-identity-bed"
+        "gate-82"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -1511,7 +1464,6 @@
         "gate-30",
         "gate-31",
         "gate-32",
-        "gate-33",
         "gate-34",
         "gate-35",
         "gate-36",
@@ -1535,7 +1487,6 @@
         "gate-54",
         "gate-55",
         "gate-58",
-        "gate-59",
         "gate-60",
         "gate-61",
         "gate-62",
@@ -1544,18 +1495,13 @@
         "gate-65",
         "gate-66",
         "gate-72",
-        "gate-74",
         "gate-75",
         "gate-76",
         "gate-77",
-        "gate-78",
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82",
-        "graph-edges-live",
-        "health-admission",
-        "line-identity-bed"
+        "gate-82"
       ]
     },
     "full(ci=on)": {
@@ -1565,22 +1511,11 @@
         "ci-only"
       ],
       "gates": [
-        "ci-only-01",
-        "ci-only-02",
-        "ci-only-03",
-        "ci-only-04",
-        "ci-only-05",
-        "ci-only-06",
-        "ci-only-07",
         "ci-only-08",
-        "ci-only-09",
         "ci-only-19",
         "ci-only-20",
         "ci-only-21",
-        "ci-only-22",
         "ci-only-23",
-        "ci-only-24",
-        "ci-only-25",
         "ci-only-26",
         "gate-01",
         "gate-02",
@@ -1610,7 +1545,6 @@
         "gate-30",
         "gate-31",
         "gate-32",
-        "gate-33",
         "gate-34",
         "gate-35",
         "gate-36",
@@ -1636,7 +1570,6 @@
         "gate-56",
         "gate-57",
         "gate-58",
-        "gate-59",
         "gate-60",
         "gate-61",
         "gate-62",
@@ -1645,19 +1578,13 @@
         "gate-65",
         "gate-66",
         "gate-72",
-        "gate-74",
         "gate-75",
         "gate-76",
         "gate-77",
-        "gate-78",
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82",
-        "graph-edges-live",
-        "health-admission",
-        "line-identity-bed",
-        "line-identity-ci"
+        "gate-82"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -2199,7 +2126,6 @@
         "gate-30",
         "gate-31",
         "gate-32",
-        "gate-33",
         "gate-34",
         "gate-35",
         "gate-36",
@@ -2223,7 +2149,6 @@
         "gate-54",
         "gate-55",
         "gate-58",
-        "gate-59",
         "gate-60",
         "gate-61",
         "gate-62",
@@ -2232,40 +2157,35 @@
         "gate-65",
         "gate-66",
         "gate-72",
-        "gate-74",
         "gate-75",
         "gate-76",
         "gate-77",
-        "gate-78",
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82",
-        "graph-edges-live",
-        "health-admission",
-        "line-identity-bed"
+        "gate-82"
       ]
     }
   },
   "counts": {
     "fast": {
-      "gates": 73,
+      "gates": 66,
       "specs": 103
     },
     "pre-tag": {
-      "gates": 73,
+      "gates": 66,
       "specs": 436
     },
     "ci-only": {
-      "gates": 20,
+      "gates": 8,
       "specs": 73
     },
     "full(ci=off)": {
-      "gates": 73,
+      "gates": 66,
       "specs": 436
     },
     "full(ci=on)": {
-      "gates": 93,
+      "gates": 74,
       "specs": 509
     }
   },

@@ -253,13 +253,11 @@ export const guards = [
   }),
 
   gate("gate-33", {
-    kind: "script",
+    kind: "external",
     tree: "mirror",
     title: "生成物 `--check`（六件一起，CI 同款）：`node packages/scripts/gen-bundle-patches.mjs packages --check` ＋ `gen-client-tokens.mjs packages --check` ＋ `gen-param-client-view.mjs packages --check` ＋ `gen-param-docs.mjs packages --check` ＋ `gen-client-guards.mjs packages --check` ＋ `gen-about.mjs packages --check`（G5.10/U-10：版本与用途的生成物 ✓）（G4.1/C5：生成物与源不同步即红——四个生成器**都已支持 `--check`**，缺的只是\"有人跑\"。drill：给 PARAMETERS.md 动一个字符 ⇒ `gen-param-docs --check` 必红，撤回即绿 ✓）",
-    argv: null,
     lanes: ["local","ci-static"],
-    argvProblem: "composite-cell: 6 commands in one table row",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
+    reason: "The six --check generators are executable at gate-60..gate-66; this composite prose row is retired. The table number stays reserved (ids are frozen, rows are not renumbered).",
   }),
 
   gate("gate-34", {
@@ -438,153 +436,124 @@ export const guards = [
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/gen-about.mjs packages/evolution --check",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/gen-about.mjs","packages/evolution","--check"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-61", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/gen-bundle-patches.mjs packages/evolution --check",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/gen-bundle-patches.mjs","packages/evolution","--check"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-62", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/gen-client-guards.mjs","packages/evolution","--check"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-63", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/gen-client-tokens.mjs packages/evolution --check",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/gen-client-tokens.mjs","packages/evolution","--check"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-64", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/gen-param-client-view.mjs packages/evolution --check",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/gen-param-client-view.mjs","packages/evolution","--check"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-65", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/gen-param-docs.mjs","packages/evolution","--check"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-66", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/gen-requirements.mjs","packages/evolution","--check"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-72", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/requirements.selftest.mjs",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/requirements.selftest.mjs"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-75", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/verify-layout-sync.mjs","packages/evolution/scripts","../packages/scripts"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
     localSafe: false,
     localSafeReason: "CI workspace-relative path — not resolvable on a dev machine",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-76", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/verify-probes.mjs","packages/evolution"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-77", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/verify-requirements.mjs","packages/evolution"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-78", {
-    kind: "script",
+    kind: "external",
     tree: "mirror",
     title: "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
-    argv: null,
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
+    reason: "Exact duplicate of gate-23 (policy-only line-identity check). The table number stays reserved (ids are frozen, rows are not renumbered); retire the row with the next table renumber.",
   }),
 
   gate("gate-79", {
     kind: "script",
     tree: "mirror",
     title: "node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict",
-    argv: null,
+    argv: ["node","packages/scripts/verify-line-identity.mjs","--manifest","packages/scripts/files/line-manifest.json","--strict"],
     lanes: ["local","ci-static"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-80", {
     kind: "script",
     tree: "overlay",
     title: "node packages/evolution/scripts/verify-graph-edges.mjs --report",
-    argv: null,
+    argv: ["node","packages/evolution/scripts/verify-graph-edges.mjs","--report"],
     lanes: ["local"],
-    argvProblem: "no-command-in-cell",
     drillCmd: "node packages/scripts/verify-graph-edges.mjs --self-test",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-81", {
     kind: "script",
     tree: "mirror",
     title: "node packages/scripts/verify-health-admission.mjs",
-    argv: null,
+    argv: ["node","packages/scripts/verify-health-admission.mjs"],
     lanes: ["local"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
+    registration: {"reason":"the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge","owner":"scripts/gates","expiry":"0.47.0","plan":"the CI lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay"},
   }),
 
   gate("gate-82", {
@@ -593,66 +562,6 @@ export const guards = [
     title: "`node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、529 个 key、113 个参数文案、31 个 host error，8 语言 key/占位符/生成物一致；`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；重跑生成器即绿）",
     argv: ["node","packages/scripts/verify-i18n.mjs"],
     lanes: ["local","ci-static"],
-  }),
-
-  gate("ci-only-02", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/gen-about.mjs packages/evolution --check",
-    argv: ["node","packages/evolution/scripts/gen-about.mjs","packages/evolution","--check"],
-    lanes: ["ci-static"],
-    reason: "repo-root about manifest; the overlay carries no repository package.json above it (the action itself reports 'not armed')",
-    owner: "ci",
-  }),
-
-  gate("ci-only-03", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/gen-bundle-patches.mjs packages/evolution --check",
-    argv: ["node","packages/evolution/scripts/gen-bundle-patches.mjs","packages/evolution","--check"],
-    lanes: ["ci-static"],
-    reason: "generated bundle-patch freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-    owner: "ci",
-  }),
-
-  gate("ci-only-04", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check",
-    argv: ["node","packages/evolution/scripts/gen-client-guards.mjs","packages/evolution","--check"],
-    lanes: ["ci-static"],
-    reason: "generated client-guard copy freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-    owner: "ci",
-  }),
-
-  gate("ci-only-05", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/gen-client-tokens.mjs packages/evolution --check",
-    argv: ["node","packages/evolution/scripts/gen-client-tokens.mjs","packages/evolution","--check"],
-    lanes: ["ci-static"],
-    reason: "generated client-token copy freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-    owner: "ci",
-  }),
-
-  gate("ci-only-06", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/gen-param-client-view.mjs packages/evolution --check",
-    argv: ["node","packages/evolution/scripts/gen-param-client-view.mjs","packages/evolution","--check"],
-    lanes: ["ci-static"],
-    reason: "generated param client-view freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-    owner: "ci",
-  }),
-
-  gate("ci-only-07", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check",
-    argv: ["node","packages/evolution/scripts/gen-param-docs.mjs","packages/evolution","--check"],
-    lanes: ["ci-static"],
-    reason: "generated param docs freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-    owner: "ci",
   }),
 
   gate("ci-only-08", {
@@ -665,16 +574,6 @@ export const guards = [
     expiry: "0.47.0",
 
     renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
-  }),
-
-  gate("ci-only-09", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check",
-    argv: ["node","packages/evolution/scripts/gen-requirements.mjs","packages/evolution","--check"],
-    lanes: ["ci-static"],
-    reason: "generated requirements view freshness --check (the CI job owns the non-strict gate view)",
-    owner: "ci",
   }),
 
   gate("ci-only-19", {
@@ -713,18 +612,6 @@ export const guards = [
     renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
   }),
 
-  gate("ci-only-22", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
-    argv: ["node","packages/evolution/scripts/verify-layout-sync.mjs","packages/evolution/scripts","../packages/scripts"],
-    lanes: ["ci-static"],
-    reason: "mirror↔overlay script/version parity; needs the mirror checkout beside the overlay",
-    owner: "ci",
-    localSafe: false,
-    localSafeReason: "CI workspace-relative path — not resolvable on a dev machine",
-  }),
-
   gate("ci-only-23", {
     kind: "script",
     tree: "overlay",
@@ -735,26 +622,6 @@ export const guards = [
     expiry: "0.47.0",
 
     renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
-  }),
-
-  gate("ci-only-24", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
-    argv: ["node","packages/evolution/scripts/verify-probes.mjs","packages/evolution"],
-    lanes: ["ci-static"],
-    reason: "probe registry schema lint; the CI job executes it, the mirror local lane has no platform overlay",
-    owner: "ci",
-  }),
-
-  gate("ci-only-25", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
-    argv: ["node","packages/evolution/scripts/verify-requirements.mjs","packages/evolution"],
-    lanes: ["ci-static"],
-    reason: "requirements matrix coverage; the CI job executes it after gen-requirements",
-    owner: "ci",
   }),
 
   gate("ci-only-26", {
@@ -769,42 +636,4 @@ export const guards = [
     renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
   }),
 
-  gate("line-identity-ci", {
-    kind: "script",
-    tree: "mirror",
-    title: "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
-    argv: ["node","packages/scripts/verify-line-identity.mjs","--policy-only","--strict"],
-    lanes: ["ci-static"],
-    reason: "CI has no machine bed — policy half only (contract §5e)",
-  }),
-
-  gate("line-identity-bed", {
-    kind: "script",
-    tree: "mirror",
-    title: "node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict",
-    argv: ["node","packages/scripts/verify-line-identity.mjs","--manifest","packages/scripts/files/line-manifest.json","--strict"],
-    lanes: ["local","pre-tag"],
-    reason: "toothed form: compares the bed manifest produced by gen-line-manifest.mjs",
-  }),
-
-  gate("graph-edges-live", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/verify-graph-edges.mjs --report",
-    argv: ["node","packages/evolution/scripts/verify-graph-edges.mjs","--report"],
-    lanes: ["local","pre-tag"],
-    reason: "live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)",
-    owner: "toolchain",
-    noDrillReason: "live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half",
-  }),
-
-  gate("health-admission", {
-    kind: "script",
-    tree: "mirror",
-    title: "node packages/scripts/verify-health-admission.mjs",
-    argv: ["node","packages/scripts/verify-health-admission.mjs"],
-    lanes: ["local","pre-tag"],
-    reason: "needs both local corpora; on a machine without them it must report CANNOT DECIDE rather than pass",
-    registration: {"reason":"no user or platform corpora on this machine, so admission cannot be judged","owner":"scripts/gates","expiry":"0.47.0","plan":"run where the corpora exist (CI or a real profile)","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
-  }),
 ]

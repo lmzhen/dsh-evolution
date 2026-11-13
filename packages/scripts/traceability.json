@@ -271,7 +271,7 @@
         "beh-installer-layered"
       ],
       "gates": [
-        "ci-only-10"
+        "gate-67"
       ],
       "evidence": "C"
     },
@@ -378,7 +378,7 @@
         "beh-installer-layered"
       ],
       "gates": [
-        "ci-only-10"
+        "gate-67"
       ],
       "evidence": "C"
     },
@@ -823,7 +823,7 @@
         "beh-installer-layered"
       ],
       "gates": [
-        "ci-only-10"
+        "gate-67"
       ],
       "evidence": "C"
     }

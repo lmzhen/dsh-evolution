@@ -70,13 +70,28 @@ export function validateRegistry(entries) {
     if (entry.tree !== 'machine-local' && entry.lanes.includes('machine-local')) problems.push(id + ': non-machine-local row carries machine-local')
     const runnable = RUNNABLE_KINDS.has(entry.kind)
     if (runnable && !entry.lanes.some((lane) => RUN_LANES.has(lane))) problems.push(id + ': runnable row has no runnable lane')
-    if (entry.argv !== null && entry.argv !== undefined) {
-      if (!Array.isArray(entry.argv) || entry.argv.length === 0 || entry.argv.some((token) => typeof token !== 'string')) problems.push(id + ': argv must be a non-empty string array or null')
+    if (runnable) {
+      // A row that claims to be a check must name its command. The old prose-cell registrations are
+      // retired: a check without an executable form is documentation, not a gate (W11 A1b).
+      if (!Array.isArray(entry.argv) || entry.argv.length === 0) problems.push(id + ': runnable row needs argv (a check without an executable form is not a gate)')
+      else if (entry.argv.some((token) => typeof token !== 'string')) problems.push(id + ': argv must be a string array')
       else if (!/^node$/.test(entry.argv[0])) problems.push(id + ': argv does not start with node: ' + JSON.stringify(entry.argv[0]))
       else if (quotedToken(entry.argv) !== undefined) problems.push(id + ': argv token carries shell quotes: ' + JSON.stringify(quotedToken(entry.argv)) + ' (tokens are spawn arguments)')
-    } else if (entry.argvProblem === undefined) problems.push(id + ': argv is null without an argvProblem (a row must say why it has no executable form)')
-    if (entry.argv === null && entry.registration === undefined) problems.push(id + ': argv-null row carries no registration (cannot-decide debt must be owned)')
-    if (entry.command !== undefined && (typeof entry.command !== 'string' || entry.command.trim() === '')) problems.push(id + ': command must be a non-empty string')
+      if (entry.argv !== undefined && entry.command !== undefined) problems.push(id + ': a runnable row carries both argv and command')
+    }
+    if (entry.kind === 'step') {
+      if (typeof entry.command !== 'string' || entry.command.trim() === '') problems.push(id + ': step row needs command (executed by its lane/action, not by run-gates)')
+      if (entry.argv !== undefined && entry.argv !== null) problems.push(id + ': step row carries argv (steps are command text, not spawn argv)')
+    }
+    if (entry.kind === 'external') {
+      // External rows document a command the family does not execute (another tool owns it). argv may
+      // be present as documentation; it is never spawned, so it does not participate in dedupe.
+      if (entry.command !== undefined) problems.push(id + ': external row carries command')
+      if (entry.reason === undefined && entry.registration === undefined) problems.push(id + ': external row carries neither reason nor registration')
+    }
+    if (!runnable && entry.kind !== 'step' && entry.kind !== 'external' && entry.argv !== undefined && entry.argv !== null) problems.push(id + ': argv is only meaningful on runnable rows')
+    if (entry.command !== undefined && runnable) problems.push(id + ': command belongs to step rows, not runnable rows')
+    if (entry.argv === null) problems.push(id + ': argv must be omitted rather than null (omit it for step/external rows)')
     if (entry.timeoutMs !== undefined && (!Number.isInteger(entry.timeoutMs) || entry.timeoutMs <= 0)) problems.push(id + ': timeoutMs must be a positive integer')
     for (const field of ['needs', 'after']) {
       const value = entry[field]
@@ -103,7 +118,6 @@ export function validateRegistry(entries) {
         if (ci.argv === undefined && ci.env === undefined && ci.cwd === undefined && ci.timeoutMs === undefined) problems.push(id + ': ci override carries none of argv/env/cwd/timeoutMs')
       }
     }
-    if (entry.kind === 'external' && entry.reason === undefined && entry.registration === undefined) problems.push(id + ': external row carries neither reason nor registration')
   }
   for (const entry of entries) {
     for (const field of ['needs', 'after']) {
@@ -111,6 +125,9 @@ export function validateRegistry(entries) {
         if (!ids.has(dep)) problems.push(entry.id + ': ' + field + ' names unknown gate ' + JSON.stringify(dep))
       }
     }
+  }
+  for (const group of duplicateCommands(entries)) {
+    problems.push(group.ids.join(' / ') + ': duplicate executable command (' + group.command.slice(0, 120) + ') — one check must have one row')
   }
   return problems
 }
@@ -122,6 +139,7 @@ export function validateRegistry(entries) {
 export function duplicateCommands(entries) {
   const groups = new Map()
   for (const entry of entries) {
+    if (entry.kind === 'external') continue
     const command = Array.isArray(entry.argv) ? entry.argv.join(' ') : typeof entry.command === 'string' ? entry.command : null
     if (command === null) continue
     const key = command.replace(/`/g, '').replace(/\s+/g, ' ').trim()

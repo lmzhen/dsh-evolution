@@ -60,32 +60,21 @@ export const release = [
   }),
 
   gate("gate-59", {
-    kind: "script",
+    kind: "step",
     tree: "overlay",
     title: "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
-    argv: null,
+    command: "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
     lanes: ["local","ci-release"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
+    reason: "action step — executed by its lane/action step, not by run-gates",
   }),
 
   gate("gate-74", {
-    kind: "script",
+    kind: "step",
     tree: "overlay",
     title: "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
-    argv: null,
+    command: "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
     lanes: ["local","ci-release","ci-windows"],
-    argvProblem: "no-command-in-cell",
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.47.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
+    reason: "action step — executed by its lane/action step, not by run-gates",
   }),
 
-  gate("ci-only-01", {
-    kind: "script",
-    tree: "overlay",
-    title: "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
-    argv: ["node","packages/evolution/scripts/audit-release-tarballs.mjs","packages/evolution/dist","--version","\"${RELEASE_VERSION#v}\"","--platform-range","\"^$RANGE\""],
-    lanes: ["ci-release"],
-    reason: "payload audit of the packed dist — only meaningful after prepare-release has staged the release job's inputs",
-    owner: "ci",
-  }),
 ]

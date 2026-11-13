@@ -603,7 +603,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "cd9f96f66012e8e8747d6213495d43becc532c08f283bc81e400c90e803ec46d",
+        "sha256": "ab0f566f80ac4212d1bf9f8d3b219c504ae29f5cd421e17b60a0385b78f89495",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -757,7 +757,7 @@
           },
           {
             "id": "gate-33",
-            "tier": "fast",
+            "tier": "unmapped",
             "criterion": "unknown"
           },
           {
@@ -868,77 +868,77 @@
           {
             "id": "gate-60",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "gen-about"
           },
           {
             "id": "gate-61",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "gen-bundle-patches"
           },
           {
             "id": "gate-62",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "gen-client-guards"
           },
           {
             "id": "gate-63",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "gen-client-tokens"
           },
           {
             "id": "gate-64",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "gen-param-client-view"
           },
           {
             "id": "gate-65",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "gen-param-docs"
           },
           {
             "id": "gate-66",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "gen-requirements"
           },
           {
             "id": "gate-72",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "requirements.selftest"
           },
           {
             "id": "gate-75",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "verify-layout-sync"
           },
           {
             "id": "gate-76",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "verify-probes"
           },
           {
             "id": "gate-77",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "verify-requirements"
           },
           {
             "id": "gate-78",
-            "tier": "fast",
+            "tier": "unmapped",
             "criterion": "unknown"
           },
           {
             "id": "gate-79",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "verify-line-identity"
           },
           {
             "id": "gate-80",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "verify-graph-edges"
           },
           {
             "id": "gate-81",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "verify-health-admission"
           },
           {
             "id": "gate-82",
@@ -946,44 +946,9 @@
             "criterion": "verify-i18n"
           },
           {
-            "id": "ci-only-02",
-            "tier": "ci-only",
-            "criterion": "gen-about"
-          },
-          {
-            "id": "ci-only-03",
-            "tier": "ci-only",
-            "criterion": "gen-bundle-patches"
-          },
-          {
-            "id": "ci-only-04",
-            "tier": "ci-only",
-            "criterion": "gen-client-guards"
-          },
-          {
-            "id": "ci-only-05",
-            "tier": "ci-only",
-            "criterion": "gen-client-tokens"
-          },
-          {
-            "id": "ci-only-06",
-            "tier": "ci-only",
-            "criterion": "gen-param-client-view"
-          },
-          {
-            "id": "ci-only-07",
-            "tier": "ci-only",
-            "criterion": "gen-param-docs"
-          },
-          {
             "id": "ci-only-08",
             "tier": "ci-only",
             "criterion": "gen-protection-view"
-          },
-          {
-            "id": "ci-only-09",
-            "tier": "ci-only",
-            "criterion": "gen-requirements"
           },
           {
             "id": "ci-only-19",
@@ -1001,67 +966,14 @@
             "criterion": "verify-exemptions"
           },
           {
-            "id": "ci-only-22",
-            "tier": "ci-only",
-            "criterion": "verify-layout-sync"
-          },
-          {
             "id": "ci-only-23",
             "tier": "ci-only",
             "criterion": "verify-param-consumers"
           },
           {
-            "id": "ci-only-24",
-            "tier": "ci-only",
-            "criterion": "verify-probes"
-          },
-          {
-            "id": "ci-only-25",
-            "tier": "ci-only",
-            "criterion": "verify-requirements"
-          },
-          {
             "id": "ci-only-26",
             "tier": "ci-only",
             "criterion": "verify-test-lines"
-          },
-          {
-            "id": "line-identity-ci",
-            "tier": "ci-only",
-            "criterion": "verify-line-identity"
-          },
-          {
-            "id": "line-identity-bed",
-            "tier": "fast",
-            "criterion": "verify-line-identity",
-            "requires": [
-              {
-                "script": "gen-line-manifest.mjs",
-                "mode": "present",
-                "path": "packages/scripts/files/line-manifest.json",
-                "reason": "the toothed form compares the bed manifest this producer writes; a missing product is not a broken check (the reviewer requires the path in the report)",
-                "owner": "scripts"
-              }
-            ]
-          },
-          {
-            "id": "graph-edges-live",
-            "tier": "fast",
-            "criterion": "verify-graph-edges"
-          },
-          {
-            "id": "health-admission",
-            "tier": "fast",
-            "criterion": "verify-health-admission",
-            "requires": [
-              {
-                "script": "gen-health-baseline.mjs",
-                "mode": "present",
-                "path": "packages/scripts/reports/health-baseline.json",
-                "reason": "the admission gate only reads the calibration artifact; the producer gen-health-baseline.mjs writes it (a test used to, guarded by a write flag on that spec), so a missing product is cannot-decide and a missing producer is red",
-                "owner": "scripts"
-              }
-            ]
           },
           {
             "id": "gate-03",
@@ -1100,32 +1012,18 @@
           },
           {
             "id": "gate-59",
-            "tier": "fast",
+            "tier": "unmapped",
             "criterion": "unknown"
           },
           {
             "id": "gate-74",
-            "tier": "fast",
+            "tier": "unmapped",
             "criterion": "unknown"
-          },
-          {
-            "id": "ci-only-01",
-            "tier": "ci-only",
-            "criterion": "audit-release-tarballs",
-            "requires": [
-              {
-                "script": "build-lib.mjs",
-                "mode": "present",
-                "path": "packages/evolution/dist",
-                "reason": "the tarball audit reads the built dist of the overlay; in CI the build step produces it, so its absence is cannot-decide rather than a failing audit",
-                "owner": "scripts"
-              }
-            ]
           },
           {
             "id": "gate-04",
             "tier": "unmapped",
-            "criterion": "build-lib"
+            "criterion": "unknown"
           },
           {
             "id": "gate-67",
@@ -1158,72 +1056,26 @@
             "criterion": "unknown"
           },
           {
-            "id": "ci-only-10",
-            "tier": "unmapped",
-            "criterion": "inject-evolution-paths"
-          },
-          {
-            "id": "ci-only-11",
-            "tier": "unmapped",
-            "criterion": "install-layered"
-          },
-          {
-            "id": "ci-only-12",
-            "tier": "unmapped",
-            "criterion": "lib-line-header"
-          },
-          {
             "id": "ci-only-13",
             "tier": "unmapped",
-            "criterion": "prepare-packed-platform"
-          },
-          {
-            "id": "ci-only-14",
-            "tier": "unmapped",
-            "criterion": "prepare-release"
-          },
-          {
-            "id": "ci-only-15",
-            "tier": "unmapped",
-            "criterion": "publish-scoped"
-          },
-          {
-            "id": "ci-only-16",
-            "tier": "unmapped",
-            "criterion": "requirements.selftest"
-          },
-          {
-            "id": "ci-only-17",
-            "tier": "unmapped",
-            "criterion": "run-load-sensitive"
+            "criterion": "unknown"
           },
           {
             "id": "ci-only-18",
             "tier": "unmapped",
-            "criterion": "smoke-packed-install"
+            "criterion": "unknown"
           }
         ],
         "pendingColumns": [
           {
             "column": "claim",
-            "rowsWithoutIt": 112,
+            "rowsWithoutIt": 90,
             "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
             "expiry": "0.26.0",
             "owner": "scripts"
           }
         ],
         "pendingAxes": [
-          {
-            "axis": "executability",
-            "rows": 23,
-            "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
-            "expiry": "0.47.0",
-            "owner": "scripts",
-            "reasonRef": "scripts/family-facts.json checks.pendingAxes",
-            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action | 2026-11-12 re-measured: verify-param-consumers.mjs joined CI | 2026-11-12 re-measured: the anchor selftest row carries its own executable form | 2026-11-12: 23 after the state-storage merge removed one registered row | 2026-11-13 re-measured: W10 M5 changes no gate-table rows",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the axis rows are the registrations above; the reduction lands when the overlay mutation runner and the table split land (both are single-pass items, tracked in W9-gates §4). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
-          },
           {
             "axis": "expiry-due",
             "rows": 3,
@@ -1237,13 +1089,13 @@
           },
           {
             "axis": "falsifiability-carrier",
-            "rows": 7,
+            "rows": 4,
             "reason": "three rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.47.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition | 2026-11-12 re-measured: the consumer ledger adds one axis definition row | 2026-11-12 re-measured: verify-contract-anchors.selftest.mjs adds an axis definition | 2026-11-13 re-measured: W10 M5 changes no gate-table rows",
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition | 2026-11-12 re-measured: the consumer ledger adds one axis definition row | 2026-11-12 re-measured: verify-contract-anchors.selftest.mjs adds an axis definition | 2026-11-13 re-measured: W10 M5 changes no gate-table rows | 2026-11-13 A1b: the duplicate table/twin rows were deleted, so the carrier debt dropped 7 -> 4 (real row reduction, not a renewal).",
             "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the axis rows are the registrations above; the reduction lands when the overlay mutation runner and the table split land (both are single-pass items, tracked in W9-gates §4). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
           },
           {
@@ -1705,19 +1557,6 @@
                 "replace": "    \"@deepseek-ai/schemastery\": { \"status\": \"declared\", \"reason\": 0 },"
               },
               "expect": "red",
-              "note": "a profileHoist entry whose reason is not a string: in policy-only form the guard requires every hoist entry to carry a reason, so a non-string reason is its subject (kept valid JSON so the intended branch fires, not the parser)",
-              "provenAt": "2026-10-14T08:33:35.644Z",
-              "provenSha": "b2c6b521079b008d3ae4d70b52f8d150cab0305f41991f04f15f13fda6643eca"
-            }
-          ],
-          "line-identity-ci": [
-            {
-              "mutate": {
-                "file": "packages/scripts/line-policy.json",
-                "find": "    \"@deepseek-ai/schemastery\": { \"status\": \"declared\", \"reason\": \"closure pins 3.18.2 whose .volatile() is types-only; the profile hoist (3.18.4) is what the family’s volatile tests exercise\" },",
-                "replace": "    \"@deepseek-ai/schemastery\": { \"status\": \"declared\", \"reason\": 0 },"
-              },
-              "expect": "red",
               "note": "the CI row runs the same script in the same policy-only form, so the same non-string-reason mutation is its red too; two rows sharing one script still carry their own proof",
               "provenAt": "2026-10-14T08:33:45.995Z",
               "provenSha": "b2c6b521079b008d3ae4d70b52f8d150cab0305f41991f04f15f13fda6643eca"
@@ -1863,94 +1702,6 @@
             "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
             "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
           },
-          "ci-only-01": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-02": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-03": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-04": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-05": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-06": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-07": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-09": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-10": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-11": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "ci-only-12": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
           "ci-only-13": {
             "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
             "owner": "scripts/verify-mutations",
@@ -1959,44 +1710,12 @@
             "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
             "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
           },
-          "ci-only-14": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "graph-edges-live": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): every one of these rows waits on the same missing tool — an overlay-tree mutation mode in verify-mutations; when it lands the whole group is proven in one pass and deleted together. Row count is unchanged by this renewal, which is the honest statement: no reduction happened this release. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "line-identity-bed": {
-            "reason": "ABSENT-LOCALLY SUBJECT: its argv names packages/scripts/line-manifest.json as the bed manifest, and that file does not exist in this repo (it is produced on the bed tree it describes, from machine state this repo does not carry), so no mutation inside the repo can change what it judges",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
-            "condition": "release gate: if the manifest ever becomes a tracked file here, delete this exemption and prove it by mutation (the CI and policy-only rows on the same script are already proven by a non-string policy reason)",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
           "gate-27": {
             "reason": "BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mutation in this repo can red it without first building",
             "owner": "scripts/verify-mutations",
             "expiry": "0.47.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row gains a source-level subject or dist becomes part of the reviewed tree, delete this exemption and prove it by mutation",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "health-admission": {
-            "reason": "CANNOT-DECIDE BY DESIGN: run as registered it reports CANNOT DECIDE (user=46 platform=0) because a 0-hit count over an EMPTY corpus would admit every rule - the guard refuses rather than pass, so it has no green baseline a mutation could turn red; its enforcement branch is also empty by design (the policy inForce list is empty until a rule is measured on both corpora)",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.47.0",
-            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
-            "condition": "release gate: if a platform corpus is supplied in-tree and a rule is registered inForce, delete this exemption and prove it by making that rule fail admission on the baseline",
             "renewal": "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
           },
           "gate-50": {
@@ -2211,13 +1930,6 @@
             "expiry": "0.47.0",
             "plan": "close records per check; coverage exits 0 once every check is proven",
             "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the registrations close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
-          "health-admission": {
-            "reason": "no user or platform corpora on this machine, so admission cannot be judged",
-            "owner": "scripts/gates",
-            "expiry": "0.47.0",
-            "plan": "run where the corpora exist (CI or a real profile)",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the registrations close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
           }
         },
         "unmappedTier": [
@@ -2236,6 +1948,30 @@
           {
             "id": "gate-15",
             "reasonRef": "scripts/gate-manifest.json#gate-15",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-33",
+            "reasonRef": "scripts/gate-manifest.json#gate-33",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-78",
+            "reasonRef": "scripts/gate-manifest.json#gate-78",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-59",
+            "reasonRef": "scripts/gate-manifest.json#gate-59",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-74",
+            "reasonRef": "scripts/gate-manifest.json#gate-74",
             "expiry": "0.26.0",
             "owner": "scripts"
           },
@@ -2282,50 +2018,8 @@
             "owner": "scripts"
           },
           {
-            "id": "ci-only-10",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-10",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-11",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-11",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-12",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-12",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
             "id": "ci-only-13",
             "reasonRef": "scripts/gate-manifest.json#ci-only-13",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-14",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-14",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-15",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-15",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-16",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-16",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-17",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-17",
             "expiry": "0.26.0",
             "owner": "scripts"
           },
@@ -2350,92 +2044,8 @@
             "owner": "scripts"
           },
           {
-            "id": "gate-60",
-            "reasonRef": "scripts/gate-manifest.json#gate-60",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-61",
-            "reasonRef": "scripts/gate-manifest.json#gate-61",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-62",
-            "reasonRef": "scripts/gate-manifest.json#gate-62",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-63",
-            "reasonRef": "scripts/gate-manifest.json#gate-63",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-64",
-            "reasonRef": "scripts/gate-manifest.json#gate-64",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-65",
-            "reasonRef": "scripts/gate-manifest.json#gate-65",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-66",
-            "reasonRef": "scripts/gate-manifest.json#gate-66",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-72",
-            "reasonRef": "scripts/gate-manifest.json#gate-72",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-75",
-            "reasonRef": "scripts/gate-manifest.json#gate-75",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-76",
-            "reasonRef": "scripts/gate-manifest.json#gate-76",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-77",
-            "reasonRef": "scripts/gate-manifest.json#gate-77",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
             "id": "gate-78",
             "reasonRef": "scripts/gate-manifest.json#gate-78",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-79",
-            "reasonRef": "scripts/gate-manifest.json#gate-79",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-80",
-            "reasonRef": "scripts/gate-manifest.json#gate-80",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-81",
-            "reasonRef": "scripts/gate-manifest.json#gate-81",
             "expiry": "0.26.0",
             "owner": "scripts"
           },
@@ -2448,6 +2058,12 @@
           {
             "id": "gate-74",
             "reasonRef": "scripts/gate-manifest.json#gate-74",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "gate-04",
+            "reasonRef": "scripts/gate-manifest.json#gate-04",
             "expiry": "0.26.0",
             "owner": "scripts"
           },
@@ -2486,6 +2102,18 @@
             "reasonRef": "scripts/gate-manifest.json#gate-73",
             "expiry": "0.26.0",
             "owner": "scripts"
+          },
+          {
+            "id": "ci-only-13",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-13",
+            "expiry": "0.26.0",
+            "owner": "scripts"
+          },
+          {
+            "id": "ci-only-18",
+            "reasonRef": "scripts/gate-manifest.json#ci-only-18",
+            "expiry": "0.26.0",
+            "owner": "scripts"
           }
         ],
         "duplicateGroups": [
@@ -2493,218 +2121,7 @@
             "key": "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
             "ids": [
               "gate-23",
-              "gate-78",
-              "line-identity-ci"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/gen-about.mjs packages/evolution --check",
-            "ids": [
-              "gate-60",
-              "ci-only-02"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/gen-bundle-patches.mjs packages/evolution --check",
-            "ids": [
-              "gate-61",
-              "ci-only-03"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check",
-            "ids": [
-              "gate-62",
-              "ci-only-04"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/gen-client-tokens.mjs packages/evolution --check",
-            "ids": [
-              "gate-63",
-              "ci-only-05"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/gen-param-client-view.mjs packages/evolution --check",
-            "ids": [
-              "gate-64",
-              "ci-only-06"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check",
-            "ids": [
-              "gate-65",
-              "ci-only-07"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check",
-            "ids": [
-              "gate-66",
-              "ci-only-09"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/requirements.selftest.mjs",
-            "ids": [
-              "gate-72",
-              "ci-only-16"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
-            "ids": [
-              "gate-75",
-              "ci-only-22"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
-            "ids": [
-              "gate-76",
-              "ci-only-24"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
-            "ids": [
-              "gate-77",
-              "ci-only-25"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict",
-            "ids": [
-              "gate-79",
-              "line-identity-bed"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/verify-graph-edges.mjs --report",
-            "ids": [
-              "gate-80",
-              "graph-edges-live"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/scripts/verify-health-admission.mjs",
-            "ids": [
-              "gate-81",
-              "health-admission"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
-            "ids": [
-              "gate-59",
-              "ci-only-01"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
-            "ids": [
-              "gate-67",
-              "ci-only-10"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
-            "ids": [
-              "gate-68",
-              "ci-only-11"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json",
-            "ids": [
-              "gate-69",
-              "ci-only-12"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
-            "ids": [
-              "gate-70",
-              "ci-only-14"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
-            "ids": [
-              "gate-71",
-              "ci-only-15"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "key": "node packages/evolution/scripts/run-load-sensitive.mjs .",
-            "ids": [
-              "gate-73",
-              "ci-only-17"
+              "gate-78"
             ],
             "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
             "expiry": "0.26.0",
