@@ -1,3 +1,13 @@
+## 0.47.0 (consolidation) — 全量债务收口：门禁单源、写路径单门面、merge/installer 单源、settings 单传输
+
+> **范围（W11 A–F，25 个 P0 全关）**：① 门禁内核 `packages/scripts/gates/{model,report,runner,views}.mjs` + 注册表 112→90 行，无 runnable `argv:null`，重复命令硬红；pre/post-tag/ci lanes 与 release `needs` 单源。② 写路径只走 `transactIo`（unit/journal/lease 全部收敛），undo 用 `kernel.restore` CAS。③ merge 删除 legacy writer/route source：`MergeRouteSource` 只剩 snapshot+bodyRef，`facts.ts`/`wire-projection.ts`/`metrics.ts` 删除；`undone` 不再误报 merged。④ installer 抽出唯一 `SourceTree`（source/staging/dist 同校验），packed 依赖钉回 `^familyVersion`。⑤ Doctor 单 `DoctorReport`、installForm 七个语义值单源；settings 只走平台 `configForms`，family HTTP settings surface 删除。⑥ F：死 UI/导出/spec/旧 tarball 清理，params-docs 不再假绿。
+>
+> **破坏性变更（0.x，按 W11 §8）**：删除公开导出 `probe.valueOr/mapProbe`、`liveString/liveEnum`、`foldUntrustedLines`、`WriteOutcome/transactOutcome/TransactTaskGuard/transactTaskGuard`、`journal-protocol.canAdvance/isTerminal`、`subagentChannelState`、client-kit `settings-gateway` 的 `saveSettings/createSettingsGatewayCache` 及五个类型；删除 family HTTP surface `settings`（HOST_ROUTES 21→19 endpoints）与 merge legacy `facts.ts/wire-projection.ts/metrics.ts`；`doctor --json` 现在输出完整 `DoctorReport`（不再只 view，脚本需改读 `report.view`）；installer 无 `--mode` 时默认 `all`（原 `layered`），`--from-dist` 依赖固定为 `^0.47.0`；`run-gates` 的 pre-tag 由 `local ∪ ci-static ∪ ci-unit` 组成，action 以 lane 调用。
+>
+> **验证（本地，2026-11-14）**：门禁 local/pre-tag exit 0；全量家族套件（CI lane）绿；25 个 P0 逐条关闭；4 个 lane 产出 `gates-*.json`；`verify-check-registry` 仅剩既有 `beh-installer-layered` 登记；发布字节与真机验收见发布报告。
+>
+> **残余（W11 §27）**：installer legacy 安装路径删除/plan-apply-cli 拆分登记到 0.48.0（owner scripts/installer）；C2 的 SourceTree 已单源，本次不删 legacy 安装模式，避免 0.46 layered 用户失去回滚/迁移工具。
+
 ## 0.46.0 (CI/release control plane) — 门禁单源、发布机械化、Windows 安装 lane 3 分钟
 
 > **范围（只动工程/发布链：产品行为与包集合不变）**：① **门禁唯一源** `packages/scripts/gates/registry.mjs`（112 行、id 冻结、lanes；`gate-manifest.json` 与 CONTRIBUTING 表改为生成视图；CI action 在 static/unit 段按 `run-gates --lane` 调用，CI 专属 argv/env 走 `ci:` 覆盖）；② **单一执行器**（有界并发、needs/after、fail-fast、逐行 verdict 工件 `gates-*.json`；探针复用套件基线，CI 探针 2m12→约 55s）；③ **发布 v2**（publish 顺序由依赖图 Kahn 分层派生；`verify-published` 独立作业 + 每包预算退避；Windows lane 消费 packed 工件并走 `installer --from-dist`，18m57→**3.1m**；`verify-published-bytes` 对已发布 0.45.0 实测 20/20、7.5s）；④ **清理**（`build-lib` 去掉无条件 `--force`；publish 内联 heredoc→`release-job-ledger.mjs`；过渡的 `gate-lanes.json` 删除）。

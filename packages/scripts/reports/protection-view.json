@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/gen-protection-view.mjs",
-  "generatedAt": "2026-11-13T15:05:51.411Z",
+  "generatedAt": "2026-11-13T21:14:00.206Z",
   "rows": 90,
   "distinctProtections": 70,
   "noIndependentProtection": 0,

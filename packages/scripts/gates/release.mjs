@@ -43,7 +43,7 @@ export const release = [
     argv: ["node","packages/scripts/verify-mutations.mjs","--coverage"],
     lanes: ["ci-release"],
     after: ["gate-48"],
-    registration: {"reason":"the mutation ledger is still being filled: 29 of 109 checks carry a proven red record","owner":"scripts/gates","expiry":"0.47.0","plan":"close records per check; coverage exits 0 once every check is proven","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
+    registration: {"reason":"the mutation ledger is still being filled: 29 of 109 checks carry a proven red record","owner":"scripts/gates","expiry":"0.48.0","plan":"close records per check; coverage exits 0 once every check is proven","renewal":"Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."},
   }),
 
   gate("gate-56", {
