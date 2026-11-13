@@ -219,21 +219,6 @@ runs:
         node packages/evolution/scripts/audit-release-tarballs.mjs \
           packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "^$RANGE"
 
-    - name: Verify platform version ranges (N-2 guard)
-      shell: bash
-      working-directory: upstream
-      env:
-        NPM_SCOPE: ${{ inputs.npm_scope }}
-      run: |
-        # R-10: --our-scope is passed EXPLICITLY from the same scope the pack
-        # rewrite used — the guard's '@lmzhen' default is no longer an
-        # independent second definition that can silently drift.
-        # G1-S6: the platform line is NOT a flag anymore — the guard reads platform-line.json
-        # (version/floor/peers/engines/grid) through lib-platform-line.mjs.
-        node packages/evolution/scripts/verify-platform-ranges.mjs \
-          --manifest-dir packages/evolution/.release-staging \
-          --our-scope "$NPM_SCOPE"
-
     - name: Run the static gate lane (registry ci-static)
       shell: bash
       working-directory: upstream
@@ -242,6 +227,16 @@ runs:
         # registry's ci-static set (gates/*.mjs; CI overrides carry the runner-shaped argv). The
         # per-row verdicts land in gates-static.json so a red names its row without reading the log.
         node packages/evolution/scripts/run-gates.mjs ci --lane ci-static --concurrency 2 --json-out "$RUNNER_TEMP/gates-static.json"
+
+    - name: "Run the release gate lane (post-pack: ranges, registry, mutation coverage)"
+      shell: bash
+      working-directory: upstream
+      env:
+        NPM_SCOPE: ${{ inputs.npm_scope }}
+      run: |
+        # W11 A3: release rows run only after pack. gate-27 judges the packed .release-staging tree,
+        # gate-48 the seven-axis registry ledger, gate-49 the mutation coverage (registered cannot).
+        node packages/evolution/scripts/run-gates.mjs ci --lane ci-release --concurrency 1 --json-out "$RUNNER_TEMP/gates-release.json"
 
     - name: Declare the line this CI run measured (G1.5)
       shell: bash
@@ -283,28 +278,6 @@ runs:
         else
           echo "release evidence: skipped on non-tag dry run"
         fi
-        node packages/evolution/scripts/verify-profile-bundles.mjs --self-test
-        # No --require-repo-docs here: the overlay carries `packages/` only, so the repo-level
-        # docs (CHANGELOG / README / INSTALL) are not in this tree. That half of the guard runs
-        # in the family's own gate against the mirror, where those files exist.
-        node packages/evolution/scripts/verify-doc-facts.mjs packages/evolution --strict
-        node packages/evolution/scripts/verify-package-discovery.mjs packages/evolution --strict
-        node packages/evolution/scripts/verify-family-tool-names.mjs packages/evolution --strict
-        node packages/evolution/scripts/verify-skill-roots.mjs packages/evolution --strict
-        # The release wiring itself: every artifact `publish` downloads must be produced by a job
-        # in the same workflow (v0.17.0-rc.1 spent a human approval, then failed on `-baseline`,
-        # whose producing job had been retired). Walks up from the working directory for `.github`.
-        node packages/evolution/scripts/verify-release-artifacts.mjs ../.github --strict --self-test
-        # G6/M5 registration: a check DECLARED in the gate table must also be EXECUTED here -
-        # gate-22 refuses a declaration the action never runs (and no register covers). The view
-        # census, the verdict-records vacuum fixture and the seven-axis ledger therefore run in CI;
-        # the mutation ledger is registered instead (its records are still being filled, so its
-        # --coverage form is legitimately CANNOT DECIDE and must not fail the job).
-        node packages/evolution/scripts/gen-check-taxonomy.mjs packages/evolution --check
-        node packages/evolution/scripts/verify-verdict-records.mjs packages/evolution
-        node packages/evolution/scripts/verify-check-registry.mjs packages/evolution --strict
-        node packages/evolution/scripts/verify-test-lines.mjs packages/evolution --strict
-        node packages/evolution/scripts/verify-core-surface.mjs packages/evolution
 
     - name: "Packed install: full import against the npm platform"
       shell: bash

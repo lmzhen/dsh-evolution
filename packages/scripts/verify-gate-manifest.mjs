@@ -89,6 +89,10 @@ if (registers === null) {
 const MACHINE_LOCAL = registers.machineLocal
 const CI_NOT_EXECUTED = registers.localOnly
 const CI_ONLY = Array.isArray(registers.ciOnly) ? registers.ciOnly : []
+// Scripts the workflow itself runs as job steps (release evidence assemble/verify). They are not
+// gates by design (W11 A3: a gate judges, it does not produce the evidence), so the wild-check half
+// accepts the register entry instead of demanding a registry row.
+const WORKFLOW_STEPS = new Set((Array.isArray(registers.workflowSteps) ? registers.workflowSteps : []).map((entry) => entry.script))
 
 const contributingPath = join(repo, 'CONTRIBUTING.md')
 const actionPath = join(repo, '.github', 'actions', 'evolution-validate', 'action.yml')
@@ -258,6 +262,7 @@ for (const script of registryCiScripts) {
 }
 for (const script of actionFamilyScripts) {
   if (script === 'run-gates.mjs') continue
+  if (WORKFLOW_STEPS.has(script)) continue
   if (!registryCiScripts.has(script)) problems.push('the CI action runs ' + script + ' but no registry row carries it on a ci-* lane - a wild check (add it to packages/scripts/gates/registry.mjs or stop running it)')
 }
 for (const lane of ['ci-static', 'ci-unit']) {

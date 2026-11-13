@@ -1540,13 +1540,25 @@
       ],
       "tree": "mirror",
       "profiles": [
-        "local",
         "ci"
       ],
+      "after": [
+        "gate-16"
+      ],
       "lanes": [
-        "local",
         "ci-release"
-      ]
+      ],
+      "ci": {
+        "cwd": "upstream",
+        "argv": [
+          "node",
+          "packages/evolution/scripts/verify-platform-ranges.mjs",
+          "--manifest-dir",
+          "packages/evolution/.release-staging",
+          "--our-scope",
+          "$NPM_SCOPE"
+        ]
+      }
     },
     {
       "id": "gate-48",
@@ -1560,11 +1572,12 @@
       ],
       "tree": "mirror",
       "profiles": [
-        "local",
         "ci"
       ],
+      "after": [
+        "gate-27"
+      ],
       "lanes": [
-        "local",
         "ci-release"
       ]
     },
@@ -1579,11 +1592,12 @@
       ],
       "tree": "mirror",
       "profiles": [
-        "local",
         "ci"
       ],
+      "after": [
+        "gate-48"
+      ],
       "lanes": [
-        "local",
         "ci-release"
       ],
       "registration": {
@@ -1596,42 +1610,24 @@
     },
     {
       "id": "gate-56",
-      "kind": "script",
+      "kind": "external",
       "human": "`node packages/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json`（W2/W3/W10/W11 发布证据：schemaVersion=2、platformLine 与 platform-line.json 逐字、manifests 范围一致；`--release` 时另要求 ciFace/gates/S1–S4 全 pass/52 项 traceability 全覆——blocked 不算 pass。缺文件/不可解析→**exit 2**）",
-      "argv": [
-        "node",
-        "packages/scripts/verify-release-evidence.mjs",
-        "packages/evolution/dist/release-evidence.json"
-      ],
+      "argv": null,
       "tree": "mirror",
-      "profiles": [
-        "ci"
-      ],
+      "profiles": [],
+      "reason": "Release evidence is a workflow job step (verify after assemble), not a gate: a gate must judge, not produce or re-verify a file the publish job owns. The table number stays reserved (ids are frozen).",
       "lanes": [
         "ci-release"
       ]
     },
     {
       "id": "gate-57",
-      "kind": "script",
+      "kind": "external",
       "human": "`node packages/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json --gates-from-manifest ci --ci-face ci --os ci`（W3/W10 发布证据装配：把 pack 写出的 schema-2 骨架与本仓演练快照（S1–S4 spike 证据 + W11 52 项 traceability）合并，并写入 CI face 与本次 compat-check 已执行的 gate 台账；`--release` 在 publish 前复验；缺输入/不合格→exit 1/2）",
-      "argv": [
-        "node",
-        "packages/scripts/assemble-release-evidence.mjs",
-        "packages/evolution/dist/release-evidence.json",
-        "--rehearsal",
-        "packages/evolution/scripts/release-evidence-rehearsal.json",
-        "--gates-from-manifest",
-        "ci",
-        "--ci-face",
-        "ci",
-        "--os",
-        "ci"
-      ],
+      "argv": null,
       "tree": "mirror",
-      "profiles": [
-        "ci"
-      ],
+      "profiles": [],
+      "reason": "Release evidence is assembled by the publish job (assemble → verify → publish), not by a gate: the old row produced the evidence inside a gate, which is the synthesis this phase removes. The table number stays reserved (ids are frozen).",
       "lanes": [
         "ci-release"
       ]
@@ -1646,7 +1642,6 @@
       "command": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
       "reason": "action step — executed by its lane/action step, not by run-gates",
       "lanes": [
-        "local",
         "ci-release"
       ]
     },
@@ -1660,7 +1655,6 @@
       "command": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
       "reason": "action step — executed by its lane/action step, not by run-gates",
       "lanes": [
-        "local",
         "ci-release",
         "ci-windows"
       ]

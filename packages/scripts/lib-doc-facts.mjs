@@ -754,7 +754,11 @@ export function familyGateRegisters(root) {
     const fact = (asset.facts ?? []).find(entry => entry?.machine?.kind === 'gate-set')
     if (fact === undefined) return null
     const registers = fact.machine.registers ?? {}
-    return { localOnly: registers.localOnly ?? [], machineLocal: registers.machineLocal ?? [] }
+    return {
+      localOnly: registers.localOnly ?? [],
+      machineLocal: registers.machineLocal ?? [],
+      workflowSteps: Array.isArray(registers.workflowSteps) ? registers.workflowSteps : [],
+    }
   } catch {
     return null
   }

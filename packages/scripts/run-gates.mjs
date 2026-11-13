@@ -56,10 +56,22 @@ if (!existsSync(MANIFEST)) { console.error('run-gates: missing gate-manifest.jso
 const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
 const RUNNABLE = new Set(['script', 'toolchain'])
 const gates = manifest.gates.filter((g) => RUNNABLE.has(g.kind))
-const ofProfile = (p) => gates.filter((g) => g.profiles.includes(p))
-const union = (a, b) => { const m = new Map(); for (const g of [...a, ...b]) m.set(g.id, g); return [...m.values()] }
-const byProfile = { local: ofProfile('local'), ci: ofProfile('ci') }
-byProfile['pre-tag'] = union(byProfile.local, byProfile.ci)
+const lanesOf = (gate) => (Array.isArray(gate.lanes) ? gate.lanes : [])
+const profilesOfGate = (gate) => (Array.isArray(gate.profiles) ? gate.profiles : [])
+const hasLane = (gate, lane) => lanesOf(gate).includes(lane)
+const anyCi = (gate) => lanesOf(gate).some((lane) => lane.startsWith('ci-'))
+// W11 A3: pre-tag is local ∪ ci-static ∪ ci-unit. The old union(local, all ci) dragged the
+// release/windows rows into a clean tree where their packed artifacts do not exist, which is why a
+// clean `pre-tag` could never exit 0. Release rows belong to the lanes that run after pack.
+// Fixture manifests (verify-verdict-records) carry profiles but no lanes; fall back to profiles so
+// the fixture keeps exercising the executor instead of being filtered out.
+const byProfile = {
+  local: gates.filter((g) => (lanesOf(g).length > 0 ? hasLane(g, 'local') : profilesOfGate(g).includes('local'))),
+  'pre-tag': gates.filter((g) => lanesOf(g).length > 0
+    ? hasLane(g, 'local') || hasLane(g, 'ci-static') || hasLane(g, 'ci-unit')
+    : profilesOfGate(g).includes('local') || profilesOfGate(g).includes('pre-tag')),
+  ci: gates.filter((g) => (lanesOf(g).length > 0 ? anyCi(g) : profilesOfGate(g).includes('ci'))),
+}
 
 const sha8 = (p) => { try { return createHash('sha256').update(readFileSync(p)).digest('hex').slice(0, 8) } catch { return 'absent' } }
 const gitHead = () => { const r = spawnSync('git', ['-C', MIRROR_ROOT, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }); return (r.stdout || 'unknown').trim() || 'unknown' }

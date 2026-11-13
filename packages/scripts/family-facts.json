@@ -304,6 +304,16 @@
               "reason": "CI runs the PROBE half (--probes --no-stamp --json, three-valued); the COVERAGE half stays local-only until every check carries a proven red record",
               "expiry": "0.45.0"
             }
+          ],
+          "workflowSteps": [
+            {
+              "script": "assemble-release-evidence.mjs",
+              "reason": "Release evidence is assembled by the publish job after pack, as an explicit job step (W11 A3): a gate judges, it does not produce the evidence file."
+            },
+            {
+              "script": "verify-release-evidence.mjs",
+              "reason": "Release evidence is verified by the publish job immediately after assemble and before publish (W11 A3); the gate table no longer carries evidence rows."
+            }
           ]
         }
       },
@@ -603,7 +613,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "93b976090bcd9090769a0ec9af1c010ffc8001bf6631b3c5fa03780c483b28cd",
+        "sha256": "68ad0be4b90c3e70fc672e455a21cbcf6c55468a47405ee6abeca798907b025a",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -957,28 +967,18 @@
           },
           {
             "id": "gate-27",
-            "tier": "fast",
+            "tier": "ci-only",
             "criterion": "verify-platform-ranges"
           },
           {
             "id": "gate-48",
-            "tier": "fast",
+            "tier": "ci-only",
             "criterion": "verify-check-registry"
           },
           {
             "id": "gate-49",
-            "tier": "fast",
+            "tier": "ci-only",
             "criterion": "verify-mutations"
-          },
-          {
-            "id": "gate-56",
-            "tier": "ci-only",
-            "criterion": "verify-release-evidence"
-          },
-          {
-            "id": "gate-57",
-            "tier": "ci-only",
-            "criterion": "assemble-release-evidence"
           }
         ],
         "pendingAxes": [
