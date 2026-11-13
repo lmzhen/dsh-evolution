@@ -1,21 +1,26 @@
 #!/usr/bin/env node
 /**
- * run-gates — 门禁清单的唯一执行器（G0-2）。只判不改。
- * G1: every gate now emits a VerdictRecord; the runner renders, it does not decide by exit code alone.
- * G1/S4: the spawn seam lives in lib-run-gates.mjs (createRunner) - this file wires spawnSync and
- * renders what the runner observed; no env/CLI switch reaches the seam.
- * 用法：node packages/scripts/run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--json-out <path>] [--lane <name>] [--only <id>] [--drill <id>] [--overlay <path>]
+ * run-gates — the family gate runner.
+ *
+ * G1/S4: the spawn seam lives in lib-run-gates.mjs (createAsyncRunner for the concurrent path,
+ * createRunner kept for fixtures); this file wires the real child_process seams, judges each row
+ * through lib-verdict, and renders the summary. It never decides on its own: every verdict is the
+ * contract in lib-verdict + the observed process result.
+ *
+ * 用法：node packages/scripts/run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--json-out <path>]
+ *       [--lane <name>] [--only <id>] [--drill <id>] [--overlay <path>] [--concurrency <n>] [--fail-fast]
  * 规则：seed = CI ∪ 表；pre-tag = local ∪ ci；runner 只跑 kind=script|toolchain；tree=overlay 的门禁在 overlay 根下跑。
- * M0/M3（W10 §10/§16）：每行带 `lanes`（由 gates/registry.mjs 生成到 manifest）；`--lane` 在 profile 选择后再按 lane 过滤，
- * 空选择 exit 2；`--json-out` 写逐行 verdict 工件（`--json` 仍是 stdout 模式，两者可同时用）。
+ * M0/M3（W10 §10/§16）：lanes 由 gates/registry.mjs 生成到 manifest；`--lane` 在 profile 选择后过滤，空选择 exit 2。
+ * M3b（W10 §16.8）：`--concurrency`（默认 1，最多 32）打开有界并发；`--fail-fast` 在首个 fail 后不启动新行。
  */
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { validate, counts, render, actionBlock } from './lib-verdict.mjs'
-import { createRunner, decideRequires } from './lib-run-gates.mjs'
+import { createAsyncRunner, decideRequires } from './lib-run-gates.mjs'
+import { clampConcurrency, runTasks } from './lib-gate-scheduler.mjs'
 import { softOverlay } from './lib-env.mjs'
 import { familyVersion } from './lib-family-version.mjs'
 import { exemptionProblems } from './lib-exemptions.mjs'
@@ -30,6 +35,8 @@ const profile = args.find((a) => ['local', 'pre-tag', 'ci'].includes(a))
 // M3 lane selection: lane membership comes from the gate registry, rendered onto each manifest row.
 const laneName = flag('--lane')
 const jsonOut = flag('--json-out')
+const concurrency = clampConcurrency(flag('--concurrency') === undefined ? 1 : flag('--concurrency'))
+const failFast = has('--fail-fast')
 const KNOWN_LANES = new Set(['local', 'pre-tag', 'ci-setup', 'ci-static', 'ci-unit', 'ci-release', 'ci-windows', 'machine-local'])
 if (laneName !== undefined) {
   if (laneName === '' || !KNOWN_LANES.has(laneName)) { console.error('run-gates: --lane needs one of ' + [...KNOWN_LANES].join('|') + ' (got ' + JSON.stringify(laneName) + ')'); process.exit(2) }
@@ -50,7 +57,6 @@ const sha8 = (p) => { try { return createHash('sha256').update(readFileSync(p)).
 const gitHead = () => { const r = spawnSync('git', ['-C', MIRROR_ROOT, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }); return (r.stdout || 'unknown').trim() || 'unknown' }
 // policySha is the keep-list identity: a canonical projection of the facts asset, so the mutation
 // prover's own stamps (provenAt/provenSha) cannot churn it - those are data about proofs, not policy.
-// Sorted keys everywhere; volatile keys dropped; a real policy edit still moves the hash.
 const VOLATILE = new Set(['provenAt', 'provenSha'])
 const canonical = (value) => {
   if (Array.isArray(value)) return value.map(canonical)
@@ -98,7 +104,7 @@ if (has('--drill')) {
   process.exit(r.status ?? 1)
 }
 
-if (!profile) { console.error('run-gates: usage: run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--only <id>] [--drill <id>]'); process.exit(2) }
+if (!profile) { console.error('run-gates: usage: run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--json-out <path>] [--lane <name>] [--only <id>] [--drill <id>] [--overlay <path>] [--concurrency <n>] [--fail-fast]'); process.exit(2) }
 let list = byProfile[profile]
 const only = flag('--only')
 if (only !== undefined) { list = list.filter((g) => g.id === only); if (list.length === 0) { console.error('run-gates: --only ' + only + ' not in profile ' + profile); process.exit(2) } }
@@ -108,13 +114,10 @@ if (laneName !== undefined) {
 }
 if (has('--list')) { emitList(list, laneName === undefined ? profile : profile + ' lane=' + laneName); process.exit(0) }
 
-const runner = createRunner({ spawn: spawnSync })
+const runner = createAsyncRunner({ spawn })
 // requires (R38/R42): the prerequisites each check declares. The FACT owns them (nothing else
 // does), the decision is the pure matrix in lib-run-gates, and this runner only supplies what it
 // observed. A prerequisite that does not pass aborts THIS row - no member verdict is invented.
-// The checks fact owns both the declared criterion (who judges this row) and the prerequisites.
-// The executor READS them; it never invents a criterion of its own (the old value was the
-// placeholder <id>-criterion, which named nothing a reader could follow).
 const declared = (() => {
   try {
     const asset = JSON.parse(readFileSync(join(HERE, 'family-facts.json'), 'utf8'))
@@ -132,19 +135,27 @@ const declaredRequires = declared.requires
 const criterionOf = (id) => declared.criteria.get(id) ?? 'undeclared'
 const treeRootFor = (tree) => (tree === 'overlay' ? overlayRoot : MIRROR_ROOT)
 /**
- * Rows are written for the overlay layout (`packages/evolution/<pkg>`); the mirror publishes the
- * same tree flat (`packages/<pkg>`). A token is rewritten ONLY when the flat path exists and the
- * written one does not, so a genuinely absent artifact still reads as absent (G7-e1).
+ * Layout translation (W10 M3b): rows are authored for the OVERLAY layout
+ * (`packages/evolution/<pkg>`), while the local mirror is flat (`packages/<pkg>`). The reverse also
+ * exists: inside the CI overlay the mirror rows' `packages/scripts/...` has no flat tree, so they
+ * resolve to `packages/evolution/scripts/...`. A token is rewritten only when the target exists and
+ * the written one does not, so a genuinely absent artifact still reads as absent (G7-e1).
  */
 const flatLayout = !existsSync(join(MIRROR_ROOT, 'packages', 'evolution'))
+const nestedLayout = !flatLayout
 const resolveLayoutToken = (token, tree) => {
-  // Only the tree that is actually FLAT may be rewritten: an overlay row runs under the nested
-  // layout, where \packages/scripts/...\ does not exist at all.
-  if (tree !== 'mirror' || !flatLayout || !token.startsWith('packages/evolution/')) return token
-  const flat = 'packages/' + token.slice('packages/evolution/'.length)
-  return !existsSync(join(MIRROR_ROOT, token)) && existsSync(join(MIRROR_ROOT, flat)) ? flat : token
+  if (tree !== 'mirror') return token
+  if (flatLayout && token.startsWith('packages/evolution/')) {
+    const flat = 'packages/' + token.slice('packages/evolution/'.length)
+    return !existsSync(join(MIRROR_ROOT, token)) && existsSync(join(MIRROR_ROOT, flat)) ? flat : token
+  }
+  if (nestedLayout && token.startsWith('packages/scripts/')) {
+    const nested = 'packages/evolution/' + token
+    return !existsSync(join(MIRROR_ROOT, token)) && existsSync(join(MIRROR_ROOT, nested)) ? nested : token
+  }
+  return token
 }
-const evaluateRequires = (gate) => {
+const evaluateRequires = async (gate) => {
   for (const req of declaredRequires.get(gate.id) ?? []) {
     if (req.mode === 'present') {
       const product = /^[A-Za-z]:[\\/]/.test(req.path) ? req.path : join(treeRootFor(gate.tree), resolveLayoutToken(req.path, gate.tree))
@@ -154,86 +165,90 @@ const evaluateRequires = (gate) => {
     }
     const script = /[\\/]/.test(req.script) ? req.script : join(HERE, req.script)
     if (!existsSync(script)) return { req, decision: decideRequires({ status: null, errorCode: 'ENOENT', path: script }, 'in-repo', 'run') }
-    const observed = runner.run([process.execPath, script], { cwd: treeRootFor(gate.tree), stdio: has('--json') ? 'pipe' : 'inherit' })
+    const observed = await runner.run([process.execPath, script], { cwd: treeRootFor(gate.tree) })
     const decision = decideRequires({ status: observed.status, errorCode: observed.errorCode, killedBy: observed.killedBy, signal: observed.signal, ms: observed.ms, path: script }, 'in-repo', 'run')
     if (decision.verdict !== 'pass') return { req, decision }
   }
   return null
 }
 const identity = identityFor(profile)
-const records = []
 const base = (g, extra) => ({ id: g.id, check: g.human, criterion: criterionOf(g.id), lanes: Array.isArray(g.lanes) ? g.lanes : [], identity, subject: { kind: 'paths', count: 0 }, ...extra })
 
-for (const g of list) {
+/** Judge ONE gate. Every branch returns a record (never throws); the scheduler owns the order. */
+async function executeGate(g) {
   // 1) static executability: a placeholder token or a non-command argv[0] cannot run a criterion at all
-  // M2: the executable form is the declared argv; the human cell is prose and may carry
-  // placeholders. A row that declares no single command (a composite table cell) is
-  // cannot-decide with its reason named - never "run the first thing that looks like a command".
   const argv = Array.isArray(g.argv) ? g.argv : null
-  // the placeholder is read from the JOINED argv (the executable form): a multi-word one
-  // (<platform tree>) stays whole (R124), and a placeholder that lives only in the human
-  // annotation is prose about usage - the table row 24 annotates a <path> it never passes.
   const executable = argv === null ? '' : argv.join(' ')
   const placeholder = (executable.match(/<[^>]*>/) || [])[0]
   if (argv === null || argv.length === 0) {
-    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [g.argvProblem === undefined ? 'argv' : g.argvProblem], path: 'UNRESOLVED', next: 'declare ONE executable command for this row (split the prose cell, or give the row an argv with a value source for every placeholder)', evidence: MANIFEST + ':' + g.id + ' declares no argv' + (g.argvProblem === undefined ? '' : ' (' + g.argvProblem + ')') }))
-    continue
+    return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [g.argvProblem === undefined ? 'argv' : g.argvProblem], path: 'UNRESOLVED', next: 'declare ONE executable command for this row (split the prose cell, or give the row an argv with a value source for every placeholder)', evidence: MANIFEST + ':' + g.id + ' declares no argv' + (g.argvProblem === undefined ? '' : ' (' + g.argvProblem + ')') })
   }
   if (placeholder !== undefined) {
-    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [placeholder], path: 'UNRESOLVED', next: 'declare the placeholder value in the gate table (or register an args[] source) so the command is executable', evidence: MANIFEST + ':' + g.id + ' cmd contains ' + placeholder }))
-    continue
+    return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [placeholder], path: 'UNRESOLVED', next: 'declare the placeholder value in the gate table (or register an args[] source) so the command is executable', evidence: MANIFEST + ':' + g.id + ' cmd contains ' + placeholder })
   }
   if (argv[0].startsWith('-')) {
-    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: ['argv[0]'], path: 'UNRESOLVED', next: 'name a script as argv[0] (a bare flag is not a command) or register the step explicitly', evidence: MANIFEST + ':' + g.id + ' argv[0]=' + String(argv[0]) }))
-    continue
+    return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: ['argv[0]'], path: 'UNRESOLVED', next: 'name a script as argv[0] (a bare flag is not a command) or register the step explicitly', evidence: MANIFEST + ':' + g.id + ' argv[0]=' + String(argv[0]) })
   }
-  const blocked = evaluateRequires(g)
+  const blocked = await evaluateRequires(g)
   if (blocked !== null) {
-    if (!has('--json')) console.log('           requires: ' + blocked.req.script + ' (mode=' + blocked.req.mode + ', verdict=' + blocked.decision.verdict + ')')
-    records.push(base(g, { verdict: blocked.decision.verdict, criterionEvaluated: blocked.decision.criterionEvaluated, cause: blocked.decision.cause, missing: blocked.decision.missing, path: String(blocked.req.path ?? blocked.req.script), next: blocked.decision.next, evidence: blocked.decision.evidence }))
-    continue
+    return base(g, { verdict: blocked.decision.verdict, criterionEvaluated: blocked.decision.criterionEvaluated, cause: blocked.decision.cause, missing: blocked.decision.missing, path: String(blocked.req.path ?? blocked.req.script), next: blocked.decision.next, evidence: blocked.decision.evidence })
   }
   if (g.localSafe === false && !process.env.CI) {
-    records.push(base(g, { verdict: 'skipped', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [g.localSafeReason || 'CI-shaped command'], path: 'UNRESOLVED' }))
-    continue
+    return base(g, { verdict: 'skipped', criterionEvaluated: false, cause: { kind: 'field-absent' }, missing: [g.localSafeReason || 'CI-shaped command'], path: 'UNRESOLVED' })
   }
   if (g.tree === 'overlay' && !existsSync(overlayRoot)) {
-    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, missing: [overlayRoot], path: overlayRoot, next: 'clone the overlay tree or pass --overlay <path>', evidence: 'overlay root missing: ' + overlayRoot }))
-    continue
+    return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, missing: [overlayRoot], path: overlayRoot, next: 'clone the overlay tree or pass --overlay <path>', evidence: 'overlay root missing: ' + overlayRoot })
   }
   const cwd = g.tree === 'overlay' ? overlayRoot : MIRROR_ROOT
   // the declared argv names the command as the table writes it (`node <script> ...`); the runner
-  // always spawns through process.execPath, so the leading token is dropped here - keeping it
-  // would spawn `node node script` and every spawning gate would read as a broken check.
-  const declared = argv[0] === 'node' ? argv.slice(1) : argv
-  const [script, ...rest] = declared.map((token) => resolveLayoutToken(token, g.tree))
-  // the seam owns the spawn and reports killedBy explicitly; this file never infers it
+  // always spawns through process.execPath, so the leading token is dropped here.
+  const declaredArgv = argv[0] === 'node' ? argv.slice(1) : argv
+  const [script, ...rest] = declaredArgv.map((token) => resolveLayoutToken(token, g.tree))
   // A gate that never returns must not stop the whole local chain: budget it, and let the verdict
   // read cannot-decide (killedBy=budget) instead of hanging the runner forever.
-  const observed = runner.run([process.execPath, script, ...rest], { cwd, stdio: 'pipe', timeoutMs: 180000 })
+  const observed = await runner.run([process.execPath, script, ...rest], { cwd, timeoutMs: 180000 })
   const ms = observed.ms
   const status = observed.status === undefined ? null : observed.status
-  // G0-fix (2026-10-15): the on-disk check below is a PATH check, so it may only run when the token
-  // actually names a path. `node -e <script>` is a legal row form (the verdict fixture carries one as
-  // its healthy control) and its second token is a FLAG: checking `-e` on disk reported cannot-decide
-  // for a row that exits 0, which is the exact "a green path that can never be green" shape this
-  // fixture exists to catch. A token starting with `-` is an option, not a script.
+  if (observed.stdout !== undefined && observed.stdout !== '' && (status !== 0 || status === null)) process.stdout.write(observed.stdout)
+  if (observed.stderr !== undefined && observed.stderr !== '' && (status !== 0 || status === null)) process.stderr.write(observed.stderr)
   const scriptPath = script.startsWith('-') ? null : resolve(cwd, script)
-  if (scriptPath !== null && !existsSync(scriptPath)) records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [script], next: 'the declared script is not on disk - fix the row, or register this check as cannot-decide on this machine', evidence: script + ' absent' }))
-  else if (observed.killedBy === 'budget' || observed.errorCode === 'ETIMEDOUT') records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'timeout' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'the gate ran past its 180 s local budget - run it on the build line, or register it as cannot-decide on this machine', evidence: script + ' killed at the 180 s budget' }))
-  else if (status === 0) records.push(base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms }))
-  else if (status === 2) {
+  if (scriptPath !== null && !existsSync(scriptPath)) return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [script], next: 'the declared script is not on disk - fix the row, or register this check as cannot-decide on this machine', evidence: script + ' absent' })
+  if (observed.killedBy === 'budget' || observed.errorCode === 'ETIMEDOUT') return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'timeout' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'the gate ran past its 180 s local budget - run it on the build line, or register it as cannot-decide on this machine', evidence: script + ' killed at the 180 s budget' })
+  if (status === 0) return base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms })
+  if (status === 2) {
     // The family's CLI convention is 0 = pass / 1 = fail / 2 = CANNOT DECIDE. Collapsing 2 into
-    // fail makes a missing input (an empty corpus, an absent bed, a reader that is not there)
-    // read as a violated invariant - infrastructure failure must not masquerade as a check
-    // failure. The child's own CANNOT DECIDE line is carried into the evidence so the reason
-    // travels with the verdict instead of being re-invented here.
-    const childLine = String((observed.stderr === undefined || observed.stderr === null ? '' : observed.stderr) + (observed.stdout === undefined || observed.stdout === null ? '' : observed.stdout))
-      .split('\n').map((line) => line.trim()).find((line) => /CANNOT DECIDE|cannot decide/i.test(line))
-    records.push(base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'the check reported CANNOT DECIDE: read its own line above (it names the input that is not there) - supply that input or register the check as cannot-decide on this machine', evidence: script + ' exit=2' + (childLine === undefined ? '' : ' :: ' + childLine) }))
+    // fail makes a missing input read as a violated invariant.
+    const childLine = String(observed.stderr ?? '') + String(observed.stdout ?? '')
+    const line = childLine.split('\n').map((entry) => entry.trim()).find((entry) => /CANNOT DECIDE|cannot decide/i.test(entry))
+    return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'the check reported CANNOT DECIDE: read its own line above (it names the input that is not there) - supply that input or register the check as cannot-decide on this machine', evidence: script + ' exit=2' + (line === undefined ? '' : ' :: ' + line) })
   }
-  else records.push(base(g, { verdict: 'fail', criterionEvaluated: true, cause: { kind: 'non-zero-exit' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, next: 'read the failing script output above, then fix the gate or the tree it judges', evidence: script + ' exit=' + status }))
+  return base(g, { verdict: 'fail', criterionEvaluated: true, cause: { kind: 'non-zero-exit' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, next: 'read the failing script output above, then fix the gate or the tree it judges', evidence: script + ' exit=' + status })
 }
+
+const tasks = list.map((g) => ({
+  id: g.id,
+  needs: Array.isArray(g.needs) ? g.needs : [],
+  after: Array.isArray(g.after) ? g.after : [],
+  execute: () => executeGate(g),
+}))
+const byId = new Map(list.map((g) => [g.id, g]))
+if (concurrency > 1) console.log('run-gates [' + profile + (laneName === undefined ? '' : ' lane=' + laneName) + '] concurrency=' + concurrency + (failFast ? ' fail-fast' : ''))
+const outcomes = await runTasks({
+  tasks,
+  concurrency,
+  failFast,
+  onStatus: (outcome) => {
+    if (concurrency > 1 && outcome.status === 'done') console.log('  [done] ' + outcome.id.padEnd(18) + String(outcome.record.verdict).padEnd(14) + String(outcome.record.ms ?? '-') + 'ms')
+  },
+})
+const records = list.map((g) => {
+  const outcome = outcomes.get(g.id)
+  if (outcome === undefined) return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'filter-no-match' }, missing: ['outcome'], path: 'UNRESOLVED' })
+  if (outcome.status === 'done') return outcome.record
+  if (outcome.status === 'error') return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'internal-error' }, missing: [String(outcome.error ?? 'error')], path: 'UNRESOLVED', next: 'the gate executor threw before producing a verdict; fix the runner (an exception is not a check failure)', evidence: String(outcome.error ?? 'unknown error') })
+  if (outcome.status === 'blocked') return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'prerequisite-blocked' }, missing: outcome.deps ?? [], path: 'UNRESOLVED', next: 'a declared prerequisite did not pass; this row was not executed', evidence: 'blocked by ' + String((outcome.deps ?? []).join(', ')) })
+  return base(g, { verdict: 'skipped', criterionEvaluated: false, cause: { kind: 'fail-fast' }, missing: ['fail-fast'], path: 'UNRESOLVED', next: 'fail-fast stopped the run before this row started (skipped is not a pass)' })
+})
 
 // A profile that selects nothing is NOT a pass (plan step 3's vacuum fixture): the run would
 // otherwise print pass=0 fail=0 and exit 0, which is exactly the F=0 shape this redesign hunts.
@@ -242,6 +257,7 @@ if (records.length === 0) {
     id: 'profile:' + profile,
     check: 'run-gates ' + profile,
     criterion: 'profiles',
+    lanes: [],
     identity,
     subject: { kind: 'paths', count: 0 },
     path: MIRROR_ROOT,
@@ -255,8 +271,7 @@ if (records.length === 0) {
 }
 
 const familyVersionValue = familyVersion(join(HERE, '..'))
-// W9-gates §3.1: "cannot decide" is a debt with an owner, not a permanent red. A row whose table
-// cell states a step in prose is registered (owner, plan, version); an unregistered one still fails.
+// W9-gates §3.1: "cannot decide" is a debt with an owner, not a permanent red.
 const unregisteredCannotDecide = records
   .filter((record) => record.verdict === 'cannot-decide')
   .filter((record) => {
@@ -265,7 +280,7 @@ const unregisteredCannotDecide = records
   })
 const c = counts(records)
 const violations = records.flatMap((r) => validate(r, r.id))
-const payload = { schema: 1, profile, lane: laneName ?? null, counts: c, gates: records, violations }
+const payload = { schema: 1, profile, lane: laneName ?? null, concurrency, counts: c, gates: records, violations }
 if (jsonOut !== undefined) {
   const target = resolve(jsonOut)
   mkdirSync(dirname(target), { recursive: true })

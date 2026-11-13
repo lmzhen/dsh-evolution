@@ -173,3 +173,55 @@ export function createRunner({ spawn, now }) {
   }
   return { run }
 }
+
+/**
+ * The ASYNC seam (W10 M3b): the scheduler needs concurrent spawns, and concurrency needs a
+ * promise-based observation. Same contract as createRunner — observe, never decide:
+ *   { argv, cwd, status, signal, errorCode, killedBy, ms, stdout, stderr }
+ * `killedBy='budget'` is set ONLY by this runner's own timer; a signal from outside stays
+ * `killedBy='external'` (the same distinction the sync seam and the fixture layer rely on).
+ */
+export function createAsyncRunner({ spawn, now }) {
+  if (typeof spawn !== 'function') throw new Error('createAsyncRunner needs a spawn function (the CLI wires child_process.spawn; fixtures inject a stub)')
+  const clock = typeof now === 'function' ? now : () => Date.now()
+  const run = (argv, options) => new Promise((resolve) => {
+    const opts = options === undefined ? {} : options
+    const started = clock()
+    let stdout = ''
+    let stderr = ''
+    let timedOut = false
+    let settled = false
+    const finish = (status, signal, errorCode) => {
+      if (settled) return
+      settled = true
+      if (timer !== null) clearTimeout(timer)
+      resolve({
+        argv,
+        cwd: opts.cwd === undefined ? null : opts.cwd,
+        status,
+        signal: signal === undefined ? null : signal,
+        errorCode: errorCode === undefined ? null : errorCode,
+        killedBy: timedOut ? 'budget' : signal === undefined || signal === null ? null : 'external',
+        ms: clock() - started,
+        stdout,
+        stderr,
+      })
+    }
+    let timer = null
+    let child
+    try {
+      child = spawn(argv[0], argv.slice(1), { cwd: opts.cwd, env: opts.env, stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (error) {
+      finish(null, null, error !== null && typeof error === 'object' && typeof error.code === 'string' ? error.code : 'spawn-failed')
+      return
+    }
+    if (opts.timeoutMs !== undefined && opts.timeoutMs !== null && opts.timeoutMs > 0) {
+      timer = setTimeout(() => { timedOut = true; try { child.kill('SIGTERM') } catch { /* the close event finishes the observation */ } }, opts.timeoutMs)
+    }
+    if (child.stdout !== undefined && child.stdout !== null) child.stdout.on('data', (chunk) => { stdout += String(chunk) })
+    if (child.stderr !== undefined && child.stderr !== null) child.stderr.on('data', (chunk) => { stderr += String(chunk) })
+    child.on('error', (error) => finish(null, null, error !== null && typeof error === 'object' && typeof error.code === 'string' ? error.code : 'spawn-failed'))
+    child.on('close', (status, signal) => finish(status, signal, null))
+  })
+  return { run }
+}

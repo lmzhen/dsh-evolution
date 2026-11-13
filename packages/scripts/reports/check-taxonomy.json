@@ -146,6 +146,7 @@
         "evolution-core::tests/write-outcome.spec.ts",
         "evolution-curator::tests/unit-undo-plan.spec.ts",
         "evolution-host::tests/decide-requires.spec.ts",
+        "evolution-host::tests/gate-scheduler.spec.ts",
         "evolution-maintenance::tests/drift-scan.spec.ts",
         "evolution-merge-ui::tests/MergeStore.client.spec.ts",
         "evolution-merge-ui::tests/api.client.spec.ts",
@@ -521,6 +522,7 @@
         "evolution-host::tests/bundle-mutual-exclusion.spec.ts",
         "evolution-host::tests/decide-requires.spec.ts",
         "evolution-host::tests/dial-reference.spec.ts",
+        "evolution-host::tests/gate-scheduler.spec.ts",
         "evolution-host::tests/guard-scripts.negative.spec.ts",
         "evolution-host::tests/installation-matrix.spec.ts",
         "evolution-host::tests/installer-preset-base.spec.ts",
@@ -1219,6 +1221,7 @@
         "evolution-host::tests/bundle-mutual-exclusion.spec.ts",
         "evolution-host::tests/decide-requires.spec.ts",
         "evolution-host::tests/dial-reference.spec.ts",
+        "evolution-host::tests/gate-scheduler.spec.ts",
         "evolution-host::tests/guard-scripts.negative.spec.ts",
         "evolution-host::tests/installation-matrix.spec.ts",
         "evolution-host::tests/installer-preset-base.spec.ts",
@@ -1852,6 +1855,7 @@
         "evolution-host::tests/decide-requires.spec.ts",
         "evolution-host::tests/dependency-contract.spec.ts",
         "evolution-host::tests/dial-reference.spec.ts",
+        "evolution-host::tests/gate-scheduler.spec.ts",
         "evolution-host::tests/guard-scripts.negative.spec.ts",
         "evolution-host::tests/guard-scripts.spec.ts",
         "evolution-host::tests/host-composition.spec.ts",
@@ -2258,11 +2262,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 102
+      "specs": 103
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 435
+      "specs": 436
     },
     "ci-only": {
       "gates": 18,
@@ -2270,16 +2274,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 435
+      "specs": 436
     },
     "full(ci=on)": {
       "gates": 93,
-      "specs": 508
+      "specs": 509
     }
   },
   "specs": {
-    "total": 508,
-    "marked": 508,
+    "total": 509,
+    "marked": 509,
     "unmarked": 0
   }
 }
