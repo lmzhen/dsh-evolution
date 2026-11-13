@@ -74,7 +74,7 @@ node packages/scripts/run-gates.mjs local --lane ci-static --concurrency 4 --ove
 ### 加界面视图
 
 1. 页面/侧栏入口由 `evolution-ui` 的 workbench 页持有；新功能用 `registerWorkbenchView` 注册到 `evolution.workbench.view` 子槽，不要再注册 `sidebar.panellist`/`main` 或自建 `settings.section`。
-2. 参数编辑只走平台 `settings.plugin.item`；family 数据经 `/api/dsh-evolution/settings/*` 读写平台 settings provider。
+2. 参数编辑只走平台 `settings.plugin.item`；读写都走平台 `configForms`（family 不再有 `/api/dsh-evolution/settings/*` 路由）。
 3. 路由路径先加到 core `HOST_ROUTES`，再生成 client-kit 镜像。
 4. 只读视图不要把写操作做成按钮；写操作给命令复制或明确审批。
 

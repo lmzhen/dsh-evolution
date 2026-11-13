@@ -33,9 +33,9 @@ const published = [...coreSource.matchAll(/'(\/api\/dsh-evolution\/[^']*)'/g)]
   // The registerHostRoutes prefix guard names the bare prefix; only endpoints carry a segment after it.
   .filter((path) => path !== '/api/dsh-evolution/')
 for (const path of published) seenPaths.push(path)
-if (published.length !== 21) problems.push('HOST_ROUTES carries ' + published.length + ' endpoint path(s), expected 21')
+if (published.length !== 19) problems.push('HOST_ROUTES carries ' + published.length + ' endpoint path(s), expected 19')
 if (new Set(published).size !== published.length) problems.push('HOST_ROUTES declares a duplicate endpoint path')
-for (const surface of ['approval', 'skillHistory', 'skillHealth', 'merge', 'diagnostics', 'settings']) {
+for (const surface of ['approval', 'skillHistory', 'skillHealth', 'merge', 'diagnostics']) {
   if (!new RegExp('\\b' + surface + '\\s*:').test(coreSource)) problems.push('HOST_ROUTES is missing the "' + surface + '" surface')
 }
 const publishedSet = new Set(published)

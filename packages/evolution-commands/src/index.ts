@@ -13,7 +13,6 @@ import { createSubagentChannel, authorityFrom, mutationLockFrom } from '@deepsee
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
 import { makeDiagnosticsRoutes } from './diagnostics-route.ts'
-import { makeSettingsRoutes } from './settings-route.ts'
 import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
@@ -1656,7 +1655,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     ...makeDiagnosticsRoutes(() => assembleDoctorInputs(ctx, {
       runs: doctorRuns(),
     })),
-    ...makeSettingsRoutes(() => ctx.get('settings') as never),
   ])
   void (async () => {
     const loader = (ctx.root as { loader?: { await?(): Promise<unknown> } }).loader

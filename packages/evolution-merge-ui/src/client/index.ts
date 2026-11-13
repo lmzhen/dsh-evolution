@@ -1,7 +1,7 @@
 /** Browser half: one read-only merge view inside the shared evolution workbench. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactNode } from 'react'
-import { createSettingsSeat, panelWorkspaceId, registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
+import { panelWorkspaceId, registerWorkbenchView, type ConfigFormsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
 import { NS, dictionaries } from './messages.ts'
@@ -22,10 +22,11 @@ function MergeView(props: MergeFace & { activeView?: string }): ReactNode {
  * @param ctx - the client context.
  */
 export function apply(ctx: ClientContext): void {
-  const seat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
+  // The platform settings shell owns the seat; the merge panel only renders the forms it serves.
+  const seat = (ctx as unknown as { get?: (name: string) => unknown }).get?.('configForms') as ConfigFormsSeat | undefined
   const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
   const store = new MergeStore(source)
-  ctx.effect(() => () => { store.dispose(); seat.dispose?.() }, 'evolution-merge-ui: settings seat + store')
+  ctx.effect(() => () => { store.dispose() }, 'evolution-merge-ui: store')
   registerWorkbenchView<MergeFace>(ctx, {
     id: PANEL_ID,
     order: PANEL_ORDER,
@@ -39,7 +40,7 @@ export function apply(ctx: ClientContext): void {
         store,
         t,
         doctorCommand: '/evolution doctor',
-        settings: { ...(seat.get('evolution-merge') === undefined ? {} : { merge: seat.get('evolution-merge')! }), ...(seat.get('evolution-approval') === undefined ? {} : { platform: seat.get('evolution-approval')! }) },
+        settings: { ...(seat?.get('evolution-merge') === undefined ? {} : { merge: seat?.get('evolution-merge')! }), ...(seat?.get('evolution-approval') === undefined ? {} : { platform: seat?.get('evolution-approval')! }) },
         decide: async (rowId: string, verb: 'approve' | 'reject') => {
           const sessionId = currentSessionId(ctx)
           if (sessionId === undefined) return { ok: false, message: t('session.missing') }

@@ -2,7 +2,6 @@
 export type { ClientSeam, ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ConfigPathOpLike, ConfigWriteKind, ConfigWriteOutcome, LocaleSeat, PanelBodyOptions, PanelRowOptions, SettingsFace, SlotsSeat } from './seam.ts'
 export { registerSidebarPanel, requireClientSeats, type SidebarPanelSpec, type Translate } from './panel.ts'
 export { registerWorkbenchView } from './workbench-view.ts'
-export { createSettingsSeat } from './settings-seat.ts'
 export type { WorkbenchViewSpec } from './workbench-view.ts'
 export { panelWorkspaceId } from './workspace.ts'
 export { AsyncResource } from './async-resource.ts'

@@ -7,7 +7,7 @@ import type { FallbackHint } from './contracts.generated.ts'
  * COMMAND_FALLBACKS (the ONE home). When the platform's connection carrier is absent (E-325) the
  * panels render this hint instead of a bare HTTP failure — same use case, command face.
  */
-export const FALLBACKS: Readonly<Record<'approval' | 'skill-history' | 'skill-health' | 'merge' | 'diagnostics' | 'settings', FallbackHint>> = {
+export const FALLBACKS: Readonly<Record<'approval' | 'skill-history' | 'skill-health' | 'merge' | 'diagnostics', FallbackHint>> = {
   approval: {
     command: '/evolution pending … /evolution approve <id> … /evolution reject <id> … /evolution release <id>',
   },
@@ -23,8 +23,5 @@ export const FALLBACKS: Readonly<Record<'approval' | 'skill-history' | 'skill-he
   diagnostics: {
     command: '/evolution doctor',
     platformCli: 'dsh --json /evolution doctor',
-  },
-  settings: {
-    command: '/evolution params --group deployment（写入由平台插件管理的 row 配置页承载）',
   },
 }

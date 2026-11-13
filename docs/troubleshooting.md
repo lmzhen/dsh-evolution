@@ -42,7 +42,7 @@
 ## 5. 工作台或设置卡片不出现
 
 - 技能历史工作台只在 all + Web/桌面 GUI 提供；TUI/headless 没有，host/preset/分层也不带。
-- 参数卡在平台“设置 → 插件配置”；family 数据经 `/api/dsh-evolution/settings/*`，平台 RPC 白名单不暴露 family namespace 是预期行为。
+- 参数卡在平台“设置 → 插件配置”，读写都走平台 `configForms`；family 不再提供 `/api/dsh-evolution/settings/*` 路由。
 - 工作台历史/合并需要连接服务；连接缺失时无法读取数据。
 - 合并视图只读，按钮复制命令，不直接执行合并写操作。
 - 健康视图默认禁用，需要在部署配置中显式启用；未启用时工作台不显示健康 tab。

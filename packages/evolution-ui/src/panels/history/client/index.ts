@@ -5,7 +5,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
-import { createSettingsSeat, registerSidebarPanel, PAGE_SURFACE_CSS, ROUTES, type Translate } from '@lmzhen/dsh-evolution-client-kit'
+import { registerSidebarPanel, PAGE_SURFACE_CSS, ROUTES, type ConfigFormsSeat, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import type { DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
 import { createDiagnosticsApi } from '../../settings/diagnostics-state.ts'
@@ -28,12 +28,13 @@ export const inject = ['slots', 'locale']
  */
 export function apply(ctx: ClientContext): void {
   const api = createSkillHistoryApi()
-  const settingsSeat = createSettingsSeat(ctx as unknown as { get?: (name: string) => unknown })
-  ctx.effect(() => () => { settingsSeat.dispose?.() }, 'evolution-ui: settings seat')
+  // The platform settings shell owns this seat; read it lazily (the history panel may activate
+  // before the shell exists) and never dispose it (it is not ours).
+  const settingsSeat = (): ConfigFormsSeat | undefined => (ctx as unknown as { get?: (name: string) => unknown }).get?.('configForms') as ConfigFormsSeat | undefined
   // U-6: unknown must never mean "auto-execute". The form starts at `ask`; the family
   // describe answers with the user layer and flips to auto only when the operator chose it.
   let approvalConfirmMode: 'auto' | 'ask' = 'ask'
-  const approvalForm = settingsSeat.get('evolution-approval')
+  const approvalForm = settingsSeat()?.get('evolution-approval')
   const stopApprovalWatch = approvalForm?.subscribe(() => {
     approvalConfirmMode = confirmModeFrom(approvalForm.getSnapshot().user)
   })
