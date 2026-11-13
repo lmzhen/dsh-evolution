@@ -14,7 +14,7 @@
  * M3b（W10 §16.8）：`--concurrency`（默认 1，最多 32）打开有界并发；`--fail-fast` 在首个 fail 后不启动新行。
  */
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
@@ -26,7 +26,11 @@ import { familyVersion } from './lib-family-version.mjs'
 import { exemptionProblems } from './lib-exemptions.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const MIRROR_ROOT = resolve(HERE, '..', '..')
+// The runner lives in TWO layouts: the flat mirror (packages/scripts) and the CI overlay
+// (packages/evolution/scripts). The tree root is therefore not a fixed ".." — the overlay's parent
+// of scripts is `packages`, whose own parent is the checkout root.
+const OVERLAY_LAYOUT = basename(dirname(HERE)) === 'evolution'
+const MIRROR_ROOT = OVERLAY_LAYOUT ? resolve(HERE, '..', '..', '..') : resolve(HERE, '..', '..')
 const MANIFEST = join(HERE, 'gate-manifest.json')
 const args = process.argv.slice(2)
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : '') : undefined }
@@ -42,7 +46,11 @@ if (laneName !== undefined) {
   if (laneName === '' || !KNOWN_LANES.has(laneName)) { console.error('run-gates: --lane needs one of ' + [...KNOWN_LANES].join('|') + ' (got ' + JSON.stringify(laneName) + ')'); process.exit(2) }
 }
 // 遗留⑤: the platform tree is a fixture, not a repo fact — resolve it portably (env first).
-const overlayRoot = flag('--overlay') || softOverlay()
+// In the overlay layout the tree the runner is inside IS the overlay root; locally the bed is elsewhere.
+const overlayFlag = flag('--overlay')
+const overlayRoot = overlayFlag !== undefined && overlayFlag !== ''
+  ? resolve(overlayFlag)
+  : (OVERLAY_LAYOUT ? MIRROR_ROOT : softOverlay())
 
 if (!existsSync(MANIFEST)) { console.error('run-gates: missing gate-manifest.json — run gen-gate-manifest.mjs'); process.exit(2) }
 const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
@@ -133,7 +141,7 @@ const declared = (() => {
 })()
 const declaredRequires = declared.requires
 const criterionOf = (id) => declared.criteria.get(id) ?? 'undeclared'
-const treeRootFor = (tree) => (tree === 'overlay' ? overlayRoot : MIRROR_ROOT)
+const treeRootFor = (tree) => (tree === 'overlay' ? overlayRoot : FAMILY_CHECKOUT)
 /**
  * Layout translation (W10 M3b): rows are authored for the OVERLAY layout
  * (`packages/evolution/<pkg>`), while the local mirror is flat (`packages/<pkg>`). The reverse also
@@ -143,22 +151,37 @@ const treeRootFor = (tree) => (tree === 'overlay' ? overlayRoot : MIRROR_ROOT)
  */
 const flatLayout = !existsSync(join(MIRROR_ROOT, 'packages', 'evolution'))
 const nestedLayout = !flatLayout
-const resolveLayoutToken = (token, tree) => {
+/**
+ * Translate a registry token for the TREE THE ROW RUNS IN (not the runner's own tree):
+ *   - flat family checkout: `packages/evolution/x` -> `packages/x` when the flat copy exists;
+ *   - nested overlay tree: family-root `packages` and `packages/x` -> `packages/evolution/...`.
+ * Tokens are rewritten only when the target exists and the written one does not.
+ */
+const resolveLayoutToken = (token, tree, treeRoot) => {
   if (tree !== 'mirror') return token
-  if (flatLayout && token.startsWith('packages/evolution/')) {
-    const flat = 'packages/' + token.slice('packages/evolution/'.length)
-    return !existsSync(join(MIRROR_ROOT, token)) && existsSync(join(MIRROR_ROOT, flat)) ? flat : token
+  const flat = !existsSync(join(treeRoot, 'packages', 'evolution'))
+  if (flat && token.startsWith('packages/evolution/')) {
+    const mapped = 'packages/' + token.slice('packages/evolution/'.length)
+    return !existsSync(join(treeRoot, token)) && existsSync(join(treeRoot, mapped)) ? mapped : token
   }
-  if (nestedLayout && token.startsWith('packages/scripts/')) {
-    const nested = 'packages/evolution/' + token
-    return !existsSync(join(MIRROR_ROOT, token)) && existsSync(join(MIRROR_ROOT, nested)) ? nested : token
+  if (!flat) {
+    if (token === 'packages') return existsSync(join(treeRoot, 'packages', 'evolution')) ? 'packages/evolution' : token
+    if (token.startsWith('packages/') && !token.startsWith('packages/evolution/') && existsSync(join(treeRoot, 'packages', 'evolution', token.slice('packages/'.length)))) {
+      return 'packages/evolution/' + token.slice('packages/'.length)
+    }
   }
   return token
 }
+/** Expand ${NAME}/$NAME from the environment (CI override argv only; local argv stays literal). */
+const expandEnv = (token) => token.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (whole, braced, bare) => {
+  const name = braced === undefined ? bare : braced
+  return process.env[name] === undefined ? whole : process.env[name]
+})
 const evaluateRequires = async (gate) => {
+  const gateRoot = treeRootFor(gate.tree)
   for (const req of declaredRequires.get(gate.id) ?? []) {
     if (req.mode === 'present') {
-      const product = /^[A-Za-z]:[\\/]/.test(req.path) ? req.path : join(treeRootFor(gate.tree), resolveLayoutToken(req.path, gate.tree))
+      const product = /^[A-Za-z]:[\\/]/.test(req.path) ? req.path : join(gateRoot, resolveLayoutToken(req.path, gate.tree, gateRoot))
       const decision = decideRequires({ present: existsSync(product), path: product }, 'in-repo', 'present')
       if (decision.verdict !== 'pass') return { req, decision }
       continue
@@ -172,12 +195,23 @@ const evaluateRequires = async (gate) => {
   return null
 }
 const identity = identityFor(profile)
+// In CI the runner executes from the OVERLAY checkout (upstream/), while mirror-tree rows read the
+// FAMILY checkout (workspace root: .github + CONTRIBUTING + flat packages). Local runs have no
+// workspace root, so mirror rows fall back to the tree the runner is inside.
+const FAMILY_CHECKOUT = (() => {
+  const workspace = process.env.GITHUB_WORKSPACE
+  if (typeof workspace === 'string' && workspace !== '' && existsSync(join(workspace, '.github', 'actions', 'evolution-validate', 'action.yml'))) return workspace
+  return MIRROR_ROOT
+})()
 const base = (g, extra) => ({ id: g.id, check: g.human, criterion: criterionOf(g.id), lanes: Array.isArray(g.lanes) ? g.lanes : [], identity, subject: { kind: 'paths', count: 0 }, ...extra })
 
 /** Judge ONE gate. Every branch returns a record (never throws); the scheduler owns the order. */
 async function executeGate(g) {
   // 1) static executability: a placeholder token or a non-command argv[0] cannot run a criterion at all
-  const argv = Array.isArray(g.argv) ? g.argv : null
+  // CI override (W10 §16.8.2): only on a runner, only for rows that declare one. It replaces the
+  // argv/env/cwd the table form carries (machine paths, $RUNNER_TEMP homes, the probe baseline).
+  const ciOverride = process.env.CI && g.ci !== undefined && g.ci !== null ? g.ci : null
+  const argv = ciOverride !== null && Array.isArray(ciOverride.argv) ? ciOverride.argv : (Array.isArray(g.argv) ? g.argv : null)
   const executable = argv === null ? '' : argv.join(' ')
   const placeholder = (executable.match(/<[^>]*>/) || [])[0]
   if (argv === null || argv.length === 0) {
@@ -199,14 +233,19 @@ async function executeGate(g) {
   if (g.tree === 'overlay' && !existsSync(overlayRoot)) {
     return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, missing: [overlayRoot], path: overlayRoot, next: 'clone the overlay tree or pass --overlay <path>', evidence: 'overlay root missing: ' + overlayRoot })
   }
-  const cwd = g.tree === 'overlay' ? overlayRoot : MIRROR_ROOT
+  const cwd = ciOverride !== null && typeof ciOverride.cwd === 'string'
+    ? resolve(g.tree === 'overlay' ? overlayRoot : FAMILY_CHECKOUT, ciOverride.cwd)
+    : (g.tree === 'overlay' ? overlayRoot : FAMILY_CHECKOUT)
+  const gateEnv = ciOverride !== null && ciOverride.env !== undefined
+    ? Object.fromEntries(Object.entries(ciOverride.env).map(([key, value]) => [key, expandEnv(value)]))
+    : undefined
   // the declared argv names the command as the table writes it (`node <script> ...`); the runner
   // always spawns through process.execPath, so the leading token is dropped here.
   const declaredArgv = argv[0] === 'node' ? argv.slice(1) : argv
-  const [script, ...rest] = declaredArgv.map((token) => resolveLayoutToken(token, g.tree))
+  const [script, ...rest] = declaredArgv.map((token) => resolveLayoutToken(ciOverride === null ? token : expandEnv(token), g.tree, cwd))
   // A gate that never returns must not stop the whole local chain: budget it, and let the verdict
   // read cannot-decide (killedBy=budget) instead of hanging the runner forever.
-  const observed = await runner.run([process.execPath, script, ...rest], { cwd, timeoutMs: 180000 })
+  const observed = await runner.run([process.execPath, script, ...rest], { cwd, timeoutMs: 180000, env: gateEnv === undefined ? process.env : { ...process.env, ...gateEnv } })
   const ms = observed.ms
   const status = observed.status === undefined ? null : observed.status
   if (observed.stdout !== undefined && observed.stdout !== '' && (status !== 0 || status === null)) process.stdout.write(observed.stdout)

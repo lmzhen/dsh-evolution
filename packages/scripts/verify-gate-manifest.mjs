@@ -188,18 +188,35 @@ else {
 // precedent). Block-scalar comments inside `run: |` are line comments too, so one filter covers both.
 const actionText = readFileSync(actionPath, 'utf8')
   .split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n')
-for (const entry of CI_ONLY) {
-  if (!actionText.includes(entry.script)) problems.push('the ciOnly register names ' + entry.script + ', which the CI action does not execute — stale register entry')
-}
-for (const script of declaredScripts) {
-  if (actionText.includes(script)) continue
-  if (CI_NOT_EXECUTED.some((entry) => entry.script === script)) { notes.push(script + ' is local-runner only (registered)'); continue }
-  problems.push('the table declares ' + script + ' but the CI action never runs it and no register entry covers it — a declared check nobody executes is not a gate')
-}
-
 // G0-5: the manifest is the register both halves read (direction 2 + toolchain exceptions).
 const manifestPath = join(root, 'scripts', 'gate-manifest.json')
 const manifestGates = existsSync(manifestPath) ? (JSON.parse(readFileSync(manifestPath, 'utf8')).gates ?? []) : []
+
+// W10 M3b2: the action may run a REGISTRY LANE instead of naming every script. A lane covers the
+// rows it selects, so containment must count those rows (CI override argv wins over the table form).
+const ACTION_LANE_RUNS = [...actionText.matchAll(/run-gates\.mjs\s+ci\s+--lane\s+(ci-[a-z-]+)/g)].map((match) => match[1])
+const laneCoveredScripts = new Set()
+const laneCoveredTools = new Set()
+for (const gate of manifestGates) {
+  if (!ACTION_LANE_RUNS.some((lane) => Array.isArray(gate.lanes) && gate.lanes.includes(lane))) continue
+  const tokens = gate.ci !== undefined && Array.isArray(gate.ci.argv) ? gate.ci.argv : gate.argv
+  for (const token of tokens ?? []) {
+    if (/scripts\//.test(token) && /\.mjs$/.test(token)) laneCoveredScripts.add(token.replace(/^.*[\\/]/, ''))
+    if (token.includes('oxlint/bin/oxlint')) laneCoveredTools.add('oxlint/bin/oxlint')
+    if (token.includes('vitest/vitest.mjs')) laneCoveredTools.add('vitest/vitest.mjs')
+    if (token.includes('typescript/lib/tsc.js')) laneCoveredTools.add('typescript/lib/tsc.js')
+  }
+}
+/** A script counts as executed when the action names it OR invokes a lane whose rows run it. */
+const executedByAction = (script) => actionText.includes(script) || laneCoveredScripts.has(script)
+for (const entry of CI_ONLY) {
+  if (!executedByAction(entry.script)) problems.push('the ciOnly register names ' + entry.script + ', which the CI action does not execute — stale register entry')
+}
+for (const script of declaredScripts) {
+  if (executedByAction(script)) continue
+  if (CI_NOT_EXECUTED.some((entry) => entry.script === script)) { notes.push(script + ' is local-runner only (registered)'); continue }
+  problems.push('the table declares ' + script + ' but the CI action never runs it and no register entry covers it — a declared check nobody executes is not a gate')
+}
 
 // ── W10 M3: registry -> generated views -> CI wiring ───────────────────────────────────────────
 // The registry is the source; the manifest and the CONTRIBUTING table are generated from it. These
@@ -226,11 +243,16 @@ for (const gate of renderedGates) {
     registryCiScripts.add(token.replace(/^.*[\\/]/, ''))
   }
 }
+const coveredScripts = new Set([...actionFamilyScripts, ...laneCoveredScripts])
 for (const script of registryCiScripts) {
-  if (!actionFamilyScripts.has(script)) problems.push('the registry carries ' + script + ' on a ci-* lane but the CI action never runs it - the declaration and the fact disagree')
+  if (!coveredScripts.has(script)) problems.push('the registry carries ' + script + ' on a ci-* lane but the action neither runs it nor invokes a lane that covers it - declare the lane call (or stop carrying the row)')
 }
 for (const script of actionFamilyScripts) {
+  if (script === 'run-gates.mjs') continue
   if (!registryCiScripts.has(script)) problems.push('the CI action runs ' + script + ' but no registry row carries it on a ci-* lane - a wild check (add it to packages/scripts/gates/registry.mjs or stop running it)')
+}
+for (const lane of ['ci-static', 'ci-unit']) {
+  if (!ACTION_LANE_RUNS.includes(lane)) problems.push('the CI action does not invoke run-gates --lane ' + lane + ' - the action must run the registry lane instead of a hand-written command list (W10 M3b2)')
 }
 
 // (4c) G0-5: toolchain rows used to be judged on NEITHER side — scriptOf() returns null for node_modules
@@ -240,7 +262,7 @@ for (const script of actionFamilyScripts) {
 for (const tool of ['typescript/lib/tsc.js', 'oxlint/bin/oxlint', 'vitest/vitest.mjs']) {
   const row = tableRows.find((entry) => entry.command.includes(tool))
   if (row === undefined) continue
-  if (actionText.includes(tool)) continue
+  if (actionText.includes(tool) || laneCoveredTools.has(tool)) continue
   const registered = manifestGates.find((gate) => typeof gate.human === 'string' && gate.human.includes(tool) && typeof gate.reason === 'string')
   if (registered !== undefined) { notes.push(tool + ' is registered as a declared local check: ' + registered.reason); continue }
   problems.push('row ' + row.n + ' declares ' + tool + ' but neither this action nor a manifest entry with a reason covers it — a deleted step would go unnoticed (G0-5)')
@@ -264,6 +286,7 @@ notes.push('composite action: ' + declaredInputs.size + ' declared input(s), ' +
 // while nothing on either side named it. The old unexplained `verify-client*` filter is gone with it: those
 // entries are registered like every other one.
 const ciOnly = [...new Set([...actionText.matchAll(/scripts\/([A-Za-z0-9._-]+\.mjs)/g)].map((match) => match[1]))]
+  .filter((script) => script !== 'run-gates.mjs')
   .filter((script) => !declaredScripts.has(script))
   .sort()
 for (const script of ciOnly) {

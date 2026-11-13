@@ -147,32 +147,19 @@ runs:
         # the root script, so the overlay does the same before running them.
         pnpm run build:native-system
 
-    - name: Build, test and lint
+    - name: Build the family libraries
+      shell: bash
+      working-directory: upstream
+      run: node packages/evolution/scripts/build-lib.mjs
+
+    - name: Run the family unit lane (suite; writes the probe baseline)
       shell: bash
       working-directory: upstream
       run: |
-        node packages/evolution/scripts/build-lib.mjs
-        # Worker cap + explicit timeout: the suite has IO-heavy lock/CAS cases
-        # (write-lock takeover, cross-process RMW, dir-fsync) that are sensitive
-        # to machine load. At vitest's defaults (full parallelism, 5s testTimeout)
-        # a loaded runner produced a false red on 2026-09-13 — the two
-        # REV-06(b) lock cases (anchored-smoke TEST-06/TEST-07) lost their write
-        # to a takeover and failed; the identical commit passed on the sibling
-        # job and on an immediate rerun. This is the same configuration the
-        # release-time local gate uses (and has been green 10/10 repeatedly):
-        # maxWorkers=2, testTimeout=30s.
-        # Why NOT `-c packages/evolution/scripts/vitest.family.config.mjs` here (tried on 2026-10-15 and
-        # reverted): the family config is a LOCAL instrument. It refuses to run without the machine line
-        # adapter (`D:/_tools/lib-line.mjs`, hard-coded at vitest.family.config.mjs:51) and exits 2 with
-        # CANNOT DECIDE, and without that adapter its platform-coupled specs cannot resolve their aliases
-        # either - the config says so in its own comment. On a runner there is no such line, so pointing CI
-        # at it turned a GREEN step (v0.26.15) RED. The local half of the same rule: without `-c` a machine
-        # WITH the platform tree present resolves the platform root config and its invariant harness rejects
-        # family specs; the released tree does not carry that harness, which is why the pre-2026-10-15 line
-        # was green here for every release up to v0.26.15. A check that needs "this machine has X" belongs
-        # to local/pre-tag (see the policy-only step below for the half that legitimately runs in CI).
-        node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=${{ runner.os == 'Windows' && 1 || 2 }} --testTimeout=30000 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/probe-baseline.json"
-        node node_modules/oxlint/bin/oxlint -c packages/evolution/oxlint.release.json packages/evolution --ignore-pattern '**/tests/**' --ignore-pattern '**/vendor/**' --ignore-pattern '**/scripts/**' -A style
+        # W10 M3b2: the suite is one registry row again (gates/unit.mjs, gate-03). Its CI override
+        # carries the worker cap, the explicit timeout and the JSON reporter the probe lane consumes
+        # (W10 M2); no second command list lives here.
+        node packages/evolution/scripts/run-gates.mjs ci --lane ci-unit --concurrency 1 --json-out "$RUNNER_TEMP/gates-unit.json"
 
     # G7 (0.17.0): the D-9 test-file typecheck step is GONE with the baseline job — it ran the
     # MIRROR's `tsconfig.host.json` against the pinned dev tree, and that graph is not ours to
@@ -199,20 +186,21 @@ runs:
     # artifact is in this tree" belongs to the layout that has it: the three-part sequence (generate ->
     # porcelain proves the committed copy matches -> --check) runs in the mirror local/pre-tag gate,
     # which is also what the header contract says: "真比对进 local/pre-tag；CI 保持 policy-only".
-    - name: Verify dependency closure (G0.1 guard)
+    - name: Run the static gate lane (registry ci-static)
       shell: bash
       working-directory: upstream
       run: |
-        # 0.3.26 (V4-03): F-105's guard was only run locally — wire it into the
-        # chain before packing so a new undeclared cross-package import fails CI.
-        node packages/evolution/scripts/verify-dependency-closure.mjs packages/evolution --strict
-    - name: Verify graph edges (P0-prime read path)
+        # W10 M3b2: every read-only guard below used to be a hand-written step; the lane IS the
+        # registry's ci-static set (gates/*.mjs; CI overrides carry the runner-shaped argv). The
+        # per-row verdicts land in gates-static.json so a red names its row without reading the log.
+        node packages/evolution/scripts/run-gates.mjs ci --lane ci-static --concurrency 2 --json-out "$RUNNER_TEMP/gates-static.json"
+
+    - name: Declare the line this CI run measured (G1.5)
       shell: bash
       working-directory: upstream
       run: |
-        # P0-prime: the family gate for skill see-also edges. Self-test form only:
-        # the live-root form needs a skill root and is local/pre-tag only.
-        node packages/evolution/scripts/verify-graph-edges.mjs --self-test
+        # A setup step, not a gate (lane ci-setup): every conclusion names its line.
+        node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json
 
     - name: Pack scoped release
       shell: bash
@@ -262,179 +250,6 @@ runs:
           --manifest-dir packages/evolution/.release-staging \
           --our-scope "$NPM_SCOPE"
 
-    - name: Verify architecture guards (G7.1)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # 0.3.23: strict mode is on — N1/N2 are zero-tolerance (single-source
-        # contracts); 0.3.25 flipped N3 into the gate too (numeric clamps);
-        # P3-2 (v14): the warn-only N4 "dead-fallback" listing was removed
-        # (78/78 false positives), so the gate is N1/N2/N3 + H2 ghost keys.
-        node packages/evolution/scripts/verify-arch-guards.mjs packages/evolution --strict
-
-    - name: Verify the write inventory lands inside the plane (G2)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # 0.22.0: the legend<->resolver check plus the landing check (every declared path must resolve
-        # INSIDE the given home). A synthetic home is enough here: the question CI can answer is
-        # "does any path escape the plane it claims", not "what is on this machine".
-        node packages/evolution/scripts/verify-write-inventory.mjs packages/evolution --strict --home "$RUNNER_TEMP/plane-home"
-
-    - name: Verify the line-identity policy (G1.1)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # The manifest form of this gate judges the MACHINE BED and therefore cannot run here; the
-        # policy-only form is the repo-side half (kinds, hoist whitelist with reasons, removal notes)
-        # and is what CI can hold. The doc-facts rule requires a declared check to be run by CI or
-        # registered as local-only — this step is that wiring.
-        node packages/evolution/scripts/verify-line-identity.mjs --policy-only --strict
-
-    - name: Declare the line this CI run measured (G1.5)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # Every conclusion names its line. On a runner the line is the checkout plus the declared kind
-        # policy (no bed manifest exists here), so this is the explicit CI form rather than the
-        # fail-closed local one.
-        node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json
-
-    - name: Verify the gates are armed (G1.2)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # A rule can be clean and still never judge anything: its scan may have found no files at all.
-        # This gate consumes the guard's --arming-json report and fails when a rule family scanned zero
-        # files on the real tree (a vacuum pass is not a pass).
-        node packages/evolution/scripts/verify-arming.mjs --packages packages/evolution --strict
-
-    - name: Verify event pairing (G7.3)
-      shell: bash
-      working-directory: upstream
-      run: |
-        node packages/evolution/scripts/verify-event-pairing.mjs packages/evolution --strict
-
-    - name: Verify declared config reach (G3.1)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # G3.1 (v27 T-1): a patch layer only overrides keys of a row that exists
-        # AND is enabled in the plane below it. The platform's web-app bundle
-        # disables the profile-root `tool-skill` row (presets own the per-agent
-        # skill rows), so the declared `catalogDescriptionMaxLength: 60` is
-        # reachable in that profile only through the preset composer — the guard
-        # prints each declaration's reach per profile and fails (strict) when a
-        # declared key has no plane that reads it, or when a claimed composer
-        # reach no longer exists in the code it names.
-        # WARN mode for one release (batch-3 rule: one warn round before strict).
-        # V27 batch-3 close-out: the warn round is over — the gate reports 0
-        # violations on this tree, so CI now runs it strict (the plan's §5 flip).
-        node packages/evolution/scripts/verify-declared-config.mjs packages/evolution --strict
-
-    - name: Verify the platform contract against the checked-out upstream ref (v33 G4.1/G4.2)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # v33 G4.1/G4.2: the two probes that turn hand-copied platform facts into a red
-        # light. v46 S1.9: the step used to carry `if: inputs.copy_host_tsconfig == 'false'`
-        # — an input this action never declared, so the expression was empty-string false
-        # and the probes never ran (finding T7-01). Every job that uses this action now
-        # checks out the released upstream ref, so the guard has one tree to judge and the
-        # condition is gone rather than declared.
-        #
-        # verify-declared-config --upstream: recomputes each plane's disabled set
-        # and each overridden row's Config key set from the platform's own
-        # sources instead of trusting the snapshot in the guard, and checks that
-        # every platform key is acknowledged in the bundle patches'
-        # whole-config-replacement note (an override replaces `config` wholesale).
-        #
-        # verify-platform-contract runs in its DEFAULT (strict) mode: v33 G0
-        # re-recorded every anchor to this platform line, so any difference now
-        # fails again — a platform symbol the family imports that is gone, a
-        # service name nobody provides, a re-scaled section order, or a recorded
-        # anchor whose text moved. The NEXT upgrade starts by running the same
-        # script with --accept-recorded to turn this red light into a decision
-        # list, then re-records the anchors and drops the flag once more.
-        node packages/evolution/scripts/verify-declared-config.mjs \
-          packages/evolution --strict --upstream .
-        node packages/evolution/scripts/verify-platform-contract.mjs \
-          packages/evolution --upstream .
-
-    - name: Verify the family guard set (G5/G6)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # The guards the family's own gate runs on the build line and this action did not. Each is
-        # line-independent (it reads the overlay tree), and each covers a silent-failure class: a
-        # parameter channel that drifted from the registry, a browser seat nobody mounts, a bundle
-        # row nobody declares, a doc fact that moved. `--upstream .` is the checked-out platform.
-        node packages/evolution/scripts/verify-param-registry.mjs packages/evolution --strict
-        node packages/evolution/scripts/verify-bundle-rows.mjs packages/evolution --strict
-        node packages/evolution/scripts/verify-param-channel-parity.mjs packages/evolution --strict
-        node packages/evolution/scripts/verify-client-tokens.mjs packages/evolution --strict
-        node packages/evolution/scripts/verify-client-seats.mjs packages/evolution --strict --upstream .
-        # U-8/G5.9: the client halves' visible copy must come from a dictionary (no undeclared
-        # literal child, no cross-face instruction in a string).
-        node packages/evolution/scripts/verify-client-ui-i18n.mjs packages/evolution
-        # B6: one catalog source for every supported locale, including generated host/parameter tables.
-        node packages/evolution/scripts/verify-i18n.mjs
-        # G4.3/C5: the error-code table and README must be the same set, and the stated range must match.
-        node packages/evolution/scripts/verify-error-codes.mjs packages/evolution
-        # G4.1/C5: the package map must name exactly what the tree publishes.
-        # G4: a declared parameter must name a reader (or be deleted).
-        # G3-b: the contract-anchor grader must be able to go red (fixtures, not the live tree).
-        node packages/evolution/scripts/verify-contract-anchors.selftest.mjs
-        node packages/evolution/scripts/verify-param-consumers.mjs packages/evolution
-        node packages/evolution/scripts/verify-exemptions.mjs packages/evolution
-        # G7-f: a row that cannot execute is only acceptable while it carries a registration;
-        # 109 rows collapse to 82 distinct protections, and that number is now derived, not asserted.
-        node packages/evolution/scripts/gen-protection-view.mjs --check
-        node packages/evolution/scripts/verify-package-map.mjs packages/evolution
-        # G6-②: profile-patch writes must call the platform HMR lock (and keep its degrade shape).
-        node packages/evolution/scripts/verify-lock-usage.mjs packages/evolution
-        # G7-3: one comment stripper for the whole tooling (lib-source-text.mjs).
-        node packages/evolution/scripts/verify-source-text-single-source.mjs packages/evolution
-        # G7-3: one atomic writer for the family (the io seam).
-        node packages/evolution/scripts/verify-atomic-write-single-source.mjs packages/evolution
-        # G7.1/A8: one plain-object predicate (the client halves use the generated copy).
-        node packages/evolution/scripts/verify-predicate-single-source.mjs packages/evolution
-        # G7.2/F-2: the read-only action criterion is spelled once.
-        node packages/evolution/scripts/verify-readonly-single-criterion.mjs packages/evolution
-        # G7.4/C7: the command table and the dispatch must agree.
-        node packages/evolution/scripts/verify-command-table.mjs packages/evolution
-        # G2.4/C3: one lock, one upper bound.
-        node packages/evolution/scripts/verify-bounds.mjs packages/evolution
-        # G2.2/C4: the write facade is the only door to the disk.
-        node packages/evolution/scripts/verify-io-discipline.mjs packages/evolution
-        # G4/C5+C6: declared fields are rendered; every self-kept control is declared.
-        node packages/evolution/scripts/verify-declarations.mjs packages/evolution
-        # G4.1/C5: the generated artifacts must match their sources.
-        node packages/evolution/scripts/gen-bundle-patches.mjs packages/evolution --check
-        node packages/evolution/scripts/gen-client-tokens.mjs packages/evolution --check
-        node packages/evolution/scripts/gen-param-client-view.mjs packages/evolution --check
-        node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check
-        node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check
-        node packages/evolution/scripts/gen-about.mjs packages/evolution --check
-        # G2-S2: the composer has ONE implementation (core); the installer imports the built lib.
-        node packages/evolution/scripts/verify-composer-single-source.mjs packages/evolution
-        # G7-S1: the hand-authored probe registry must match its generated artifact (empty = silent gate).
-        node packages/evolution/scripts/verify-probes.mjs packages/evolution
-        # G3-S6: ONE subagent execution path — business sources must not reach for the removed 0.2.1 APIs.
-        node packages/evolution/scripts/verify-subagent-single-source.mjs packages/evolution
-        # G4/W6: ONE host path table + ONE carrier — no fence, no webServer registration, no hand-copied paths.
-        node packages/evolution/scripts/verify-host-routes.mjs packages/evolution
-        # G5/W7: the generated client seams must equal their template/core output (no hand edits).
-        node packages/evolution/scripts/gen-client-seam.mjs packages/evolution --check
-        # G7/W11: the 52-item traceability universe is complete and honest (strict mode: probes registered).
-        node packages/evolution/scripts/verify-traceability.mjs packages/evolution --strict
-        # F0/A3: requirement definitions, evidence and generated views share ONE registry.
-        # Non-strict here (the 251-ID evidence upgrade is tracked by the optimization goal);
-        # REPORT-ONLY (DEFERRED): 9 V2-* requirements are still unverified and 1 is partial;
-        # the release gate must not claim a strict requirements pass until those close.
-        node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check
-        node packages/evolution/scripts/verify-requirements.mjs packages/evolution
-        node packages/evolution/scripts/requirements.selftest.mjs
     - name: Prove the mutation probes can still go red (W9 S4)
       shell: bash
       working-directory: upstream
@@ -547,6 +362,13 @@ runs:
       with:
         name: evolution-scripts-${{ inputs.artifact_suffix }}
         path: upstream/packages/evolution/scripts
+        retention-days: 14
+
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: ${{ inputs.upload_artifacts == 'true' }}
+      with:
+        name: evolution-gates-${{ inputs.artifact_suffix }}
+        path: ${{ runner.temp }}/gates-*.json
         retention-days: 14
 
     # The name is quoted on purpose: an unquoted colon-space inside a flow scalar makes YAML read

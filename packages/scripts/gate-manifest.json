@@ -160,7 +160,17 @@
       "lanes": [
         "local",
         "ci-static"
-      ]
+      ],
+      "ci": {
+        "argv": [
+          "node",
+          "packages/scripts/verify-declared-config.mjs",
+          "packages",
+          "--strict",
+          "--upstream",
+          "upstream"
+        ]
+      }
     },
     {
       "id": "gate-10",
@@ -290,7 +300,15 @@
       "lanes": [
         "local",
         "ci-static"
-      ]
+      ],
+      "ci": {
+        "argv": [
+          "node",
+          "packages/scripts/verify-doc-facts.mjs",
+          "packages",
+          "--strict"
+        ]
+      }
     },
     {
       "id": "gate-18",
@@ -312,7 +330,16 @@
       "lanes": [
         "local",
         "ci-static"
-      ]
+      ],
+      "ci": {
+        "argv": [
+          "node",
+          "packages/scripts/verify-platform-contract.mjs",
+          "packages",
+          "--upstream",
+          "upstream"
+        ]
+      }
     },
     {
       "id": "gate-19",
@@ -453,7 +480,17 @@
       "lanes": [
         "local",
         "ci-static"
-      ]
+      ],
+      "ci": {
+        "argv": [
+          "node",
+          "packages/scripts/verify-client-seats.mjs",
+          "packages",
+          "--strict",
+          "--upstream",
+          "upstream"
+        ]
+      }
     },
     {
       "id": "gate-26",
@@ -523,6 +560,16 @@
         "expiry": "0.46.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
         "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+      },
+      "ci": {
+        "argv": [
+          "node",
+          "packages/scripts/verify-write-inventory.mjs",
+          "packages",
+          "--strict",
+          "--home",
+          "${RUNNER_TEMP}/plane-home"
+        ]
       }
     },
     {
@@ -1793,6 +1840,19 @@
         "expiry": "0.46.0",
         "plan": "CI owns the full suite; local runs use targeted specs",
         "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+      },
+      "ci": {
+        "argv": [
+          "node",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/evolution",
+          "--maxWorkers=2",
+          "--testTimeout=30000",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile.json=${RUNNER_TEMP}/probe-baseline.json"
+        ]
       }
     },
     {

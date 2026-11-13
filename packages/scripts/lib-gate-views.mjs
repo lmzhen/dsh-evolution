@@ -19,6 +19,8 @@ export function renderGate(entry) {
   }
   gate.lanes = [...entry.lanes].sort((left, right) => LANES.indexOf(left) - LANES.indexOf(right))
   if (entry.registration !== undefined) gate.registration = entry.registration
+  // CI override layer: the runner applies it only when CI is set (local runs keep the table form).
+  if (entry.ci !== undefined) gate.ci = entry.ci
   return gate
 }
 

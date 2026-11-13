@@ -61,6 +61,18 @@ export function validateRegistry(entries) {
       if (registration === null || typeof registration !== 'object' || typeof registration.reason !== 'string' || registration.reason.trim() === '') problems.push(id + ': registration needs a reason')
       if (registration !== null && typeof registration === 'object' && registration.expiry !== undefined && typeof registration.owner !== 'string') problems.push(id + ': registration with expiry needs an owner')
     }
+    // CI override layer (W10 §16.8.2): several rows are authored in table/local form and need
+    // different argv/env/cwd on a runner (machine paths, $RUNNER_TEMP homes, the probe baseline).
+    if (entry.ci !== undefined) {
+      const ci = entry.ci
+      if (ci === null || typeof ci !== 'object' || Array.isArray(ci)) problems.push(id + ': ci override must be an object')
+      else {
+        if (ci.argv !== undefined && (!Array.isArray(ci.argv) || ci.argv.length === 0 || ci.argv[0] !== 'node' || ci.argv.some((token) => typeof token !== 'string'))) problems.push(id + ': ci.argv must be a non-empty node command (string[])')
+        if (ci.env !== undefined && (ci.env === null || typeof ci.env !== 'object' || Object.values(ci.env).some((value) => typeof value !== 'string'))) problems.push(id + ': ci.env must be a string map')
+        if (ci.cwd !== undefined && typeof ci.cwd !== 'string') problems.push(id + ': ci.cwd must be a string')
+        if (ci.argv === undefined && ci.env === undefined && ci.cwd === undefined) problems.push(id + ': ci override carries none of argv/env/cwd')
+      }
+    }
     if (entry.kind === 'external' && entry.reason === undefined && entry.registration === undefined) problems.push(id + ': external row carries neither reason nor registration')
   }
   return problems

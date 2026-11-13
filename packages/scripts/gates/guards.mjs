@@ -62,6 +62,8 @@ export const guards = [
     tree: "mirror",
     title: "`node packages/scripts/verify-declared-config.mjs packages --strict`",
     argv: ["node","packages/scripts/verify-declared-config.mjs","packages","--strict"],
+    // CI runs in the FAMILY checkout with the platform checked out at ./upstream
+    ci: { argv: ["node","packages/scripts/verify-declared-config.mjs","packages","--strict","--upstream","upstream"] },
     lanes: ["local","ci-static"],
   }),
 
@@ -124,6 +126,8 @@ export const guards = [
     tree: "mirror",
     title: "`node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs`",
     argv: ["node","packages/scripts/verify-doc-facts.mjs","packages","--strict","--require-repo-docs"],
+    // The overlay carries the family docs but the platform repo docs are not ours: CI omits the flag.
+    ci: { argv: ["node","packages/scripts/verify-doc-facts.mjs","packages","--strict"] },
     lanes: ["local","ci-static"],
   }),
 
@@ -132,6 +136,8 @@ export const guards = [
     tree: "mirror",
     title: "`node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/_upstream/dsh-upstream-0.2.2-rc.1 --accept-recorded`",
     argv: ["node","packages/scripts/verify-platform-contract.mjs","packages","--upstream","D:/dsh/_upstream/dsh-upstream-0.2.2-rc.1","--accept-recorded"],
+    // CI: the platform checkout at ./upstream IS the tree to judge; strict mode (no --accept-recorded).
+    ci: { argv: ["node","packages/scripts/verify-platform-contract.mjs","packages","--upstream","upstream"] },
     lanes: ["local","ci-static"],
   }),
 
@@ -189,6 +195,8 @@ export const guards = [
     tree: "mirror",
     title: "`node packages/scripts/verify-client-seats.mjs packages --strict`（客户端半的座位读取与平台席位一致性）",
     argv: ["node","packages/scripts/verify-client-seats.mjs","packages","--strict"],
+    // CI checks the seats against the platform checkout at ./upstream.
+    ci: { argv: ["node","packages/scripts/verify-client-seats.mjs","packages","--strict","--upstream","upstream"] },
     lanes: ["local","ci-static"],
   }),
 
@@ -213,6 +221,8 @@ export const guards = [
     tree: "mirror",
     title: "`node packages/scripts/verify-write-inventory.mjs packages --strict --home <plane home>`（写清单落地：**CI 形态**用 `$RUNNER_TEMP/plane-home`）",
     argv: ["node","packages/scripts/verify-write-inventory.mjs","packages","--strict","--home","<plane","home>"],
+    // CI uses a synthetic plane home (the action's --home "$RUNNER_TEMP/plane-home").
+    ci: { argv: ["node","packages/scripts/verify-write-inventory.mjs","packages","--strict","--home","${RUNNER_TEMP}/plane-home"] },
     lanes: ["local","ci-static"],
     registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.46.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."},
   }),

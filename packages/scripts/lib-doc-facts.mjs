@@ -452,6 +452,19 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
       }
     }
     const executed = new Set([...text.matchAll(/scripts\/([A-Za-z0-9._-]+\.mjs)/g)].map(match => match[1]))
+    // W10 M3b2: the action may run a REGISTRY LANE instead of naming every script. A lane covers the
+    // rows it selects, so the executed set must include those rows' scripts (CI override argv wins).
+    const laneRuns = [...text.matchAll(/run-gates\.mjs\s+ci\s+--lane\s+(ci-[a-z-]+)/g)].map((match) => match[1])
+    if (laneRuns.length > 0) {
+      try {
+        const gates = JSON.parse(readFileSync(join(root, 'scripts', 'gate-manifest.json'), 'utf8')).gates ?? []
+        for (const gate of gates) {
+          if (!laneRuns.some((lane) => Array.isArray(gate.lanes) && gate.lanes.includes(lane))) continue
+          const tokens = gate.ci !== undefined && Array.isArray(gate.ci.argv) ? gate.ci.argv : gate.argv
+          for (const token of tokens ?? []) if (/scripts\//.test(token) && /\.mjs$/.test(token)) executed.add(token.replace(/^.*[\\/]/, ''))
+        }
+      } catch { /* unreadable manifest: the manifest gate names it; executed stays literal here */ }
+    }
     if (executed.size === 0) {
       out.push(`${machine.file}: the gate machine reads no script at all — the executed set cannot be derived (a vacuum pass is not a pass)`)
       return out
