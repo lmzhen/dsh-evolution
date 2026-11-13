@@ -1,0 +1,83 @@
+name: evolution-pack
+description: >-
+  The pack lane (W10 M4c): overlay the family onto the released upstream ref, build the libraries,
+  pack the scoped release, and upload the dist artifact. No tests, probes, guards or publish dry-run:
+  this lane exists so the Windows install job can consume the SAME packed bytes without running a
+  full validation first (or packing a second copy itself).
+inputs:
+  upstream_repo:
+    description: Upstream repository to overlay onto
+    required: true
+  upstream_ref:
+    description: Upstream ref this lane packs against
+    required: true
+  version:
+    description: The release version to pack with (RELEASE_VERSION); a leading 'v' is stripped
+    required: true
+  node_version:
+    description: Node major version for the pack lane
+    required: false
+    default: '24'
+  npm_scope:
+    description: npm scope the pack rewrite uses (one source with the workflow's NPM_SCOPE)
+    required: false
+    default: '@lmzhen'
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        repository: ${{ inputs.upstream_repo }}
+        ref: ${{ inputs.upstream_ref }}
+        path: upstream
+        persist-credentials: false
+
+    - name: Overlay mirror packages into upstream
+      shell: bash
+      run: node packages/scripts/ci-overlay.mjs
+
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      with:
+        version: '11.7.0'
+
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: ${{ inputs.node_version }}
+        cache: pnpm
+        cache-dependency-path: upstream/pnpm-lock.yaml
+
+    - name: Pre-register overlay workspace packages in the lockfile (P2-16)
+      shell: bash
+      working-directory: upstream
+      run: |
+        pnpm install --lockfile-only --no-frozen-lockfile
+        echo "pre-registered $(grep -c '^  packages/evolution/' pnpm-lock.yaml || true) evolution importer(s) into the lockfile"
+
+    - name: Install dependencies from the frozen lockfile
+      shell: bash
+      working-directory: upstream
+      run: pnpm install --frozen-lockfile
+
+    - name: Build the family libraries
+      shell: bash
+      working-directory: upstream
+      run: node packages/evolution/scripts/build-lib.mjs
+
+    - name: Pack the family release
+      shell: bash
+      working-directory: upstream
+      env:
+        NPM_SCOPE: ${{ inputs.npm_scope }}
+        RELEASE_VERSION: ${{ inputs.version }}
+      run: |
+        # Same packing semantics as the full lane: a tag packs its own semver, a main push packs the
+        # dev placeholder (never published — publish is tag-gated).
+        ARGS=(--scope "$NPM_SCOPE" --version "${RELEASE_VERSION#v}")
+        if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then ARGS+=(--dev-build); fi
+        node packages/evolution/scripts/prepare-release.mjs "${ARGS[@]}"
+
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: evolution-dist-pack
+        path: upstream/packages/evolution/dist
+        retention-days: 14

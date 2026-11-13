@@ -75,6 +75,26 @@ jobs:
   # GATE (rc.54): after consecutive green runs (rc.52 main + rc.53 tag), this
   # job is a hard requirement of `publish` — a released-upstream
   # incompatibility now blocks the release instead of merely failing a run.
+  # W10 M4c: the pack lane. It produces the packed dist artifact the Windows install job consumes,
+  # without running the full validation first (compat-check still packs for its own audits). ~2.5 min;
+  # runs on main and tags so the Windows lane's bytes and the release bytes come from one pack path.
+  pack:
+    name: pack release bytes
+    needs: platform-line
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/evolution-pack
+        with:
+          upstream_repo: ${{ env.UPSTREAM_REPO }}
+          upstream_ref: ${{ needs.platform-line.outputs.upstream_ref }}
+          version: ${{ env.RELEASE_VERSION }}
+          npm_scope: ${{ env.NPM_SCOPE }}
+
   compat-check:
     name: validate (released upstream)
     needs: platform-line
@@ -121,17 +141,20 @@ jobs:
   # the validation it duplicated (W10 §1: 18m57 of which ~30s was install).
   desktop-install:
     name: desktop install (windows)
-    # W10 M4c will gate this on the pack lane's dist artifact (installer --from-dist is ready in the
-    # action). Gating it on a full `compat-check` today would put the Windows lane AFTER a ~6.6 min
-    # validate job, pushing the release critical path to ~9.6 min (> the 8 min target); the pack
-    # lane that gives the artifact without the full validation is the M4c slice.
-    needs: platform-line
+    # W10 M4c: consume the pack lane's bytes. The lane skips build/pack and the profile guard runs
+    # installer --from-dist, so this job no longer serializes behind the full compat-check.
+    needs: [platform-line, pack]
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: evolution-dist-pack
+          path: dist
 
       - uses: ./.github/actions/evolution-windows-install
         with:
@@ -140,6 +163,7 @@ jobs:
           platform_version: ${{ needs.platform-line.outputs.version }}
           version: ${{ env.RELEASE_VERSION }}
           npm_scope: ${{ env.NPM_SCOPE }}
+          dist_dir: ${{ github.workspace }}/dist
 
   publish:
     name: publish
@@ -191,20 +215,11 @@ jobs:
           COMPAT_CHECK_NODE22_RESULT: ${{ needs['compat-check-node22'].result }}
           DESKTOP_INSTALL_RESULT: ${{ needs['desktop-install'].result }}
         run: |
-          # P1-13: the staging ledger assembled in compat-check is synthetic. This
-          # jobs-level ledger is the real result of THIS run's required jobs; the
-          # per-gate transcript still has to come from a future gate-runner artifact,
-          # but these rows are not fabricated ok:true values.
-          node - <<'NODE'
-          const fs = require('node:fs')
-          const rows = [
-            ['platform-line', process.env.PLATFORM_LINE_RESULT],
-            ['compat-check', process.env.COMPAT_CHECK_RESULT],
-            ['compat-check-node22', process.env.COMPAT_CHECK_NODE22_RESULT],
-            ['desktop-install', process.env.DESKTOP_INSTALL_RESULT],
-          ].map(([id, result]) => ({ id, ok: result === 'success', reading: 'GitHub Actions job ' + id + ' result=' + result, criterionEvaluated: true }))
-          fs.writeFileSync('ci-gates.json', JSON.stringify({ gates: rows }, null, 2) + '\n')
-          NODE
+          # P1-13: the staging ledger assembled in compat-check is synthetic. This jobs-level ledger
+          # is the real result of THIS run's required jobs. W10 M4c: the rows are written by
+          # release-job-ledger.mjs (the inline heredoc that used to do this is gone), and a missing
+          # result is exit 1 instead of a silently fabricated ok:false.
+          node packages/evolution/scripts/release-job-ledger.mjs --output ci-gates.json
 
           node packages/evolution/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json \
             --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json \
