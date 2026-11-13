@@ -18,7 +18,7 @@
 import { familyVersion as familyVersionOf } from './lib-family-version.mjs'
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
@@ -46,9 +46,53 @@ import { EVOLUTION_BUNDLE_TAILS, EVOLUTION_PREFIXES, RETIRED_PACKAGE_NAMES } fro
 
 // G2-S2: the ONE composer lives in evolution-core. The source installer consumes the BUILT
 // artifact (CI runs build-lib before tests/publish); a missing build fails loud with the fix.
-const COMPOSER_LIB_URL = new URL('../evolution-core/lib/composition/index.js', import.meta.url)
+//
+// W10 M4d: `--from-dist <dir>` installs the PACKED tarballs instead of the source tree. The
+// composer is then read from the packed core tarball's lib/composition/index.js, and the copy
+// source root is the extracted tarball tree — the same bytes a user receives, with no build step.
+const FROM_DIST_ARG = (() => {
+  const index = process.argv.indexOf('--from-dist')
+  if (index < 0) return undefined
+  const value = process.argv[index + 1]
+  if (value === undefined || value.startsWith('--')) {
+    console.error('install-layered: --from-dist needs the dist directory prepare-release wrote')
+    process.exit(2)
+  }
+  return value
+})()
+/** Extract every packed tarball into <tmp>/<bareName>/ and return that source root. */
+function prepareDistSourceRoot(distDir) {
+  const resolved = resolve(distDir)
+  const manifestPath = join(resolved, 'manifest.json')
+  if (!existsSync(manifestPath)) {
+    console.error('install-layered: --from-dist ' + resolved + ' has no manifest.json (pass the prepare-release dist directory)')
+    process.exit(2)
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  // Extract INSIDE the family tree so the packed composer's own imports (js-yaml et al) resolve
+  // through the checkout's node_modules — a system-temp extraction has no dependency tree.
+  const familyRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+  const root = mkdtempSync(join(familyRoot, '.from-dist-'))
+  process.on('exit', () => { try { rmSync(root, { recursive: true, force: true }) } catch { /* Windows may still hold a file; the dot dir is ignored */ } })
+  for (const [name, file] of Object.entries(manifest)) {
+    const bare = name.startsWith('@') ? (name.split('/')[1] ?? '') : name
+    const destination = join(root, bare)
+    mkdirSync(destination, { recursive: true })
+    try {
+      execFileSync('tar', ['-xzf', join(resolved, String(file)), '-C', destination, '--strip-components=1'], { stdio: 'pipe' })
+    } catch (error) {
+      console.error('install-layered: cannot unpack ' + file + ' from --from-dist (' + String(error && error.message).slice(0, 160) + ')')
+      process.exit(2)
+    }
+  }
+  return root
+}
+const DIST_SOURCE_ROOT = FROM_DIST_ARG === undefined ? null : prepareDistSourceRoot(FROM_DIST_ARG)
+const COMPOSER_LIB_URL = DIST_SOURCE_ROOT === null
+  ? new URL('../evolution-core/lib/composition/index.js', import.meta.url)
+  : pathToFileURL(join(DIST_SOURCE_ROOT, 'dsh-evolution-core', 'lib', 'composition', 'index.js'))
 if (!existsSync(fileURLToPath(COMPOSER_LIB_URL))) {
-  console.error('install-layered: evolution-core build is missing (' + fileURLToPath(COMPOSER_LIB_URL) + '). Run: node packages/scripts/build-lib.mjs')
+  console.error('install-layered: ' + (DIST_SOURCE_ROOT === null ? 'evolution-core build is missing (' + fileURLToPath(COMPOSER_LIB_URL) + '). Run: node packages/scripts/build-lib.mjs' : 'the packed core tarball carries no lib/composition/index.js (' + fileURLToPath(COMPOSER_LIB_URL) + ')'))
   process.exit(1)
 }
 const composer = await import(COMPOSER_LIB_URL.href)
@@ -74,7 +118,8 @@ const {
   composePresetComposition,
 } = composer
 const PACKAGES_DIR = fileURLToPath(new URL('../', import.meta.url))
-const EVOLUTION_SCOPE = process.env.EVOLUTION_SCOPE?.trim() || '@deepseek-ai'
+// A packed install only exists under the release scope; default to it when --from-dist is used.
+const EVOLUTION_SCOPE = process.env.EVOLUTION_SCOPE?.trim() || (FROM_DIST_ARG !== undefined ? '@lmzhen' : '@deepseek-ai')
 const BUNDLES = {
   host: `${EVOLUTION_SCOPE}/dsh-evolution-host`,
   oneclick: `${EVOLUTION_SCOPE}/dsh-evolution-preset`,
@@ -98,6 +143,8 @@ function familyVersion(sourceRoot = packageSourceRoot()) {
 }
 
 function packageSourceRoot() {
+  // W10 M4d: the packed install copies the extracted tarball tree, never a staging tree.
+  if (DIST_SOURCE_ROOT !== null) return DIST_SOURCE_ROOT
   if (EVOLUTION_SCOPE === '@deepseek-ai') return PACKAGES_DIR
   if (existsSync(STAGING_DIR)) {
     // F-213: refuse a stale staging built for an older release. The persistent
@@ -1006,9 +1053,23 @@ export function generateAgentPreset(standardComposition, deltaComposition) {
  *     but the missed cap must be observable).
  */
 /** The delta fragment a run composes: the packaged `evolution-agent/agent.cordis.yml`, or the
- * `DSH_EVOLUTION_DELTA_PATH` override tests and one-off builds use. */
+ * `DSH_EVOLUTION_DELTA_PATH` override tests and one-off builds use.
+ * W10 M4d: a packed source root names directories by PACKAGE name (`dsh-evolution-agent-preset`),
+ * not by the source-tree directory, so resolve by the manifest name when the source path is absent. */
 function agentDeltaPath() {
-  return process.env.DSH_EVOLUTION_DELTA_PATH?.trim() || join(packageSourceRoot(), 'evolution-agent', 'agent.cordis.yml')
+  const override = process.env.DSH_EVOLUTION_DELTA_PATH?.trim()
+  if (override !== undefined && override !== '') return override
+  const root = packageSourceRoot()
+  const sourceLayout = join(root, 'evolution-agent', 'agent.cordis.yml')
+  if (existsSync(sourceLayout)) return sourceLayout
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    try {
+      const manifest = JSON.parse(readFileSync(join(root, entry.name, 'package.json'), 'utf8'))
+      if (typeof manifest.name === 'string' && manifest.name.endsWith('/dsh-evolution-agent-preset')) return join(root, entry.name, 'agent.cordis.yml')
+    } catch { /* not a package directory */ }
+  }
+  return sourceLayout
 }
 
 /**
@@ -1567,6 +1628,7 @@ export const INSTALL_FLAGS = [
   { flag: '--profile', value: '<name>', summary: 'profile directory under $DSH_HOME/profiles (default web)' },
   { flag: '--base', value: '<name>[,<name>...]', summary: 'platform agent-preset base the family preset follows (repeatable)' },
   { flag: '--home', value: '<dir>', summary: 'harness home to write into (default $DSH_HOME)' },
+  { flag: '--from-dist', value: '<dir>', summary: 'install the packed tarballs from a prepare-release dist directory (packed-install guard; no build step needed)' },
   { flag: '--dry-run', value: '', summary: 'report what would change and write nothing' },
   { flag: '--force', value: '', summary: 'proceed past a conflicting install form' },
   { flag: '--check-presets', value: '', summary: 'report on the presets already on disk (composes with any mode)' },
@@ -1613,6 +1675,7 @@ function parseArgs(argv) {
   // native command, so `resolve('~/.dsh')` used to install into `<cwd>/~/.dsh` — a tree no runtime
   // reads (G6 review, P2).
   else if (arg === '--home') options.home = resolveHome({ ...process.env, DSH_HOME: next() })
+    else if (arg === '--from-dist') options.fromDist = next()
     else if (arg === '--dry-run') options.dryRun = true
     else if (arg === '--force') options.force = true
     // `--check-presets` is a FLAG, not a mode: it reports on the presets already

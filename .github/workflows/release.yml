@@ -121,6 +121,10 @@ jobs:
   # the validation it duplicated (W10 §1: 18m57 of which ~30s was install).
   desktop-install:
     name: desktop install (windows)
+    # W10 M4c will gate this on the pack lane's dist artifact (installer --from-dist is ready in the
+    # action). Gating it on a full `compat-check` today would put the Windows lane AFTER a ~6.6 min
+    # validate job, pushing the release critical path to ~9.6 min (> the 8 min target); the pack
+    # lane that gives the artifact without the full validation is the M4c slice.
     needs: platform-line
     runs-on: windows-latest
     timeout-minutes: 20

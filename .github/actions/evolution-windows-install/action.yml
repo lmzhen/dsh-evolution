@@ -28,6 +28,13 @@ inputs:
     description: npm scope the pack rewrite uses (one source with the workflow's NPM_SCOPE)
     required: false
     default: '@lmzhen'
+  dist_dir:
+    description: >-
+      Optional absolute directory holding prepare-release's packed tarballs. When set, the lane
+      installs THOSE bytes (installer --from-dist) and skips the build/pack steps: the workflow
+      downloads the released dist artifact instead of packing the same bytes a second time.
+    required: false
+    default: ''
 runs:
   using: composite
   steps:
@@ -82,11 +89,13 @@ runs:
       run: pnpm run build:native-system
 
     - name: Build the family libraries
+      if: inputs.dist_dir == ''
       shell: bash
       working-directory: upstream
       run: node packages/evolution/scripts/build-lib.mjs
 
     - name: Pack the family release
+      if: inputs.dist_dir == ''
       shell: bash
       working-directory: upstream
       env:
@@ -104,29 +113,44 @@ runs:
       working-directory: upstream
       env:
         PLATFORM_VERSION: ${{ inputs.platform_version }}
+        DIST_DIR: ${{ inputs.dist_dir }}
       run: |
-        PLATFORM_DIR="$(node packages/evolution/scripts/prepare-packed-platform.mjs packages/evolution/dist "$PLATFORM_VERSION" | tail -n 1)"
+        # W10 M4d: DIST_DIR (set by the workflow) carries the released artifact; without it this
+        # lane packs its own bytes exactly as before.
+        TARGET="${DIST_DIR:-packages/evolution/dist}"
+        test -f "$TARGET/manifest.json"
+        PLATFORM_DIR="$(node packages/evolution/scripts/prepare-packed-platform.mjs "$TARGET" "$PLATFORM_VERSION" | tail -n 1)"
         test -d "$PLATFORM_DIR"
-        node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules "$PLATFORM_DIR"
+        node packages/evolution/scripts/smoke-packed-install.mjs "$TARGET" --platform-node-modules "$PLATFORM_DIR"
 
     - name: "Install smoke: packed tarballs into a throwaway consumer"
       shell: bash
       working-directory: upstream
+      env:
+        DIST_DIR: ${{ inputs.dist_dir }}
       run: |
         # The bytes a user receives: every tarball unpacked, every declared entry imported, every
         # bundle patch asset present. `--assets-only` is the CI half (the platform is source-only in
         # this checkout); the full runtime import runs in the step above and on a real host.
-        node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only
+        node packages/evolution/scripts/smoke-packed-install.mjs "${DIST_DIR:-packages/evolution/dist}" --assets-only
 
-    - name: Source-overlay installer guard (Windows install path)
+    - name: Packed-profile installer guard (Windows install path)
       shell: bash
       working-directory: upstream
+      env:
+        DIST_DIR: ${{ inputs.dist_dir }}
       run: |
         # The Windows-specific half: the installer's profile patch shape (bundle row, preset row,
-        # journal, no double mount) is what a Windows path bug breaks first.
+        # journal, no double mount) is what a Windows path bug breaks first. With DIST_DIR set the
+        # guard installs the PACKED tarballs (installer --from-dist), i.e. the bytes users receive.
         HOME_DIR="$(mktemp -d)"
-        node packages/evolution/scripts/install-layered.mjs \
-          --home "$HOME_DIR" --profile web --mode layered
+        if [[ -n "${DIST_DIR}" ]]; then
+          node packages/evolution/scripts/install-layered.mjs \
+            --home "$HOME_DIR" --profile web --mode layered --from-dist "$DIST_DIR"
+        else
+          node packages/evolution/scripts/install-layered.mjs \
+            --home "$HOME_DIR" --profile web --mode layered
+        fi
         node packages/evolution/scripts/verify-profile-bundles.mjs "$HOME_DIR/profiles/web"
         test -f "$HOME_DIR/profiles/web/.evolution-install.json"
         test -f "$HOME_DIR/profiles/web/cordis.patch.yml"
@@ -135,12 +159,12 @@ runs:
       shell: bash
       working-directory: upstream
       run: |
-        # The full suite stays on the Linux matrix (node 22 + 24). These four cover the classes that
-        # are Windows-only in practice: EPERM rename/unlink retries, CRLF-authored preset bytes, and
-        # the lock primitives under the native flock binding. Measured 62 tests / 19.2 s on Windows.
+        # The full suite stays on the Linux matrix (node 22 + 24). These three cover the classes that
+        # are Windows-only in practice: EPERM rename/unlink retries and the lock primitives under the
+        # native flock binding. (preset-composition left the subset with M4d: it drives the SOURCE
+        # installer, which needs a built composer; the packed guard above covers this lane instead.)
         node node_modules/vitest/vitest.mjs run \
           packages/evolution/evolution-core/tests/io.spec.ts \
           packages/evolution/evolution-commands/tests/atomic-write.spec.ts \
-          packages/evolution/evolution-core/tests/preset-composition.spec.ts \
           packages/evolution/evolution-core/tests/mutation-lock.spec.ts \
           --maxWorkers=1 --testTimeout=30000
