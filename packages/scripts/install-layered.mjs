@@ -19,7 +19,7 @@ import { familyVersion as familyVersionOf } from './lib-family-version.mjs'
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
 
@@ -74,20 +74,17 @@ function prepareDistSourceRoot(distDir) {
   const familyRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
   const root = mkdtempSync(join(familyRoot, '.from-dist-'))
   process.on('exit', () => { try { rmSync(root, { recursive: true, force: true }) } catch { /* Windows may still hold a file; the dot dir is ignored */ } })
-  // The runner's `tar` may be GNU tar (Git for Windows), which reads an absolute `D:\...` argument
-  // as a REMOTE host. --force-local is the documented opt-out; bsdtar does not accept it, so detect.
-  let forceLocal = false
-  try {
-    const version = execFileSync('tar', ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-    forceLocal = process.platform === 'win32' && /GNU tar/i.test(version)
-  } catch { forceLocal = false }
+  // The extraction uses ONLY relative paths: cwd = the dist directory (archive argument is a bare
+  // file name) and -C is the relative path to the destination. An absolute `D:\...` argument makes
+  // GNU tar read the drive letter as a REMOTE host (Git-for-Windows tar), and the MSYS path forms
+  // are not stable across runners; relative paths sidestep both.
+  const distRelative = (target) => relative(resolved, target).split(sep).join('/')
   for (const [name, file] of Object.entries(manifest)) {
     const bare = name.startsWith('@') ? (name.split('/')[1] ?? '') : name
     const destination = join(root, bare)
     mkdirSync(destination, { recursive: true })
     try {
-      const args = ['-xzf', String(file), '-C', destination, '--strip-components=1']
-      execFileSync('tar', forceLocal ? ['--force-local', ...args] : args, { stdio: 'pipe', cwd: resolved })
+      execFileSync('tar', ['-xzf', String(file), '-C', distRelative(destination), '--strip-components=1'], { stdio: 'pipe', cwd: resolved })
     } catch (error) {
       const detail = error !== null && typeof error === 'object' && error.stderr !== undefined && error.stderr !== null ? String(error.stderr) : (error instanceof Error ? error.message : String(error))
       console.error('install-layered: cannot unpack ' + file + ' from --from-dist (' + detail.trim().slice(0, 240) + ')')
