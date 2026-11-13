@@ -568,7 +568,6 @@
         "evolution-merge::tests/gates/rg1b-reconcile.spec.ts",
         "evolution-merge::tests/gates/rg1b-runtime.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-backup.spec.ts",
-        "evolution-merge::tests/gates/rg1b2a-old-reader.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-schema4.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-stage.spec.ts",
         "evolution-merge::tests/gates/rg1b2b-core-fields.spec.ts",
@@ -1230,7 +1229,6 @@
         "evolution-merge::tests/gates/rg1b-reconcile.spec.ts",
         "evolution-merge::tests/gates/rg1b-runtime.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-backup.spec.ts",
-        "evolution-merge::tests/gates/rg1b2a-old-reader.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-schema4.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-stage.spec.ts",
         "evolution-merge::tests/gates/rg1b2b-core-fields.spec.ts",
@@ -1835,7 +1833,6 @@
         "evolution-merge::tests/gates/rg1b-reconcile.spec.ts",
         "evolution-merge::tests/gates/rg1b-runtime.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-backup.spec.ts",
-        "evolution-merge::tests/gates/rg1b2a-old-reader.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-schema4.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-stage.spec.ts",
         "evolution-merge::tests/gates/rg1b2b-core-fields.spec.ts",
@@ -2136,7 +2133,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 433
+      "specs": 432
     },
     "ci-only": {
       "gates": 10,
@@ -2144,16 +2141,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 433
+      "specs": 432
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 506
+      "specs": 505
     }
   },
   "specs": {
-    "total": 506,
-    "marked": 506,
+    "total": 505,
+    "marked": 505,
     "unmarked": 0
   }
 }
