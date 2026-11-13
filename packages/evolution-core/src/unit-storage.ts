@@ -1,7 +1,7 @@
 /** G2 unit storage: opaque unitId -> Windows-safe storage key. */
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import type { EvolutionIoLike } from './io.ts'
+import { transactIo, type EvolutionIoLike } from './io.ts'
 
 export const UNIT_STORAGE_SCHEMA_VERSION = 1
 
@@ -85,8 +85,7 @@ export function unitIndexPath(home: string): string {
 export async function writeUnitSnapshot(io: EvolutionIoLike, home: string, snapshot: UnitSnapshot, scope: UnitStoreScope = 'merge'): Promise<string> {
   const path = unitSnapshotPath(home, snapshot.unitId, scope)
   const content = JSON.stringify(snapshot, null, 2) + '\n'
-  if (io.transact !== undefined) await io.transact(path, () => content)
-  else await io.writeText(path, content)
+  await transactIo(io, path, () => content)
   return path
 }
 
@@ -99,8 +98,7 @@ export async function readUnitSnapshot(io: EvolutionIoLike, home: string, unitId
 export async function writeUnitEvidence(io: EvolutionIoLike, home: string, evidence: UnitEvidenceRecord): Promise<string> {
   const path = unitEvidencePath(home, evidence.unitId)
   const content = JSON.stringify(evidence, null, 2) + '\n'
-  if (io.transact !== undefined) await io.transact(path, () => content)
-  else await io.writeText(path, content)
+  await transactIo(io, path, () => content)
   await upsertUnitIndex(io, home, {
     unitId: evidence.unitId,
     storageKey: unitStorageKey(evidence.unitId),
@@ -132,8 +130,7 @@ export async function upsertUnitIndex(io: EvolutionIoLike, home: string, entry: 
     const next = entries.filter(item => item.unitId !== entry.unitId).concat(entry)
     return JSON.stringify({ schemaVersion: UNIT_STORAGE_SCHEMA_VERSION, entries: next }, null, 2) + '\n'
   }
-  if (io.transact !== undefined) await io.transact(path, content)
-  else await io.writeText(path, content(await io.readText(path)))
+  await transactIo(io, path, content)
 }
 
 export interface UnitReceiptRecord {
@@ -155,8 +152,7 @@ export function unitReceiptPath(home: string, unitId: string): string {
 export async function writeUnitReceipt(io: EvolutionIoLike, home: string, receipt: UnitReceiptRecord): Promise<string> {
   const path = unitReceiptPath(home, receipt.unitId)
   const text = JSON.stringify(receipt, null, 2) + '\n'
-  if (io.transact !== undefined) await io.transact(path, () => text)
-  else await io.writeText(path, text)
+  await transactIo(io, path, () => text)
   return path
 }
 

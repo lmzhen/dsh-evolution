@@ -114,9 +114,9 @@
       "path": "<skillsRoot>/**",
       "writer": "evolution-core/src/skill-store.ts",
       "serializedBy": "write-lock",
-      "marker": "fileMutationLock(",
+      "marker": "withMutationLock(",
       "state": [],
-      "note": "The skill tree itself. G1: ordinary byte writers take the root mutation lock (fileMutationLock) and still run their per-file read-modify-write through `transact`; the root lock is what keeps extract/restructure/update/patch/create from interleaving. Destructive movers refuse only when a support directory cannot be listed (fail-closed)."
+      "note": "The skill tree itself. G1: ordinary byte writers take the root mutation lock through withMutationLock (the injected authority lock) and still run their per-file read-modify-write through `transact`; the root lock is what keeps extract/restructure/update/patch/create from interleaving. Destructive movers refuse only when a support directory cannot be listed (fail-closed). N20 (W11 E): the marker is the PRODUCTION symbol withMutationLock; lockPort()'s test fallback (fileMutationLock) is not evidence for a production write."
     },
     {
       "id": "activity-log-fenced",
@@ -279,6 +279,51 @@
       "marker": "transactIo(io, pairIndexPath(home)",
       "state": [],
       "note": "pairKey → result/runId/target index; RMW under the same IO lock so two merge runs cannot lose each other's entries."
+    },
+    {
+      "id": "unit-snapshot-and-evidence",
+      "path": "<evolutionHome>/merge/unit-snapshots/** | <evolutionHome>/units/skill/snapshots/** | <evolutionHome>/merge/units/**/evidence.json",
+      "writer": "evolution-core/src/unit-storage.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, path, () => content)",
+      "state": [],
+      "note": "Unit snapshot + evidence writes (W11 E): both go through transactIo now instead of a conditional io.transact/writeText fallback, so a committed-fsync warning is tolerated uniformly and a byte-identical write is a no-op."
+    },
+    {
+      "id": "unit-index",
+      "path": "<evolutionHome>/merge/unit-index.json",
+      "writer": "evolution-core/src/unit-storage.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, path, content)",
+      "state": [],
+      "note": "The unit index is a read-modify-write of the shared entries array; the task reads the current value inside the transaction (no lost update)."
+    },
+    {
+      "id": "unit-receipt",
+      "path": "<evolutionHome>/merge/unit-receipts/**",
+      "writer": "evolution-core/src/unit-storage.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, path, () => text)",
+      "state": [],
+      "note": "Receipts are written once per unit; the path is derived from the hashed unit id."
+    },
+    {
+      "id": "unit-journal",
+      "path": "<evolutionHome>/merge/unit-journals/** | <evolutionHome>/units/skill/journals/**",
+      "writer": "evolution-core/src/unit-journal.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, path, () => content)",
+      "state": [],
+      "note": "Phase transitions are validated against the existing journal before the transaction; the write itself is the shared transactIo path."
+    },
+    {
+      "id": "run-lease",
+      "path": "<evolutionHome>/leases/**",
+      "writer": "evolution-core/src/lease-store.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(this.io, path, (raw)",
+      "state": [],
+      "note": "Lease acquire/heartbeat/release all use transactIo now: the old private fallback did not tolerate a committed-fsync warning, so acquire could report failure after the active lease had landed."
     }
   ]
 }

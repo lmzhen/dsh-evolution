@@ -34,7 +34,7 @@ import type { CitationPolicy, EvolutionIoLike, LiveValue, SupportFileCharPolicy 
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { SkillSummary } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '@deepseek-ai/dsh-evolution-skill-discovery/usage'
-import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from './write-gates.ts'
+import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from '@deepseek-ai/dsh-evolution-core'
 /**
  * F-2 (audit v46 / G7.2): the read-only action set used to be spelled out FOUR times in this file
  * (usage accounting at the patch_count bump, the cross-source directory exemption, the approval gap

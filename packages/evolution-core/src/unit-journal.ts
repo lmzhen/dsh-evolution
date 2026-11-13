@@ -1,7 +1,7 @@
 /** G2 unit journal: intent/phase/checkpoint only, never evidence bodies. */
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import type { EvolutionIoLike } from './io.ts'
+import { transactIo, type EvolutionIoLike } from './io.ts'
 
 export const UNIT_JOURNAL_SCHEMA_VERSION = 1
 
@@ -70,8 +70,7 @@ export async function writeUnitJournal(io: EvolutionIoLike, home: string, journa
   const existing = await readUnitJournal(io, home, key, scope)
   if (existing !== null) assertUnitJournalTransition(existing.phase, journal.phase)
   const content = JSON.stringify(journal, null, 2) + '\n'
-  if (io.transact !== undefined) await io.transact(path, () => content)
-  else await io.writeText(path, content)
+  await transactIo(io, path, () => content)
   return path
 }
 

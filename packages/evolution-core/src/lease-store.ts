@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type { MutationOwner } from './contract.ts'
-import type { EvolutionIoLike } from './io.ts'
+import { transactIo, type EvolutionIoLike } from './io.ts'
 
 /** One persisted run/claim lease. Epoch increments on every re-acquire. */
 export interface LeaseRecord {
@@ -53,17 +53,6 @@ function parseLease(raw: string | null): LeaseRecord | undefined {
   }
 }
 
-async function transact(io: EvolutionIoLike, path: string, task: (current: string | null) => string | null): Promise<void> {
-  if (io.transact !== undefined) {
-    await io.transact(path, task)
-    return
-  }
-  const current = await io.readText(path)
-  const next = task(current)
-  if (next === null) await io.remove(path)
-  else if (next !== current) await io.writeText(path, next)
-}
-
 function tokenOf(record: LeaseRecord): LeaseToken {
   return { id: record.id, owner: record.owner, runId: record.runId, epoch: record.epoch }
 }
@@ -95,7 +84,7 @@ export class LeaseStore {
     const now = this.now()
     let created: LeaseRecord | undefined
     let holder: LeaseRecord | undefined
-    await transact(this.io, path, (raw) => {
+    await transactIo(this.io, path, (raw) => {
       const current = parseLease(raw)
       if (current !== undefined && current.state === 'active' && now < current.expiresAt) {
         holder = current
@@ -131,7 +120,7 @@ export class LeaseStore {
   async renew(token: LeaseToken, ttlMs = this.ttlMs): Promise<LeaseRecord | null> {
     const path = this.path(token.runId)
     let next: LeaseRecord | null = null
-    await transact(this.io, path, (raw) => {
+    await transactIo(this.io, path, (raw) => {
       const current = parseLease(raw)
       if (current === undefined || current.state !== 'active' || current.id !== token.id || current.epoch !== token.epoch) return raw
       const now = this.now()
@@ -143,7 +132,7 @@ export class LeaseStore {
 
   async release(token: LeaseToken): Promise<void> {
     const path = this.path(token.runId)
-    await transact(this.io, path, (raw) => {
+    await transactIo(this.io, path, (raw) => {
       const current = parseLease(raw)
       if (current === undefined || current.id !== token.id || current.epoch !== token.epoch) return raw
       return JSON.stringify({ ...current, state: 'released', heartbeatAt: this.now() })

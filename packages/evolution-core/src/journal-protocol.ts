@@ -20,23 +20,3 @@ export interface JournalProtocol<P extends string> {
   recoveryOf(phase: P): JournalRecovery
 }
 
-/**
- * True when `from` may advance to `to`.
- * @param protocol - the journal's protocol.
- * @param from - the recorded phase.
- * @param to - the phase the caller wants to record next.
- * @returns whether the transition is declared.
- */
-export function canAdvance<P extends string>(protocol: JournalProtocol<P>, from: P, to: P): boolean {
-  return protocol.next[from].includes(to)
-}
-
-/**
- * True when the phase is terminal (nothing may follow it).
- * @param protocol - the journal's protocol.
- * @param phase - the phase to test.
- * @returns whether the phase is terminal.
- */
-export function isTerminal<P extends string>(protocol: JournalProtocol<P>, phase: P): boolean {
-  return protocol.next[phase].length === 0
-}

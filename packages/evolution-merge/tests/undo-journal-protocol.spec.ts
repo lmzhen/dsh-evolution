@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { canAdvance, isTerminal } from '@deepseek-ai/dsh-evolution-core'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { readUndoJournal, UNDO_PAIR_PROTOCOL, writeUndoJournal } from '../src/domain/undo-journal.ts'
 
@@ -17,12 +16,12 @@ const dir = (): string => mkdtempSync(join(tmpdir(), 'undo-journal-'))
 
 describe('undo journal protocol', () => {
   it('declares the full transition chain', () => {
-    expect(canAdvance(UNDO_PAIR_PROTOCOL, 'receipt', 'pair-index')).toBe(true)
-    expect(canAdvance(UNDO_PAIR_PROTOCOL, 'pair-index', 'run-meta')).toBe(true)
-    expect(canAdvance(UNDO_PAIR_PROTOCOL, 'run-meta', 'done')).toBe(true)
-    expect(canAdvance(UNDO_PAIR_PROTOCOL, 'receipt', 'done')).toBe(false)
-    expect(isTerminal(UNDO_PAIR_PROTOCOL, 'done')).toBe(true)
-    expect(isTerminal(UNDO_PAIR_PROTOCOL, 'pair-index')).toBe(false)
+    expect(UNDO_PAIR_PROTOCOL.next.receipt).toContain('pair-index')
+    expect(UNDO_PAIR_PROTOCOL.next['pair-index']).toContain('run-meta')
+    expect(UNDO_PAIR_PROTOCOL.next['run-meta']).toContain('done')
+    expect(UNDO_PAIR_PROTOCOL.next.receipt).not.toContain('done')
+    expect(UNDO_PAIR_PROTOCOL.next.done).toHaveLength(0)
+    expect(UNDO_PAIR_PROTOCOL.next['pair-index'].length).toBeGreaterThan(0)
   })
 
   it('tells a restart to continue from every non-terminal phase', () => {

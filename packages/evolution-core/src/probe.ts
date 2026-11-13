@@ -47,15 +47,6 @@ export function isUnknown<T>(probe: Probe<T>): probe is { kind: 'unknown'; reaso
   return probe.kind === 'unknown'
 }
 
-/** Only a PRESENT probe yields a value; absent and unknown both fall back. */
-export function valueOr<T>(probe: Probe<T>, fallback: T): T {
-  return probe.kind === 'present' ? probe.value : fallback
-}
-
-export function mapProbe<T, U>(probe: Probe<T>, transform: (value: T) => U): Probe<U> {
-  return probe.kind === 'present' ? probePresent(transform(probe.value)) : probe
-}
-
 /** The reason an `unknown` probe carries (message, never a bare String(object)). */
 export function probeReason(error: unknown): string {
   return error instanceof Error ? error.message : String(error)

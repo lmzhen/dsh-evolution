@@ -527,8 +527,10 @@ export class MutationUnit {
           const op = snapshot.ops.find(entry => entry.target === target)
           if (op === undefined) continue
           try {
-            if (op.after === null) await this.io.remove(target)
-            else await this.io.writeText(target, op.after)
+            // restore(target) writes `before` only while the current bytes equal `after`; the undo
+            // wrote op.before, so the compensation passes (before=op.after, after=op.before).
+            const restored = await this.kernel.restore({ path: target, before: op.after, after: op.before })
+            if (!restored.ok) throw new Error(restored.errors[0]?.message ?? 'compensation blocked: ' + target)
           } catch {
             // best-effort undo compensation; the structured error below remains honest
           }

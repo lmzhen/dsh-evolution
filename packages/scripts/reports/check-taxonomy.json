@@ -131,7 +131,6 @@
         "evolution-core::tests/skill-model.spec.ts",
         "evolution-core::tests/skill-store-authority-lock.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
-        "evolution-core::tests/write-outcome.spec.ts",
         "evolution-curator::tests/unit-undo-plan.spec.ts",
         "evolution-host::tests/decide-requires.spec.ts",
         "evolution-host::tests/gate-scheduler.spec.ts",
@@ -453,13 +452,11 @@
         "evolution-core::tests/threats.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
-        "evolution-core::tests/unit-crash-final.spec.ts",
         "evolution-core::tests/unit-engine-single-source.spec.ts",
         "evolution-core::tests/unit-head.spec.ts",
         "evolution-core::tests/unit-journal.spec.ts",
         "evolution-core::tests/unit-members.spec.ts",
         "evolution-core::tests/unit-prune3.spec.ts",
-        "evolution-core::tests/unit-recovery.spec.ts",
         "evolution-core::tests/unit-storage.spec.ts",
         "evolution-core::tests/unit-transaction.spec.ts",
         "evolution-core::tests/unit-undo-executor.spec.ts",
@@ -470,7 +467,6 @@
         "evolution-core::tests/write-authority-origin.spec.ts",
         "evolution-core::tests/write-inventory-lazy-asset.spec.ts",
         "evolution-core::tests/write-inventory.spec.ts",
-        "evolution-core::tests/write-outcome.spec.ts",
         "evolution-core::tests/write-path-identity.spec.ts",
         "evolution-core::tests/write-receipt-health.spec.ts",
         "evolution-curator::tests/curator-clamp.spec.ts",
@@ -1119,13 +1115,11 @@
         "evolution-core::tests/threats.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
-        "evolution-core::tests/unit-crash-final.spec.ts",
         "evolution-core::tests/unit-engine-single-source.spec.ts",
         "evolution-core::tests/unit-head.spec.ts",
         "evolution-core::tests/unit-journal.spec.ts",
         "evolution-core::tests/unit-members.spec.ts",
         "evolution-core::tests/unit-prune3.spec.ts",
-        "evolution-core::tests/unit-recovery.spec.ts",
         "evolution-core::tests/unit-storage.spec.ts",
         "evolution-core::tests/unit-transaction.spec.ts",
         "evolution-core::tests/unit-undo-executor.spec.ts",
@@ -1136,7 +1130,6 @@
         "evolution-core::tests/write-authority-origin.spec.ts",
         "evolution-core::tests/write-inventory-lazy-asset.spec.ts",
         "evolution-core::tests/write-inventory.spec.ts",
-        "evolution-core::tests/write-outcome.spec.ts",
         "evolution-core::tests/write-path-identity.spec.ts",
         "evolution-core::tests/write-receipt-health.spec.ts",
         "evolution-curator::tests/curator-clamp.spec.ts",
@@ -1718,13 +1711,11 @@
         "evolution-core::tests/threats.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
-        "evolution-core::tests/unit-crash-final.spec.ts",
         "evolution-core::tests/unit-engine-single-source.spec.ts",
         "evolution-core::tests/unit-head.spec.ts",
         "evolution-core::tests/unit-journal.spec.ts",
         "evolution-core::tests/unit-members.spec.ts",
         "evolution-core::tests/unit-prune3.spec.ts",
-        "evolution-core::tests/unit-recovery.spec.ts",
         "evolution-core::tests/unit-storage.spec.ts",
         "evolution-core::tests/unit-transaction.spec.ts",
         "evolution-core::tests/unit-undo-executor.spec.ts",
@@ -1735,7 +1726,6 @@
         "evolution-core::tests/write-authority-origin.spec.ts",
         "evolution-core::tests/write-inventory-lazy-asset.spec.ts",
         "evolution-core::tests/write-inventory.spec.ts",
-        "evolution-core::tests/write-outcome.spec.ts",
         "evolution-core::tests/write-path-identity.spec.ts",
         "evolution-core::tests/write-receipt-health.spec.ts",
         "evolution-curator::tests/boundary.spec.ts",
@@ -2148,11 +2138,11 @@
   "counts": {
     "fast": {
       "gates": 63,
-      "specs": 103
+      "specs": 102
     },
     "pre-tag": {
       "gates": 63,
-      "specs": 436
+      "specs": 433
     },
     "ci-only": {
       "gates": 9,
@@ -2160,16 +2150,16 @@
     },
     "full(ci=off)": {
       "gates": 63,
-      "specs": 436
+      "specs": 433
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 509
+      "specs": 506
     }
   },
   "specs": {
-    "total": 509,
-    "marked": 509,
+    "total": 506,
+    "marked": 506,
     "unmarked": 0
   }
 }
