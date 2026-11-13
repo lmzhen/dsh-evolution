@@ -74,9 +74,15 @@ export function versionReached(current, until) {
 
 /** The family version: the install tile under evolution-host wins, else the root package.json. */
 export function familyVersion(sourceRoot, root = sourceRoot) {
-  try {
-    const v = JSON.parse(readFileSync(join(sourceRoot, "evolution-host", "package.json"), "utf8")).version;
-    if (typeof v === "string" && SEMVER.test(v)) return v;
-  } catch { /* fall through to the root package.json */ }
+  // Source/staging trees carry the bare package dir (`evolution-host`); a prepare-release dist
+  // extraction names the dir after the SCOPED package (`dsh-evolution-host`). Both are the same
+  // tile; without the second form `--from-dist` fell through to a missing root manifest and pinned
+  // the bundle dependency to `*` (audit 06 P0-1).
+  for (const dir of ['evolution-host', 'dsh-evolution-host']) {
+    try {
+      const v = JSON.parse(readFileSync(join(sourceRoot, dir, 'package.json'), 'utf8')).version;
+      if (typeof v === 'string' && SEMVER.test(v)) return v;
+    } catch { /* fall through to the root package.json */ }
+  }
   return readRootVersion(root) ?? undefined;
 }

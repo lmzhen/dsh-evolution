@@ -69,6 +69,30 @@ function prepareDistSourceRoot(distDir) {
     process.exit(2)
   }
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  // Audit 06 P0-3: the packed path used to check only that manifest.json exists. The source/staging
+  // paths verify version+scope; the packed path must judge the same two facts from the bytes it is
+  // about to install: the evidence's familyVersion (when the dist carries it) and one scope for
+  // every tarball name.
+  const distScope = process.env.EVOLUTION_SCOPE?.trim() || '@lmzhen'
+  const scopes = new Set(Object.keys(manifest).map((name) => name.split('/')[0]))
+  if (scopes.size !== 1 || !scopes.has(distScope)) {
+    console.error('install-layered: --from-dist manifest names ' + JSON.stringify([...scopes]) + ' but this install resolves under "' + distScope + '" — rebuild the dist with the same scope')
+    process.exit(2)
+  }
+  const evidencePath = join(resolved, 'release-evidence.json')
+  if (existsSync(evidencePath)) {
+    let evidence
+    try { evidence = JSON.parse(readFileSync(evidencePath, 'utf8')) } catch (error) {
+      console.error('install-layered: --from-dist release-evidence.json is unreadable (' + (error instanceof Error ? error.message : String(error)) + ')')
+      process.exit(2)
+    }
+    const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+    const expected = familyVersionOf(sourceRoot, sourceRoot)
+    if (typeof evidence.familyVersion !== 'string' || evidence.familyVersion !== expected) {
+      console.error('install-layered: --from-dist evidence familyVersion ' + String(evidence.familyVersion) + ' does not match this tree ' + String(expected) + ' — the dist is stale')
+      process.exit(2)
+    }
+  }
   // Extract INSIDE the family tree so the packed composer's own imports (js-yaml et al) resolve
   // through the checkout's node_modules — a system-temp extraction has no dependency tree.
   const familyRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -1657,7 +1681,9 @@ export function usageText() {
 }
 
 function parseArgs(argv) {
-  const options = { mode: 'layered', profile: 'web', bases: [] }
+  // W11 C: the documented default (INSTALL_FLAGS/INSTALL.md) is all. The old `layered` default was
+  // a second product decision that the library default (`options.mode ?? 'all'`) never observed.
+  const options = { mode: 'all', profile: 'web', bases: [] }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     // D-15 (v18): a missing value used to fall through silently (`--mode`
@@ -1681,7 +1707,10 @@ function parseArgs(argv) {
   // native command, so `resolve('~/.dsh')` used to install into `<cwd>/~/.dsh` — a tree no runtime
   // reads (G6 review, P2).
   else if (arg === '--home') options.home = resolveHome({ ...process.env, DSH_HOME: next() })
-    else if (arg === '--from-dist') options.fromDist = next()
+    // `--from-dist` is parsed once at module load (it decides which composer the process imports);
+    // the parser only consumes its value so it is not read as an unknown argument. There is no
+    // second, dead `options.fromDist` that library callers could believe in (audit 06 P0-2).
+    else if (arg === '--from-dist') next()
     else if (arg === '--dry-run') options.dryRun = true
     else if (arg === '--force') options.force = true
     // `--check-presets` is a FLAG, not a mode: it reports on the presets already
