@@ -113,28 +113,28 @@ jobs:
           upload_artifacts: 'false'
           npm_scope: ${{ env.NPM_SCOPE }}
 
-  # G7 §2.3: the desktop plane. The Electron cold-boot assertion itself stays a real-machine
-  # acceptance (it needs the signed app; recorded in the G2/G3 design docs with its evidence).
-  # What a runner owns is the WINDOWS half of the install: build the family artifacts on
-  # `windows-latest`, install them into a throwaway DSH_HOME with the family's installer, and let
-  # the family's own profile guard judge what came out (bundle row, preset row, journal, no double
-  # mount). A path bug that only breaks on Windows then fails here.
+  # G7 §2.3 / W10 M1: the desktop plane. The Electron cold-boot assertion itself stays a
+  # real-machine acceptance (it needs the signed app; recorded in the G2/G3 design docs with its
+  # evidence). What a runner owns is the WINDOWS half of the INSTALL — the same install guards as
+  # before, but the family suite, mutation probes, static guards, tarball audit and publish dry-run
+  # stay on the Linux lanes: repeating them here made an "install" job three times the length of
+  # the validation it duplicated (W10 §1: 18m57 of which ~30s was install).
   desktop-install:
     name: desktop install (windows)
     needs: platform-line
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/evolution-validate
+      - uses: ./.github/actions/evolution-windows-install
         with:
           upstream_repo: ${{ env.UPSTREAM_REPO }}
           upstream_ref: ${{ needs.platform-line.outputs.upstream_ref }}
-          artifact_suffix: windows
-          install_smoke: 'true'
+          platform_version: ${{ needs.platform-line.outputs.version }}
+          version: ${{ env.RELEASE_VERSION }}
           npm_scope: ${{ env.NPM_SCOPE }}
 
   publish:
