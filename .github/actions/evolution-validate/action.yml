@@ -171,7 +171,7 @@ runs:
         # family specs; the released tree does not carry that harness, which is why the pre-2026-10-15 line
         # was green here for every release up to v0.26.15. A check that needs "this machine has X" belongs
         # to local/pre-tag (see the policy-only step below for the half that legitimately runs in CI).
-        node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=${{ runner.os == 'Windows' && 1 || 2 }} --testTimeout=30000
+        node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=${{ runner.os == 'Windows' && 1 || 2 }} --testTimeout=30000 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/probe-baseline.json"
         node node_modules/oxlint/bin/oxlint -c packages/evolution/oxlint.release.json packages/evolution --ignore-pattern '**/tests/**' --ignore-pattern '**/vendor/**' --ignore-pattern '**/scripts/**' -A style
 
     # G7 (0.17.0): the D-9 test-file typecheck step is GONE with the baseline job — it ran the
@@ -443,7 +443,7 @@ runs:
         # nothing about its mutation, so it is reported as cannot-decide and counted; a mutation that
         # stays green is a real defect and fails here. This is the half CI never ran, which is why a
         # stale probe signature could only be discovered by hand.
-        node packages/evolution/scripts/verify-mutations.mjs --probes --no-stamp --json
+        node packages/evolution/scripts/verify-mutations.mjs --probes --no-stamp --baseline=json:"$RUNNER_TEMP/probe-baseline.json" --json
     - name: Assemble the release evidence planes (W10/W11)
       shell: bash
       working-directory: upstream

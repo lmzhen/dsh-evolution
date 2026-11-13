@@ -237,6 +237,7 @@ function stampRecords(id, results) {
 import { closeSync, mkdirSync, openSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { overlayAvailable, probeCommand, probeProblems, probeSignature, readMutationFixture, readProbes, resolveLayoutPath } from './lib-probes.mjs'
+import { baselineForProbe, readSuiteBaseline } from './lib-probes-baseline.mjs'
 
 const probesWanted = process.argv.includes('--probes')
 const listWanted = process.argv.includes('--list')
@@ -275,6 +276,26 @@ if (probesWanted || listWanted) {
   const ledgerTarget = ledgerFlag >= 0 ? process.argv[ledgerFlag + 1] : undefined
   if (ledgerFlag >= 0 && (ledgerTarget === undefined || ledgerTarget.startsWith('--'))) { console.error('verify-mutations --probes: --ledger needs a path'); process.exit(2) }
   const noStamp = process.argv.includes('--no-stamp')
+  // W10 §15: the baseline is the suite run that already happened in this job. `rerun` keeps the old
+  // behaviour as the fallback switch; `json:<path>` consumes a vitest JSON report.
+  const baselineArg = process.argv.find((arg) => arg.startsWith('--baseline='))
+  const baselineMode = baselineArg !== undefined ? baselineArg.slice('--baseline='.length) : (process.env.EVOLUTION_PROBE_BASELINE ?? 'rerun')
+  let baselineEvidence = null
+  let baselineFallback = null
+  if (baselineMode.startsWith('json:')) {
+    const evidencePath = baselineMode.slice('json:'.length)
+    const evidence = readSuiteBaseline(evidencePath, PROBE_ROOT)
+    if (evidence.ok) baselineEvidence = evidence
+    else {
+      baselineFallback = evidence.reason
+      console.error('verify-mutations --probes: baseline evidence unusable (' + evidence.reason + ') — falling back to per-probe rerun')
+    }
+  } else if (baselineMode !== 'rerun') {
+    console.error('verify-mutations --probes: --baseline accepts rerun or json:<path> (got ' + JSON.stringify(baselineMode) + ')')
+    process.exit(2)
+  }
+  let baselineFromEvidence = 0
+  let baselineRerun = 0
   const lockPath = resolvePath(tmpdir(), 'dsh-probe-mutation.lock')
   let lockFd = null
   try { lockFd = openSync(lockPath, 'wx') } catch { console.error('verify-mutations --probes: CANNOT DECIDE - another probe-mutation run holds ' + lockPath); process.exit(2) }
@@ -298,8 +319,17 @@ if (probesWanted || listWanted) {
     const timeout = read.fixture.timeoutMs ?? 180000
     const runProbe = () => spawnSync(command.argv[0], command.argv.slice(1), { cwd: command.cwd, encoding: 'utf8', timeout, maxBuffer: 32 * 1024 * 1024 })
     const preDirty = dirtySet()
-    const baseline = runProbe()
-    if (baseline.status !== 0) { probeResults.push({ id: probe.id, status: 'NO GREEN BASELINE', detail: 'exit=' + String(baseline.status) + (baseline.stderr === null ? '' : ' :: ' + String(baseline.stderr).trim().split(String.fromCharCode(10)).slice(-2).join(' ')) }); continue }
+    let baselineGreen = false
+    if (baselineEvidence !== null) {
+      const decision = baselineForProbe(probe, PROBE_ROOT, baselineEvidence)
+      if (decision.kind === 'green') { baselineGreen = true; baselineFromEvidence += 1 }
+      else if (decision.kind === 'cannot-decide') { probeResults.push({ id: probe.id, status: 'NO GREEN BASELINE', detail: 'baseline evidence: ' + decision.reason }); continue }
+    }
+    if (!baselineGreen) {
+      const baseline = runProbe()
+      if (baseline.status !== 0) { probeResults.push({ id: probe.id, status: 'NO GREEN BASELINE', detail: 'exit=' + String(baseline.status) + (baseline.stderr === null ? '' : ' :: ' + String(baseline.stderr).trim().split(String.fromCharCode(10)).slice(-2).join(' ')) }); continue }
+      baselineRerun += 1
+    }
     let status = 'NOT PROVEN RED'
     let detail = ''
     try {
@@ -307,6 +337,7 @@ if (probesWanted || listWanted) {
       const mutated = runProbe()
       const verdict = mutated.status === 1 ? 'red' : mutated.status === 0 ? 'green' : mutated.status === 2 ? 'cannot-decide' : 'exit-' + String(mutated.status)
       if (verdict === 'red') { status = 'PROVEN RED'; detail = 'mutation run exit=1 (expected red)' }
+      else if (mutated.status === null) { status = 'NO VERDICT (TIMEOUT)'; detail = 'mutation run did not finish (timeout/termination); an unfinished run is not evidence that the mutation stayed green' }
       else detail = 'mutation run exit=' + String(mutated.status) + ' (' + verdict + '); the probe did not go red, so the fixture proves nothing'
     } finally {
       restoreAll()
@@ -321,7 +352,7 @@ if (probesWanted || listWanted) {
   // Three answers, not two (W9-gates §11): a probe whose unmutated baseline is not green here
   // proves nothing about the mutation, and calling that a failure is how a real regression gets
   // lost in environmental noise. Only "the mutation stayed green" is a defect.
-  const probeKind = (status) => status === 'PROVEN RED' ? 'proven-red' : status === 'NO GREEN BASELINE' ? 'cannot-decide' : 'failed'
+  const probeKind = (status) => status === 'PROVEN RED' ? 'proven-red' : (status === 'NO GREEN BASELINE' || status === 'NO VERDICT (TIMEOUT)') ? 'cannot-decide' : 'failed'
   const proven = probeResults.filter((entry) => probeKind(entry.status) === 'proven-red')
   const cannotDecide = probeResults.filter((entry) => probeKind(entry.status) === 'cannot-decide')
   const failed = probeResults.filter((entry) => probeKind(entry.status) === 'failed')
@@ -351,11 +382,12 @@ if (probesWanted || listWanted) {
     proven: proven.length,
     cannotDecide: cannotDecide.length,
     failed: failed.length,
+    baseline: { mode: baselineMode, fromEvidence: baselineFromEvidence, rerun: baselineRerun, fallback: baselineFallback },
     seconds: Math.round((Date.now() - startedAt) / 100) / 10,
     ledger: ledgerPath,
   }
   if (jsonMode) console.log(JSON.stringify(summary, null, 2))
-  else console.log('verify-mutations --probes: proven=' + String(proven.length) + ' cannotDecide=' + String(cannotDecide.length) + ' failed=' + String(failed.length) + (cannotDecide.length === 0 ? '' : ' (cannot decide: ' + cannotDecide.map((entry) => entry.id).join(', ') + ')') + (ledgerPath === null ? ' (ledger not written)' : '; ledger ' + ledgerPath))
+  else console.log('verify-mutations --probes: proven=' + String(proven.length) + ' cannotDecide=' + String(cannotDecide.length) + ' failed=' + String(failed.length) + ' baseline(evidence=' + String(baselineFromEvidence) + ', rerun=' + String(baselineRerun) + ')' + (cannotDecide.length === 0 ? '' : ' (cannot decide: ' + cannotDecide.map((entry) => entry.id).join(', ') + ')') + (ledgerPath === null ? ' (ledger not written)' : '; ledger ' + ledgerPath))
   process.exit(failed.length === 0 ? 0 : 1)
 }
 
