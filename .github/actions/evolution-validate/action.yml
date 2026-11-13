@@ -186,22 +186,6 @@ runs:
     # artifact is in this tree" belongs to the layout that has it: the three-part sequence (generate ->
     # porcelain proves the committed copy matches -> --check) runs in the mirror local/pre-tag gate,
     # which is also what the header contract says: "真比对进 local/pre-tag；CI 保持 policy-only".
-    - name: Run the static gate lane (registry ci-static)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # W10 M3b2: every read-only guard below used to be a hand-written step; the lane IS the
-        # registry's ci-static set (gates/*.mjs; CI overrides carry the runner-shaped argv). The
-        # per-row verdicts land in gates-static.json so a red names its row without reading the log.
-        node packages/evolution/scripts/run-gates.mjs ci --lane ci-static --concurrency 2 --json-out "$RUNNER_TEMP/gates-static.json"
-
-    - name: Declare the line this CI run measured (G1.5)
-      shell: bash
-      working-directory: upstream
-      run: |
-        # A setup step, not a gate (lane ci-setup): every conclusion names its line.
-        node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json
-
     - name: Pack scoped release
       shell: bash
       working-directory: upstream
@@ -249,6 +233,22 @@ runs:
         node packages/evolution/scripts/verify-platform-ranges.mjs \
           --manifest-dir packages/evolution/.release-staging \
           --our-scope "$NPM_SCOPE"
+
+    - name: Run the static gate lane (registry ci-static)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # W10 M3b2: every read-only guard below used to be a hand-written step; the lane IS the
+        # registry's ci-static set (gates/*.mjs; CI overrides carry the runner-shaped argv). The
+        # per-row verdicts land in gates-static.json so a red names its row without reading the log.
+        node packages/evolution/scripts/run-gates.mjs ci --lane ci-static --concurrency 2 --json-out "$RUNNER_TEMP/gates-static.json"
+
+    - name: Declare the line this CI run measured (G1.5)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # A setup step, not a gate (lane ci-setup): every conclusion names its line.
+        node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json
 
     - name: Prove the mutation probes can still go red (W9 S4)
       shell: bash
