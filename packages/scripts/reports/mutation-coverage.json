@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-13T19:15:23.891Z",
+  "generatedAt": "2026-11-13T20:08:12.811Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -17,14 +17,14 @@
     },
     {
       "probe": "beh-hmr-double-apply",
-      "signature": "ba5cca9ebce5620bb68675a5d84b2897d75bb3253564cc27c1a8849b20dc153c",
-      "provenAt": "2026-11-13T17:01:47.489Z",
+      "signature": "6ff7beee6740a0bd61ba86dee0f2241d99255f1e100afffca27046bf43c27ca8",
+      "provenAt": "2026-11-13T20:08:12.803Z",
       "tree": "overlay"
     },
     {
       "probe": "beh-host-route-registration",
-      "signature": "980450ae594b38ea81b30369f9844d0f82bab9c5531b0565a93fddcfaacd6bd2",
-      "provenAt": "2026-11-13T17:00:39.353Z",
+      "signature": "316d8ab85550a48c0e20c003298eed42d66342db265010f411e4d737dbebe572",
+      "provenAt": "2026-11-13T20:07:55.416Z",
       "tree": "overlay"
     },
     {
@@ -107,8 +107,8 @@
     },
     {
       "probe": "decl-contracts-surface",
-      "signature": "426704925e7b2e9ae3f59635c5d2d081c2c5a1d3764819a05620f666fc8606a3",
-      "provenAt": "2026-11-13T17:00:39.314Z",
+      "signature": "5e0678efaed26a85f63557a0605dec184f2f8306e05f28835d28681a68c9c0ff",
+      "provenAt": "2026-11-13T20:07:46.505Z",
       "tree": "overlay"
     },
     {

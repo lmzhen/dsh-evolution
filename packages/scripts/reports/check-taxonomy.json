@@ -79,7 +79,6 @@
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
-        "evolution-client-kit::tests/settings-seat.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
         "evolution-commands::tests/help-locale.spec.ts",
@@ -325,7 +324,6 @@
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
-        "evolution-client-kit::tests/settings-seat.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
@@ -979,7 +977,6 @@
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
-        "evolution-client-kit::tests/settings-seat.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
@@ -1558,7 +1555,6 @@
         "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
-        "evolution-client-kit::tests/settings-seat.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/commands.spec.ts",
@@ -2108,11 +2104,11 @@
   "counts": {
     "fast": {
       "gates": 62,
-      "specs": 102
+      "specs": 101
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 425
+      "specs": 424
     },
     "ci-only": {
       "gates": 10,
@@ -2120,16 +2116,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 425
+      "specs": 424
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 498
+      "specs": 497
     }
   },
   "specs": {
-    "total": 498,
-    "marked": 498,
+    "total": 497,
+    "marked": 497,
     "unmarked": 0
   }
 }
