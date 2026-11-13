@@ -29,7 +29,7 @@ The canonical fact table is `packages/scripts/family-facts.json`. If you move a 
 
 ## The gate: all 82 steps
 
-The local profile runs the family gate runner (see [docs/developer/development.md](docs/developer/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from `packages/scripts/gate-manifest.json`; do not hand-edit it. If a row moves tier or command, change the manifest, regenerate, and update this appendix.
+The local profile runs the family gate runner (see [docs/developer/development.md](docs/developer/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from the gate registry (`packages/scripts/gates/registry.mjs`); do not hand-edit it. If a row moves tier or command, change the registry and regenerate the views.
 
 | # | Command | Working tree |
 |---|---|---|

@@ -23,6 +23,9 @@ import { join, resolve } from 'node:path'
 import { familyGateRegisters } from './lib-doc-facts.mjs'
 import { familyVersion, versionReached } from './lib-family-version.mjs'
 import { softOverlay } from './lib-env.mjs'
+import { registry } from './gates/registry.mjs'
+import { validateRegistry } from './gates/helpers.mjs'
+import { renderManifestGates, renderTableRows } from './lib-gate-views.mjs'
 
 const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
@@ -44,7 +47,7 @@ const problems = []
 
 // G0-0.2: the manifest generator own --check had NO execution point in the tree (F-15). Wiring it
 // here makes it run wherever this meta gate runs (gate-22: local + ci) - one owner, no second
-// drift detector. Measured: gen-gate-manifest.mjs:199 exits 1 when the manifest is stale.
+// drift detector. Measured: gen-gate-manifest.mjs --check exits 1 on a stale view.
 if (process.env.SKIP_MANIFEST_FRESHNESS !== '1') {
   const probe = spawnSync(process.execPath, [join(root, 'scripts', 'gen-gate-manifest.mjs'), '--check'], { encoding: 'utf8' })
   if (probe.status !== 0) {
@@ -197,6 +200,38 @@ for (const script of declaredScripts) {
 // G0-5: the manifest is the register both halves read (direction 2 + toolchain exceptions).
 const manifestPath = join(root, 'scripts', 'gate-manifest.json')
 const manifestGates = existsSync(manifestPath) ? (JSON.parse(readFileSync(manifestPath, 'utf8')).gates ?? []) : []
+
+// ── W10 M3: registry -> generated views -> CI wiring ───────────────────────────────────────────
+// The registry is the source; the manifest and the CONTRIBUTING table are generated from it. These
+// checks judge the committed views and the CI wiring AGAINST the registry (the old direction let a
+// hand-edited table or an action text change silently re-number ids).
+for (const problem of validateRegistry(registry)) problems.push('registry: ' + problem)
+const renderedGates = renderManifestGates(registry)
+if (renderedGates.length !== manifestGates.length || JSON.stringify(renderedGates) !== JSON.stringify(manifestGates)) {
+  const byId = new Map(manifestGates.map((gate) => [gate.id, gate]))
+  const differing = renderedGates.filter((gate) => JSON.stringify(gate) !== JSON.stringify(byId.get(gate.id))).map((gate) => gate.id)
+  problems.push('gate-manifest.json does not match the registry rendering (first differing: ' + (differing.length === 0 ? 'row count ' + renderedGates.length + ' vs ' + manifestGates.length : differing.slice(0, 6).join(', ')) + ') - the manifest is generated; rerun gen-gate-manifest.mjs then gen-checks-fact.mjs')
+}
+const expectedTable = renderTableRows(renderedGates)
+const tableSet = tableRows.map((row) => ({ n: row.n, tree: row.tree })).sort((left, right) => left.n - right.n)
+if (JSON.stringify(tableSet) !== JSON.stringify(expectedTable.map((row) => ({ n: row.n, tree: row.tree })))) {
+  problems.push('the CONTRIBUTING gate table does not match the registry table rows (' + tableRows.length + ' vs ' + expectedTable.length + ') - the table is generated; rerun gen-gate-manifest.mjs')
+}
+const actionFamilyScripts = new Set([...actionText.matchAll(/scripts\/([A-Za-z0-9._-]+\.mjs)/g)].map((match) => match[1]))
+const registryCiScripts = new Set()
+for (const gate of renderedGates) {
+  if (!gate.lanes.some((lane) => lane.startsWith('ci-'))) continue
+  for (const token of gate.argv ?? []) {
+    if (!/scripts\//.test(token) || !/\.mjs$/.test(token)) continue
+    registryCiScripts.add(token.replace(/^.*[\\/]/, ''))
+  }
+}
+for (const script of registryCiScripts) {
+  if (!actionFamilyScripts.has(script)) problems.push('the registry carries ' + script + ' on a ci-* lane but the CI action never runs it - the declaration and the fact disagree')
+}
+for (const script of actionFamilyScripts) {
+  if (!registryCiScripts.has(script)) problems.push('the CI action runs ' + script + ' but no registry row carries it on a ci-* lane - a wild check (add it to packages/scripts/gates/registry.mjs or stop running it)')
+}
 
 // (4c) G0-5: toolchain rows used to be judged on NEITHER side — scriptOf() returns null for node_modules
 // paths, so tsc/oxlint/vitest never reached the containment loop, and deleting the lint step turned

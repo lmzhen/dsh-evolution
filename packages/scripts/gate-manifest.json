@@ -2,10 +2,8 @@
   "version": 1,
   "generatedBy": "packages/scripts/gen-gate-manifest.mjs",
   "sources": [
-    "CONTRIBUTING.md (gate table)",
-    ".github/actions/evolution-validate/action.yml (CI run steps)",
-    "packages/scripts/probes.json (probe registry)",
-    "packages/scripts/gate-lanes.json (lane membership, M0)"
+    "packages/scripts/gates/registry.mjs (gate registry, W10 M3)",
+    "packages/scripts/probes.json (probe registry)"
   ],
   "gates": [
     {
@@ -58,53 +56,6 @@
       "lanes": [
         "local",
         "ci-static"
-      ]
-    },
-    {
-      "id": "gate-03",
-      "kind": "toolchain",
-      "human": "`node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000`",
-      "argv": [
-        "node",
-        "node_modules/vitest/vitest.mjs",
-        "run",
-        "packages/evolution",
-        "--maxWorkers=2",
-        "--testTimeout=30000"
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "lanes": [
-        "local",
-        "ci-unit"
-      ],
-      "registration": {
-        "reason": "the full family vitest suite does not return on this machine within the 180 s budget",
-        "owner": "scripts/gates",
-        "expiry": "0.46.0",
-        "plan": "CI owns the full suite; local runs use targeted specs",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
-      }
-    },
-    {
-      "id": "gate-04",
-      "kind": "step",
-      "human": "`node packages/evolution/scripts/build-lib.mjs`",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/build-lib.mjs"
-      ],
-      "tree": "overlay",
-      "profiles": [],
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "lanes": [
-        "local",
-        "ci-unit",
-        "ci-release",
-        "ci-windows"
       ]
     },
     {
@@ -321,26 +272,6 @@
       ]
     },
     {
-      "id": "gate-16",
-      "kind": "script",
-      "human": "`node packages/scripts/verify-profile-bundles.mjs --self-test`",
-      "argv": [
-        "node",
-        "packages/scripts/verify-profile-bundles.mjs",
-        "--self-test"
-      ],
-      "tree": "mirror",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "lanes": [
-        "local",
-        "ci-release",
-        "ci-windows"
-      ]
-    },
-    {
       "id": "gate-17",
       "kind": "script",
       "human": "`node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs`",
@@ -542,26 +473,6 @@
       "lanes": [
         "local",
         "ci-static"
-      ]
-    },
-    {
-      "id": "gate-27",
-      "kind": "script",
-      "human": "`node packages/scripts/verify-platform-ranges.mjs --manifest-dir packages/evolution/.release-staging`（**发布期**：每个 staged manifest 的 `@deepseek-ai/dsh-*` 必须逐字等于 platform-line.json 派生的 peers 范围、`engines.dsh` 必须等于 engines 窗口；vendored 范围由 `lib-vendored-ranges.mjs` 单源钉住；同时打印双谓词窗口网格两表读数 ✓）",
-      "argv": [
-        "node",
-        "packages/scripts/verify-platform-ranges.mjs",
-        "--manifest-dir",
-        "packages/evolution/.release-staging"
-      ],
-      "tree": "mirror",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "lanes": [
-        "local",
-        "ci-release"
       ]
     },
     {
@@ -962,52 +873,6 @@
       ]
     },
     {
-      "id": "gate-48",
-      "kind": "script",
-      "human": "`node packages/scripts/verify-check-registry.mjs packages --strict`（七轴总账：闭包／可执行性／到期／**mutation 覆盖（读 reports/mutation-coverage.json 的签名台账，6 探针逐条）**／**生产者接线（每条 check.requires 的 producer 必须有 manifest 行或 CI action 执行）**／真空证伪／占位符——在册的轴计数与实测不符即红，闭包破了即红）",
-      "argv": [
-        "node",
-        "packages/scripts/verify-check-registry.mjs",
-        "packages",
-        "--strict"
-      ],
-      "tree": "mirror",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "lanes": [
-        "local",
-        "ci-release"
-      ]
-    },
-    {
-      "id": "gate-49",
-      "kind": "script",
-      "human": "`node packages/scripts/verify-mutations.mjs --coverage`（G5/1 变异库：每条 check 需 `checkMutations` 记录，缺／残 ⇒ cannot-decide；`--only <id>` 现场打补丁→跑→断言语义→还原并校验哈希；`--self-test` 必须抓出等值 mutation 与矛盾期望，抓出即 **exit 0**；`--probes [--only <probe>] [--list] [--ledger <path>] [--no-stamp]` 逐条执行 `probes.json` 的 mutation fixture：快照→应用→探针必红→还原校验→写 `reports/mutation-coverage.json` 签名台账）",
-      "argv": [
-        "node",
-        "packages/scripts/verify-mutations.mjs",
-        "--coverage"
-      ],
-      "tree": "mirror",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "lanes": [
-        "local",
-        "ci-release"
-      ],
-      "registration": {
-        "reason": "the mutation ledger is still being filled: 29 of 109 checks carry a proven red record",
-        "owner": "scripts/gates",
-        "expiry": "0.46.0",
-        "plan": "close records per check; coverage exits 0 once every check is proven",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
-      }
-    },
-    {
       "id": "gate-50",
       "kind": "script",
       "human": "`node packages/scripts/gen-health-baseline.mjs packages --check`（G4/① 生产者：健康基线语料的**唯一作者**；消费侧缺产物一律 cannot-decide，不许绿色兜底）",
@@ -1121,52 +986,6 @@
       ]
     },
     {
-      "id": "gate-56",
-      "kind": "script",
-      "human": "`node packages/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json`（W2/W3/W10/W11 发布证据：schemaVersion=2、platformLine 与 platform-line.json 逐字、manifests 范围一致；`--release` 时另要求 ciFace/gates/S1–S4 全 pass/52 项 traceability 全覆——blocked 不算 pass。缺文件/不可解析→**exit 2**）",
-      "argv": [
-        "node",
-        "packages/scripts/verify-release-evidence.mjs",
-        "packages/evolution/dist/release-evidence.json"
-      ],
-      "tree": "mirror",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "lanes": [
-        "local",
-        "ci-release"
-      ]
-    },
-    {
-      "id": "gate-57",
-      "kind": "script",
-      "human": "`node packages/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json --gates-from-manifest ci --ci-face ci --os ci`（W3/W10 发布证据装配：把 pack 写出的 schema-2 骨架与本仓演练快照（S1–S4 spike 证据 + W11 52 项 traceability）合并，并写入 CI face 与本次 compat-check 已执行的 gate 台账；`--release` 在 publish 前复验；缺输入/不合格→exit 1/2）",
-      "argv": [
-        "node",
-        "packages/scripts/assemble-release-evidence.mjs",
-        "packages/evolution/dist/release-evidence.json",
-        "--rehearsal",
-        "packages/evolution/scripts/release-evidence-rehearsal.json",
-        "--gates-from-manifest",
-        "ci",
-        "--ci-face",
-        "ci",
-        "--os",
-        "ci"
-      ],
-      "tree": "mirror",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "lanes": [
-        "local",
-        "ci-release"
-      ]
-    },
-    {
       "id": "gate-58",
       "kind": "script",
       "human": "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 发布 parity：UPSTREAM.json 的逐文件 bytes/sha256 与 testPatchSet 的 patchedBytes/patchedSha256 必须全等；缺文件/不匹配→exit 1。GAP-P0-05 的发布门禁）",
@@ -1181,29 +1000,6 @@
       "lanes": [
         "local"
       ]
-    },
-    {
-      "id": "gate-59",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
-      "argv": null,
-      "tree": "overlay",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "argvProblem": "no-command-in-cell",
-      "lanes": [
-        "local",
-        "ci-release"
-      ],
-      "registration": {
-        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
-        "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
-        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
-      }
     },
     {
       "id": "gate-60",
@@ -1367,106 +1163,6 @@
       }
     },
     {
-      "id": "gate-67",
-      "kind": "step",
-      "human": "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
-      "argv": null,
-      "tree": "mirror",
-      "profiles": [],
-      "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "lanes": [
-        "ci-setup"
-      ],
-      "registration": {
-        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
-        "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
-        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
-      }
-    },
-    {
-      "id": "gate-68",
-      "kind": "step",
-      "human": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
-      "argv": null,
-      "tree": "overlay",
-      "profiles": [],
-      "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "lanes": [
-        "ci-windows"
-      ],
-      "registration": {
-        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
-        "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
-        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
-      }
-    },
-    {
-      "id": "gate-69",
-      "kind": "step",
-      "human": "node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json",
-      "argv": null,
-      "tree": "overlay",
-      "profiles": [],
-      "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "lanes": [
-        "ci-setup"
-      ],
-      "registration": {
-        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
-        "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
-        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
-      }
-    },
-    {
-      "id": "gate-70",
-      "kind": "step",
-      "human": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
-      "argv": null,
-      "tree": "overlay",
-      "profiles": [],
-      "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "lanes": [
-        "ci-release"
-      ],
-      "registration": {
-        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
-        "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
-        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
-      }
-    },
-    {
-      "id": "gate-71",
-      "kind": "step",
-      "human": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
-      "argv": null,
-      "tree": "overlay",
-      "profiles": [],
-      "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "lanes": [
-        "ci-release"
-      ],
-      "registration": {
-        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
-        "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
-        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
-      }
-    },
-    {
       "id": "gate-72",
       "kind": "script",
       "human": "node packages/evolution/scripts/requirements.selftest.mjs",
@@ -1480,50 +1176,6 @@
       "lanes": [
         "local",
         "ci-static"
-      ],
-      "registration": {
-        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
-        "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
-        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
-      }
-    },
-    {
-      "id": "gate-73",
-      "kind": "step",
-      "human": "node packages/evolution/scripts/run-load-sensitive.mjs .",
-      "argv": null,
-      "tree": "overlay",
-      "profiles": [],
-      "argvProblem": "no-command-in-cell",
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "lanes": [
-        "ci-unit"
-      ],
-      "registration": {
-        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
-        "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
-        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
-      }
-    },
-    {
-      "id": "gate-74",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
-      "argv": null,
-      "tree": "overlay",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "argvProblem": "no-command-in-cell",
-      "lanes": [
-        "local",
-        "ci-release",
-        "ci-windows"
       ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
@@ -1657,8 +1309,7 @@
       "argv": null,
       "tree": "overlay",
       "profiles": [
-        "local",
-        "ci"
+        "local"
       ],
       "argvProblem": "no-command-in-cell",
       "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test",
@@ -1710,29 +1361,6 @@
       "lanes": [
         "local",
         "ci-static"
-      ]
-    },
-    {
-      "id": "ci-only-01",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/audit-release-tarballs.mjs",
-        "packages/evolution/dist",
-        "--version",
-        "\"${RELEASE_VERSION#v}\"",
-        "--platform-range",
-        "\"^$RANGE\""
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "ci"
-      ],
-      "reason": "payload audit of the packed dist — only meaningful after prepare-release has staged the release job's inputs",
-      "owner": "ci",
-      "lanes": [
-        "ci-release"
       ]
     },
     {
@@ -1893,6 +1521,619 @@
       "lanes": [
         "ci-static"
       ]
+    },
+    {
+      "id": "ci-only-19",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-contract-anchors.selftest.mjs",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-contract-anchors.selftest.mjs"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
+    },
+    {
+      "id": "ci-only-20",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-core-surface.mjs packages/evolution",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-core-surface.mjs",
+        "packages/evolution"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
+    },
+    {
+      "id": "ci-only-21",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-exemptions.mjs packages/evolution",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-exemptions.mjs",
+        "packages/evolution"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
+    },
+    {
+      "id": "ci-only-22",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-layout-sync.mjs",
+        "packages/evolution/scripts",
+        "../packages/scripts"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "mirror↔overlay script/version parity; needs the mirror checkout beside the overlay",
+      "owner": "ci",
+      "localSafe": false,
+      "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine",
+      "lanes": [
+        "ci-static"
+      ]
+    },
+    {
+      "id": "ci-only-23",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-param-consumers.mjs packages/evolution",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-param-consumers.mjs",
+        "packages/evolution"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
+    },
+    {
+      "id": "ci-only-24",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-probes.mjs",
+        "packages/evolution"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "probe registry schema lint; the CI job executes it, the mirror local lane has no platform overlay",
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
+    },
+    {
+      "id": "ci-only-25",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-requirements.mjs",
+        "packages/evolution"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "requirements matrix coverage; the CI job executes it after gen-requirements",
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
+    },
+    {
+      "id": "ci-only-26",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-test-lines.mjs packages/evolution --strict",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-test-lines.mjs",
+        "packages/evolution",
+        "--strict"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
+    },
+    {
+      "id": "line-identity-ci",
+      "kind": "script",
+      "human": "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
+      "argv": [
+        "node",
+        "packages/scripts/verify-line-identity.mjs",
+        "--policy-only",
+        "--strict"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "CI has no machine bed — policy half only (contract §5e)",
+      "lanes": [
+        "ci-static"
+      ]
+    },
+    {
+      "id": "line-identity-bed",
+      "kind": "script",
+      "human": "node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict",
+      "argv": [
+        "node",
+        "packages/scripts/verify-line-identity.mjs",
+        "--manifest",
+        "packages/scripts/files/line-manifest.json",
+        "--strict"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "pre-tag"
+      ],
+      "reason": "toothed form: compares the bed manifest produced by gen-line-manifest.mjs",
+      "lanes": [
+        "local",
+        "pre-tag"
+      ]
+    },
+    {
+      "id": "graph-edges-live",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/verify-graph-edges.mjs --report",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/verify-graph-edges.mjs",
+        "--report"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "pre-tag"
+      ],
+      "reason": "live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)",
+      "owner": "toolchain",
+      "noDrillReason": "live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half",
+      "lanes": [
+        "local",
+        "pre-tag"
+      ]
+    },
+    {
+      "id": "health-admission",
+      "kind": "script",
+      "human": "node packages/scripts/verify-health-admission.mjs",
+      "argv": [
+        "node",
+        "packages/scripts/verify-health-admission.mjs"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "pre-tag"
+      ],
+      "reason": "needs both local corpora; on a machine without them it must report CANNOT DECIDE rather than pass",
+      "lanes": [
+        "local",
+        "pre-tag"
+      ],
+      "registration": {
+        "reason": "no user or platform corpora on this machine, so admission cannot be judged",
+        "owner": "scripts/gates",
+        "expiry": "0.46.0",
+        "plan": "run where the corpora exist (CI or a real profile)",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+      }
+    },
+    {
+      "id": "gate-03",
+      "kind": "toolchain",
+      "human": "`node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000`",
+      "argv": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "packages/evolution",
+        "--maxWorkers=2",
+        "--testTimeout=30000"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-unit"
+      ],
+      "registration": {
+        "reason": "the full family vitest suite does not return on this machine within the 180 s budget",
+        "owner": "scripts/gates",
+        "expiry": "0.46.0",
+        "plan": "CI owns the full suite; local runs use targeted specs",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+      }
+    },
+    {
+      "id": "gate-16",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-profile-bundles.mjs --self-test`",
+      "argv": [
+        "node",
+        "packages/scripts/verify-profile-bundles.mjs",
+        "--self-test"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release",
+        "ci-windows"
+      ]
+    },
+    {
+      "id": "gate-27",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-platform-ranges.mjs --manifest-dir packages/evolution/.release-staging`（**发布期**：每个 staged manifest 的 `@deepseek-ai/dsh-*` 必须逐字等于 platform-line.json 派生的 peers 范围、`engines.dsh` 必须等于 engines 窗口；vendored 范围由 `lib-vendored-ranges.mjs` 单源钉住；同时打印双谓词窗口网格两表读数 ✓）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-platform-ranges.mjs",
+        "--manifest-dir",
+        "packages/evolution/.release-staging"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
+      ]
+    },
+    {
+      "id": "gate-48",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-check-registry.mjs packages --strict`（七轴总账：闭包／可执行性／到期／**mutation 覆盖（读 reports/mutation-coverage.json 的签名台账，6 探针逐条）**／**生产者接线（每条 check.requires 的 producer 必须有 manifest 行或 CI action 执行）**／真空证伪／占位符——在册的轴计数与实测不符即红，闭包破了即红）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-check-registry.mjs",
+        "packages",
+        "--strict"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
+      ]
+    },
+    {
+      "id": "gate-49",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-mutations.mjs --coverage`（G5/1 变异库：每条 check 需 `checkMutations` 记录，缺／残 ⇒ cannot-decide；`--only <id>` 现场打补丁→跑→断言语义→还原并校验哈希；`--self-test` 必须抓出等值 mutation 与矛盾期望，抓出即 **exit 0**；`--probes [--only <probe>] [--list] [--ledger <path>] [--no-stamp]` 逐条执行 `probes.json` 的 mutation fixture：快照→应用→探针必红→还原校验→写 `reports/mutation-coverage.json` 签名台账）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-mutations.mjs",
+        "--coverage"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
+      ],
+      "registration": {
+        "reason": "the mutation ledger is still being filled: 29 of 109 checks carry a proven red record",
+        "owner": "scripts/gates",
+        "expiry": "0.46.0",
+        "plan": "close records per check; coverage exits 0 once every check is proven",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+      }
+    },
+    {
+      "id": "gate-56",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json`（W2/W3/W10/W11 发布证据：schemaVersion=2、platformLine 与 platform-line.json 逐字、manifests 范围一致；`--release` 时另要求 ciFace/gates/S1–S4 全 pass/52 项 traceability 全覆——blocked 不算 pass。缺文件/不可解析→**exit 2**）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-release-evidence.mjs",
+        "packages/evolution/dist/release-evidence.json"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
+      ]
+    },
+    {
+      "id": "gate-57",
+      "kind": "script",
+      "human": "`node packages/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json --gates-from-manifest ci --ci-face ci --os ci`（W3/W10 发布证据装配：把 pack 写出的 schema-2 骨架与本仓演练快照（S1–S4 spike 证据 + W11 52 项 traceability）合并，并写入 CI face 与本次 compat-check 已执行的 gate 台账；`--release` 在 publish 前复验；缺输入/不合格→exit 1/2）",
+      "argv": [
+        "node",
+        "packages/scripts/assemble-release-evidence.mjs",
+        "packages/evolution/dist/release-evidence.json",
+        "--rehearsal",
+        "packages/evolution/scripts/release-evidence-rehearsal.json",
+        "--gates-from-manifest",
+        "ci",
+        "--ci-face",
+        "ci",
+        "--os",
+        "ci"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
+      ]
+    },
+    {
+      "id": "gate-59",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-release"
+      ],
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.46.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+      }
+    },
+    {
+      "id": "gate-74",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-release",
+        "ci-windows"
+      ],
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.46.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+      }
+    },
+    {
+      "id": "ci-only-01",
+      "kind": "script",
+      "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/audit-release-tarballs.mjs",
+        "packages/evolution/dist",
+        "--version",
+        "\"${RELEASE_VERSION#v}\"",
+        "--platform-range",
+        "\"^$RANGE\""
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "ci"
+      ],
+      "reason": "payload audit of the packed dist — only meaningful after prepare-release has staged the release job's inputs",
+      "owner": "ci",
+      "lanes": [
+        "ci-release"
+      ]
+    },
+    {
+      "id": "gate-04",
+      "kind": "step",
+      "human": "`node packages/evolution/scripts/build-lib.mjs`",
+      "argv": [
+        "node",
+        "packages/evolution/scripts/build-lib.mjs"
+      ],
+      "tree": "overlay",
+      "profiles": [],
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "local",
+        "ci-unit",
+        "ci-release",
+        "ci-windows"
+      ]
+    },
+    {
+      "id": "gate-67",
+      "kind": "step",
+      "human": "node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json",
+      "argv": null,
+      "tree": "mirror",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-setup"
+      ],
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.46.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+      }
+    },
+    {
+      "id": "gate-68",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-windows"
+      ],
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.46.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+      }
+    },
+    {
+      "id": "gate-69",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-setup"
+      ],
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.46.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+      }
+    },
+    {
+      "id": "gate-70",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/prepare-release.mjs \"${ARGS[@]}\"",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-release"
+      ],
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.46.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+      }
+    },
+    {
+      "id": "gate-71",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-release"
+      ],
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.46.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+      }
+    },
+    {
+      "id": "gate-73",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/run-load-sensitive.mjs .",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "argvProblem": "no-command-in-cell",
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-unit"
+      ],
+      "registration": {
+        "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
+        "owner": "scripts/gate-manifest",
+        "expiry": "0.46.0",
+        "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
+        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+      }
     },
     {
       "id": "ci-only-10",
@@ -2063,250 +2304,6 @@
         "ci-release",
         "ci-windows"
       ]
-    },
-    {
-      "id": "ci-only-19",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/verify-contract-anchors.selftest.mjs",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-contract-anchors.selftest.mjs"
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "ci"
-      ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0",
-      "lanes": [
-        "ci-static"
-      ]
-    },
-    {
-      "id": "ci-only-20",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/verify-core-surface.mjs packages/evolution",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-core-surface.mjs",
-        "packages/evolution"
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "ci"
-      ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0",
-      "lanes": [
-        "ci-static"
-      ]
-    },
-    {
-      "id": "ci-only-21",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/verify-exemptions.mjs packages/evolution",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-exemptions.mjs",
-        "packages/evolution"
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "ci"
-      ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0",
-      "lanes": [
-        "ci-static"
-      ]
-    },
-    {
-      "id": "ci-only-22",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-layout-sync.mjs",
-        "packages/evolution/scripts",
-        "../packages/scripts"
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "ci"
-      ],
-      "reason": "mirror↔overlay script/version parity; needs the mirror checkout beside the overlay",
-      "owner": "ci",
-      "localSafe": false,
-      "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine",
-      "lanes": [
-        "ci-static"
-      ]
-    },
-    {
-      "id": "ci-only-23",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/verify-param-consumers.mjs packages/evolution",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-param-consumers.mjs",
-        "packages/evolution"
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "ci"
-      ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0",
-      "lanes": [
-        "ci-static"
-      ]
-    },
-    {
-      "id": "ci-only-24",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/verify-probes.mjs packages/evolution",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-probes.mjs",
-        "packages/evolution"
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "ci"
-      ],
-      "reason": "probe registry schema lint; the CI job executes it, the mirror local lane has no platform overlay",
-      "owner": "ci",
-      "lanes": [
-        "ci-static"
-      ]
-    },
-    {
-      "id": "ci-only-25",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/verify-requirements.mjs packages/evolution",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-requirements.mjs",
-        "packages/evolution"
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "ci"
-      ],
-      "reason": "requirements matrix coverage; the CI job executes it after gen-requirements",
-      "owner": "ci",
-      "lanes": [
-        "ci-static"
-      ]
-    },
-    {
-      "id": "ci-only-26",
-      "kind": "script",
-      "human": "node packages/evolution/scripts/verify-test-lines.mjs packages/evolution --strict",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-test-lines.mjs",
-        "packages/evolution",
-        "--strict"
-      ],
-      "tree": "overlay",
-      "profiles": [
-        "ci"
-      ],
-      "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0",
-      "lanes": [
-        "ci-static"
-      ]
-    },
-    {
-      "id": "line-identity-ci",
-      "kind": "script",
-      "tree": "mirror",
-      "profiles": [
-        "ci"
-      ],
-      "human": "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
-      "argv": [
-        "node",
-        "packages/scripts/verify-line-identity.mjs",
-        "--policy-only",
-        "--strict"
-      ],
-      "reason": "CI has no machine bed — policy half only (contract §5e)",
-      "lanes": [
-        "ci-static"
-      ]
-    },
-    {
-      "id": "line-identity-bed",
-      "kind": "script",
-      "tree": "mirror",
-      "profiles": [
-        "local",
-        "pre-tag"
-      ],
-      "human": "node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict",
-      "argv": [
-        "node",
-        "packages/scripts/verify-line-identity.mjs",
-        "--manifest",
-        "packages/scripts/files/line-manifest.json",
-        "--strict"
-      ],
-      "reason": "toothed form: compares the bed manifest produced by gen-line-manifest.mjs",
-      "lanes": [
-        "local",
-        "pre-tag"
-      ]
-    },
-    {
-      "id": "graph-edges-live",
-      "kind": "script",
-      "tree": "overlay",
-      "profiles": [
-        "local",
-        "pre-tag"
-      ],
-      "human": "node packages/evolution/scripts/verify-graph-edges.mjs --report",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-graph-edges.mjs",
-        "--report"
-      ],
-      "noDrillReason": "live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half",
-      "reason": "live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)",
-      "owner": "toolchain",
-      "lanes": [
-        "local",
-        "pre-tag"
-      ]
-    },
-    {
-      "id": "health-admission",
-      "kind": "script",
-      "tree": "mirror",
-      "profiles": [
-        "local",
-        "pre-tag"
-      ],
-      "human": "node packages/scripts/verify-health-admission.mjs",
-      "argv": [
-        "node",
-        "packages/scripts/verify-health-admission.mjs"
-      ],
-      "reason": "needs both local corpora; on a machine without them it must report CANNOT DECIDE rather than pass",
-      "lanes": [
-        "local",
-        "pre-tag"
-      ],
-      "registration": {
-        "reason": "no user or platform corpora on this machine, so admission cannot be judged",
-        "owner": "scripts/gates",
-        "expiry": "0.46.0",
-        "plan": "run where the corpora exist (CI or a real profile)",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
-      }
     }
   ],
   "probes": [

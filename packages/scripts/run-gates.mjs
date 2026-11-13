@@ -6,7 +6,7 @@
  * renders what the runner observed; no env/CLI switch reaches the seam.
  * 用法：node packages/scripts/run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--json-out <path>] [--lane <name>] [--only <id>] [--drill <id>] [--overlay <path>]
  * 规则：seed = CI ∪ 表；pre-tag = local ∪ ci；runner 只跑 kind=script|toolchain；tree=overlay 的门禁在 overlay 根下跑。
- * M0（W10 §10）：每行带 `lanes`（gate-lanes.json 生成）；`--lane` 在 profile 选择后再按 lane 过滤，
+ * M0/M3（W10 §10/§16）：每行带 `lanes`（由 gates/registry.mjs 生成到 manifest）；`--lane` 在 profile 选择后再按 lane 过滤，
  * 空选择 exit 2；`--json-out` 写逐行 verdict 工件（`--json` 仍是 stdout 模式，两者可同时用）。
  */
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -27,7 +27,7 @@ const args = process.argv.slice(2)
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : '') : undefined }
 const has = (name) => args.includes(name)
 const profile = args.find((a) => ['local', 'pre-tag', 'ci'].includes(a))
-// M0 lane selection: lane membership is data on each row (gate-lanes.json), not another profile.
+// M3 lane selection: lane membership comes from the gate registry, rendered onto each manifest row.
 const laneName = flag('--lane')
 const jsonOut = flag('--json-out')
 const KNOWN_LANES = new Set(['local', 'pre-tag', 'ci-setup', 'ci-static', 'ci-unit', 'ci-release', 'ci-windows', 'machine-local'])
