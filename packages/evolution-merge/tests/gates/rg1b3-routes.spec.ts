@@ -21,7 +21,6 @@ async function sourceFor(home: string, io: ReturnType<typeof nodeEvolutionIo>): 
   return {
     async snapshot() { return await readMergeSnapshot({ io, home, runs: [], approval: false }) },
     async bodyRef() { return 'body text' },
-    commands() { return [] },
   }
 }
 

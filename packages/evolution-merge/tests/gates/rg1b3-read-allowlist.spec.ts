@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { expect, it } from 'vitest'
 
 const root = new URL('../../src/', import.meta.url)
-const readFiles = ['domain/merge-snapshot.ts', 'surface/merge-view.ts', 'surface/body.ts', 'read-commands.ts', 'facts.ts', 'status.ts', 'wire-projection.ts', 'merge-routes.ts', 'doctor.ts']
+const readFiles = ['domain/merge-snapshot.ts', 'surface/merge-view.ts', 'surface/body.ts', 'read-commands.ts', 'status.ts', 'merge-routes.ts', 'doctor.ts']
 const writeAllow = ['state.ts', 'approve-command.ts', 'resume-command.ts', 'runtime.ts', 'scan-run.ts', 'pending-actions.ts']
 
 it('read modules have no loadMergeState/v4ToLegacy imports', async () => {

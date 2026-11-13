@@ -24,7 +24,6 @@ it('previous-ui fixture accepts new server view/rows/body/history and copies a r
   const source: MergeRouteSource = {
     async snapshot() { return await readMergeSnapshot({ io, home, runs: [], approval: false, platformWrite: false }) },
     async bodyRef() { return '# a\n' },
-    commands() { return [] },
   }
   const routes = makeMergeRoutes({ getSource: () => source }, {} as never)
   const get = async (path: string): Promise<Response> => await routes.find(item => item.path === path.split('?')[0])!.fetch(new Request('http://local' + path))

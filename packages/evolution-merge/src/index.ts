@@ -340,11 +340,6 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         } })
       },
       async bodyRef(ref: BodyRef) { return await resolveBody(io, home, ref, async () => ref.side === 'archive' ? await skills.readArchived(ref.name) : await skills.read(ref.name)) },
-      approval() { return getParams().mergeApproval },
-      readiness() { return ready },
-      commands() {
-        return ['merge scan', 'merge doctor', 'merge status', 'merge pending', 'merge skipped', 'merge report', 'merge runs', 'merge cancel', 'merge reconcile']
-      },
     }
     doctorFact = async () => {
       const current = source
