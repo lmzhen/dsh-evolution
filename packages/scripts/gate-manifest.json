@@ -24,9 +24,9 @@
       "registration": {
         "reason": "the bed platform tree fails its own tsc -b (cordis 4.0.5 vs the checked-in platform sources), so this row cannot judge the family here",
         "owner": "scripts/gates",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "run on the build line whose platform tree typechecks; the family half is covered by tsc -p per package",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -77,9 +77,9 @@
       "registration": {
         "reason": "smoke-built-entries needs built lib artifacts that a source checkout does not carry",
         "owner": "scripts/gates",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "run after build-lib on the build line",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -558,9 +558,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       },
       "ci": {
         "argv": [
@@ -647,9 +647,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1075,9 +1075,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1098,9 +1098,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1121,9 +1121,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1144,9 +1144,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1167,9 +1167,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1190,9 +1190,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1213,9 +1213,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1236,9 +1236,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1261,9 +1261,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1284,9 +1284,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1307,9 +1307,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1330,9 +1330,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1353,9 +1353,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1375,9 +1375,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1396,9 +1396,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1817,9 +1817,9 @@
       "registration": {
         "reason": "no user or platform corpora on this machine, so admission cannot be judged",
         "owner": "scripts/gates",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "run where the corpora exist (CI or a real profile)",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1846,9 +1846,9 @@
       "registration": {
         "reason": "the full family vitest suite does not return on this machine within the 180 s budget",
         "owner": "scripts/gates",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "CI owns the full suite; local runs use targeted specs",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       },
       "ci": {
         "argv": [
@@ -1945,9 +1945,9 @@
       "registration": {
         "reason": "the mutation ledger is still being filled: 29 of 109 checks carry a proven red record",
         "owner": "scripts/gates",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "close records per check; coverage exits 0 once every check is proven",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -1961,11 +1961,9 @@
       ],
       "tree": "mirror",
       "profiles": [
-        "local",
         "ci"
       ],
       "lanes": [
-        "local",
         "ci-release"
       ]
     },
@@ -1988,11 +1986,9 @@
       ],
       "tree": "mirror",
       "profiles": [
-        "local",
         "ci"
       ],
       "lanes": [
-        "local",
         "ci-release"
       ]
     },
@@ -2014,9 +2010,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -2038,9 +2034,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -2099,9 +2095,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -2119,9 +2115,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -2139,9 +2135,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -2159,9 +2155,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -2179,9 +2175,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {
@@ -2199,9 +2195,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.46.0",
+        "expiry": "0.47.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix."
+        "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row is a prose table cell with no single argv; splitting the table into executable rows is one mechanical pass over CONTRIBUTING that this release did not include. The count is unchanged; the reduction is the split, not a per-row fix. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
       }
     },
     {

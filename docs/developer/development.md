@@ -22,16 +22,20 @@ pnpm exec vitest run <spec> --maxWorkers=1
 ## 3. 门禁
 
 ```bash
-node packages/scripts/gen-gate-manifest.mjs
+node packages/scripts/gen-gate-manifest.mjs        # registry -> gate-manifest.json + CONTRIBUTING 表
 node packages/scripts/gen-checks-fact.mjs
 node packages/scripts/verify-probes.mjs packages
 node packages/scripts/verify-traceability.mjs packages --strict
 node packages/scripts/run-gates.mjs local --only gate-XX
+node packages/scripts/run-gates.mjs local --lane ci-static --concurrency 4 --overlay <line>
 ```
 
+- **门的唯一源是 `packages/scripts/gates/registry.mjs`**（四个域文件 + helpers）：改门先改那里，再跑生成器；`gate-manifest.json` 与 CONTRIBUTING 表都是生成物，手改会被 `--check` 判 stale。
+- 每行有 `lanes`（`local`/`pre-tag`/`ci-static`/`ci-unit`/`ci-release`/`ci-windows`/`ci-setup`）；CI 的 action 按 lane 调 runner，不再维护第二份命令列表。CI 专属实参/环境写在该行的 `ci:{argv,env,cwd}` 覆盖里（只在 CI 生效）。
+- `--concurrency N`（默认 1）打开有界并发，`--fail-fast` 在首个 fail 后不再启动新行；`--json-out <path>` 写逐行 verdict 工件（CI 上传为 `evolution-gates-*`）。
 - 改 action/脚本后，先重生成 manifest，否则门禁会判 stale。
 - `verify-traceability --strict` 是 52 项覆盖账本；不要用 alias 过。
-- probe 的 mutation 锚点必须唯一；红 baseline 不能证明 mutation。
+- probe 的 mutation 锚点必须唯一；红 baseline 不能证明 mutation。**改了 mutation 目标文件后必须重跑 probes 重签账本**（否则 `verify-check-registry` 的 mutation-coverage 轴会红）。
 - 文档 canonical facts 在 `packages/scripts/family-facts.json`；一个事实只有一个 home。
 
 ## 4. 文档规则

@@ -31,6 +31,8 @@ The canonical fact table is `packages/scripts/family-facts.json`. If you move a 
 
 The local profile runs the family gate runner (see [docs/developer/development.md](docs/developer/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from the gate registry (`packages/scripts/gates/registry.mjs`); do not hand-edit it. If a row moves tier or command, change the registry and regenerate the views.
 
+The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-unit`/`ci-release`/`ci-windows`/`ci-setup`); the CI action runs lanes through `run-gates.mjs` instead of a hand-written command list, and each row's CI-specific argv/environment lives in its `ci:` override. Registry ids are frozen: never renumber a row.
+
 | # | Command | Working tree |
 |---|---|---|
 | 1 | `node packages/evolution/scripts/verify-family-types.mjs` | overlay |

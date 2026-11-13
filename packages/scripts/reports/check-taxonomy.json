@@ -63,8 +63,6 @@
         "gate-53",
         "gate-54",
         "gate-55",
-        "gate-56",
-        "gate-57",
         "gate-58",
         "gate-59",
         "gate-60",
@@ -245,8 +243,6 @@
         "gate-53",
         "gate-54",
         "gate-55",
-        "gate-56",
-        "gate-57",
         "gate-58",
         "gate-59",
         "gate-60",
@@ -328,8 +324,6 @@
         "gate-53",
         "gate-54",
         "gate-55",
-        "gate-56",
-        "gate-57",
         "gate-58",
         "gate-59",
         "gate-60",
@@ -843,8 +837,6 @@
         "gate-53",
         "gate-54",
         "gate-55",
-        "gate-56",
-        "gate-57",
         "gate-58",
         "gate-59",
         "gate-60",
@@ -891,6 +883,8 @@
         "ci-only-24",
         "ci-only-25",
         "ci-only-26",
+        "gate-56",
+        "gate-57",
         "line-identity-ci"
       ],
       "specs": [
@@ -1027,8 +1021,6 @@
         "gate-53",
         "gate-54",
         "gate-55",
-        "gate-56",
-        "gate-57",
         "gate-58",
         "gate-59",
         "gate-60",
@@ -1542,8 +1534,6 @@
         "gate-53",
         "gate-54",
         "gate-55",
-        "gate-56",
-        "gate-57",
         "gate-58",
         "gate-59",
         "gate-60",
@@ -2232,8 +2222,6 @@
         "gate-53",
         "gate-54",
         "gate-55",
-        "gate-56",
-        "gate-57",
         "gate-58",
         "gate-59",
         "gate-60",
@@ -2261,19 +2249,19 @@
   },
   "counts": {
     "fast": {
-      "gates": 75,
+      "gates": 73,
       "specs": 103
     },
     "pre-tag": {
-      "gates": 75,
+      "gates": 73,
       "specs": 436
     },
     "ci-only": {
-      "gates": 18,
+      "gates": 20,
       "specs": 73
     },
     "full(ci=off)": {
-      "gates": 75,
+      "gates": 73,
       "specs": 436
     },
     "full(ci=on)": {

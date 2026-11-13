@@ -603,7 +603,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "d98e4476e094267ddc7627ce96e7e553f57c1db0da115a6fda078c43190e69c1",
+        "sha256": "366bec1ff58393927b8135cc4030dd5f9e2156dbf57cfe6af3090af6d72c793d",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",
@@ -1090,12 +1090,12 @@
           },
           {
             "id": "gate-56",
-            "tier": "fast",
+            "tier": "ci-only",
             "criterion": "verify-release-evidence"
           },
           {
             "id": "gate-57",
-            "tier": "fast",
+            "tier": "ci-only",
             "criterion": "assemble-release-evidence"
           },
           {
@@ -1217,44 +1217,45 @@
             "axis": "executability",
             "rows": 23,
             "reason": "CI observes 23 gate rows lacking a drillCmd; local overlay observes 24 because one toolchain cell differs | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
-            "expiry": "0.46.0",
+            "expiry": "0.47.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action | 2026-11-12 re-measured: verify-param-consumers.mjs joined CI | 2026-11-12 re-measured: the anchor selftest row carries its own executable form | 2026-11-12: 23 after the state-storage merge removed one registered row",
-            "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the axis rows are the registrations above; the reduction lands when the overlay mutation runner and the table split land (both are single-pass items, tracked in W9-gates §4)."
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs to the CI action without a drillCmd | 2026-11-12 re-measured after the lint row was aligned with CI (gate-02 now carries drill flags) | 2026-11-12 re-measured: gen-protection-view.mjs joined the CI action | 2026-11-12 re-measured: verify-param-consumers.mjs joined CI | 2026-11-12 re-measured: the anchor selftest row carries its own executable form | 2026-11-12: 23 after the state-storage merge removed one registered row | 2026-11-13 re-measured: W10 M5 changes no gate-table rows",
+            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the axis rows are the registrations above; the reduction lands when the overlay mutation runner and the table split land (both are single-pass items, tracked in W9-gates §4). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
           },
           {
             "axis": "expiry-due",
             "rows": 3,
             "reason": "three gate rows carry a due expiry on the 0.41 line; retirement is scheduled | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
-            "expiry": "0.46.0",
+            "expiry": "0.47.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the axis rows are the registrations above; the reduction lands when the overlay mutation runner and the table split land (both are single-pass items, tracked in W9-gates §4)."
+            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the axis rows are the registrations above; the reduction lands when the overlay mutation runner and the table split land (both are single-pass items, tracked in W9-gates §4). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47.",
+            "note": "2026-11-13 re-measured: W10 M5 changes no gate-table rows"
           },
           {
             "axis": "falsifiability-carrier",
             "rows": 7,
             "reason": "three rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
-            "expiry": "0.46.0",
+            "expiry": "0.47.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition | 2026-11-12 re-measured: the consumer ledger adds one axis definition row | 2026-11-12 re-measured: verify-contract-anchors.selftest.mjs adds an axis definition",
-            "renewal": "Renewed at 0.45.0 (expiry 0.46.0): the axis rows are the registrations above; the reduction lands when the overlay mutation runner and the table split land (both are single-pass items, tracked in W9-gates §4)."
+            "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition | 2026-11-12 re-measured: the consumer ledger adds one axis definition row | 2026-11-12 re-measured: verify-contract-anchors.selftest.mjs adds an axis definition | 2026-11-13 re-measured: W10 M5 changes no gate-table rows",
+            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the axis rows are the registrations above; the reduction lands when the overlay mutation runner and the table split land (both are single-pass items, tracked in W9-gates §4). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
           },
           {
             "axis": "mutation-coverage",
             "rows": 1,
             "reason": "the beh-installer-layered probe suite hangs in the local overlay before its green baseline; CI probe owns it | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
-            "expiry": "0.46.0",
+            "expiry": "0.47.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "reduce this axis to 0 rows by its expiry: 23/24 probes carry a fresh PROVEN-red signature; the remaining row (beh-installer-layered) cannot-decide on the source line because its baseline is the full installer run, which exceeds the probe runner budget there. The next release either proves it on the CI build line (the ledger it stamps is committed) or the probe baseline command moves into the lighter installer fixture, then this row drops to 0. A renewal without a row reduction is refused.",
-            "note": "2026-11-12 re-measured: decl-platform-contract and beh-installer-layered lack a fresh signature after the W9 script changes (the ledger keeps their stale records; the count is the debt size) | 2026-11-12 re-measured: params.ts/doctor-view edits invalidated five probe signatures (beh-doctor-view, decl-platform-contract, decl-configforms-seat, decl-platform-ranges, decl-doc-facts); re-sign on the next probe run | 2026-11-12 re-measured after the G3-c deletions: seven probe signatures predate the removed adapter/spec files; re-sign on the next probe run | 2026-11-12: nine probe signatures predate the G8-B2 state merge; re-sign on the next probe run | 2026-11-12: eleven after the B3 merges moved probe fixtures; re-sign on the next probe run",
-            "renewal": "Reduced 11 -> 1 at 0.45.0: the 11 rows were the pre-re-sign measurement; after re-stamping on the stable line 23/24 probes match their ledger record and only beh-installer-layered stays cannot-decide."
+            "note": "2026-11-12 re-measured: decl-platform-contract and beh-installer-layered lack a fresh signature after the W9 script changes (the ledger keeps their stale records; the count is the debt size) | 2026-11-12 re-measured: params.ts/doctor-view edits invalidated five probe signatures (beh-doctor-view, decl-platform-contract, decl-configforms-seat, decl-platform-ranges, decl-doc-facts); re-sign on the next probe run | 2026-11-12 re-measured after the G3-c deletions: seven probe signatures predate the removed adapter/spec files; re-sign on the next probe run | 2026-11-12: nine probe signatures predate the G8-B2 state merge; re-sign on the next probe run | 2026-11-12: eleven after the B3 merges moved probe fixtures; re-sign on the next probe run | 2026-11-13 re-measured: W10 M5 changes no gate-table rows",
+            "renewal": "Reduced 11 -> 1 at 0.45.0: the 11 rows were the pre-re-sign measurement; after re-stamping on the stable line 23/24 probes match their ledger record and only beh-installer-layered stays cannot-decide. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47."
           }
         ],
         "checkMutations": {

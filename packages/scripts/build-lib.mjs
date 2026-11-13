@@ -51,7 +51,9 @@ if (packages.includes('evolution-merge-engine')) {
 }
 
 const projects = packages.map(name => join(evolutionRoot, name, 'tsconfig.json'))
-run(tsc, ['-b', ...projects, '--force'], repoRoot)
+// W10 M5: a fresh CI checkout has no tsbuildinfo, so --force only re-does work there. Local stale
+// caches are the reason the flag existed; EVOLUTION_BUILD_FORCE=1 keeps that escape hatch.
+run(tsc, process.env.EVOLUTION_BUILD_FORCE === '1' ? ['-b', ...projects, '--force'] : ['-b', ...projects], repoRoot)
 for (const name of packages) {
   console.log(`build: ${name}`)
   if (name === 'evolution-merge-engine') continue
