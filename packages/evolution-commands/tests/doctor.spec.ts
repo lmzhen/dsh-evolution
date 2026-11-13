@@ -144,11 +144,11 @@ describe('doctor (WB2, 0.3.55)', () => {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-all'])
       const report = await diagnose(stub, { home })
       expect(report.installForm).toBe('full')
+  expect(report.view.runtime.find(row => row.key === 'install-form-detected')?.detail).toContain('完整功能包')
       // C axis (0.3.77): 'full' is the ATTACH product form — every session
       // carries the family's model rows, which is what the session-scoped gate
       // then resolves per session.
-      expect(report.deploymentForm).toBe('attach')
-      expect(report.conflicts).toEqual([])
+          expect(report.conflicts).toEqual([])
       expect(report.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(false)
       // P0-1 (v11): review is inferred from the bundle (it provides no service
       // key) — a healthy full install must never render review=false.
@@ -164,8 +164,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host'])
       const report = await diagnose(stub, { home })
       expect(report.services.review).toBe(true)
-      expect(report.deploymentForm).toBe('host-only')
-    } finally {
+        } finally {
       await rm(home, { recursive: true, force: true })
     }
   })
@@ -184,8 +183,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect((await diagnose(stub, { home })).installForm).toBe('layered')
       // ...and the product name for that layout: the variant form, in which a
       // session on a platform original preset carries no family rows at all.
-      expect((await diagnose(stub, { home })).deploymentForm).toBe('variant')
-    } finally {
+        } finally {
       await rm(home, { recursive: true, force: true })
     }
   })
@@ -219,8 +217,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       await deliverPresetRow(home, 'ptc')
       const hostReport = await diagnose(stub, { home })
       expect(hostReport.installForm).toBe('layered')
-      expect(hostReport.deploymentForm).toBe('variant')
-      // The ptc row with NO evolution bundle = preset-only (used to read as 'none'
+          // The ptc row with NO evolution bundle = preset-only (used to read as 'none'
       // and the action ladder then recommended installing `all` on top — the exact
       // double-mount this report exists to prevent). The artifact lives in the
       // profile's own patch layer now, so this state is the profile that outlived
@@ -558,6 +555,8 @@ describe('doctor (WB2, 0.3.55)', () => {
       try {
         const noneReport = await diagnose(stub, { home: empty })
         expect(noneReport.installForm).toBe('none')
+  expect(noneReport.view.runtime.find(row => row.key === 'install-form-detected')?.detail).toContain('未安装')
+  expect(noneReport.view.runtime.find(row => row.key === 'install-form-detected')?.detail).not.toContain('会话预设包')
         expect(noneReport.actions.some(action => action.includes('@lmzhen/dsh-evolution-all'))).toBe(true)
       } finally {
         await rm(empty, { recursive: true, force: true })
@@ -773,8 +772,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       await deliverPresetRow(home, 'standard', 'web', { destination: 'home' })
       const report = await diagnose(stub, { home })
       expect(report.installForm).toBe('layered')
-      expect(report.deploymentForm).toBe('variant')
-      // The same detection feeds every layered conflict row: stacking `all` on that
+          // The same detection feeds every layered conflict row: stacking `all` on that
       // home-layer install is the double-mount the doctor exists to prevent.
       await makeProfile(home, 'web', ['@lmzhen/dsh-evolution-host', '@lmzhen/dsh-evolution-all'])
       const stacked = await diagnose(stub, { home })

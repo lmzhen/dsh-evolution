@@ -21,7 +21,6 @@ import {
   MAINTAINER_PRESET_ID,
   PLATFORM_LINE,
   REVIEWER_PRESET_ID,
-  classifySessionEvent,
   createSubagentChannel,
   errorText,
   hostSurface,
@@ -32,8 +31,8 @@ import {
 } from '@deepseek-ai/dsh-evolution-core'
 import { COMMAND_FALLBACKS } from './command-fallback.ts'
 
-/** The install form the running profile was classified as (W8 §2 runtime install-form-detected). */
-export type InstallFormId = 'M1' | 'M2' | 'M3' | 'M4'
+/** The install form the running profile was classified as (the seven values DoctorReport uses). */
+export type InstallFormId = 'full' | 'human-gated' | 'preset' | 'host' | 'layered' | 'preset-only' | 'none'
 
 /** One preset's probe result (reviewer/maintainer). */
 export interface PresetFacts {
@@ -61,7 +60,6 @@ export interface DoctorInputs {
   readonly host: { readonly mounted: boolean; readonly reason?: string | undefined; readonly deploymentAllowsRemote?: boolean | undefined }
   readonly runs: { readonly running: number; readonly orphaned: number }
   readonly missingServices?: readonly string[] | undefined
-  readonly sessionFoldClassifierPresent?: boolean | undefined
   readonly platformPairing?: PlatformPairing | undefined
   /** Human-facing total of registered host routes, when the carrier reports one (12 today). */
   readonly hostRouteCount?: { readonly mounted: number; readonly total: number } | undefined
@@ -99,14 +97,17 @@ const RUNTIME_LABELS: Readonly<Record<string, string>> = {
 }
 
 /**
- * The install form in reader-facing words. The M1..M4 ids stay internal (the runtime rows and
- * --json keep them); a settings reader sees what the deployment is FOR, not the code name.
+ * The install form in reader-facing words. The ids are the SAME seven values DoctorReport
+ * carries, so the text, --json and the settings card cannot disagree about the form.
  */
 const FORM_WORDS: Readonly<Record<InstallFormId, string>> = Object.freeze({
-  M1: '完整功能包',
-  M2: '人工审批包',
-  M3: '会话预设包',
-  M4: '分层安装',
+  full: '完整功能包',
+  'human-gated': '完整功能包（人工审批）',
+  preset: '会话预设包',
+  host: '仅宿主插件（无模型工具）',
+  layered: '分层安装（会话选用）',
+  'preset-only': '仅预设行（未挂载插件包）',
+  none: '未安装',
 })
 
 /**
@@ -257,14 +258,11 @@ function pairingRow(inputs: DoctorInputs): DiagnosticRow {
 
 function runtimeOf(inputs: DoctorInputs): DiagnosticRow[] {
   const missing = inputs.missingServices ?? []
-  const fold = inputs.sessionFoldClassifierPresent !== false
   const rows: DiagnosticRow[] = [
     channelRow(inputs.channels),
     presetRow(inputs.presets),
     hostRow(inputs.host, inputs.hostRouteCount),
-    fold
-      ? { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件读取', status: 'ok', detail: '事件读取通道正常：对话内容会被读取，其余记录忽略。' }
-      : { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件读取', status: 'fail', detail: '事件读取组件缺失，无法确认读取通道正常。', remedy: '重新安装完整功能包（evolution-all）。' },
+    { key: 'session-fold', label: RUNTIME_LABELS['session-fold'] ?? '会话事件读取', status: 'ok', detail: '事件读取通道正常：对话内容会被读取，其余记录忽略。' },
     missing.length === 0
       ? { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务', status: 'ok', detail: '需要的服务都已就绪' }
       : { key: 'platform-services', label: RUNTIME_LABELS['platform-services'] ?? '平台服务', status: 'warn', detail: '缺少：' + missing.join('、'), remedy: '安装 evolution-host 或 evolution-all，或检查配置。' },
@@ -445,18 +443,21 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
   const hasAll = bundles.some(name => name.endsWith('dsh-evolution-all'))
   const hasPreset = bundles.some(name => name.endsWith('dsh-evolution-preset'))
   const hasHost = bundles.some(name => name.endsWith('dsh-evolution-host'))
-  // M4 (host + generated family preset): the preset row is installed into the profile patch and the
-  // registry reports the family preset id; a host-only face (M3) does not.
+  // host + generated family preset: the preset row is installed into the profile patch and the
+  // registry reports the family preset id; a host-only face does not.
   const hasFamilyPreset = listed.some(entry => typeof entry.id === 'string' && EVOLUTION_PRESET_IDS.includes(entry.id as never))
   const approval = get('evolutionApproval') as { readonly isEnabled?: boolean } | undefined
   const humanGated = approval?.isEnabled === true
+  // Fallback only: doctor.ts passes its OWN single detection as extras.form. This branch keeps
+  // the diagnostics route/tests working when no caller supplied one, and uses the same semantic
+  // ids (no M1..M4 words, and an empty deployment is `none`, not a fake "session preset").
   const detectedForm: DoctorInputs['form'] = hasAll || hasPreset
-    ? { id: humanGated ? 'M2' : 'M1', evidence: [hasAll ? 'bundle dsh-evolution-all installed' : 'bundle dsh-evolution-preset installed', ...(humanGated ? ['approval.enabled: true'] : [])], confidence: 'declared' }
+    ? { id: humanGated ? 'human-gated' : hasAll ? 'full' : 'preset', evidence: [hasAll ? 'bundle dsh-evolution-all installed' : 'bundle dsh-evolution-preset installed', ...(humanGated ? ['approval.enabled: true'] : [])], confidence: 'declared' }
     : hasHost
       ? hasFamilyPreset
-        ? { id: 'M4', evidence: ['bundle dsh-evolution-host installed', 'family agent preset registered'], confidence: 'declared' }
-        : { id: 'M3', evidence: ['bundle dsh-evolution-host installed'], confidence: 'declared' }
-      : { id: 'M3', evidence: ['no family bundle was reported by the platform manager'], confidence: 'inferred' }
+        ? { id: 'layered', evidence: ['bundle dsh-evolution-host installed', 'family agent preset registered'], confidence: 'declared' }
+        : { id: 'host', evidence: ['bundle dsh-evolution-host installed'], confidence: 'declared' }
+      : { id: 'none', evidence: ['no family bundle was reported by the platform manager'], confidence: 'inferred' }
   const platformVersion = hostRuntimeVersion()
   const missingServices = [
     ...SERVICES_PROBED.filter(name => get(name) === undefined),
@@ -480,7 +481,6 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
     },
     runs: extras.runs ?? { running: 0, orphaned: 0 },
     missingServices,
-    sessionFoldClassifierPresent: typeof classifySessionEvent === 'function',
     platformPairing: extras.platformPairing ?? pairingOf(extras.hostVersion ?? platformVersion, PLATFORM_LINE),
   }
 }

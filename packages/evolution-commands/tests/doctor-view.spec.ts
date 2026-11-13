@@ -26,7 +26,7 @@ function inputs(overrides: Partial<DoctorInputs> = {}): DoctorInputs {
     platformLine: { version: PLATFORM_LINE.version, floor: PLATFORM_LINE.floor },
     familyVersion: '0.27.0',
     hostVersion: PLATFORM_LINE.version,
-    form: { id: 'M2', evidence: ['profile declares evolution-all'], confidence: 'declared' },
+    form: { id: 'human-gated', evidence: ['profile declares evolution-all'], confidence: 'declared' },
     probes: { agentPresets: true, connection: true },
     channels: { review: AVAILABLE, maintenance: AVAILABLE },
     presets: {
@@ -36,8 +36,7 @@ function inputs(overrides: Partial<DoctorInputs> = {}): DoctorInputs {
     host: { mounted: true, deploymentAllowsRemote: false },
     runs: { running: 0, orphaned: 0 },
     missingServices: [],
-    sessionFoldClassifierPresent: true,
-    platformPairing: 'in-window',
+      platformPairing: 'in-window',
     hostRouteCount: { mounted: 12, total: 12 },
     ...overrides,
   }
@@ -160,15 +159,10 @@ describe('buildDoctorView: unreadable providers become named rows, never silence
   })
 
   it('marks an inferred install form as a warn with its evidence', () => {
-    const view = buildDoctorView(inputs({ form: { id: 'M3', evidence: ['no bundle surface'], confidence: 'inferred' } }))
+    const view = buildDoctorView(inputs({ form: { id: 'none', evidence: ['no bundle surface'], confidence: 'inferred' } }))
     const entry = row(view, 'install-form-detected')
     expect(entry.status).toBe('warn')
     expect(entry.detail).toContain('no bundle surface')
-  })
-
-  it('fails the session-fold row when the frozen classifier is absent', () => {
-    const view = buildDoctorView(inputs({ sessionFoldClassifierPresent: false }))
-    expect(row(view, 'session-fold').status).toBe('fail')
   })
 })
 
@@ -201,7 +195,7 @@ describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0
     const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z'), runs: { running: 0, orphaned: 0 } })
     // The preset probe: a NOT-awaited promise used to leave this row permanently unknown.
     expect(assembled.presets.reviewer).toMatchObject({ id: REVIEWER_PRESET_ID, registered: true })
-    expect(assembled.form).toMatchObject({ id: 'M1', confidence: 'declared' })
+    expect(assembled.form).toMatchObject({ id: 'full', confidence: 'declared' })
     expect(assembled.probes.agentPresets).toBe(true)
     expect(assembled.host.mounted).toBe(true)
     // The host version is a soft probe: when the platform manifest resolves it must agree with the line.
@@ -222,9 +216,9 @@ describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0
     ctx.provide('pluginManager', { listBundles: async () => [{ name: '@deepseek-ai/dsh-evolution-all' }] })
     ctx.provide('evolutionApproval', { isEnabled: true })
     const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z') })
-    expect(assembled.form).toMatchObject({ id: 'M2', confidence: 'declared' })
+    expect(assembled.form).toMatchObject({ id: 'human-gated', confidence: 'declared' })
     const view = buildDoctorView(assembled)
-    expect(view.runtime.find(row => row.key === 'install-form-detected')?.detail).toContain('人工审批包')
+    expect(view.runtime.find(row => row.key === 'install-form-detected')?.detail).toContain('完整功能包（人工审批）')
   })
 
   it('detects M4 when the host bundle plus the family agent preset are installed', async () => {
@@ -236,7 +230,7 @@ describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0
     ctx.provide('subagents', {})
     ctx.provide('pluginManager', { listBundles: async () => [{ name: '@deepseek-ai/dsh-evolution-host' }] })
     const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z') })
-    expect(assembled.form).toMatchObject({ id: 'M4', confidence: 'declared' })
+    expect(assembled.form).toMatchObject({ id: 'layered', confidence: 'declared' })
   })
 
   it('stays a named view when nothing is mounted (no throw, no invented health)', async () => {
@@ -267,7 +261,7 @@ describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0
     ;(ctx as unknown as { profileContext: unknown }).profileContext = { dir, installAnchor: installation }
     const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z') })
     expect(listBundles).not.toHaveBeenCalled()
-    expect(assembled.form).toMatchObject({ id: 'M1', confidence: 'declared' })
+    expect(assembled.form).toMatchObject({ id: 'full', confidence: 'declared' })
   })
 
   it('falls back to the manager when the profile manifests cannot be read', async () => {
@@ -281,6 +275,6 @@ describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0
     }
     const assembled = await assembleDoctorInputs(ctx, { now: new Date('2026-10-19T00:00:00.000Z') })
     expect(listBundles).toHaveBeenCalled()
-    expect(assembled.form).toMatchObject({ id: 'M1', confidence: 'declared' })
+    expect(assembled.form).toMatchObject({ id: 'full', confidence: 'declared' })
   })
 })

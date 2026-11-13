@@ -247,13 +247,6 @@ export interface DoctorReport {
    * installing `all` — which double-mounts the preset's model rows (the
    * exact conflict this report flags). */
   installForm: 'full' | 'human-gated' | 'host' | 'preset' | 'layered' | 'preset-only' | 'none'
-  /** The PRODUCT form the install form implies (0.3.77, C axis). `variant` =
-   * session-level opt-in: the model tools live in the Evolution preset, so a
-   * session on any platform original preset carries none of the family and the
-   * cross-session consumers skip it (config `sessionScoped`). `attach` =
-   * profile-level: the model rows sit at profile root and every session carries
-   * them. The two are mutually exclusive install targets (E-33). */
-  deploymentForm: 'variant' | 'attach' | 'host-only' | 'preset-only' | 'none'
   /** Aggregated across ALL profiles under `home` (N13, v12): doctor answers
    * "is any profile carrying an evolution bundle / which install forms exist"
    * — not "what this runtime mounted". `services.review` is the runtime-side
@@ -768,13 +761,6 @@ export async function diagnose(
   const approval = ctx.get('evolutionApproval') as { readonly isEnabled?: boolean } | undefined
   const humanGated = approval?.isEnabled === true
   const installForm: DoctorReport['installForm'] = full || preset ? (humanGated ? 'human-gated' : full ? 'full' : 'preset') : layered ? 'layered' : host ? 'host' : presetDirInstalled ? 'preset-only' : 'none'
-  // 0.3.77 (C axis): the install form in PRODUCT terms. The distinction decides
-  // whether a platform original preset session is a family session at all — the
-  // cross-session rows carry `sessionScoped: true` and answer it per session.
-  const deploymentForm: DoctorReport['deploymentForm'] = installForm === 'layered'
-    ? 'variant'
-    : installForm === 'full' || installForm === 'preset' || installForm === 'human-gated' ? 'attach' : installForm === 'host' ? 'host-only' : installForm === 'preset-only' ? 'preset-only' : 'none'
-
   // OPT-22 (2026-09): only real double-mount rows drive the action ladder's
   // "keep exactly one" advice. The enumeration/manifest DEGRADED detail also
   // lives in `conflicts` (report + --json compatibility) — but that detail
@@ -852,14 +838,24 @@ export async function diagnose(
   // neither may be dressed up as advice to re-run the installer.
   for (const row of presetFreshness) {
     if (row.status !== 'differs') continue
-    actions.push(`Preset row for base "${row.base}" in ${row.destination} DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
+    actions.push(`Preset row for base "${row.base}" in ${row.destination} DIFFERS from a fresh generation — it is an install-time snapshot; re-run the package installer to regenerate`)
   }
 
   // G3: which profiles under this home are NOT this plane. Read from the same owner module as the
   // rest of the profile surface; the mounted identity is handed in by the caller (one probe for it
   // exists in preset-source.ts — doctor must not add a second).
   // G6/W8 tail: one view for every doctor face (text / --json / diagnostics route / client card).
-  const view = buildDoctorView(await assembleDoctorInputs(ctx as unknown as Parameters<typeof assembleDoctorInputs>[0], options.runs === undefined ? {} : { runs: options.runs }))
+  // The form is the SAME value this report carries; the view must not re-derive it from a
+  // different bundle list (audit 07 P0: "installed but not enabled" showed M1 while installForm
+  // said none).
+  const form = {
+    id: installForm,
+    evidence: runtimeFlags === undefined
+      ? ['install form read from the cross-profile manifest aggregate']
+      : ['platform pluginManager enabled rows'],
+    confidence: (runtimeFlags === undefined ? 'inferred' : 'declared') as 'declared' | 'inferred',
+  }
+  const view = buildDoctorView(await assembleDoctorInputs(ctx as unknown as Parameters<typeof assembleDoctorInputs>[0], options.runs === undefined ? { form } : { runs: options.runs, form }))
   // Plan §2.3: evolution-commands owns the global doctor; the merge plugin contributes one line
   // built from ITS DoctorView envelope. A missing merge row is an honest unknown, not silence.
   const merge = await mergeDoctorLine(ctx)
@@ -868,7 +864,7 @@ export async function diagnose(
     .filter(({ profile, dir }) => mounted === undefined || (profile !== mounted.profile && dir !== mounted.dir))
     .map(({ profile }) => profile)
   return {
-    installForm, deploymentForm, bundles, foreignProfiles, conflicts, budgetIssues,
+    installForm, bundles, foreignProfiles, conflicts, budgetIssues,
     paramIssues, queryIssues, services, capabilityAbsence,
     pendingCount, executingCount, presetFreshness, scopedProbe, legacy,
     runtimeBundles: runtimeBundles ?? null,
@@ -1099,7 +1095,7 @@ export function renderDoctorText(report: DoctorReport, locale: HostLocale = 'zh'
     extras.push(hostCommandText(locale, 'doctor.presetLine', { base: row.base, destination: row.destination, verdict }))
   }
   if (report.presetIssues.length > 0) extras.push('agent presets:', ...report.presetIssues.map(line => `  ! ${line}`))
-  if (report.foreignProfiles.length > 0) extras.push('profiles-foreign: ' + report.foreignProfiles.join(', ') + ' — not part of this plane: /evolution preset install ignores them, while the bundles (all profiles) line above counts them')
+  if (report.foreignProfiles.length > 0) extras.push('profiles-foreign: ' + report.foreignProfiles.join(', ') + ' — not part of this plane: the package installer ignores them, while the bundles (all profiles) line above counts them')
   if (report.conflicts.length > 0) extras.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
   if (report.budgetIssues.length > 0) extras.push('memory budget:', ...report.budgetIssues.map(line => `  ! ${line}`))
   if (report.paramIssues.length > 0) extras.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))

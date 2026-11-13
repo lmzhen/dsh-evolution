@@ -18,7 +18,7 @@ function inputs(): DoctorInputs {
     now: new Date('2026-10-19T00:00:00.000Z'),
     platformLine: { version: PLATFORM_LINE.version, floor: PLATFORM_LINE.floor },
     familyVersion: '0.27.0',
-    form: { id: 'M2', evidence: ['profile declares evolution-all'], confidence: 'declared' },
+    form: { id: 'human-gated', evidence: ['profile declares evolution-all'], confidence: 'declared' },
     probes: { agentPresets: true, connection: true },
     channels: {
       review: { kind: 'available', provider: 'spawn' },
@@ -28,8 +28,7 @@ function inputs(): DoctorInputs {
     host: { mounted: true, deploymentAllowsRemote: false },
     runs: { running: 0, orphaned: 0 },
     missingServices: [],
-    sessionFoldClassifierPresent: true,
-    platformPairing: 'in-window',
+      platformPairing: 'in-window',
   }
 }
 
