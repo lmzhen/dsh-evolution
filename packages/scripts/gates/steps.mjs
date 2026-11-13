@@ -119,7 +119,9 @@ export const steps = [
     argv: ["node","packages/evolution/scripts/prepare-packed-platform.mjs","packages/evolution/dist","\"$PLATFORM_VERSION\"","|","tail","-n","1)"],
     lanes: ["ci-release","ci-windows"],
     reason: "mutating/helper step — registered, not run by run-gates (contract 5c)",
-    expiry: "0.46.0",
+    expiry: "0.47.0",
+
+    renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
   }),
 
   gate("ci-only-14", {
