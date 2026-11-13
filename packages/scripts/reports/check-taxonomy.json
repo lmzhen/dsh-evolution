@@ -481,6 +481,7 @@
         "evolution-host::tests/guard-scripts.negative.spec.ts",
         "evolution-host::tests/installation-matrix.spec.ts",
         "evolution-host::tests/installer-preset-base.spec.ts",
+        "evolution-host::tests/installer-source-tree.spec.ts",
         "evolution-host::tests/installer.spec.ts",
         "evolution-host::tests/layout-sync.spec.ts",
         "evolution-host::tests/packed-install.spec.ts",
@@ -1134,6 +1135,7 @@
         "evolution-host::tests/guard-scripts.negative.spec.ts",
         "evolution-host::tests/installation-matrix.spec.ts",
         "evolution-host::tests/installer-preset-base.spec.ts",
+        "evolution-host::tests/installer-source-tree.spec.ts",
         "evolution-host::tests/installer.spec.ts",
         "evolution-host::tests/layout-sync.spec.ts",
         "evolution-host::tests/packed-install.spec.ts",
@@ -1725,6 +1727,7 @@
         "evolution-host::tests/inject-paths.spec.ts",
         "evolution-host::tests/installation-matrix.spec.ts",
         "evolution-host::tests/installer-preset-base.spec.ts",
+        "evolution-host::tests/installer-source-tree.spec.ts",
         "evolution-host::tests/installer.spec.ts",
         "evolution-host::tests/layout-sync.spec.ts",
         "evolution-host::tests/package-map-shape.spec.ts",
@@ -2108,7 +2111,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 424
+      "specs": 425
     },
     "ci-only": {
       "gates": 10,
@@ -2116,16 +2119,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 424
+      "specs": 425
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 497
+      "specs": 498
     }
   },
   "specs": {
-    "total": 497,
-    "marked": 497,
+    "total": 498,
+    "marked": 498,
     "unmarked": 0
   }
 }
