@@ -246,7 +246,7 @@ async function executeGate(g) {
   // A gate that never returns must not stop the whole local chain: budget it, and let the verdict
   // read cannot-decide (killedBy=budget) instead of hanging the runner forever. The row may declare
   // its own budget (`timeoutMs`) because a full suite and a linter do not share one number.
-  const budgetMs = g.timeoutMs === undefined ? 180000 : g.timeoutMs
+  const budgetMs = ciOverride !== null && Number.isInteger(ciOverride.timeoutMs) ? ciOverride.timeoutMs : (g.timeoutMs === undefined ? 180000 : g.timeoutMs)
   const observed = await runner.run([process.execPath, script, ...rest], { cwd, timeoutMs: budgetMs, env: gateEnv === undefined ? process.env : { ...process.env, ...gateEnv } })
   const ms = observed.ms
   const status = observed.status === undefined ? null : observed.status

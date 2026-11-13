@@ -99,7 +99,8 @@ export function validateRegistry(entries) {
         if (ci.argv !== undefined && quotedToken(ci.argv) !== undefined) problems.push(id + ': ci.argv token carries shell quotes: ' + JSON.stringify(quotedToken(ci.argv)))
         if (ci.env !== undefined && (ci.env === null || typeof ci.env !== 'object' || Object.values(ci.env).some((value) => typeof value !== 'string'))) problems.push(id + ': ci.env must be a string map')
         if (ci.cwd !== undefined && typeof ci.cwd !== 'string') problems.push(id + ': ci.cwd must be a string')
-        if (ci.argv === undefined && ci.env === undefined && ci.cwd === undefined) problems.push(id + ': ci override carries none of argv/env/cwd')
+        if (ci.timeoutMs !== undefined && (!Number.isInteger(ci.timeoutMs) || ci.timeoutMs <= 0)) problems.push(id + ': ci.timeoutMs must be a positive integer')
+        if (ci.argv === undefined && ci.env === undefined && ci.cwd === undefined && ci.timeoutMs === undefined) problems.push(id + ': ci override carries none of argv/env/cwd/timeoutMs')
       }
     }
     if (entry.kind === 'external' && entry.reason === undefined && entry.registration === undefined) problems.push(id + ': external row carries neither reason nor registration')

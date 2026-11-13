@@ -1861,7 +1861,8 @@
           "--reporter=default",
           "--reporter=json",
           "--outputFile.json=${RUNNER_TEMP}/probe-baseline.json"
-        ]
+        ],
+        "timeoutMs": 480000
       }
     },
     {
