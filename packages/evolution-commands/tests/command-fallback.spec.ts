@@ -1,7 +1,7 @@
 // @tier fast
 /**
  * G6/W8: COMMAND_FALLBACKS is the ONE home of the command-face pairs. Its key set is pinned to the
- * four Host surfaces (the same set HOST_ROUTES declares), so a new surface cannot ship without a
+ * five Host surfaces (the same set HOST_ROUTES declares), so a new surface cannot ship without a
  * command-face answer, and every hint names a family command.
  */
 import { describe, expect, it } from 'vitest'
@@ -14,7 +14,6 @@ const HOST_SURFACE_IDS: Readonly<Record<string, string>> = {
   skillHealth: 'skill-health',
   merge: 'merge',
   diagnostics: 'diagnostics',
-  settings: 'settings',
 }
 
 describe('COMMAND_FALLBACKS', () => {

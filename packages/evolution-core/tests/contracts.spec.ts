@@ -27,11 +27,11 @@ describe('G0 frozen contracts', () => {
     expect(RESTRICTED_PRESET_DISPLAY.maintainer.order).toBe(901)
   })
 
-  it('freezes the host route table at 6 surfaces / 21 endpoints under the /api prefix', () => {
+  it('freezes the host route table at 5 surfaces / 19 endpoints under the /api prefix', () => {
     const surfaces = Object.values(HOST_ROUTES)
-    expect(surfaces).toHaveLength(6)
+    expect(surfaces).toHaveLength(5)
     const paths = surfaces.flatMap(surface => Object.values(surface))
-    expect(paths).toHaveLength(21)
+    expect(paths).toHaveLength(19)
     for (const path of paths) expect(path.startsWith('/api/dsh-evolution/')).toBe(true)
     expect(MAX_REQUEST_BODY_BYTES).toBe(64 * 1024)
   })

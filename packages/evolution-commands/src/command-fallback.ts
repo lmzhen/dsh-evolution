@@ -17,8 +17,8 @@ export interface CommandFallbackHint {
   readonly platformCli?: string
 }
 
-/** The four Host surfaces (keyed exactly like the frozen `COMMAND_FALLBACK_SURFACES`). */
-export type CommandFallbackSurface = 'approval' | 'skill-history' | 'skill-health' | 'merge' | 'diagnostics' | 'settings'
+/** The five Host surfaces (keyed exactly like the frozen `COMMAND_FALLBACK_SURFACES`). */
+export type CommandFallbackSurface = 'approval' | 'skill-history' | 'skill-health' | 'merge' | 'diagnostics'
 
 /**
  * One entry per Host surface. The command column names the same service methods the routes call,
@@ -37,9 +37,6 @@ export const COMMAND_FALLBACKS: Readonly<Record<CommandFallbackSurface, CommandF
   merge: {
     command: '/evolution merge status / pending / approve <id> / report',
   },
-  settings: {
-    command: '/evolution params --group deployment（写入由平台插件管理的 row 配置页承载）',
-  },
   diagnostics: {
     command: '/evolution doctor',
     platformCli: 'dsh --json /evolution doctor',
@@ -47,4 +44,4 @@ export const COMMAND_FALLBACKS: Readonly<Record<CommandFallbackSurface, CommandF
 }
 
 /** The ordered surface ids (the frozen W1 set). */
-export const COMMAND_FALLBACK_SURFACES: readonly CommandFallbackSurface[] = ['approval', 'skill-history', 'skill-health', 'merge', 'diagnostics', 'settings']
+export const COMMAND_FALLBACK_SURFACES: readonly CommandFallbackSurface[] = ['approval', 'skill-history', 'skill-health', 'merge', 'diagnostics']
