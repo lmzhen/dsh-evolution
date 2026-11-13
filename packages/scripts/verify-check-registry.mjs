@@ -49,44 +49,45 @@ if (rows.length === 0 || declarations.length === 0) {
 }
 
 // --- closure: the two homes must name exactly the same checks -------------------------------
-const rowIds = new Set(rows.map((row) => row.id))
+// The declaration face owns executable checks only; step/external rows are action commands or
+// another owner's command and are deliberately not declarations (W11 A2).
+const RUNNABLE_KINDS = new Set(['script', 'toolchain'])
+const runnableRows = rows.filter((row) => RUNNABLE_KINDS.has(row.kind))
+const rowIds = new Set(runnableRows.map((row) => row.id))
 const declaredIds = new Set(declarations.map((row) => row.id))
 const missingDeclarations = [...rowIds].filter((id) => !declaredIds.has(id))
 const staleDeclarations = [...declaredIds].filter((id) => !rowIds.has(id))
 
-// --- the meta-gate's observations, consumed as data -----------------------------------------
+// --- armed check + the meta-gate's observations, consumed as data ----------------------------
+// A meta-gate that is not armed has no observations, and an empty observation set is NOT a clean
+// account: exit 2. A child that exits non-zero (contract violation, stale facts, ...) is fatal,
+// never parsed as data (P0-7).
+const repoMarker = join('.github', 'actions', 'evolution-validate', 'action.yml')
+let armed = false
+for (let dir = TREE; ; ) {
+  if (existsSync(join(dir, repoMarker))) { armed = true; break }
+  const up = resolve(dir, '..')
+  if (up === dir) break
+  dir = up
+}
+if (!armed) {
+  console.error('verify-check-registry: CANNOT DECIDE - no repository marker above ' + TREE + ' (the meta-gate cannot arm here; an unarmed ledger must not pass)')
+  process.exit(2)
+}
 const gateRun = spawnSync(process.execPath, [join(HERE, 'verify-gate-manifest.mjs'), TREE, '--json'], { encoding: 'utf8' })
+if (gateRun.status !== 0) {
+  const detail = (gateRun.stderr === null ? '' : gateRun.stderr).trim().split('\n').slice(-6).join('\n')
+  console.error('verify-check-registry: CANNOT DECIDE - meta-gate exit=' + String(gateRun.status) + ' (its observations are this ledger\'s other half)')
+  if (detail !== '') console.error('verify-check-registry: meta-gate stderr tail:\n' + detail)
+  process.exit(2)
+}
 let observations = []
-let gateOk = false
 try {
   const parsed = JSON.parse(gateRun.stdout === null ? '' : gateRun.stdout)
   observations = Array.isArray(parsed.observations) ? parsed.observations : []
-  gateOk = true
-} catch { gateOk = false }
-if (!gateOk) {
-  // Diagnosability: spawnSync captures the child's stderr as well, so keeping it in a variable
-  // and never printing it locked the root cause away from the CI log - the job showed only this
-  // conclusion and no reason. Print the exit status and the child's stderr before exiting.
-  const detail = (gateRun.stderr === null ? '' : gateRun.stderr).trim().split('\n').slice(-6).join('\n')
-  console.error('verify-check-registry: meta-gate exit=' + String(gateRun.status) + ' stdoutBytes=' + String(gateRun.stdout === null ? 0 : gateRun.stdout.length))
-  if (detail !== '') console.error('verify-check-registry: meta-gate stderr tail:\n' + detail)
-  // Arm-awareness: the register records the meta-gate row against the MIRROR tree, and the
-  // released-upstream layout carries no repository root above it (no composite action file there),
-  // so the meta-gate is legitimately not armed. Every axis then reads as 'no live observation',
-  // which the loop below already treats as pass; only the missing JSON was fatal.
-  const repoMarker = join('.github', 'actions', 'evolution-validate', 'action.yml')
-  let armed = false
-  for (let dir = TREE; ; ) {
-    if (existsSync(join(dir, repoMarker))) { armed = true; break }
-    const up = resolve(dir, '..')
-    if (up === dir) break
-    dir = up
-  }
-  if (armed) {
-    console.error('verify-check-registry: CANNOT DECIDE - the meta-gate did not answer with JSON (its observations are this ledger\'s other half)')
-    process.exit(2)
-  }
-  console.error('verify-check-registry: NOT ARMED in this layout - no repository marker above ' + TREE + ' (the register records this row against the mirror tree)')
+} catch {
+  console.error('verify-check-registry: CANNOT DECIDE - the meta-gate exited 0 but did not answer with JSON')
+  process.exit(2)
 }
 const liveCount = (criterion) => observations.filter((entry) => entry.criterion === criterion).length
 
@@ -148,7 +149,7 @@ const actionText = (() => {
   }
 })()
 const wiredScripts = new Set()
-for (const row of rows) for (const text of [row.human, row.reason, Array.isArray(row.argv) ? row.argv.join(' ') : '']) if (typeof text === 'string') for (const match of text.matchAll(/[A-Za-z0-9._-]+\.mjs/g)) wiredScripts.add(match[0])
+for (const row of rows) for (const text of [Array.isArray(row.argv) ? row.argv.join(' ') : '', Array.isArray(row.ci?.argv) ? row.ci.argv.join(' ') : '', typeof row.command === 'string' ? row.command : '']) if (text !== '') for (const match of text.matchAll(/[A-Za-z0-9._-]+\.mjs/g)) wiredScripts.add(match[0])
 if (actionText !== null) for (const match of actionText.matchAll(/[A-Za-z0-9._-]+\.mjs/g)) wiredScripts.add(match[0])
 const unwiredProducers = []
 for (const declaration of declarations) for (const requirement of Array.isArray(declaration.requires) ? declaration.requires : []) {

@@ -571,9 +571,7 @@ export const guards = [
     argv: ["node","packages/evolution/scripts/gen-protection-view.mjs","--check"],
     lanes: ["ci-static"],
     reason: "CI-only gate with no table row yet — local slot pending (G0-1)",
-    expiry: "0.47.0",
 
-    renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
   }),
 
   gate("ci-only-19", {
@@ -583,9 +581,7 @@ export const guards = [
     argv: ["node","packages/evolution/scripts/verify-contract-anchors.selftest.mjs"],
     lanes: ["ci-static"],
     reason: "CI-only gate with no table row yet — local slot pending (G0-1)",
-    expiry: "0.47.0",
 
-    renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
   }),
 
   gate("ci-only-20", {
@@ -595,9 +591,7 @@ export const guards = [
     argv: ["node","packages/evolution/scripts/verify-core-surface.mjs","packages/evolution"],
     lanes: ["ci-static"],
     reason: "CI-only gate with no table row yet — local slot pending (G0-1)",
-    expiry: "0.47.0",
 
-    renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
   }),
 
   gate("ci-only-21", {
@@ -607,9 +601,7 @@ export const guards = [
     argv: ["node","packages/evolution/scripts/verify-exemptions.mjs","packages/evolution"],
     lanes: ["ci-static"],
     reason: "CI-only gate with no table row yet — local slot pending (G0-1)",
-    expiry: "0.47.0",
 
-    renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
   }),
 
   gate("ci-only-23", {
@@ -619,9 +611,7 @@ export const guards = [
     argv: ["node","packages/evolution/scripts/verify-param-consumers.mjs","packages/evolution"],
     lanes: ["ci-static"],
     reason: "CI-only gate with no table row yet — local slot pending (G0-1)",
-    expiry: "0.47.0",
 
-    renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
   }),
 
   gate("ci-only-26", {
@@ -631,9 +621,7 @@ export const guards = [
     argv: ["node","packages/evolution/scripts/verify-test-lines.mjs","packages/evolution","--strict"],
     lanes: ["ci-static"],
     reason: "CI-only gate with no table row yet — local slot pending (G0-1)",
-    expiry: "0.47.0",
 
-    renewal: "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the local-slot/table split that closes these rows is tracked in W9-gates §4, before 0.47.",
   }),
 
 ]

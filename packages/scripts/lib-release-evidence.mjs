@@ -125,7 +125,10 @@ export function validateReleaseEvidence(evidence, options = {}) {
   if (release && nonEmptyString(options.expectedTag) && evidence.tag !== options.expectedTag) problems.push('release: tag ' + String(evidence.tag) + ' does not match the release tag ' + options.expectedTag)
   if (release && nonEmptyString(evidence.generatedAt) && Number.isInteger(options.maxAgeMs) && Date.now() - Date.parse(evidence.generatedAt) > options.maxAgeMs) problems.push('release: generatedAt is older than ' + String(options.maxAgeMs) + 'ms — regenerate the evidence for this build')
   const line = evidence.platformLine
-  if (!isObject(line) || !nonEmptyString(line.version) || !nonEmptyString(line.peersRange) || !nonEmptyString(line.enginesRange)) problems.push('platformLine must carry version/peersRange/enginesRange')
+  // A missing/non-object platformLine must RETURN: the fields below dereference it, and a TypeError
+  // is not the declared cannot-decide report (P0-8).
+  if (!isObject(line)) return [...problems, 'platformLine must be an object carrying version/peersRange/enginesRange']
+  if (!nonEmptyString(line.version) || !nonEmptyString(line.peersRange) || !nonEmptyString(line.enginesRange)) problems.push('platformLine must carry version/peersRange/enginesRange')
   if (!isObject(evidence.manifests) || !Number.isInteger(evidence.manifests.count) || evidence.manifests.count <= 0) problems.push('manifests.count must be a positive integer')
   else {
     if (evidence.manifests.enginesRange !== line.enginesRange) problems.push('manifests.enginesRange must equal platformLine.enginesRange')

@@ -79,7 +79,8 @@ const summary = 'rules=' + (report.rules ?? '?') + ' detectors=' + present.size 
 if (problems.length > 0) {
   console.error('verify-arming: ' + problems.length + ' unarmed control(s):')
   for (const line of problems) console.error('  - ' + line)
-  if (strict || true) process.exit(1)
+  // --strict is the gate switch (gate-24 passes it); without it this is the report half.
+  if (strict) process.exit(1)
 }
 console.log('verify-arming: OK — ' + summary + (notes.length > 0 ? '  (' + notes.join('; ') + ')' : ''))
 console.log('  note: the “declared check must be run by CI or registered local-only” class is owned by verify-arch-guards doc-facts (not duplicated here)')

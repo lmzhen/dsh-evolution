@@ -115,10 +115,13 @@ describe('release-evidence schema v2', () => {
       ['short traceability', (doc) => { (doc.traceability as Record<string, unknown>).covered = 51 }],
       ['wrong universe', (doc) => { (doc.traceability as Record<string, unknown>).universe = { A: 22, B: 18, C: 11 } }],
       ['rehearsal status', (doc) => { doc.evidenceStatus = 'rehearsal' }],
+      ['missing platformLine', (doc) => { delete doc.platformLine }],
+      ['non-object platformLine', (doc) => { doc.platformLine = '0.2.2-rc.1' }],
     ]
     for (const [label, mutate] of cases) {
       const doc = releasable()
       mutate(doc)
+      expect(() => validateReleaseEvidence(doc, { release: true }), label + ' must not throw').not.toThrow()
       expect(validateReleaseEvidence(doc, { release: true }), label).not.toEqual([])
     }
   })

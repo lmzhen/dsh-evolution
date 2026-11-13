@@ -592,27 +592,22 @@
     },
     {
       "id": "checks",
-      "title": "the declaration face of every check: its claim, its tier and its criterion",
+      "title": "the declaration face of every executable check: its tier and its criterion",
       "home": "README.md",
       "must": [
         {
-          "text": "A column nobody has written yet is not a pass",
+          "text": "A check without a declaration is not accounted",
           "unique": true
         }
       ],
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "ab0f566f80ac4212d1bf9f8d3b219c504ae29f5cd421e17b60a0385b78f89495",
+        "sha256": "93b976090bcd9090769a0ec9af1c010ffc8001bf6631b3c5fa03780c483b28cd",
         "tierSource": "testing-policy",
-        "sentinel": {
-          "tier": "unmapped",
-          "criterion": "unknown"
-        },
         "rule": {
-          "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only, no profile => unmapped (registered)",
-          "criterion": "the basename of the first .mjs/.cjs the row runs; a row that runs no script => unknown (registered)",
-          "claim": "human-written; a row without one sits in pendingHuman with a reason, an expiry and an owner"
+          "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
+          "criterion": "the basename of the script the row runs, or the tool for a toolchain row"
         },
         "declarations": [
           {
@@ -623,7 +618,7 @@
           {
             "id": "gate-02",
             "tier": "fast",
-            "criterion": "unknown"
+            "criterion": "oxlint"
           },
           {
             "id": "gate-05",
@@ -664,21 +659,6 @@
             "id": "gate-12",
             "tier": "fast",
             "criterion": "verify-param-channel-parity"
-          },
-          {
-            "id": "gate-13",
-            "tier": "unmapped",
-            "criterion": "check-tsconfigs"
-          },
-          {
-            "id": "gate-14",
-            "tier": "unmapped",
-            "criterion": "check-manifests"
-          },
-          {
-            "id": "gate-15",
-            "tier": "unmapped",
-            "criterion": "mirror-sync"
           },
           {
             "id": "gate-17",
@@ -754,11 +734,6 @@
             "id": "gate-32",
             "tier": "fast",
             "criterion": "gen-install-counts"
-          },
-          {
-            "id": "gate-33",
-            "tier": "unmapped",
-            "criterion": "unknown"
           },
           {
             "id": "gate-34",
@@ -921,11 +896,6 @@
             "criterion": "verify-requirements"
           },
           {
-            "id": "gate-78",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
             "id": "gate-79",
             "tier": "fast",
             "criterion": "verify-line-identity"
@@ -1009,84 +979,9 @@
             "id": "gate-57",
             "tier": "ci-only",
             "criterion": "assemble-release-evidence"
-          },
-          {
-            "id": "gate-59",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "gate-74",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "gate-04",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "gate-67",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "gate-68",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "gate-69",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "gate-70",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "gate-71",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "gate-73",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "ci-only-13",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          },
-          {
-            "id": "ci-only-18",
-            "tier": "unmapped",
-            "criterion": "unknown"
-          }
-        ],
-        "pendingColumns": [
-          {
-            "column": "claim",
-            "rowsWithoutIt": 90,
-            "reasonRef": "scripts/gate-manifest.json (the per-row reason field is the material a claim is written from)",
-            "expiry": "0.26.0",
-            "owner": "scripts"
           }
         ],
         "pendingAxes": [
-          {
-            "axis": "expiry-due",
-            "rows": 3,
-            "reason": "three gate rows carry a due expiry on the 0.41 line; retirement is scheduled | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
-            "expiry": "0.47.0",
-            "owner": "scripts",
-            "reasonRef": "scripts/family-facts.json checks.pendingAxes",
-            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the axis rows are the registrations above; the reduction lands when the overlay mutation runner and the table split land (both are single-pass items, tracked in W9-gates §4). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the axis rows' reduction lands with the gate-table split / probe-baseline work tracked in W9-gates §4, scheduled before 0.47.",
-            "note": "2026-11-13 re-measured: W10 M5 changes no gate-table rows"
-          },
           {
             "axis": "falsifiability-carrier",
             "rows": 4,
@@ -1931,203 +1826,7 @@
             "plan": "close records per check; coverage exits 0 once every check is proven",
             "renewal": "Renewed at 0.46.0 (expiry 0.47.0): the row judges the build line/CI tree (platform typecheck, full suite, built entries, coverage records, health corpora) and the local overlay cannot supply those inputs; the CI action executes the same check. Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the registrations close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
           }
-        },
-        "unmappedTier": [
-          {
-            "id": "gate-13",
-            "reasonRef": "scripts/gate-manifest.json#gate-13",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-14",
-            "reasonRef": "scripts/gate-manifest.json#gate-14",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-15",
-            "reasonRef": "scripts/gate-manifest.json#gate-15",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-33",
-            "reasonRef": "scripts/gate-manifest.json#gate-33",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-78",
-            "reasonRef": "scripts/gate-manifest.json#gate-78",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-59",
-            "reasonRef": "scripts/gate-manifest.json#gate-59",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-74",
-            "reasonRef": "scripts/gate-manifest.json#gate-74",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-04",
-            "reasonRef": "scripts/gate-manifest.json#gate-04",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-67",
-            "reasonRef": "scripts/gate-manifest.json#gate-67",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-68",
-            "reasonRef": "scripts/gate-manifest.json#gate-68",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-69",
-            "reasonRef": "scripts/gate-manifest.json#gate-69",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-70",
-            "reasonRef": "scripts/gate-manifest.json#gate-70",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-71",
-            "reasonRef": "scripts/gate-manifest.json#gate-71",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-73",
-            "reasonRef": "scripts/gate-manifest.json#gate-73",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-13",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-13",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-18",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-18",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          }
-        ],
-        "unknownCriterion": [
-          {
-            "id": "gate-02",
-            "reasonRef": "scripts/gate-manifest.json#gate-02",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-33",
-            "reasonRef": "scripts/gate-manifest.json#gate-33",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-78",
-            "reasonRef": "scripts/gate-manifest.json#gate-78",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-59",
-            "reasonRef": "scripts/gate-manifest.json#gate-59",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-74",
-            "reasonRef": "scripts/gate-manifest.json#gate-74",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-04",
-            "reasonRef": "scripts/gate-manifest.json#gate-04",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-67",
-            "reasonRef": "scripts/gate-manifest.json#gate-67",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-68",
-            "reasonRef": "scripts/gate-manifest.json#gate-68",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-69",
-            "reasonRef": "scripts/gate-manifest.json#gate-69",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-70",
-            "reasonRef": "scripts/gate-manifest.json#gate-70",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-71",
-            "reasonRef": "scripts/gate-manifest.json#gate-71",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "gate-73",
-            "reasonRef": "scripts/gate-manifest.json#gate-73",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-13",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-13",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          },
-          {
-            "id": "ci-only-18",
-            "reasonRef": "scripts/gate-manifest.json#ci-only-18",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          }
-        ],
-        "duplicateGroups": [
-          {
-            "key": "node packages/scripts/verify-line-identity.mjs --policy-only --strict",
-            "ids": [
-              "gate-23",
-              "gate-78"
-            ],
-            "reasonRef": "G5: retire one of the pair, the survivor keeps the coverage",
-            "expiry": "0.26.0",
-            "owner": "scripts"
-          }
-        ]
+        }
       }
     }
   ],

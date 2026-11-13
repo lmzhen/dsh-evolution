@@ -13,7 +13,7 @@ export const TABLE_HEADER = '| # | Command | Working tree |'
 export function renderGate(entry) {
   const gate = { id: entry.id, kind: entry.kind, human: entry.title, argv: entry.argv === undefined ? null : entry.argv, tree: entry.tree }
   gate.profiles = profilesOf(entry)
-  for (const field of ['argvProblem', 'command', 'reason', 'owner', 'expiry', 'timeoutMs', 'localSafe', 'localSafeReason', 'drillCmd', 'noDrillReason', 'needs', 'after']) {
+  for (const field of ['argvProblem', 'command', 'reason', 'owner', 'timeoutMs', 'localSafe', 'localSafeReason', 'drillCmd', 'noDrillReason', 'needs', 'after']) {
     if (entry[field] !== undefined) gate[field] = entry[field]
   }
   gate.lanes = [...entry.lanes].sort((left, right) => LANES.indexOf(left) - LANES.indexOf(right))

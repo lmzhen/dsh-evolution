@@ -91,6 +91,9 @@ export function validateRegistry(entries) {
     }
     if (!runnable && entry.kind !== 'step' && entry.kind !== 'external' && entry.argv !== undefined && entry.argv !== null) problems.push(id + ': argv is only meaningful on runnable rows')
     if (entry.command !== undefined && runnable) problems.push(id + ': command belongs to step rows, not runnable rows')
+    // Top-level expiry/owner/renewal was a half-registration: nothing evaluated it as an exemption,
+    // and the same fields inside `registration` are the ones verify-exemptions reads. One home only.
+    for (const field of ['expiry', 'renewal']) if (entry[field] !== undefined) problems.push(id + ': top-level ' + field + ' is dead - put it inside registration (the only exemption home)')
     if (entry.argv === null) problems.push(id + ': argv must be omitted rather than null (omit it for step/external rows)')
     if (entry.timeoutMs !== undefined && (!Number.isInteger(entry.timeoutMs) || entry.timeoutMs <= 0)) problems.push(id + ': timeoutMs must be a positive integer')
     for (const field of ['needs', 'after']) {

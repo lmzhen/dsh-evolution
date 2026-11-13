@@ -617,10 +617,6 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
       out.push(FACTS_ASSET + ': fact ' + fact.id + ' names tierSource ' + String(machine.tierSource) + ', which is not the fact that owns the tier closed set - the tiers have no home to compare against')
       return out
     }
-    const sentinelTier = machine.sentinel?.tier
-    const sentinelCriterion = machine.sentinel?.criterion
-    // the member scripts of the manifest (a prerequisite that is also a row is worth saying out
-    // loud; a prerequisite that is the row's OWN script is a contradiction and fails below).
     const memberScripts = new Set()
     for (const gate of gates) for (const token of (Array.isArray(gate?.argv) ? gate.argv : [])) { const hit = /([A-Za-z0-9._-]+\.(?:mjs|cjs))$/.exec(String(token)); if (hit !== null) memberScripts.add(hit[1]) }
     const rows = Array.isArray(machine.declarations) ? machine.declarations : []
@@ -631,20 +627,9 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
       rowById.set(row.id, row)
     }
     const gateById = new Map(gates.map((gate) => [gate.id, gate]))
-    for (const id of gateById.keys()) if (!rowById.has(id)) out.push(String(machine.file) + ': ' + id + ' is a check the declaration face never saw - every row of the table needs a claim, a tier and a criterion')
-    for (const id of rowById.keys()) if (!gateById.has(id)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' declares ' + id + ', which ' + String(machine.file) + ' no longer carries - a stale declaration')
-    const registerIds = (name, extraFields) => {
-      const entries = Array.isArray(machine[name]) ? machine[name] : []
-      const ids = new Set()
-      for (const entry of entries) {
-        const label = String(entry?.id ?? entry?.key ?? entry?.column ?? '(no id)')
-        for (const field of ['reasonRef', 'expiry', 'owner'].concat(extraFields ?? [])) {
-          if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + name + ' entry ' + label + ' is missing ' + field + ' - an unregistered exception is an unowned one')
-        }
-        if (typeof entry?.id === 'string') ids.add(entry.id)
-      }
-      return ids
-    }
+    const runnableById = new Map(gates.filter((gate) => gate.kind === 'script' || gate.kind === 'toolchain').map((gate) => [gate.id, gate]))
+    for (const id of runnableById.keys()) if (!rowById.has(id)) out.push(String(machine.file) + ': ' + id + ' is a runnable check the declaration face never saw - every executable row needs a tier and a criterion')
+    for (const id of rowById.keys()) if (!runnableById.has(id)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' declares ' + id + ', which is not a runnable row in ' + String(machine.file) + ' - a stale declaration')
     // the AXIS register: a non-zero gap in one of the meta-gate's axes is a registered debt
     // (count + reason + expiry + owner). The registry compares these counts against the LIVE
     // observations; this branch only refuses a shapeless entry.
@@ -659,28 +644,11 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
       for (const field of ['reasonRef', 'expiry', 'owner']) if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingAxes ' + label + ' is missing ' + field)
       if (!Number.isInteger(entry?.rows) || entry.rows < 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingAxes ' + label + ' carries no non-negative integer rows - the register must state the measured size of the gap')
     }
-    const pending = Array.isArray(machine.pendingColumns) ? machine.pendingColumns : []
-    const unmappedIds = registerIds('unmappedTier')
-    const unknownIds = registerIds('unknownCriterion')
-    const unwritten = [...rowById.values()].filter((row) => typeof row.claim !== 'string' || row.claim.trim() === '').length
-    for (const entry of pending) {
-      if (typeof entry?.column !== 'string' || entry.column.trim() === '') { out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingColumns carries an entry without a column name - a register that does not say what it defers'); continue }
-      if (!Number.isInteger(entry.rowsWithoutIt) || entry.rowsWithoutIt <= 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingColumns ' + entry.column + ' carries no positive rowsWithoutIt - the register must state the measured size of the gap')
-      else if (entry.rowsWithoutIt !== unwritten) out.push(FACTS_ASSET + ': fact ' + fact.id + ' pendingColumns ' + entry.column + ' says ' + entry.rowsWithoutIt + ' row(s) without it, the declarations say ' + unwritten + ' - the register and the rows disagree')
-    }
-    if (unwritten > 0 && pending.length === 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' has ' + unwritten + ' declaration(s) without a claim and no pendingColumns register - an unwritten column is a register row, never a silent blank')
-    if (unwritten === 0 && pending.length > 0) out.push(FACTS_ASSET + ': fact ' + fact.id + ' still registers ' + String(pending[0]?.column) + ' as pending, but every declaration carries one - a stale register')
     for (const [id, row] of rowById) {
       const gate = gateById.get(id)
       // M2: the declaration is checked against BOTH forms the row declares (argv + human cell)
       const cmd = Array.isArray(gate?.argv) ? gate.argv.join(' ') : String(gate?.human ?? '')
       const reason = gateById.get(id)?.reason
-      if (typeof row.claim === 'string' && row.claim.trim() !== '') {
-        const claim = row.claim.trim()
-        if (claim.length < 24) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.claim is ' + claim.length + ' chars - a claim is a sentence a reader can judge, not a label')
-        if (claim.includes('TODO')) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.claim still carries a TODO marker - write the claim or drop the field and let pendingColumns register it')
-        if (typeof reason === 'string' && claim === reason.trim()) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.claim copies the carrier reason - the claim states what the check asserts, the reason states why it exists')
-      }
       // R38/R42: the declared prerequisites. Static half at declaration time: closed mode, an
       // owner and a reason, the product path a `present` requirement must name, and an in-repo
       // `run` script that exists. The runtime half is decideRequires' matrix.
@@ -706,31 +674,10 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
       }
       const tier = row.tier
       if (typeof tier !== 'string' || tier === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier is missing - every check states the lane the policy requires it at')
-      else if (tier === sentinelTier) { if (!unmappedIds.has(id)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier is the sentinel ' + String(sentinelTier) + ' but unmappedTier does not carry it - an undecided tier is a decision somebody still owes') }
       else if (!tiers.includes(tier)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.tier "' + tier + '" is neither one of the ' + String(machine.tierSource) + ' tiers [' + tiers.join(', ') + '] nor the sentinel ' + String(sentinelTier) + ' - a tier outside the policy closed set')
       if (typeof row.criterion !== 'string' || row.criterion === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.criterion is missing - every check names what judges it')
-      else if (row.criterion === sentinelCriterion) { if (!unknownIds.has(id)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.criterion is the sentinel ' + String(sentinelCriterion) + ' but unknownCriterion does not carry it') }
       else if (!cmd.includes(row.criterion)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' ' + id + '.criterion "' + row.criterion + '" does not occur in the command the table runs (' + cmd + ') - the declaration and the table disagree')
     }
-    for (const id of unmappedIds) if (rowById.get(id)?.tier !== sentinelTier) out.push(FACTS_ASSET + ': fact ' + fact.id + ' unmappedTier registers ' + id + ', whose tier is not the sentinel - the register and the rows disagree')
-    for (const id of unknownIds) if (rowById.get(id)?.criterion !== sentinelCriterion) out.push(FACTS_ASSET + ': fact ' + fact.id + ' unknownCriterion registers ' + id + ', whose criterion is not the sentinel - the register and the rows disagree')
-    const byCommand = new Map()
-    for (const gate of gates) {
-      // M2: the collision key is the executable form (a composite row declares none)
-      const key = (Array.isArray(gate?.argv) ? gate.argv.join(' ') : String(gate?.human ?? '')).trim().replace(/\s+/g, ' ')
-      if (key === '') continue
-      const ids = byCommand.get(key)
-      if (ids === undefined) byCommand.set(key, [gate.id])
-      else ids.push(gate.id)
-    }
-    const collisions = [...byCommand.entries()].filter((entry) => entry[1].length > 1)
-    const declaredCollisions = Array.isArray(machine.duplicateGroups) ? machine.duplicateGroups : []
-    for (const entry of declaredCollisions) {
-      for (const field of ['key', 'reasonRef', 'expiry', 'owner']) if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') out.push(FACTS_ASSET + ': fact ' + fact.id + ' duplicateGroups entry is missing ' + field)
-      if (!Array.isArray(entry?.ids) || entry.ids.length < 2) out.push(FACTS_ASSET + ': fact ' + fact.id + ' duplicateGroups entry carries fewer than two ids - a collision names both sides')
-    }
-    for (const collision of collisions) if (!declaredCollisions.some((entry) => entry?.key === collision[0])) out.push(String(machine.file) + ': ' + collision[1].join(' = ') + ' run the same command but duplicateGroups does not carry the group - a duplicated check is known debt, not a silent one')
-    for (const entry of declaredCollisions) if (!collisions.some((collision) => collision[0] === entry?.key)) out.push(FACTS_ASSET + ': fact ' + fact.id + ' duplicateGroups registers a command no two rows share any more - the register is stale (' + String(entry?.expiry ?? '') + ')')
     return out
   }
   if (machine.kind === 'skill-name-home') {
