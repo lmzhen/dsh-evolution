@@ -1498,7 +1498,7 @@ export class SkillLibrary {
   }
 
   /** S2: mechanical hard-cap event; failure must not change the refusal. */
-  private async recordHardCapHit(name: string, bodyChars: number, source: 'create' | 'update' | 'patch' | 'write_file', supportFiles: number | null = null): Promise<void> {
+  private async recordHardCapHit(name: string, bodyChars: number, source: 'create' | 'update' | 'patch' | 'write_file', supportFiles: number | null = null, fenceHeld = false): Promise<void> {
     try {
       await appendEvolutionEvent(this.io, eventsFile(dirname(this.root)), {
         type: 'hard-cap',
@@ -1507,7 +1507,7 @@ export class SkillLibrary {
         supportFiles,
         restructureRounds: 0,
         source,
-      }, undefined, this.fence)
+      }, undefined, fenceHeld ? undefined : this.fence)
     } catch (error) {
       console.warn('skill-store: hard-cap event not recorded for "' + name + '": ' + (error instanceof Error ? error.message : String(error)))
     }
@@ -1536,7 +1536,11 @@ export class SkillLibrary {
     unitId?: string,
     unitHead?: UnitHead,
     origin?: string,
+    fenceHeld = false,
   ): Promise<void> {
+    // A committed hook (or outer tree operation) already holds the home fence.
+    // Keep the per-file transactions, but don't queue behind our own lease.
+    const fence = fenceHeld ? undefined : this.fence
     const at = new Date().toISOString()
     let versions: RecordedVersions | null = null
     try {
@@ -1552,7 +1556,7 @@ export class SkillLibrary {
         ...unitId === undefined ? {} : { unitId },
         ...unitHead === undefined ? {} : { unitHead },
       }
-      versions = await recordVersions(this.root, this.io, input, keep, this.fence)
+      versions = await recordVersions(this.root, this.io, input, keep, fence)
     } catch (error) {
       if (!this.historyWarned) {
         this.historyWarned = true
@@ -1592,7 +1596,7 @@ export class SkillLibrary {
         summary: summary + healthNote + danglingNote,
         at,
         ...origin === undefined ? {} : { origin },
-      }, undefined, this.fence)
+      }, undefined, fence)
     } catch {
       // Auditing is best-effort; a transient disk failure must not surface
       // after the mutation already landed.
@@ -1775,7 +1779,7 @@ export class SkillLibrary {
     // serialize queue (F-208 discipline, like update/patch) — two concurrent
     // create calls for one name used to both pass exists() and double-write
     // (double audit, double mutation event).
-    return await this.serial(() => this.withMutationLock(() => this.createCore(normalized, content, origin, options)))
+    return await this.serial(() => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true)))
   }
 
   private async createCore(
@@ -1783,13 +1787,14 @@ export class SkillLibrary {
     content: string,
     origin: WriteOrigin,
     options: { unitId?: string; unitHead?: UnitHead; managed?: boolean } = {},
+    fenceHeld = false,
   ): Promise<SkillActionResult> {
     // C-12 (v10 audit): the inline badName() copy is gone (see setPinned).
     const bad = this.badName(normalized)
     if (bad) return { ok: false, message: bad }
     const validation = validateFrontmatter(content, normalized, this.limits)
     if (validation) {
-      if (exceedsContentLimit(content, this.limits.maxSkillContentChars)) await this.recordHardCapHit(normalized, content.length, 'create')
+      if (exceedsContentLimit(content, this.limits.maxSkillContentChars)) await this.recordHardCapHit(normalized, content.length, 'create', null, fenceHeld)
       return { ok: false, message: validation }
     }
     // 0.3.11: frontmatter normalization happens at the write point — the
@@ -1922,7 +1927,7 @@ export class SkillLibrary {
         return { ok: false, message: `创建过程中技能「${normalized}」被并发归档；残留标记已移除：等搬运完成后重试一次。` }
       }
     }
-    await this.audit(normalized, 'create', null, onDisk, 'created', undefined, result.unitId, options.unitHead)
+    await this.audit(normalized, 'create', null, onDisk, 'created', undefined, result.unitId, options.unitHead, undefined, fenceHeld)
     this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
     // Both warnings ride the normal success path (audit/event included) — a
     // durability warning must never skip the accounting.
@@ -2012,7 +2017,7 @@ export class SkillLibrary {
         committed: async event => {
           const op = event.ops[0]
           if (op === undefined) return
-          await this.audit(name, 'update', op.before, op.after, 'updated', undefined, event.unitId, { sources: [{ skill: name }] }, origin)
+          await this.audit(name, 'update', op.before, op.after, 'updated', undefined, event.unitId, { sources: [{ skill: name }] }, origin, true)
           this.notifyMutation({ action: 'update', name, skillDir: dir })
         },
       },
@@ -2185,7 +2190,7 @@ export class SkillLibrary {
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {
-          await this.audit(name, 'patch', outcome.audit?.before ?? current, event.ops[0]?.after ?? onDisk, outcome.audit?.summary ?? `patched ${patchLabel}`, filePath === '' ? undefined : filePath, event.unitId, { sources: [{ skill: name }] }, origin)
+          await this.audit(name, 'patch', outcome.audit?.before ?? current, event.ops[0]?.after ?? onDisk, outcome.audit?.summary ?? `patched ${patchLabel}`, filePath === '' ? undefined : filePath, event.unitId, { sources: [{ skill: name }] }, origin, true)
           this.notifyMutation({ action: 'patch', name, skillDir: dir })
         },
       },
@@ -2309,7 +2314,10 @@ export class SkillLibrary {
   }
 
   async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+    return await this.archiveCore(rawName, options, origin, false)
+  }
 
+  private async archiveCore(rawName: string, options: ArchiveOptions, origin: WriteOrigin, fenceHeld: boolean): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
 
@@ -2416,7 +2424,7 @@ export class SkillLibrary {
     } catch {
       // Same posture as .archive-reason: metadata only, never abort the archive.
     }
-    await this.audit(name, 'archive', md, null, reason, undefined, options.unitId, options.unitHead, origin)
+    await this.audit(name, 'archive', md, null, reason, undefined, options.unitId, options.unitHead, origin, fenceHeld)
     this.notifyMutation({ action: 'archive', name, archivedPath: dest })
     return { ok: true, message: `技能「${name}」已归档到 .archive。`, path: dest }
   }
@@ -2446,6 +2454,10 @@ export class SkillLibrary {
     if (protectedSource !== undefined) return { ok: false, message: `来源技能「${protectedSource}」是受保护的内置技能。` }
     const limits = plan.limits ?? this.limits
     const run = async (): Promise<CommitMergeResult> => {
+      const fenceHeld = plan.nested === true
+      const archive = (name: string, archiveOptions: ArchiveOptions) => fenceHeld
+        ? this.archiveCore(name, archiveOptions, plan.origin, true)
+        : this.archive(name, archiveOptions, plan.origin)
       const dir = this.dirOf(target)
       const targetPath = join(dir, 'SKILL.md')
       if (!plan.targetExists && await this.io.exists(dir)) {
@@ -2551,7 +2563,9 @@ export class SkillLibrary {
         const stuck: string[] = []
         for (const source of [...archived].reverse()) {
           try {
-            const restored = await this.restoreFromArchive(source, plan.origin)
+            const restored = fenceHeld
+              ? await this.restoreFromArchiveCore(source, plan.origin, true)
+              : await this.restoreFromArchive(source, plan.origin)
             if (!restored.ok) stuck.push(source)
           } catch {
             stuck.push(source)
@@ -2647,12 +2661,12 @@ export class SkillLibrary {
             return { ok: false, message: 'tree fence lost before source archive; recovery required' }
           }
           await plan.onPhase?.('source-archiving', { source })
-          const archivedResult = await this.archive(source, {
+          const archivedResult = await archive(source, {
             absorbedInto: target,
             unitId,
             unitHead: { skill: target },
             reason: `Merged into ${target}`,
-          }, plan.origin)
+          })
           if (!archivedResult.ok) {
             const stuck = await rollbackSources()
             stuck.push(...await rollbackTarget())
@@ -2668,25 +2682,25 @@ export class SkillLibrary {
 
       await plan.onPhase?.('target-pending')
       if (plan.assertFence !== undefined && !(await plan.assertFence())) return { ok: false, message: 'tree fence lost before target write' }
-      const created = await this.createCore(target, plan.body, plan.origin, { unitId, unitHead, managed: true })
+      const created = await this.createCore(target, plan.body, plan.origin, { unitId, unitHead, managed: true }, fenceHeld)
       if (!created.ok) return { ok: false, message: created.message }
       await plan.onPhase?.('target-applied')
       await plan.onPhase?.('target-written')
       if (plan.signal?.aborted) {
-        const targetRollback = await this.archive(target, { reason: 'merge cancelled' }, plan.origin)
+        const targetRollback = await archive(target, { reason: 'merge cancelled' })
         return rollbackMessage('cancelled before sources archived', targetRollback.ok ? [] : [target])
       }
       for (const source of sources) {
         if (plan.signal?.aborted) {
           const stuck = await rollbackSources()
-          const targetRollback = await this.archive(target, { reason: 'merge cancelled' }, plan.origin)
+          const targetRollback = await archive(target, { reason: 'merge cancelled' })
           if (!targetRollback.ok) stuck.push(target)
           return rollbackMessage('cancelled before next source archive', stuck)
         }
         const fresh = await this.io.readText(join(this.dirOf(source), 'SKILL.md'))
         if (fresh !== sourceBodies.get(source)) {
           const stuck = await rollbackSources()
-          const targetRollback = await this.archive(target, { reason: 'merge rolled back' }, plan.origin)
+          const targetRollback = await archive(target, { reason: 'merge rolled back' })
           if (!targetRollback.ok) stuck.push(target)
           return rollbackMessage(`来源技能「${source}」在归档前被改过`, stuck)
         }
@@ -2694,15 +2708,15 @@ export class SkillLibrary {
           return { ok: false, message: 'tree fence lost before source archive; recovery required' }
         }
         await plan.onPhase?.('source-archiving', { source })
-        const result = await this.archive(source, {
+        const result = await archive(source, {
           absorbedInto: target,
           unitId,
           unitHead: { skill: target },
           reason: `Merged into ${target}`,
-        }, plan.origin)
+        })
         if (!result.ok) {
           const stuck = await rollbackSources()
-          const targetRollback = await this.archive(target, { reason: 'merge rolled back' }, plan.origin)
+          const targetRollback = await archive(target, { reason: 'merge rolled back' })
           if (!targetRollback.ok) stuck.push(target)
           return rollbackMessage(result.message, stuck)
         }
@@ -2732,7 +2746,7 @@ export class SkillLibrary {
         })
         if (!result.ok) {
           const stuck = await rollbackSources()
-          const targetRollback = await this.archive(target, { reason: 'merge rolled back' }, plan.origin)
+          const targetRollback = await archive(target, { reason: 'merge rolled back' })
           if (!targetRollback.ok) stuck.push(target)
           return rollbackMessage(result.message, stuck)
         }
@@ -3176,7 +3190,7 @@ export class SkillLibrary {
         let headPlaced = false
         for (const op of event.ops) {
           const rel = relative(dir, op.target).split(String.fromCharCode(92)).join('/')
-          await this.audit(name, 'restructure', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : this.unitHeadForOps(event.ops, [name]), origin)
+          await this.audit(name, 'restructure', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : this.unitHeadForOps(event.ops, [name]), origin, true)
           headPlaced = true
         }
         this.notifyMutation({ action: 'restructure', name, skillDir: dir })
@@ -3292,7 +3306,7 @@ export class SkillLibrary {
         for (const op of event.ops) {
           if (op.skill === undefined) continue
           const rel = relative(this.dirOf(op.skill), op.target).split(String.fromCharCode(92)).join('/')
-          await this.audit(op.skill, 'extract', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : head, origin)
+          await this.audit(op.skill, 'extract', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : head, origin, true)
           headPlaced = true
         }
         for (const name of roots) this.notifyMutation({ action: 'extract', name, skillDir: this.dirOf(name) })
@@ -3427,7 +3441,7 @@ export class SkillLibrary {
     for (let index = 0; index < landing.length; index += 1) {
       const entry = landing[index]
       if (entry === undefined) continue
-      await this.audit(entry.skill, plan.auditAction, entry.previous, entry.kind === 'delete' ? null : entry.content, plan.auditSummary, entry.rel === 'SKILL.md' ? undefined : entry.rel, unitId, index === 0 ? (plan.unitHead ?? defaultHead) : undefined, plan.origin)
+      await this.audit(entry.skill, plan.auditAction, entry.previous, entry.kind === 'delete' ? null : entry.content, plan.auditSummary, entry.rel === 'SKILL.md' ? undefined : entry.rel, unitId, index === 0 ? (plan.unitHead ?? defaultHead) : undefined, plan.origin, plan.nested === true)
       affected.add(entry.skill)
     }
     for (const skill of affected) {
@@ -3451,6 +3465,10 @@ export class SkillLibrary {
    * path back. The `.archive-reason` marker is dropped on restore.
    */
   async restoreFromArchive(rawName: string, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+    return await this.restoreFromArchiveCore(rawName, origin, false)
+  }
+
+  private async restoreFromArchiveCore(rawName: string, origin: WriteOrigin, fenceHeld: boolean): Promise<SkillActionResult> {
     const name = rawName.trim()
     // P2-2 (v11): the inline regex + hand-written message bypassed badName()
     // (C-12 single source — the regex carries no length bound, so a >64-char
@@ -3577,7 +3595,7 @@ export class SkillLibrary {
     if (isUnknown(restoredProbe)) {
       console.warn(`evolution-skill-store: the restored SKILL.md of "${name}" could not be read back (${restoredProbe.reason}); the restore is recorded without after-bytes`)
     }
-    await this.audit(name, 'restore', null, isPresent(restoredProbe) ? restoredProbe.value : null, `restored from ${source}`, undefined, undefined, undefined, origin)
+    await this.audit(name, 'restore', null, isPresent(restoredProbe) ? restoredProbe.value : null, `restored from ${source}`, undefined, undefined, undefined, origin, fenceHeld)
     this.notifyMutation({ action: 'restore', name, skillDir: dest })
     return { ok: true, message: `技能「${name}」已从 .archive 恢复。`, path: dest }
   }
@@ -3641,7 +3659,7 @@ export class SkillLibrary {
         committed: async event => {
           const op = event.ops[0]
           if (op === undefined) return
-          await this.audit(name, 'write_file', op.before, op.after, `wrote ${filePath}`, filePath, event.unitId, undefined, origin)
+          await this.audit(name, 'write_file', op.before, op.after, `wrote ${filePath}`, filePath, event.unitId, undefined, origin, true)
           this.notifyMutation({ action: 'write_file', name, skillDir: dir, file: target })
         },
       },
