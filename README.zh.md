@@ -83,7 +83,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 |---|---|
 | 验证平台线 | **`0.2.2-rc.1`** |
 | 发布依赖窗口 | `^0.2.2-rc.0` |
-| 家族版本 | `0.45.0` |
+| 家族版本 | `0.46.0` |
 | Node | `^22.19.0` 或 `>=24.0.0` |
 
 发布包不跨旧预发布平台线。安装与升级顺序见 [INSTALL.md](INSTALL.md)。
