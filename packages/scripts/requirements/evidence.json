@@ -151,7 +151,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/wire-projection.spec.ts#host generates copy-only ActionRefs and keeps 2000 rows stable",
+      "ref": "evolution-merge/tests/gates/rg4c-previous-ui.spec.ts#previous-ui fixture accepts new server view/rows/body/history and copies a row action",
       "note": "P1 targeted regression evidence"
     },
     {
@@ -652,11 +652,11 @@
     {
       "id": "D9",
       "criterion": "AC-1",
-      "kind": "test",
+      "kind": "doc",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/wire-projection.spec.ts#host generates copy-only ActionRefs and keeps 2000 rows stable",
-      "note": "review-recommended exact anchor"
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
+      "note": "v1 keeps SchedulerPort/lastRunAt design-only; the integration discussion records the decision (no scheduler test exists by design)"
     },
     {
       "id": "D10",
@@ -773,7 +773,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/surface-v2.spec.ts#counts four queues",
+      "ref": "evolution-merge/tests/ledger-v2.spec.ts#parses v2 rows and counts active only",
       "note": "audit re-anchor (54d4bcbe)"
     },
     {
@@ -1013,7 +1013,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/gates/rg5-wire.spec.ts#all seven wire envelopes carry wireVersion=1",
+      "ref": "evolution-merge/tests/wire.spec.ts#wireVersion is frozen at 1 on every envelope",
       "note": "audit re-anchor (54d4bcbe)"
     },
     {
@@ -1361,10 +1361,10 @@
     {
       "id": "DEC-D9",
       "criterion": "AC-1",
-      "kind": "test",
+      "kind": "doc",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/wire-projection.spec.ts#host generates copy-only ActionRefs and keeps 2000 rows stable",
+      "ref": "evolution-merge/docs/merge/integration-discussion.md",
       "note": "review-recommended exact anchor"
     },
     {
@@ -1807,7 +1807,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/merge-routes.spec.ts#serves wire envelopes for view/rows/body/history",
+      "ref": "evolution-merge/tests/gates/rg1b3-routes.spec.ts#serves the four panel GETs and body semantics",
       "note": "review-recommended exact anchor"
     },
     {
@@ -2050,7 +2050,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/gates/rg5-wire.spec.ts#all seven wire envelopes carry wireVersion=1",
+      "ref": "evolution-merge/tests/wire.spec.ts#wireVersion is frozen at 1 on every envelope",
       "note": "combined anchor set (audit re-check)"
     },
     {
@@ -2086,7 +2086,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/gates/rg5-get-zero-write.spec.ts#four panel GET routes only call read methods on the source",
+      "ref": "evolution-merge/tests/gates/rg5-get-zero-write.spec.ts#GET reads write zero bytes through state/run I/O",
       "note": "combined anchor set (audit re-check)"
     },
     {
@@ -2095,7 +2095,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/facts.spec.ts#readFacts is GET-zero-write",
+      "ref": "evolution-merge/tests/gates/rg5-get-zero-write.spec.ts#GET reads write zero bytes through state/run I/O",
       "note": "combined anchor set (audit re-check)"
     },
     {
@@ -2149,7 +2149,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/wire-projection.spec.ts#host generates copy-only ActionRefs and keeps 2000 rows stable",
+      "ref": "evolution-merge/tests/gates/rg4c-previous-ui.spec.ts#previous-ui fixture accepts new server view/rows/body/history and copies a row action",
       "note": "combined anchor set (audit re-check)"
     },
     {
@@ -2275,7 +2275,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/gates/rg5-wire.spec.ts#ActionRef and CommandSurface are JSON-safe and copy-complete",
+      "ref": "evolution-merge/tests/gates/rg4c-previous-ui.spec.ts#previous-ui fixture accepts new server view/rows/body/history and copies a row action",
       "note": "combined anchor set (audit re-check)"
     },
     {

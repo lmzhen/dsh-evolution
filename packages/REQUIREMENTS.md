@@ -1491,7 +1491,7 @@ MergeFacts 纯读、Reconcile 唯一写、共用同一派生；4 条 panel GET �
 
 执行宿主、错过补偿、并发、暂停: v1 只手动/后台；持久 lastRunAt、启动补偿、SchedulerPort 仅保留设计
 
-- AC-1 v1 只手动/后台；持久 lastRunAt、启动补偿、SchedulerPort 仅保留设计 → pass (A)
+- AC-1 v1 只手动/后台；持久 lastRunAt、启动补偿、SchedulerPort 仅保留设计 → pass (B)
 
 ### D10 curator/技能健康/设置卡/包归属: 模块进插件目录；curator 自动 consolidate 保留但 merge 是唯一人类合成入...
 

@@ -202,7 +202,7 @@
 | D6 | satisfied | P2 | integration | evolution-merge | 1 | pass:A |
 | D7 | satisfied | P2 | integration | evolution-merge | 1 | pass:A |
 | D8 | satisfied | P2 | integration | evolution-merge | 1 | pass:A |
-| D9 | satisfied | P2 | integration | evolution-merge | 1 | pass:A |
+| D9 | satisfied | P2 | integration | evolution-merge | 1 | pass:B |
 | D10 | satisfied | P2 | integration | evolution-merge | 1 | pass:A |
 | D11 | satisfied | P2 | integration | evolution-merge | 1 | pass:B |
 | D12 | satisfied | P2 | integration | evolution-merge | 1 | pass:B |
