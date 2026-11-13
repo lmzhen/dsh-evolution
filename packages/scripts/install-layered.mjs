@@ -80,19 +80,6 @@ function prepareDistSourceRoot(distDir) {
     process.exit(2)
   }
   const evidencePath = join(resolved, 'release-evidence.json')
-  if (existsSync(evidencePath)) {
-    let evidence
-    try { evidence = JSON.parse(readFileSync(evidencePath, 'utf8')) } catch (error) {
-      console.error('install-layered: --from-dist release-evidence.json is unreadable (' + (error instanceof Error ? error.message : String(error)) + ')')
-      process.exit(2)
-    }
-    const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-    const expected = familyVersionOf(sourceRoot, sourceRoot)
-    if (typeof evidence.familyVersion !== 'string' || evidence.familyVersion !== expected) {
-      console.error('install-layered: --from-dist evidence familyVersion ' + String(evidence.familyVersion) + ' does not match this tree ' + String(expected) + ' — the dist is stale')
-      process.exit(2)
-    }
-  }
   // Extract INSIDE the family tree so the packed composer's own imports (js-yaml et al) resolve
   // through the checkout's node_modules — a system-temp extraction has no dependency tree.
   const familyRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -112,6 +99,21 @@ function prepareDistSourceRoot(distDir) {
     } catch (error) {
       const detail = error !== null && typeof error === 'object' && error.stderr !== undefined && error.stderr !== null ? String(error.stderr) : (error instanceof Error ? error.message : String(error))
       console.error('install-layered: cannot unpack ' + file + ' from --from-dist (' + detail.trim().slice(0, 240) + ')')
+      process.exit(2)
+    }
+  }
+  // The evidence describes the PACKED tree (a dev build packs RELEASE_VERSION=0.0.0-main while the
+  // source checkout stays 0.46.0), so it is compared with the extracted tile — not with the source
+  // tree. A mismatch means the dist directory mixes a pack and an evidence file from other bytes.
+  if (existsSync(evidencePath)) {
+    let evidence
+    try { evidence = JSON.parse(readFileSync(evidencePath, 'utf8')) } catch (error) {
+      console.error('install-layered: --from-dist release-evidence.json is unreadable (' + (error instanceof Error ? error.message : String(error)) + ')')
+      process.exit(2)
+    }
+    const packedVersion = familyVersionOf(root, root)
+    if (typeof evidence.familyVersion !== 'string' || evidence.familyVersion !== packedVersion) {
+      console.error('install-layered: --from-dist evidence familyVersion ' + String(evidence.familyVersion) + ' does not match the packed tree ' + String(packedVersion) + ' — the dist mixes bytes from different builds')
       process.exit(2)
     }
   }
