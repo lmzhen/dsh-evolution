@@ -79,7 +79,7 @@ function prepareDistSourceRoot(distDir) {
     const destination = join(root, bare)
     mkdirSync(destination, { recursive: true })
     try {
-      execFileSync('tar', ['-xzf', join(resolved, String(file)), '-C', destination, '--strip-components=1'], { stdio: 'pipe' })
+      execFileSync('tar', ['-xzf', String(file), '-C', destination, '--strip-components=1'], { stdio: 'pipe', cwd: resolved })
     } catch (error) {
       console.error('install-layered: cannot unpack ' + file + ' from --from-dist (' + String(error && error.message).slice(0, 160) + ')')
       process.exit(2)

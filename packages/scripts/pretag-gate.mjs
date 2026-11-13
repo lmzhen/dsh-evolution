@@ -121,7 +121,8 @@ try {
   const tmp = fs.mkdtempSync(path.join(process.env.TEMP || '/tmp', 'pretag-'))
   execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['pack', '@lmzhen/dsh-evolution-all@' + rootVersion, '--silent'], { cwd: tmp, stdio: 'ignore', shell: true })
   const tgz = fs.readdirSync(tmp).find((n) => n.endsWith('.tgz'))
-  execFileSync('tar', ['-xzf', path.join(tmp, tgz), '-C', tmp])
+  // cwd + bare filename: GNU tar treats an absolute Windows path's drive colon as a remote host.
+  execFileSync('tar', ['-xzf', tgz, '-C', tmp], { cwd: tmp })
   const published = fs.readFileSync(path.join(tmp, 'package/cordis.patch.yml'))
   const live = fs.existsSync(installed) ? fs.readFileSync(installed) : Buffer.alloc(0)
   const equal = Buffer.compare(published, live) === 0

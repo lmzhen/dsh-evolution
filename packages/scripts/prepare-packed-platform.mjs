@@ -21,7 +21,9 @@ if (tarballs.length === 0) { console.error('prepare-packed-platform: empty manif
 const specs = new Set()
 const add = (name, range) => { if (!name.startsWith('@lmzhen/')) specs.add(name + '@' + range) }
 for (const tarball of tarballs) {
-  const raw = execFileSync('tar', ['-xOf', join(dist, String(tarball)), 'package/package.json'], { encoding: 'utf8' })
+  // cwd + bare filename: GNU tar reads `D:\...` as a REMOTE host and fails ("Cannot connect to D:") —
+  // the dist dir may be an absolute path on a Windows runner.
+  const raw = execFileSync('tar', ['-xOf', String(tarball), 'package/package.json'], { encoding: 'utf8', cwd: dist })
   const pkg = JSON.parse(raw)
   for (const [name, range] of Object.entries(pkg.dependencies ?? {})) {
     if (name.startsWith('@deepseek-ai/dsh-')) add(name, platformVersion)
