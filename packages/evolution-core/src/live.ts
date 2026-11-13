@@ -121,23 +121,3 @@ export function clampOnce(
 export function liveBool(value: LiveValue<boolean>, fallback = false): boolean {
   return unwrapLive(value) ?? fallback
 }
-
-/**
- * Read a string (live or plain). Blank/whitespace counts as unset — the same rule `evolutionRoot` uses
- * for `DSH_HOME`.
- */
-export function liveString(value: LiveValue<string>, fallback: string): string {
-  const current = unwrapLive(value)?.trim()
-  return current === undefined || current.length === 0 ? fallback : current
-}
-
-/**
- * Read an enumerated string (live or plain); a value outside `allowed` falls back.
- *
- * Used for the mode-like knobs (review mode, trigger, citation policy, write-confirm mode) where a
- * bare `?? default` would accept a typo the schema never saw.
- */
-export function liveEnum<T extends string>(value: LiveValue<T>, allowed: readonly T[], fallback: T): T {
-  const current = unwrapLive(value)
-  return current !== undefined && allowed.includes(current) ? current : fallback
-}

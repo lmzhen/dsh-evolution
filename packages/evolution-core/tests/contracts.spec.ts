@@ -7,7 +7,7 @@ import {
   RESTRICTED_TOOLS_ROW_ID,
   REVIEWER_PRESET_ID,
 } from '../src/composition/index.ts'
-import { createSubagentChannel, subagentChannelState } from '../src/subagent/index.ts'
+import { createSubagentChannel, probeChannelState } from '../src/subagent/index.ts'
 import { EVOLUTION_ERRORS, errorText } from '../src/errors.ts'
 import * as coreRoot from '../src/index.ts'
 import {
@@ -44,7 +44,7 @@ describe('G0 frozen contracts', () => {
   it('reports the subagent channel contract as unavailable until G3 implements the lifecycle', () => {
     const fakeCtx = { get: () => undefined }
     expect(createSubagentChannel(fakeCtx as never).state).toMatchObject({ kind: 'unavailable', code: 'E-323' })
-    expect(subagentChannelState(fakeCtx as never, 'reviewer')).toMatchObject({ kind: 'unavailable', code: 'E-323' })
+    expect(probeChannelState(fakeCtx as never, 'reviewer')).toMatchObject({ kind: 'unavailable', code: 'E-323' })
   })
 
   it('keeps the composer off the package root (single source is /composition)', () => {

@@ -35,13 +35,9 @@ if (/export function injectToolSkillCap/.test(installer)) {
   problems.push('install-layered.mjs regrew a local injectToolSkillCap (the cap injection belongs to the core composer)')
 }
 
-// G2-S6: the restricted preset rides in the runtime registry only (RESTRICTED_PRESET_DELIVERY=runtime),
-// so every bundle that can mount the family must resolve `evolution-core/restrictor`, and no profile
-// patch/yml may carry the restricted preset ids (a second delivery source would double-register).
-const DELIVERY = readFileSync(join(root, 'evolution-core/src/composition/preset-ids.ts'), 'utf8')
-if (!DELIVERY.includes("RESTRICTED_PRESET_DELIVERY = 'runtime'")) {
-  problems.push('RESTRICTED_PRESET_DELIVERY is not the frozen runtime value')
-}
+// G2-S6: every bundle that can mount the family must resolve `evolution-core/restrictor`, and no
+// profile patch/yml may carry the restricted preset ids (a second delivery source would
+// double-register). The old RESTRICTED_PRESET_DELIVERY string switch was dead (W11 E2b).
 const restrictedIds = ['evolution-reviewer-readonly', 'evolution-maintainer-readonly', 'evolution-restricted-tools']
 for (const bundle of ['evolution-all', 'evolution-host', 'evolution-preset', 'evolution-agent']) {
   const manifestPath = join(root, bundle, 'package.json')

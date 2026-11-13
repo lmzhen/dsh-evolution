@@ -68,8 +68,6 @@ describe('clampOnce — the pre-0.22 adapter keeps its signature and behaviour',
   })
 })
 
-// G5 step 5 (audit F1): the liveEnum / liveString assertions were retired with their exports -
-// no non-test consumer calls them (liveNumber and liveBool do have callers, so their assertions stay).
 describe('liveBool — the tri-state reader (L5)', () => {
   it('reads booleans in all three shapes', () => {
     expect(liveBool(true)).toBe(true)

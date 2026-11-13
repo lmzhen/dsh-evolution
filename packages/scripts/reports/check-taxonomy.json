@@ -14,7 +14,6 @@
       "gates": [
         "gate-01",
         "gate-02",
-        "gate-03",
         "gate-05",
         "gate-06",
         "gate-07",
@@ -183,7 +182,6 @@
       "gatesLocal": [
         "gate-01",
         "gate-02",
-        "gate-03",
         "gate-05",
         "gate-06",
         "gate-07",
@@ -254,7 +252,6 @@
       "gates": [
         "gate-01",
         "gate-02",
-        "gate-03",
         "gate-05",
         "gate-06",
         "gate-07",
@@ -754,7 +751,6 @@
       "gatesLocal": [
         "gate-01",
         "gate-02",
-        "gate-03",
         "gate-05",
         "gate-06",
         "gate-07",
@@ -828,6 +824,7 @@
         "ci-only-21",
         "ci-only-23",
         "ci-only-26",
+        "gate-03",
         "gate-27",
         "gate-48",
         "gate-49"
@@ -917,7 +914,6 @@
       "gates": [
         "gate-01",
         "gate-02",
-        "gate-03",
         "gate-05",
         "gate-06",
         "gate-07",
@@ -1417,7 +1413,6 @@
       "gatesLocal": [
         "gate-01",
         "gate-02",
-        "gate-03",
         "gate-05",
         "gate-06",
         "gate-07",
@@ -2071,7 +2066,6 @@
       "gatesLocal": [
         "gate-01",
         "gate-02",
-        "gate-03",
         "gate-05",
         "gate-06",
         "gate-07",
@@ -2137,19 +2131,19 @@
   },
   "counts": {
     "fast": {
-      "gates": 63,
+      "gates": 62,
       "specs": 102
     },
     "pre-tag": {
-      "gates": 63,
+      "gates": 62,
       "specs": 433
     },
     "ci-only": {
-      "gates": 9,
+      "gates": 10,
       "specs": 73
     },
     "full(ci=off)": {
-      "gates": 63,
+      "gates": 62,
       "specs": 433
     },
     "full(ci=on)": {

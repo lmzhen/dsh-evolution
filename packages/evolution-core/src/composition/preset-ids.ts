@@ -9,7 +9,6 @@ export const REVIEWER_PRESET_ID = 'evolution-reviewer-readonly' as const
 export const MAINTAINER_PRESET_ID = 'evolution-maintainer-readonly' as const
 export const RESTRICTED_TOOLS_ROW_ID = 'evolution-restricted-tools' as const
 export const RESTRICTOR_MODULE = scopedPackageName('dsh-evolution-core/restrictor', import.meta.url)
-export const RESTRICTED_PRESET_DELIVERY = 'runtime' as 'runtime' | 'installer'
 
 export interface RestrictedPresetDisplay {
   readonly name: string

@@ -1,7 +1,7 @@
 // Capability probe for the subagent channel: one place decides available vs unavailable.
 import type { Context } from '@deepseek-ai/cordis'
 import { restrictedPresetState } from '../composition/ensure.ts'
-import { restrictedPresetId, type RestrictedPresetKind } from '../composition/preset-ids.ts'
+import { restrictedPresetId } from '../composition/preset-ids.ts'
 import type { ChannelKind, ChannelState } from './types.ts'
 
 interface ProviderLike {
@@ -16,10 +16,6 @@ interface SubagentsLike {
 
 function serviceOf(ctx: Context, name: string): unknown {
   return (ctx as unknown as { get(service: string): unknown }).get(name)
-}
-
-function kindOf(kind: ChannelKind): RestrictedPresetKind {
-  return kind === 'reviewer' ? 'reviewer' : 'maintainer'
 }
 
 /** Pure derivation (no side effects): the doctor reads this, the channel re-probes on every run. */
@@ -40,11 +36,8 @@ export function probeChannelState(ctx: Context, kind: ChannelKind): ChannelState
   if (agentPresets === undefined || typeof agentPresets.readDocument !== 'function' || typeof agentPresets.register !== 'function') {
     return { kind: 'unavailable', code: 'E-323', reason: 'agentPresets service unavailable or incomplete' }
   }
-  const id = restrictedPresetId(kindOf(kind))
-  const state = restrictedPresetState(ctx, kindOf(kind))
+  const id = restrictedPresetId(kind)
+  const state = restrictedPresetState(ctx, kind)
   return { kind: 'available', provider: 'spawn', preset: { id, registered: state?.kind === 'ready' } }
 }
 
-export function subagentChannelState(ctx: Context, kind: ChannelKind): ChannelState {
-  return probeChannelState(ctx, kind)
-}
