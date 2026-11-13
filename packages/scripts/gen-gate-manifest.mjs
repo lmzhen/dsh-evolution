@@ -228,9 +228,51 @@ gates.push({
   reason: 'needs both local corpora; on a machine without them it must report CANNOT DECIDE rather than pass',
 })
 
+// M0 (W10 §10): lane membership is explicit data, one transitional home. The generator merges it
+// into every row and refuses to produce a manifest when the map is incomplete, names an unknown
+// lane, puts a machine-local row in a CI lane, or carries an id the manifest no longer has — a
+// table row that shifts its number therefore fails loud instead of silently inheriting a wrong lane.
+const LANE_ORDER = ['local', 'pre-tag', 'ci-setup', 'ci-static', 'ci-unit', 'ci-release', 'ci-windows', 'machine-local']
+const LANES = (() => {
+  try {
+    const parsed = JSON.parse(readFileSync(join(HERE, 'gate-lanes.json'), 'utf8'))
+    if (parsed === null || typeof parsed !== 'object' || parsed.lanes === null || typeof parsed.lanes !== 'object') throw new Error('gate-lanes.json carries no lanes object')
+    return parsed
+  } catch (error) {
+    console.error('gen-gate-manifest: gate-lanes.json is missing or unreadable (' + (error instanceof Error ? error.message : String(error)) + ') — the lane map is the M0 single source; restore it or re-derive it')
+    process.exit(1)
+  }
+})()
+
 // M2: the artifact carries the two declared forms; the internal construction key cmd is not
 // part of the schema (a third name for the same bytes is how a second source starts).
 for (const gate of gates) delete gate.cmd
+
+
+// Apply the lane map and validate it before anything is written. The map is the single source for
+// membership; the manifest only mirrors it, so a missing/extra/wrong lane fails generation rather
+// than shipping a row nobody owns.
+const RUN_LANES = new Set(['local', 'pre-tag', 'ci-setup', 'ci-static', 'ci-unit', 'ci-release', 'ci-windows'])
+const laneProblems = []
+const knownIds = new Set(gates.map((gate) => gate.id))
+for (const id of Object.keys(LANES.lanes ?? {})) if (!knownIds.has(id)) laneProblems.push('gate-lanes.json: unknown gate id ' + id)
+for (const gate of gates) {
+  const list = LANES.lanes?.[gate.id]
+  if (!Array.isArray(list) || list.length === 0) { laneProblems.push(gate.id + ': no lane in gate-lanes.json'); continue }
+  for (const lane of list) if (!LANE_ORDER.includes(lane)) laneProblems.push(gate.id + ': unknown lane ' + String(lane))
+  if (gate.tree === 'machine-local' && !(list.length === 1 && list[0] === 'machine-local')) laneProblems.push(gate.id + ': machine-local row must carry exactly ["machine-local"]')
+  if (gate.tree !== 'machine-local' && list.includes('machine-local')) laneProblems.push(gate.id + ': non-machine-local row carries machine-local')
+  if (['script', 'toolchain'].includes(gate.kind) && !list.some((lane) => RUN_LANES.has(lane))) laneProblems.push(gate.id + ': runnable row has no runnable lane')
+  gate.lanes = [...new Set(list)].sort((a, b) => LANE_ORDER.indexOf(a) - LANE_ORDER.indexOf(b))
+  const needs = LANES.needs?.[gate.id]
+  if (Array.isArray(needs) && needs.length > 0) gate.needs = [...new Set(needs)]
+}
+if (laneProblems.length > 0) {
+  console.error('gen-gate-manifest: gate-lanes.json does not match the manifest — ' + laneProblems.length + ' problem(s):')
+  for (const problem of laneProblems.slice(0, 12)) console.error('  - ' + problem)
+  if (laneProblems.length > 12) console.error('  … ' + (laneProblems.length - 12) + ' more')
+  process.exit(1)
+}
 
 // G7-S1: probes are hand-authored (probes.json) and merged here; gate-manifest.probes is the ONE
 // generated registry consumers read (verify-probes / verify-mutations / traceability).
@@ -248,7 +290,7 @@ if (probes.length === 0) {
 const out = {
   version: 1,
   generatedBy: 'packages/scripts/gen-gate-manifest.mjs',
-  sources: ['CONTRIBUTING.md (gate table)', '.github/actions/evolution-validate/action.yml (CI run steps)', 'packages/scripts/probes.json (probe registry)'],
+  sources: ['CONTRIBUTING.md (gate table)', '.github/actions/evolution-validate/action.yml (CI run steps)', 'packages/scripts/probes.json (probe registry)', 'packages/scripts/gate-lanes.json (lane membership, M0)'],
   gates,
   probes,
 }

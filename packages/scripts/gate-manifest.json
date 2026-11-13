@@ -4,7 +4,8 @@
   "sources": [
     "CONTRIBUTING.md (gate table)",
     ".github/actions/evolution-validate/action.yml (CI run steps)",
-    "packages/scripts/probes.json (probe registry)"
+    "packages/scripts/probes.json (probe registry)",
+    "packages/scripts/gate-lanes.json (lane membership, M0)"
   ],
   "gates": [
     {
@@ -17,6 +18,9 @@
       ],
       "tree": "overlay",
       "profiles": [
+        "local"
+      ],
+      "lanes": [
         "local"
       ],
       "registration": {
@@ -50,6 +54,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -69,6 +77,10 @@
         "local",
         "ci"
       ],
+      "lanes": [
+        "local",
+        "ci-unit"
+      ],
       "registration": {
         "reason": "the full family vitest suite does not return on this machine within the 180 s budget",
         "owner": "scripts/gates",
@@ -87,7 +99,13 @@
       ],
       "tree": "overlay",
       "profiles": [],
-      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)"
+      "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "local",
+        "ci-unit",
+        "ci-release",
+        "ci-windows"
+      ]
     },
     {
       "id": "gate-05",
@@ -100,6 +118,9 @@
       ],
       "tree": "overlay",
       "profiles": [
+        "local"
+      ],
+      "lanes": [
         "local"
       ],
       "registration": {
@@ -124,6 +145,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -140,6 +165,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -156,6 +185,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -172,6 +205,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -188,6 +225,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -204,6 +245,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -220,6 +265,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -233,7 +282,10 @@
       "tree": "machine-local",
       "profiles": [],
       "reason": "tsconfig registration for the overlay layout",
-      "owner": "toolchain"
+      "owner": "toolchain",
+      "lanes": [
+        "machine-local"
+      ]
     },
     {
       "id": "gate-14",
@@ -246,7 +298,10 @@
       "tree": "machine-local",
       "profiles": [],
       "reason": "manifest version uniformity across the two trees",
-      "owner": "toolchain"
+      "owner": "toolchain",
+      "lanes": [
+        "machine-local"
+      ]
     },
     {
       "id": "gate-15",
@@ -260,7 +315,10 @@
       "tree": "machine-local",
       "profiles": [],
       "reason": "mirror <-> overlay parity check",
-      "owner": "toolchain"
+      "owner": "toolchain",
+      "lanes": [
+        "machine-local"
+      ]
     },
     {
       "id": "gate-16",
@@ -275,6 +333,11 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release",
+        "ci-windows"
       ]
     },
     {
@@ -292,6 +355,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -310,6 +377,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -326,6 +397,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -342,6 +417,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -358,6 +437,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -373,6 +456,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -389,6 +476,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -407,7 +498,11 @@
         "local",
         "ci"
       ],
-      "drillCmd": "node packages/scripts/verify-arming.mjs --drill"
+      "drillCmd": "node packages/scripts/verify-arming.mjs --drill",
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
     },
     {
       "id": "gate-25",
@@ -423,6 +518,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -439,6 +538,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -455,6 +558,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
       ]
     },
     {
@@ -471,6 +578,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -490,6 +601,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
@@ -512,6 +627,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -527,6 +646,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -542,6 +665,9 @@
       "tree": "mirror",
       "profiles": [
         "local"
+      ],
+      "lanes": [
+        "local"
       ]
     },
     {
@@ -555,6 +681,10 @@
         "ci"
       ],
       "argvProblem": "composite-cell: 6 commands in one table row",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -576,6 +706,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -591,6 +725,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -606,6 +744,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -621,6 +763,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -636,6 +782,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -651,6 +801,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -666,6 +820,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -681,6 +839,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -696,6 +858,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -711,6 +877,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -726,6 +896,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -742,7 +916,11 @@
         "local",
         "ci"
       ],
-      "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test"
+      "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test",
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
     },
     {
       "id": "gate-46",
@@ -758,6 +936,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -773,6 +955,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -789,6 +975,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
       ]
     },
     {
@@ -804,6 +994,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
       ],
       "registration": {
         "reason": "the mutation ledger is still being filled: 29 of 109 checks carry a proven red record",
@@ -826,6 +1020,9 @@
       "tree": "mirror",
       "profiles": [
         "local"
+      ],
+      "lanes": [
+        "local"
       ]
     },
     {
@@ -839,6 +1036,9 @@
       ],
       "tree": "mirror",
       "profiles": [
+        "local"
+      ],
+      "lanes": [
         "local"
       ]
     },
@@ -855,6 +1055,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -870,6 +1074,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -886,6 +1094,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -902,6 +1114,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -917,6 +1133,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
       ]
     },
     {
@@ -940,6 +1160,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-release"
       ]
     },
     {
@@ -952,6 +1176,9 @@
       ],
       "tree": "mirror",
       "profiles": [
+        "local"
+      ],
+      "lanes": [
         "local"
       ]
     },
@@ -966,6 +1193,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-release"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -985,6 +1216,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1004,6 +1239,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1023,6 +1262,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1042,6 +1285,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1061,6 +1308,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1080,6 +1331,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1099,6 +1354,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1116,6 +1375,9 @@
       "profiles": [],
       "argvProblem": "no-command-in-cell",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-setup"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1133,6 +1395,9 @@
       "profiles": [],
       "argvProblem": "no-command-in-cell",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-windows"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1150,6 +1415,9 @@
       "profiles": [],
       "argvProblem": "no-command-in-cell",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-setup"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1167,6 +1435,9 @@
       "profiles": [],
       "argvProblem": "no-command-in-cell",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-release"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1184,6 +1455,9 @@
       "profiles": [],
       "argvProblem": "no-command-in-cell",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-release"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1203,6 +1477,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1220,6 +1498,9 @@
       "profiles": [],
       "argvProblem": "no-command-in-cell",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
+      "lanes": [
+        "ci-unit"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1239,6 +1520,11 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-release",
+        "ci-windows"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1260,6 +1546,10 @@
       "argvProblem": "no-command-in-cell",
       "localSafe": false,
       "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1279,6 +1569,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1298,6 +1592,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1317,6 +1615,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1336,6 +1638,10 @@
         "ci"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1356,6 +1662,9 @@
       ],
       "argvProblem": "no-command-in-cell",
       "drillCmd": "node packages/scripts/verify-graph-edges.mjs --self-test",
+      "lanes": [
+        "local"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1374,6 +1683,9 @@
         "local"
       ],
       "argvProblem": "no-command-in-cell",
+      "lanes": [
+        "local"
+      ],
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
@@ -1394,6 +1706,10 @@
       "profiles": [
         "local",
         "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -1414,7 +1730,10 @@
         "ci"
       ],
       "reason": "payload audit of the packed dist — only meaningful after prepare-release has staged the release job's inputs",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-release"
+      ]
     },
     {
       "id": "ci-only-02",
@@ -1431,7 +1750,10 @@
         "ci"
       ],
       "reason": "repo-root about manifest; the overlay carries no repository package.json above it (the action itself reports 'not armed')",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-03",
@@ -1448,7 +1770,10 @@
         "ci"
       ],
       "reason": "generated bundle-patch freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-04",
@@ -1465,7 +1790,10 @@
         "ci"
       ],
       "reason": "generated client-guard copy freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-05",
@@ -1482,7 +1810,10 @@
         "ci"
       ],
       "reason": "generated client-token copy freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-06",
@@ -1499,7 +1830,10 @@
         "ci"
       ],
       "reason": "generated param client-view freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-07",
@@ -1516,7 +1850,10 @@
         "ci"
       ],
       "reason": "generated param docs freshness --check (generator writes in the mirror; CI verifies the committed copy)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-08",
@@ -1532,7 +1869,10 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0"
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-09",
@@ -1549,7 +1889,10 @@
         "ci"
       ],
       "reason": "generated requirements view freshness --check (the CI job owns the non-strict gate view)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-10",
@@ -1564,7 +1907,10 @@
       "tree": "mirror",
       "profiles": [],
       "reason": "workflow plumbing: injects the mirror alias paths into the released upstream tsconfig (overlay setup, not a family check)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-setup"
+      ]
     },
     {
       "id": "ci-only-11",
@@ -1583,7 +1929,10 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "Windows install smoke — needs a throwaway DSH_HOME and the packed staging tarballs",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-windows"
+      ]
     },
     {
       "id": "ci-only-12",
@@ -1599,7 +1948,10 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "line-header policy check (--ci form) over the overlay tree",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-setup"
+      ]
     },
     {
       "id": "ci-only-13",
@@ -1618,7 +1970,11 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
-      "expiry": "0.46.0"
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-release",
+        "ci-windows"
+      ]
     },
     {
       "id": "ci-only-14",
@@ -1632,7 +1988,10 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "the pack step itself (a build product, not a check)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-release"
+      ]
     },
     {
       "id": "ci-only-15",
@@ -1647,7 +2006,10 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "publish dry-run of the staged tarballs",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-release"
+      ]
     },
     {
       "id": "ci-only-16",
@@ -1660,7 +2022,10 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "requirements registry self-test (a CI-only contract fixture)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-17",
@@ -1674,7 +2039,10 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "load-sensitive lock group runner (local-runner registered; the action runs it at pinned concurrency)",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-unit"
+      ]
     },
     {
       "id": "ci-only-18",
@@ -1690,7 +2058,11 @@
       "tree": "overlay",
       "profiles": [],
       "reason": "P2-33 packed-tarball consumer smoke: unpacks dist tarballs and imports every declared entry",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-release",
+        "ci-windows"
+      ]
     },
     {
       "id": "ci-only-19",
@@ -1705,7 +2077,10 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0"
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-20",
@@ -1721,7 +2096,10 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0"
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-21",
@@ -1737,7 +2115,10 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0"
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-22",
@@ -1756,7 +2137,10 @@
       "reason": "mirror↔overlay script/version parity; needs the mirror checkout beside the overlay",
       "owner": "ci",
       "localSafe": false,
-      "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine"
+      "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-23",
@@ -1772,7 +2156,10 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0"
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-24",
@@ -1788,7 +2175,10 @@
         "ci"
       ],
       "reason": "probe registry schema lint; the CI job executes it, the mirror local lane has no platform overlay",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-25",
@@ -1804,7 +2194,10 @@
         "ci"
       ],
       "reason": "requirements matrix coverage; the CI job executes it after gen-requirements",
-      "owner": "ci"
+      "owner": "ci",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "ci-only-26",
@@ -1821,7 +2214,10 @@
         "ci"
       ],
       "reason": "CI-only gate with no table row yet — local slot pending (G0-1)",
-      "expiry": "0.46.0"
+      "expiry": "0.46.0",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "line-identity-ci",
@@ -1837,7 +2233,10 @@
         "--policy-only",
         "--strict"
       ],
-      "reason": "CI has no machine bed — policy half only (contract §5e)"
+      "reason": "CI has no machine bed — policy half only (contract §5e)",
+      "lanes": [
+        "ci-static"
+      ]
     },
     {
       "id": "line-identity-bed",
@@ -1855,7 +2254,11 @@
         "packages/scripts/files/line-manifest.json",
         "--strict"
       ],
-      "reason": "toothed form: compares the bed manifest produced by gen-line-manifest.mjs"
+      "reason": "toothed form: compares the bed manifest produced by gen-line-manifest.mjs",
+      "lanes": [
+        "local",
+        "pre-tag"
+      ]
     },
     {
       "id": "graph-edges-live",
@@ -1873,7 +2276,11 @@
       ],
       "noDrillReason": "live-root form: it reads the user skill roots; a drill needs a repo-internal fixture root (--roots), which does not exist yet — the self-test form (gate-46) is the falsifiable half",
       "reason": "live-root form: needs a resolvable dependency tree and skill roots; the bare mirror is expected to exit 2 with reason=reader-unavailable (R99/R145)",
-      "owner": "toolchain"
+      "owner": "toolchain",
+      "lanes": [
+        "local",
+        "pre-tag"
+      ]
     },
     {
       "id": "health-admission",
@@ -1889,6 +2296,10 @@
         "packages/scripts/verify-health-admission.mjs"
       ],
       "reason": "needs both local corpora; on a machine without them it must report CANNOT DECIDE rather than pass",
+      "lanes": [
+        "local",
+        "pre-tag"
+      ],
       "registration": {
         "reason": "no user or platform corpora on this machine, so admission cannot be judged",
         "owner": "scripts/gates",

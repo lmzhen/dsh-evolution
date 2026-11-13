@@ -603,7 +603,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "3bfbdda5155684dc94db93a7230c83b41ad0967a8cf8108f9f34a96727b5cb2e",
+        "sha256": "cba6ada2a62692727a3caa1290d9fe8bf56e9643eb9eca2e2613657ef6b655da",
         "tierSource": "testing-policy",
         "sentinel": {
           "tier": "unmapped",

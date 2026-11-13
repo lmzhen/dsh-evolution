@@ -4,10 +4,12 @@
  * G1: every gate now emits a VerdictRecord; the runner renders, it does not decide by exit code alone.
  * G1/S4: the spawn seam lives in lib-run-gates.mjs (createRunner) - this file wires spawnSync and
  * renders what the runner observed; no env/CLI switch reaches the seam.
- * 用法：node packages/scripts/run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--only <id>] [--drill <id>] [--overlay <path>]
+ * 用法：node packages/scripts/run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--json-out <path>] [--lane <name>] [--only <id>] [--drill <id>] [--overlay <path>]
  * 规则：seed = CI ∪ 表；pre-tag = local ∪ ci；runner 只跑 kind=script|toolchain；tree=overlay 的门禁在 overlay 根下跑。
+ * M0（W10 §10）：每行带 `lanes`（gate-lanes.json 生成）；`--lane` 在 profile 选择后再按 lane 过滤，
+ * 空选择 exit 2；`--json-out` 写逐行 verdict 工件（`--json` 仍是 stdout 模式，两者可同时用）。
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -25,6 +27,13 @@ const args = process.argv.slice(2)
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : '') : undefined }
 const has = (name) => args.includes(name)
 const profile = args.find((a) => ['local', 'pre-tag', 'ci'].includes(a))
+// M0 lane selection: lane membership is data on each row (gate-lanes.json), not another profile.
+const laneName = flag('--lane')
+const jsonOut = flag('--json-out')
+const KNOWN_LANES = new Set(['local', 'pre-tag', 'ci-setup', 'ci-static', 'ci-unit', 'ci-release', 'ci-windows', 'machine-local'])
+if (laneName !== undefined) {
+  if (laneName === '' || !KNOWN_LANES.has(laneName)) { console.error('run-gates: --lane needs one of ' + [...KNOWN_LANES].join('|') + ' (got ' + JSON.stringify(laneName) + ')'); process.exit(2) }
+}
 // 遗留⑤: the platform tree is a fixture, not a repo fact — resolve it portably (env first).
 const overlayRoot = flag('--overlay') || softOverlay()
 
@@ -93,7 +102,11 @@ if (!profile) { console.error('run-gates: usage: run-gates.mjs <local|pre-tag|ci
 let list = byProfile[profile]
 const only = flag('--only')
 if (only !== undefined) { list = list.filter((g) => g.id === only); if (list.length === 0) { console.error('run-gates: --only ' + only + ' not in profile ' + profile); process.exit(2) } }
-if (has('--list')) { emitList(list, profile); process.exit(0) }
+if (laneName !== undefined) {
+  list = list.filter((g) => Array.isArray(g.lanes) && g.lanes.includes(laneName))
+  if (list.length === 0) { console.error('run-gates: --lane ' + laneName + ' selects no runnable gate in profile ' + profile + ' — an empty lane is not a pass'); process.exit(2) }
+}
+if (has('--list')) { emitList(list, laneName === undefined ? profile : profile + ' lane=' + laneName); process.exit(0) }
 
 const runner = createRunner({ spawn: spawnSync })
 // requires (R38/R42): the prerequisites each check declares. The FACT owns them (nothing else
@@ -149,7 +162,7 @@ const evaluateRequires = (gate) => {
 }
 const identity = identityFor(profile)
 const records = []
-const base = (g, extra) => ({ id: g.id, check: g.human, criterion: criterionOf(g.id), identity, subject: { kind: 'paths', count: 0 }, ...extra })
+const base = (g, extra) => ({ id: g.id, check: g.human, criterion: criterionOf(g.id), lanes: Array.isArray(g.lanes) ? g.lanes : [], identity, subject: { kind: 'paths', count: 0 }, ...extra })
 
 for (const g of list) {
   // 1) static executability: a placeholder token or a non-command argv[0] cannot run a criterion at all
@@ -252,11 +265,23 @@ const unregisteredCannotDecide = records
   })
 const c = counts(records)
 const violations = records.flatMap((r) => validate(r, r.id))
+const payload = { schema: 1, profile, lane: laneName ?? null, counts: c, gates: records, violations }
+if (jsonOut !== undefined) {
+  const target = resolve(jsonOut)
+  mkdirSync(dirname(target), { recursive: true })
+  writeFileSync(target, JSON.stringify(payload, null, 2) + '\n')
+  if (!has('--json')) console.error('run-gates: wrote lane artifact ' + target)
+}
 if (has('--json')) {
-  console.log(JSON.stringify({ schema: 1, profile, counts: c, gates: records, violations }, null, 2))
+  console.log(JSON.stringify(payload, null, 2))
 } else {
   for (const r of records) { console.log(render(r)); for (const l of actionBlock(r)) console.log(l) }
-  console.log('run-gates [' + profile + '] counts: pass=' + c.pass + ' fail=' + c.fail + ' cannotDecide=' + c.cannotDecide + '(registered=' + (c.cannotDecide - unregisteredCannotDecide.length) + ', unregistered=' + unregisteredCannotDecide.length + ')' + ' skipped=' + c.skipped)
+  console.log('run-gates [' + profile + (laneName === undefined ? '' : ' lane=' + laneName) + '] counts: pass=' + c.pass + ' fail=' + c.fail + ' cannotDecide=' + c.cannotDecide + '(registered=' + (c.cannotDecide - unregisteredCannotDecide.length) + ', unregistered=' + unregisteredCannotDecide.length + ')' + ' skipped=' + c.skipped)
+  const timed = records.filter((r) => typeof r.ms === 'number' && r.ms > 0).sort((a, b) => b.ms - a.ms).slice(0, 10)
+  if (timed.length > 0) {
+    console.log('run-gates [' + profile + '] slowest gates (ms):')
+    for (const r of timed) console.log('  ' + String(r.ms).padStart(7) + 'ms  ' + r.id.padEnd(18) + r.verdict)
+  }
 }
 if (violations.length > 0) { console.error('run-gates: record contract violations: ' + violations.slice(0, 3).join(' | ')); process.exit(2) }
 process.exit(c.fail > 0 ? 1 : c.pass === 0 ? 2 : unregisteredCannotDecide.length > 0 ? 2 : 0)
