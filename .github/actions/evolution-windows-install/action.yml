@@ -1,0 +1,146 @@
+name: evolution-windows-install
+description: >-
+  The Windows half of the release gate: overlay the family onto the released upstream ref, build
+  the family libs, pack the release, prepare the packed platform, then install the PACKED bytes into
+  a throwaway consumer and run the source-overlay installer guard against a throwaway DSH_HOME.
+  It deliberately does NOT run the family test suite, mutation probes, static guards, the tarball
+  audit or the publish dry-run: those are Linux lanes (compat-check) and repeating them here made
+  an "install" job three times the length of the validation it duplicated.
+inputs:
+  upstream_repo:
+    description: Upstream repository to overlay onto
+    required: true
+  upstream_ref:
+    description: Upstream ref (tag/commit) this lane installs against
+    required: true
+  platform_version:
+    description: Platform package version the packed consumer installs against
+    required: false
+    default: '0.2.2-rc.1'
+  version:
+    description: The release version the workflow packs with (RELEASE_VERSION); 'v' prefix is stripped
+    required: true
+  node_version:
+    description: Node major version for the Windows lane
+    required: false
+    default: '24'
+  npm_scope:
+    description: npm scope the pack rewrite uses (one source with the workflow's NPM_SCOPE)
+    required: false
+    default: '@lmzhen'
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        repository: ${{ inputs.upstream_repo }}
+        ref: ${{ inputs.upstream_ref }}
+        path: upstream
+        persist-credentials: false
+
+    - name: Overlay mirror packages into upstream
+      shell: bash
+      run: node packages/scripts/ci-overlay.mjs
+
+    - name: Verify layout sync and version alignment (P2-15, V9-01 guard)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The overlay must be the clean-clone shape before anything is built from it: the version
+        # half of this guard is the V9-01 incident's check, and it also proves the overlay copy
+        # landed the mirror scripts the family owns.
+        node packages/evolution/scripts/verify-layout-sync.mjs \
+          packages/evolution/scripts ../packages/scripts
+
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      with:
+        version: '11.7.0'
+
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: ${{ inputs.node_version }}
+        cache: pnpm
+        cache-dependency-path: upstream/pnpm-lock.yaml
+
+    - name: Pre-register overlay workspace packages in the lockfile (P2-16)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The committed upstream lockfile predates the overlaid packages/evolution/* members;
+        # resolve once, record it in the log, then install from the completed lockfile.
+        pnpm install --lockfile-only --no-frozen-lockfile
+        echo "pre-registered $(grep -c '^  packages/evolution/' pnpm-lock.yaml || true) evolution importer(s) into the lockfile"
+
+    - name: Install dependencies from the frozen lockfile
+      shell: bash
+      working-directory: upstream
+      run: pnpm install --frozen-lockfile
+
+    - name: Build the host native addon (POSIX flock binding)
+      shell: bash
+      working-directory: upstream
+      run: pnpm run build:native-system
+
+    - name: Build the family libraries
+      shell: bash
+      working-directory: upstream
+      run: node packages/evolution/scripts/build-lib.mjs
+
+    - name: Pack the family release
+      shell: bash
+      working-directory: upstream
+      env:
+        NPM_SCOPE: ${{ inputs.npm_scope }}
+        RELEASE_VERSION: ${{ inputs.version }}
+      run: |
+        # Same packing semantics as the full lane: a tag packs its own semver, a main push packs
+        # the dev placeholder (never published — publish is tag-gated).
+        ARGS=(--scope "$NPM_SCOPE" --version "${RELEASE_VERSION#v}")
+        if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then ARGS+=(--dev-build); fi
+        node packages/evolution/scripts/prepare-release.mjs "${ARGS[@]}"
+
+    - name: "Packed install: full import against the npm platform"
+      shell: bash
+      working-directory: upstream
+      env:
+        PLATFORM_VERSION: ${{ inputs.platform_version }}
+      run: |
+        PLATFORM_DIR="$(node packages/evolution/scripts/prepare-packed-platform.mjs packages/evolution/dist "$PLATFORM_VERSION" | tail -n 1)"
+        test -d "$PLATFORM_DIR"
+        node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules "$PLATFORM_DIR"
+
+    - name: "Install smoke: packed tarballs into a throwaway consumer"
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The bytes a user receives: every tarball unpacked, every declared entry imported, every
+        # bundle patch asset present. `--assets-only` is the CI half (the platform is source-only in
+        # this checkout); the full runtime import runs in the step above and on a real host.
+        node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only
+
+    - name: Source-overlay installer guard (Windows install path)
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The Windows-specific half: the installer's profile patch shape (bundle row, preset row,
+        # journal, no double mount) is what a Windows path bug breaks first.
+        HOME_DIR="$(mktemp -d)"
+        node packages/evolution/scripts/install-layered.mjs \
+          --home "$HOME_DIR" --profile web --mode layered
+        node packages/evolution/scripts/verify-profile-bundles.mjs "$HOME_DIR/profiles/web"
+        test -f "$HOME_DIR/profiles/web/.evolution-install.json"
+        test -f "$HOME_DIR/profiles/web/cordis.patch.yml"
+
+    - name: Windows path/lock risk subset
+      shell: bash
+      working-directory: upstream
+      run: |
+        # The full suite stays on the Linux matrix (node 22 + 24). These four cover the classes that
+        # are Windows-only in practice: EPERM rename/unlink retries, CRLF-authored preset bytes, and
+        # the lock primitives under the native flock binding. Measured 62 tests / 19.2 s on Windows.
+        node node_modules/vitest/vitest.mjs run \
+          packages/evolution/evolution-core/tests/io.spec.ts \
+          packages/evolution/evolution-commands/tests/atomic-write.spec.ts \
+          packages/evolution/evolution-core/tests/preset-composition.spec.ts \
+          packages/evolution/evolution-core/tests/mutation-lock.spec.ts \
+          --maxWorkers=1 --testTimeout=30000
