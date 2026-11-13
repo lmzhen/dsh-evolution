@@ -49,9 +49,9 @@ Preset bases and preconditions are single-sourced in [evolution-agent/README.md]
 
 ## Installer flags
 
-`install-layered.mjs` accepts: `--mode`, `--profile`, `--base`, `--home`, `--dry-run`, `--force`, `--check-presets`, `--uninstall`, `--help`.
+`install-layered.mjs` accepts: `--mode`, `--profile`, `--base`, `--home`, `--from-dist`, `--dry-run`, `--force`, `--check-presets`, `--uninstall`, `--help`.
 
-`--mode all` is the product install; `--mode host` is the advanced infrastructure plane. `--base` is repeatable; `--dry-run` reports changes without writing. Legacy agent/layered/oneclick values remain migration-only and are not product choices.
+`--mode all` is the product install; `--mode host` is the advanced infrastructure plane. `--base` is repeatable; `--dry-run` reports changes without writing. `--from-dist <dir>` installs the packed release tarballs (`prepare-release` output) instead of the source tree; the CI packed-install guard uses it. Legacy agent/layered/oneclick values remain migration-only and are not product choices.
 
 ## Merge control axes
 
