@@ -136,8 +136,9 @@ export const guards = [
     tree: "mirror",
     title: "`node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/_upstream/dsh-upstream-0.2.2-rc.1 --accept-recorded`",
     argv: ["node","packages/scripts/verify-platform-contract.mjs","packages","--upstream","D:/dsh/_upstream/dsh-upstream-0.2.2-rc.1","--accept-recorded"],
-    // CI: the platform checkout at ./upstream IS the tree to judge; strict mode (no --accept-recorded).
-    ci: { argv: ["node","packages/scripts/verify-platform-contract.mjs","packages","--upstream","upstream"] },
+    // CI runs the action's overlay form: the platform citations are overlay-relative, so the guard
+    // must see the overlay tree (strict mode, no --accept-recorded).
+    ci: { cwd: "upstream", argv: ["node","packages/evolution/scripts/verify-platform-contract.mjs","packages/evolution","--upstream","."] },
     lanes: ["local","ci-static"],
   }),
 
@@ -266,6 +267,9 @@ export const guards = [
     tree: "mirror",
     title: "`node packages/scripts/verify-package-map.mjs packages`（G4.1/C5 roster：`packages/README.md` 的 Package map 必须**恰好**列出树里全部可发布包——新增包没入图、或图里留着一个已不存在的包，都必红。drill：把状态行里的 `evolution-state-json` 去掉 ⇒ 必红并点名；撤回即绿 ✓）",
     argv: ["node","packages/scripts/verify-package-map.mjs","packages"],
+    // CI runs it inside the overlay tree (the action's form): the family checkout's root also holds
+    // `upstream/`, which is not a declared package root, and a root scan must not judge it.
+    ci: { cwd: "upstream", argv: ["node","packages/evolution/scripts/verify-package-map.mjs","packages/evolution"] },
     lanes: ["local","ci-static"],
   }),
 

@@ -332,12 +332,13 @@
         "ci-static"
       ],
       "ci": {
+        "cwd": "upstream",
         "argv": [
           "node",
-          "packages/scripts/verify-platform-contract.mjs",
-          "packages",
+          "packages/evolution/scripts/verify-platform-contract.mjs",
+          "packages/evolution",
           "--upstream",
-          "upstream"
+          "."
         ]
       }
     },
@@ -668,7 +669,15 @@
       "lanes": [
         "local",
         "ci-static"
-      ]
+      ],
+      "ci": {
+        "cwd": "upstream",
+        "argv": [
+          "node",
+          "packages/evolution/scripts/verify-package-map.mjs",
+          "packages/evolution"
+        ]
+      }
     },
     {
       "id": "gate-35",
