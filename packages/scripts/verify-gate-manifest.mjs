@@ -48,7 +48,13 @@ const problems = []
 // G0-0.2: the manifest generator own --check had NO execution point in the tree (F-15). Wiring it
 // here makes it run wherever this meta gate runs (gate-22: local + ci) - one owner, no second
 // drift detector. Measured: gen-gate-manifest.mjs --check exits 1 on a stale view.
-if (process.env.SKIP_MANIFEST_FRESHNESS !== '1') {
+// The generator computes its view root from its own location: that is the family mirror layout.
+// In the released-upstream overlay its parent-of-parent is the platform tree and carries no
+// CONTRIBUTING.md, so the probe is only meaningful where that file exists (the mirror verifier
+// still owns the freshness check; the overlay gate must not turn a layout into a red).
+const freshnessHome = resolve(root, '..')
+const freshnessArmed = existsSync(join(freshnessHome, 'CONTRIBUTING.md')) && existsSync(join(root, 'scripts', 'gen-gate-manifest.mjs'))
+if (process.env.SKIP_MANIFEST_FRESHNESS !== '1' && freshnessArmed) {
   const probe = spawnSync(process.execPath, [join(root, 'scripts', 'gen-gate-manifest.mjs'), '--check'], { encoding: 'utf8' })
   if (probe.status !== 0) {
     const tail = String(probe.stderr || probe.stdout || '').split('\n').filter((l) => l.trim() !== '').slice(-1)[0] || '(no output)'
