@@ -6,67 +6,52 @@ import { describe, expect, it } from 'vitest'
 import { PARAM_ALIASES } from '@deepseek-ai/dsh-evolution-core'
 
 /**
- * G0/S0.3 guard: every deprecated parameter alias must be documented where its
- * owning package is read — README and Config JSDoc both name the alias AND its
- * canonical id, and both carry the `G0/S0.3` marker so a later edit cannot drop
- * the deprecation notice silently. The machine-readable source stays
- * PARAM_ALIASES (evolution-core); this spec only pins the human-facing half.
+ * G0/S0.3 guard: every deprecated parameter alias must be documented where its canonical row is
+ * defined — README and Config/source both name the alias AND its canonical id, and both carry the
+ * `G0/S0.3` marker so a later edit cannot drop the deprecation notice silently.
+ *
+ * One table, keyed by the CANONICAL row id (the value PARAM_ALIASES points at). A missing entry is
+ * a loud failure: the old two-table split keyed one side by package name and the other by row id, so
+ * five of six aliases silently fell back to a package README whose owner never matched a row
+ * (audit 09 P0: the test looked green while testing the wrong document).
  */
-const OWNER: Record<string, string> = {
-  reviewMemoryInterval: 'evolution-review',
-  reviewSkillInterval: 'evolution-review',
-  curatorIntervalHours: 'evolution-curator',
-  skillContentChars: 'tool-skill-manage',
-  memoryChars: 'memory-files',
-  userChars: 'memory-files',
-}
-
-/** Absorbed rows keep their id; their docs and sources live under the host package. */
-const OWNER_DOCS: Record<string, { readme: string; source: string }> = {
-  'memory-files': { readme: 'memory/docs/files/README.md', source: 'memory/src/files/index.ts' },
-  'tool-memory': { readme: 'memory/docs/tools/README.md', source: 'memory/src/tools/index.ts' },
-  'skill-usage': { readme: 'evolution-skill-discovery/docs/usage/README.md', source: 'evolution-skill-discovery/src/usage/index.ts' },
-  'evolution-skill-catalog': { readme: 'evolution-skill-discovery/docs/catalog/README.md', source: 'evolution-skill-discovery/src/catalog/index.ts' },
-  'evolution-skill-health': { readme: 'evolution-skill-discovery/docs/health/README.md', source: 'evolution-skill-discovery/src/health/index.ts' },
-  'evolution-feedback': { readme: 'evolution-activity/docs/feedback/README.md', source: 'evolution-activity/src/feedback/index.ts' },
-  'evolution-replay': { readme: 'evolution-activity/docs/replay/README.md', source: 'evolution-activity/src/replay/index.ts' },
-  'evolution-learning-graph': { readme: 'evolution-activity/docs/learning-graph/README.md', source: 'evolution-activity/src/learning-graph/index.ts' },
-  'evolution-threat': { readme: 'evolution-activity/docs/threat/README.md', source: 'evolution-activity/src/threat/index.ts' },
+const DOC_SURFACES: Record<string, { readonly readme: string; readonly source: string }> = {
+  reviewMemoryInterval: { readme: 'evolution-review/README.md', source: 'evolution-review/src/index.ts' },
+  reviewSkillInterval: { readme: 'evolution-review/README.md', source: 'evolution-review/src/index.ts' },
+  curatorIntervalHours: { readme: 'evolution-curator/README.md', source: 'evolution-curator/src/index.ts' },
+  skillContentChars: { readme: 'tool-skill-manage/README.md', source: 'tool-skill-manage/src/index.ts' },
+  memoryChars: { readme: 'memory/docs/files/README.md', source: 'memory/src/files/index.ts' },
+  userChars: { readme: 'memory/docs/files/README.md', source: 'memory/src/files/index.ts' },
 }
 
 const MARKER = /G0\/S0\.3/
 
-/** Owner package of a canonical id, or a loud failure when the map is stale. */
-function ownerOf(canonical: string): string {
-  const owner = OWNER[canonical]
-  if (owner === undefined) throw new Error('no owning package declared for ' + canonical)
-  return owner
+function docsOf(canonical: string): { readonly readme: string; readonly source: string } {
+  const docs = DOC_SURFACES[canonical]
+  if (docs === undefined) throw new Error('no doc surfaces declared for canonical row ' + canonical)
+  return docs
 }
 
 describe('deprecated parameter aliases are documented (G0/S0.3)', () => {
   const root = fileURLToPath(new URL('../../', import.meta.url))
 
-  it('covers every alias with an owning package that has both doc surfaces', () => {
+  it('covers every alias with both doc surfaces', () => {
     for (const canonical of Object.values(PARAM_ALIASES)) {
-      const owner = ownerOf(canonical)
-      const docs = OWNER_DOCS[owner]
-      const readme = join(root, docs === undefined ? owner + '/README.md' : docs.readme)
-      const source = join(root, docs === undefined ? owner + '/src/index.ts' : docs.source)
-      expect(() => readFileSync(readme, 'utf8'), readme).not.toThrow()
-      expect(() => readFileSync(source, 'utf8'), source).not.toThrow()
+      const docs = docsOf(canonical)
+      for (const rel of [docs.readme, docs.source]) {
+        expect(() => readFileSync(join(root, rel), 'utf8'), rel).not.toThrow()
+      }
     }
   })
 
-  it('names the alias, the canonical id and the marker in README and Config JSDoc', () => {
+  it('names the alias, the canonical id and the marker in README and source docs', () => {
     for (const [alias, canonical] of Object.entries(PARAM_ALIASES)) {
-      const owner = ownerOf(canonical)
-      const docs = OWNER_DOCS[owner]
-      const readme = readFileSync(join(root, docs === undefined ? owner + '/README.md' : docs.readme), 'utf8')
-      const source = readFileSync(join(root, docs === undefined ? owner + '/src/index.ts' : docs.source), 'utf8')
-      for (const [label, text] of [['README', readme], ['src/index.ts', source]] as const) {
-        expect(text, owner + ' ' + label + ' names ' + alias).toContain(alias)
-        expect(text, owner + ' ' + label + ' names ' + canonical).toContain(canonical)
-        expect(text, owner + ' ' + label + ' carries the G0/S0.3 marker').toMatch(MARKER)
+      const docs = docsOf(canonical)
+      for (const rel of [docs.readme, docs.source]) {
+        const text = readFileSync(join(root, rel), 'utf8')
+        expect(text, rel + ' names ' + alias).toContain(alias)
+        expect(text, rel + ' names ' + canonical).toContain(canonical)
+        expect(text, rel + ' carries the G0/S0.3 marker').toMatch(MARKER)
       }
     }
   })

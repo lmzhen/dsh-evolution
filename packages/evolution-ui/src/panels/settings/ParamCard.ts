@@ -13,7 +13,7 @@
  * typed from the registry (\`control\`), so booleans are switches, enums are
  * selects and numbers are numeric inputs with the unit shown beside the label.
  */
-import { createElement, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ClientParamField } from './generated-params.ts'
 import { NAMESPACE_TITLES, type MessageKey } from './messages.ts'
 import { PARAM_FIELDS, PARAM_GROUPS, PARAM_UNITS, PARAM_VALUES } from './generated-param-i18n.ts'
@@ -24,42 +24,7 @@ import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated
  * needs to render: whether it was accepted, and whether it was a reset (which reads differently).
  */
 type PendingWrite = { readonly accepted: boolean; readonly resets: boolean; readonly field?: string; readonly readbackFailed?: boolean; readonly kind?: 'conflict' | 'transport' | 'validation' }
-import type { ParamSectionSnapshot, ParamSectionSource, SettingsPathOpLike, SettingsSaveResult } from './seam.ts'
-
-/**
- * Injected face: plain data and callbacks, plus the hook seat.
- *
- * The `hooks` compartment belongs to the shell, not to the component: the
- * renderer binds its entries to `use<Name>` props and omits `hooks` from what
- * the component receives. A card that reads `props.hooks` therefore reads a prop
- * that never exists.
- */
-export interface ParamCardFace {
-  namespace: string
-  fields: readonly ClientParamField[]
-  t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
-  /** Current UI language for generated labels; omitted defaults to zh. */
-  lang?: () => ParamLanguage
-  /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). The returned boolean IS
-   * the Host's verdict (contract C2/G5): `true` = accepted, `false` = refused after its recovery read. */
-  mutateOnce: (ops: readonly SettingsParamOp[], baseRevision?: number) => Promise<boolean>
-  /** Structured write result; when present the card distinguishes acceptance from readback. */
-  saveOnce?: (ops: readonly SettingsParamOp[]) => Promise<SettingsSaveResult>
-  clear: (field: string, baseRevision?: number) => Promise<boolean>
-  /** Retry the section read after a transport failure. */
-  retry?: (() => void) | undefined
-  hooks: { paramSection: ParamSectionSource }
-}
-
-/**
- * Props the renderer binds for one card: the inject face minus its hook compartment,
- * plus the seats bound from it. Spelled the way the shell derives it, so reaching for
- * `props.hooks` fails the type check instead of failing at runtime.
- */
-export type ParamCardProps = Omit<ParamCardFace, 'hooks'> & {
-  /** Bound from \`hooks.paramSection\` by the renderer. */
-  readonly useParamSection: <T>(selector: (state: ParamSectionSnapshot) => T) => T
-}
+import type { ParamSectionSnapshot, SettingsPathOpLike, SettingsSaveResult } from './seam.ts'
 
 /** Generated-copy language. */
 export type ParamLanguage = SupportedLocale
@@ -543,49 +508,3 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
       : null,
   )
 }
-
-/**
- * The card as our own section renders it: the row state comes from the hook seat the
- * renderer binds out of the inject face's `hooks` compartment (components never hold a
- * subscription of their own).
- * @param props - the card data, its callbacks, and the bound row hook.
- * @returns the card.
- */
-/**
- * Platform card-face wrapper: `settings.plugin.item` injects the face but does NOT bind
- * the `use<Name>` hook compartment, so this component owns the one stable external-store
- * subscription the section card gets from its renderer.
- * @param props - the injected card face.
- * @returns the card with its live row snapshot.
- */
-const MISSING_SNAPSHOT = { status: 'unavailable' as const, value: undefined, user: undefined, writable: false, base: undefined, reason: 'seat-missing' as const }
-const MISSING_SOURCE: ParamSectionSource = { getSnapshot: () => MISSING_SNAPSHOT, subscribe: () => () => {}, revive: () => {} }
-
-export function PluginParamCard(props: ParamCardFace): ReactNode {
-  const source = (props as { hooks?: { paramSection?: ParamSectionSource } }).hooks?.paramSection ?? MISSING_SOURCE
-  const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot)
-  return ParamCardView({
-    namespace: props.namespace,
-    fields: props.fields,
-    t: props.t,
-    ...(props.lang === undefined ? {} : { lang: props.lang }),
-    mutateOnce: props.mutateOnce,
-    ...(props.saveOnce === undefined ? {} : { saveOnce: props.saveOnce }),
-    clear: props.clear,
-    snapshot,
-  })
-}
-
-export function ParamCard(props: ParamCardProps): ReactNode {
-  return ParamCardView({
-    namespace: props.namespace,
-    fields: props.fields,
-    t: props.t,
-    ...(props.lang === undefined ? {} : { lang: props.lang }),
-    mutateOnce: props.mutateOnce,
-    ...(props.saveOnce === undefined ? {} : { saveOnce: props.saveOnce }),
-    clear: props.clear,
-    snapshot: props.useParamSection((state: ParamSectionSnapshot) => state),
-  })
-}
-
