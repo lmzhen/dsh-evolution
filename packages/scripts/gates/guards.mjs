@@ -4,7 +4,7 @@
  * Data only: ids are FROZEN (see W10 §16.3) — never renumber, never derive from position.
  * `title` is the human Command column text; `argv` is the executable form (null = registered cannot-decide).
  */
-import { gate } from './helpers.mjs'
+import { gate } from './model.mjs'
 
 export const guards = [
   gate("gate-01", {
@@ -20,7 +20,7 @@ export const guards = [
     kind: "toolchain",
     tree: "overlay",
     title: "`node node_modules/oxlint/bin/oxlint -c packages/evolution/oxlint.release.json packages/evolution --ignore-pattern '**/tests/**' --ignore-pattern '**/vendor/**' --ignore-pattern '**/scripts/**' -A style`",
-    argv: ["node","node_modules/oxlint/bin/oxlint","-c","packages/evolution/oxlint.release.json","packages/evolution","--ignore-pattern","'**/tests/**'","--ignore-pattern","'**/vendor/**'","--ignore-pattern","'**/scripts/**'","-A","style"],
+    argv: ["node","node_modules/oxlint/bin/oxlint","-c","packages/evolution/oxlint.release.json","packages/evolution","--ignore-pattern","**/tests/**","--ignore-pattern","**/vendor/**","--ignore-pattern","**/scripts/**","-A","style"],
     lanes: ["local","ci-static"],
   }),
 

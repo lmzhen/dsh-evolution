@@ -1,87 +1,119 @@
 #!/usr/bin/env node
 /**
- * @typedef {object} GateDecision
- * @property {string} verdict
- * @property {boolean} criterionEvaluated
- * @property {{ kind: string }} [cause]
- * @property {string} [evidence]
- * @property {string} [next]
- * @property {string[]} [missing]
+ * gates/runner — execution primitives: the bounded-concurrency task graph, the spawn seams and the
+ * PURE prerequisite decision. (Formerly lib-gate-scheduler.mjs + lib-run-gates.mjs.)
+ *
+ * The scheduler does no IO, spawns nothing and reads no clock: `execute` owns all of that. The
+ * runner observes (status/signal/killedBy/errno) and never decides; `decideRequires` is the pure
+ * matrix the CLI consults for declared prerequisites.
  */
+
+// ---- scheduler ---------------------------------------------------------------------------------
+export const MAX_CONCURRENCY = 32
+
+export function clampConcurrency(value) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 1
+  return Math.min(MAX_CONCURRENCY, Math.max(1, Math.floor(parsed)))
+}
 
 /**
- * @typedef {object} RunOutcome
- * @property {string[]} argv
- * @property {string|null} cwd
- * @property {number|null} status
- * @property {'budget'|'external'|null} killedBy
- * @property {number} [budgetMs]
- * @property {string|null} [signal]
- * @property {string} [errorCode]
- * @property {number} [ms]
- * @property {boolean} [present]
+ * Run a task graph with bounded concurrency.
+ *
+ * - needs: a HARD dependency. If its verdict is not 'pass', this task is blocked: it never executes,
+ *   and its record (built by the caller) is cannot-decide. A dependency that cannot be found is
+ *   blocked too - a dangling edge judges nothing.
+ * - after: ordering only. The task waits, but the dependency's verdict is ignored.
+ * - concurrency: at most N tasks in flight (clamped to [1, 32]); default 1 = serial.
+ * - failFast: after the first task records verdict 'fail', no NEW task starts; pending tasks are
+ *   'skipped' (never 'pass'). In-flight tasks still finish so their observations are not lost.
+ * - A cycle (nothing startable, nothing running) blocks the remainder instead of hanging.
+ *
+ * @param {{ tasks: Array<{id: string, needs?: string[], after?: string[], execute: () => Promise<any>}>, concurrency?: number, failFast?: boolean, onStatus?: (outcome: any) => void }} options
+ * @returns {Promise<Map<string, {id: string, status: 'done'|'error'|'blocked'|'skipped', record?: any, deps?: string[], error?: string}>>}
  */
+export async function runTasks(options) {
+  const tasks = Array.isArray(options?.tasks) ? options.tasks : []
+  const concurrency = clampConcurrency(options?.concurrency === undefined ? 1 : options.concurrency)
+  const failFast = options?.failFast === true
+  const onStatus = typeof options?.onStatus === 'function' ? options.onStatus : () => {}
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+  const outcomes = new Map()
+  const order = tasks.map((task) => task.id)
+  const running = new Map()
+  let failed = false
 
-/**
- * lib-run-gates.mjs (G1/S4): the runner seam and the PURE prerequisite decision.
- *
- * Why this exists: the executor used to spawn and judge in the same breath, so "why did this
- * tier abort?" could only be answered by running it, and a declared budget that never fired was
- * indistinguishable from an external kill. The two halves are now separate:
- *
- *   createRunner({ spawn })                 - the seam, injected at the CLI, NO env/CLI switch
- *   decideRequires(result, kind, mode)      - pure and total: no IO, no Date.now, no env
- *
- * killedBy is PASSED IN by the runner and never inferred from a declared timeout: "a budget was
- * declared and the process was externally SIGTERMed" must not read as a budget kill.
- */
+  const settle = (outcome) => { outcomes.set(outcome.id, outcome); onStatus(outcome) }
+  const depsOf = (task) => [...(task.needs ?? []), ...(task.after ?? [])]
 
-/** @type {string[]} */
+  while (outcomes.size < order.length) {
+    let startedThisPass = true
+    while (startedThisPass && running.size < concurrency) {
+      startedThisPass = false
+      for (const id of order) {
+        if (outcomes.has(id) || running.has(id)) continue
+        const task = byId.get(id)
+        const deps = depsOf(task)
+        const unknown = deps.filter((dep) => !byId.has(dep))
+        if (unknown.length > 0) { settle({ id, status: 'blocked', deps: unknown }); startedThisPass = true; continue }
+        if (deps.some((dep) => !outcomes.has(dep))) continue
+        const failedNeeds = (task.needs ?? []).filter((dep) => outcomes.get(dep)?.record === undefined || outcomes.get(dep).status === 'blocked' || outcomes.get(dep).record.verdict !== 'pass')
+        if (failedNeeds.length > 0) { settle({ id, status: 'blocked', deps: failedNeeds }); startedThisPass = true; continue }
+        if (failFast && failed) { settle({ id, status: 'skipped' }); startedThisPass = true; continue }
+        running.set(id, (async () => {
+          let record
+          try {
+            record = await task.execute()
+          } catch (error) {
+            running.delete(id)
+            settle({ id, status: 'error', error: error instanceof Error ? error.message : String(error) })
+            return
+          }
+          running.delete(id)
+          if (record !== null && typeof record === 'object' && record.verdict === 'fail') failed = true
+          settle({ id, status: 'done', record })
+        })())
+        startedThisPass = true
+        if (running.size >= concurrency) break
+      }
+    }
+    if (running.size === 0) {
+      // Nothing running and nothing startable: the remaining tasks form a cycle (or depend on a
+      // blocked chain). Block them all with their unresolved edges named, never hang.
+      for (const id of order) {
+        if (outcomes.has(id)) continue
+        settle({ id, status: 'blocked', deps: depsOf(byId.get(id)).filter((dep) => !outcomes.has(dep) || outcomes.get(dep).status !== 'done') })
+      }
+      break
+    }
+    await Promise.race([...running.values()])
+  }
+  return outcomes
+}
+
+// ---- prerequisites -----------------------------------------------------------------------------
 /** The prerequisite kinds and modes; the cross product is the declared closed set. */
 export const KINDS = ['in-repo', 'external']
-/** @type {string[]} */
 export const MODES = ['run', 'present']
-/** @type {string[]} */
 export const LEGAL_COMBINATIONS = KINDS.flatMap((kind) => MODES.map((mode) => kind + '/' + mode))
 
-/** @type {Record<string, string>} */
 /** The errno classification the matrix branches on. A code outside this map is UNKNOWN, which is
  * a cannot-decide with the raw code named - never a silent pass and never a fail. */
 export const ERRNO_CLASS = { ENOENT: 'missing', EACCES: 'denied', EPERM: 'denied', ETIMEDOUT: 'timeout' }
 
-/**
- * @param {string} code
- * @returns {'missing'|'denied'|'timeout'|'unknown'|null}
- */
 export function classifyErrno(code) {
   if (typeof code !== 'string' || code === '') return null
   return Object.prototype.hasOwnProperty.call(ERRNO_CLASS, code) ? ERRNO_CLASS[code] : 'unknown'
 }
 
-/**
- * @param {string} kind
- * @param {string} mode
- * @returns {boolean}
- */
 /** Declaration-time form check: an unlisted (kind, mode) has no semantics, so it is red there. */
 export function isLegalCombination(kind, mode) {
   return LEGAL_COMBINATIONS.includes(String(kind) + '/' + String(mode))
 }
 
 /**
- * @param {RunOutcome} result
- * @param {string} kind
- * @param {string} mode
- * @returns {GateDecision}
- */
-/**
  * Decide ONE prerequisite from what the runner observed. Pure and total: every branch returns a
- * decision fragment (verdict + whether THIS check's invariant was evaluated + cause + next +
- * evidence), and an unlisted input never throws - it fails closed with unknown-combination.
- *
- * @param result {{ status?: number|null, errorCode?: string|null, killedBy?: string|null, signal?: string|null, present?: boolean, path?: string, budgetMs?: number, budgetFrom?: string, ms?: number }}
- * @param kind - in-repo | external
- * @param mode - run | present
+ * decision fragment, and an unlisted input never throws - it fails closed with unknown-combination.
  */
 export function decideRequires(result, kind, mode) {
   const seen = result === undefined || result === null ? {} : result
@@ -94,9 +126,7 @@ export function decideRequires(result, kind, mode) {
   }
   if (mode === 'present') {
     const path = String(seen.path === undefined || seen.path === null ? '(path not given)' : seen.path)
-    if (seen.present === true) {
-      return { verdict: 'pass', criterionEvaluated: true, evidence: where + ' produced ' + path }
-    }
+    if (seen.present === true) return { verdict: 'pass', criterionEvaluated: true, evidence: where + ' produced ' + path }
     return { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'produced-missing' },
       missing: [path],
       next: 'build the product before this tier: mode=present only checks that it exists, and not-built is not broken',
@@ -139,23 +169,15 @@ export function decideRequires(result, kind, mode) {
       next: 'install the external prerequisite or point it at an existing path: target-not-built is not a failure of this check',
       evidence: where + ' errno=' + String(seen.errorCode) + ' path=' + path }
   }
-  if (seen.status === 0) {
-    return { verdict: 'pass', criterionEvaluated: true, evidence: where + ' exit=0 after ' + String(seen.ms === undefined ? '?' : seen.ms) + 'ms' }
-  }
+  if (seen.status === 0) return { verdict: 'pass', criterionEvaluated: true, evidence: where + ' exit=0 after ' + String(seen.ms === undefined ? '?' : seen.ms) + 'ms' }
   return { verdict: 'fail', criterionEvaluated: false, cause: { kind: 'requires-abort' },
     missing: ['exit=' + String(seen.status)],
     next: 'fix the prerequisite: this tier aborts without judging its members, so their invariants were never evaluated',
     evidence: where + ' exit=' + String(seen.status === undefined || seen.status === null ? 'null' : seen.status) + ' after ' + String(seen.ms === undefined ? '?' : seen.ms) + 'ms' }
 }
 
-/**
- * @param {{ spawn: Function, now: () => number }} deps
- * @returns {{ run: Function }}
- */
-/**
- * The seam. The CLI wires the real spawnSync; fixtures inject a stub, so no fixture has to start
- * a process to prove what the runner reports. The runner never decides - it observes.
- */
+// ---- spawn seams -------------------------------------------------------------------------------
+/** The synchronous seam: the CLI wires spawnSync; fixtures inject a stub. Observes, never decides. */
 export function createRunner({ spawn, now }) {
   if (typeof spawn !== 'function') throw new Error('createRunner needs a spawn function (the CLI wires spawnSync; fixtures inject a stub)')
   const clock = typeof now === 'function' ? now : () => Date.now()
@@ -175,11 +197,9 @@ export function createRunner({ spawn, now }) {
 }
 
 /**
- * The ASYNC seam (W10 M3b): the scheduler needs concurrent spawns, and concurrency needs a
- * promise-based observation. Same contract as createRunner — observe, never decide:
- *   { argv, cwd, status, signal, errorCode, killedBy, ms, stdout, stderr }
- * `killedBy='budget'` is set ONLY by this runner's own timer; a signal from outside stays
- * `killedBy='external'` (the same distinction the sync seam and the fixture layer rely on).
+ * The async seam: the scheduler needs concurrent spawns, and concurrency needs a promise-based
+ * observation. `killedBy='budget'` is set ONLY by this runner's own timer; an outside signal stays
+ * `killedBy='external'`.
  */
 export function createAsyncRunner({ spawn, now }) {
   if (typeof spawn !== 'function') throw new Error('createAsyncRunner needs a spawn function (the CLI wires child_process.spawn; fixtures inject a stub)')

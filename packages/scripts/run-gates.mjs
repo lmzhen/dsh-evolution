@@ -2,10 +2,10 @@
 /**
  * run-gates — the family gate runner.
  *
- * G1/S4: the spawn seam lives in lib-run-gates.mjs (createAsyncRunner for the concurrent path,
- * createRunner kept for fixtures); this file wires the real child_process seams, judges each row
- * through lib-verdict, and renders the summary. It never decides on its own: every verdict is the
- * contract in lib-verdict + the observed process result.
+ * G1/S4: the spawn seam lives in gates/runner.mjs (bounded scheduler + spawn observers); this file
+ * wires the real child_process seams, judges each row through gates/report.mjs (the VerdictRecord
+ * contract), and renders the summary. It never decides on its own: every verdict is the contract in
+ * gates/report.mjs + the observed process result.
  *
  * 用法：node packages/scripts/run-gates.mjs <local|pre-tag|ci> [--list] [--json] [--json-out <path>]
  *       [--lane <name>] [--only <id>] [--drill <id>] [--overlay <path>] [--concurrency <n>] [--fail-fast]
@@ -18,9 +18,9 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { validate, counts, render, actionBlock } from './lib-verdict.mjs'
-import { createAsyncRunner, decideRequires } from './lib-run-gates.mjs'
-import { clampConcurrency, runTasks } from './lib-gate-scheduler.mjs'
+import { validate, counts, render, actionBlock, exitCodeFor, EXIT } from './gates/report.mjs'
+import { createAsyncRunner, decideRequires, clampConcurrency, runTasks } from './gates/runner.mjs'
+import { LANES } from './gates/model.mjs'
 import { softOverlay } from './lib-env.mjs'
 import { familyVersion } from './lib-family-version.mjs'
 import { exemptionProblems } from './lib-exemptions.mjs'
@@ -41,7 +41,7 @@ const laneName = flag('--lane')
 const jsonOut = flag('--json-out')
 const concurrency = clampConcurrency(flag('--concurrency') === undefined ? 1 : flag('--concurrency'))
 const failFast = has('--fail-fast')
-const KNOWN_LANES = new Set(['local', 'pre-tag', 'ci-setup', 'ci-static', 'ci-unit', 'ci-release', 'ci-windows', 'machine-local'])
+const KNOWN_LANES = new Set(LANES)
 if (laneName !== undefined) {
   if (laneName === '' || !KNOWN_LANES.has(laneName)) { console.error('run-gates: --lane needs one of ' + [...KNOWN_LANES].join('|') + ' (got ' + JSON.stringify(laneName) + ')'); process.exit(2) }
 }
@@ -244,15 +244,17 @@ async function executeGate(g) {
   const declaredArgv = argv[0] === 'node' ? argv.slice(1) : argv
   const [script, ...rest] = declaredArgv.map((token) => resolveLayoutToken(ciOverride === null ? token : expandEnv(token), g.tree, cwd))
   // A gate that never returns must not stop the whole local chain: budget it, and let the verdict
-  // read cannot-decide (killedBy=budget) instead of hanging the runner forever.
-  const observed = await runner.run([process.execPath, script, ...rest], { cwd, timeoutMs: 180000, env: gateEnv === undefined ? process.env : { ...process.env, ...gateEnv } })
+  // read cannot-decide (killedBy=budget) instead of hanging the runner forever. The row may declare
+  // its own budget (`timeoutMs`) because a full suite and a linter do not share one number.
+  const budgetMs = g.timeoutMs === undefined ? 180000 : g.timeoutMs
+  const observed = await runner.run([process.execPath, script, ...rest], { cwd, timeoutMs: budgetMs, env: gateEnv === undefined ? process.env : { ...process.env, ...gateEnv } })
   const ms = observed.ms
   const status = observed.status === undefined ? null : observed.status
   if (observed.stdout !== undefined && observed.stdout !== '' && (status !== 0 || status === null)) process.stdout.write(observed.stdout)
   if (observed.stderr !== undefined && observed.stderr !== '' && (status !== 0 || status === null)) process.stderr.write(observed.stderr)
   const scriptPath = script.startsWith('-') ? null : resolve(cwd, script)
   if (scriptPath !== null && !existsSync(scriptPath)) return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'artifact-absent' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [script], next: 'the declared script is not on disk - fix the row, or register this check as cannot-decide on this machine', evidence: script + ' absent' })
-  if (observed.killedBy === 'budget' || observed.errorCode === 'ETIMEDOUT') return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'timeout' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'the gate ran past its 180 s local budget - run it on the build line, or register it as cannot-decide on this machine', evidence: script + ' killed at the 180 s budget' })
+  if (observed.killedBy === 'budget' || observed.errorCode === 'ETIMEDOUT') return base(g, { verdict: 'cannot-decide', criterionEvaluated: false, cause: { kind: 'timeout' }, subject: { kind: 'paths', count: 1 }, path: cwd, ms, missing: [], next: 'the gate ran past its ' + String(budgetMs) + ' ms budget - run it on the build line, or register it as cannot-decide on this machine', evidence: script + ' killed at the ' + String(budgetMs) + ' ms budget' })
   if (status === 0) return base(g, { verdict: 'pass', criterionEvaluated: true, subject: { kind: 'paths', count: 1 }, path: cwd, ms })
   if (status === 2) {
     // The family's CLI convention is 0 = pass / 1 = fail / 2 = CANNOT DECIDE. Collapsing 2 into
@@ -337,5 +339,6 @@ if (has('--json')) {
     for (const r of timed) console.log('  ' + String(r.ms).padStart(7) + 'ms  ' + r.id.padEnd(18) + r.verdict)
   }
 }
-if (violations.length > 0) { console.error('run-gates: record contract violations: ' + violations.slice(0, 3).join(' | ')); process.exit(2) }
-process.exit(c.fail > 0 ? 1 : c.pass === 0 ? 2 : unregisteredCannotDecide.length > 0 ? 2 : 0)
+const contractViolations = violations
+if (contractViolations.length > 0) console.error('run-gates: record contract violations (exit ' + EXIT.contract + '): ' + contractViolations.slice(0, 3).join(' | '))
+process.exit(exitCodeFor({ counts: c, violations: contractViolations, unregisteredCannotDecide: unregisteredCannotDecide.length }))

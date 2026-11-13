@@ -13,7 +13,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { STATES } from './lib-verdict.mjs'
+import { STATES } from './gates/report.mjs'
 import { REPO_ROOT, requireOverlay, requireProfile } from './lib-env.mjs'
 
 const argv = process.argv.slice(2)

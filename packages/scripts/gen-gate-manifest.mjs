@@ -16,8 +16,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { registry } from './gates/registry.mjs'
-import { validateRegistry } from './gates/helpers.mjs'
-import { renderContributing, renderManifestGates, renderTableBlock, renderTableRows } from './lib-gate-views.mjs'
+import { validateRegistry } from './gates/model.mjs'
+import { renderContributing, renderManifestGates, renderTableBlock, renderTableRows } from './gates/views.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..', '..')

@@ -20,7 +20,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { familyVersion, versionReached } from './lib-family-version.mjs'
-import { runnable, supersetPreTag, declaredPreTag, unknownProfiles } from './lib-gate-projection.mjs'
+import { declaredPreTag, unknownProfiles } from './gates/model.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const TREE = resolve(HERE, '..')

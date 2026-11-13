@@ -6,7 +6,7 @@
  *   packages/scripts/gen-gate-manifest.mjs  -> gate-manifest.json + the CONTRIBUTING gate table
  *   packages/scripts/verify-gate-manifest.mjs -> compares registry <-> views <-> CI wiring
  *
- * Rules (enforced by validateRegistry in helpers.mjs):
+ * Rules (enforced by validateRegistry in model.mjs):
  *   - ids are explicit and frozen; never derived from table row numbers or action ordering
  *   - every runnable row carries at least one run lane; machine-local rows carry exactly that lane
  *   - lanes are a closed set; unknown lanes fail generation

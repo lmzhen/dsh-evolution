@@ -4,8 +4,7 @@
 // promises, not by sleeping), and every case starts from the exported shape.
 import { EventEmitter } from 'node:events'
 import { describe, expect, it } from 'vitest'
-import { MAX_CONCURRENCY, clampConcurrency, runTasks } from '../../scripts/lib-gate-scheduler.mjs'
-import { createAsyncRunner } from '../../scripts/lib-run-gates.mjs'
+import { MAX_CONCURRENCY, clampConcurrency, runTasks, createAsyncRunner } from '../../scripts/gates/runner.mjs'
 
 const recordOf = (verdict: string) => ({ verdict })
 const defer = () => {

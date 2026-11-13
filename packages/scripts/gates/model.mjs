@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Gate registry primitives and the ONE validation entry point (W10 M3).
+ * gates/model — the gate row schema, the ONE validation entry point, and the ONE projection.
  *
- * A registry row is data, not behavior: `gate(id, fields)` only names the id explicitly, and
- * `validateRegistry` refuses a set that cannot be generated into the views. Keeping validation
- * here (not in the generator) means the verifier and any future consumer judge the same rules.
+ * A row is data, not behavior: `gate(id, fields)` only names the id explicitly. Consumers are the
+ * generators/verifiers (`gates/views.mjs` renders them), `run-gates.mjs` (selects and executes), and
+ * `gen-check-taxonomy.mjs` (counts membership). Nothing derives a second profile/lane mapping.
  */
 
 export const KINDS = ['script', 'toolchain', 'step', 'external']
@@ -12,6 +12,7 @@ export const TREES = ['mirror', 'overlay', 'machine-local']
 /** Closed lane set, in display order (the manifest sorts lanes by this order). */
 export const LANES = ['local', 'pre-tag', 'ci-setup', 'ci-static', 'ci-unit', 'ci-release', 'ci-windows', 'machine-local']
 export const RUN_LANES = new Set(['local', 'pre-tag', 'ci-setup', 'ci-static', 'ci-unit', 'ci-release', 'ci-windows'])
+export const RUNNABLE_KINDS = new Set(['script', 'toolchain'])
 
 /** `gate(id, fields)` exists so every row names its id explicitly in the diff. */
 export function gate(id, fields) {
@@ -28,20 +29,38 @@ export function profilesOf(entry) {
   return profiles
 }
 
+// ---- the ONE projection (formerly lib-gate-projection.mjs) --------------------------------------
+const profileOf = (row) => (Array.isArray(row.profiles) ? row.profiles : [])
+export const runnableRows = (rows) => rows.filter((row) => RUNNABLE_KINDS.has(row.kind))
+export const declaredPreTag = (rows) => rows.filter((row) => profileOf(row).includes('pre-tag'))
+export const supersetPreTag = (rows) => rows.filter((row) => profileOf(row).includes('local') || profileOf(row).includes('ci'))
+export const unknownProfiles = (rows) => rows
+  .map((row) => ({ id: row.id, bad: profileOf(row).filter((profile) => !['local', 'pre-tag', 'ci'].includes(profile)) }))
+  .filter((entry) => entry.bad.length > 0)
+
+/**
+ * Tokens are spawn arguments, not shell text: quotes would become pattern characters (Phase 0 #6).
+ * A token carrying a shell expansion (`$NAME`/`${...}`) is data for an action step (A3 converts
+ * those to `command`), not a spawn token, so the quote rule does not apply to it.
+ */
+function quotedToken(argv) {
+  return argv.find((token) => !token.includes('$') && ((token.startsWith("'") && token.endsWith("'")) || (token.startsWith('"') && token.endsWith('"'))))
+}
+
 /**
  * Validate a registry set. Returns problems (callers decide exit code); an empty array means every
- * consumer (generator, verifier) can trust the set.
+ * consumer can trust the set. Cross-row edges (`needs`/`after`) are validated against the same set.
  */
 export function validateRegistry(entries) {
   const problems = []
   if (!Array.isArray(entries) || entries.length === 0) return ['registry is empty - a gate registry with nothing in it is a silent gate']
-  const seen = new Set()
+  const ids = new Set()
   for (const entry of entries) {
     if (entry === null || typeof entry !== 'object') { problems.push('registry row is not an object'); continue }
     const id = entry.id
     if (typeof id !== 'string' || !/^(gate-\d{2}|ci-only-\d{2}|[a-z][a-z0-9-]*)$/.test(id)) { problems.push('row id is missing or not a frozen id: ' + JSON.stringify(id)); continue }
-    if (seen.has(id)) problems.push(id + ': duplicate id')
-    seen.add(id)
+    if (ids.has(id)) problems.push(id + ': duplicate id')
+    ids.add(id)
     if (!KINDS.includes(entry.kind)) problems.push(id + ': unknown kind ' + JSON.stringify(entry.kind))
     if (!TREES.includes(entry.tree)) problems.push(id + ': unknown tree ' + JSON.stringify(entry.tree))
     if (typeof entry.title !== 'string' || entry.title.trim() === '') problems.push(id + ': no title (the human Command column)')
@@ -49,13 +68,22 @@ export function validateRegistry(entries) {
     for (const lane of entry.lanes) if (!LANES.includes(lane)) problems.push(id + ': unknown lane ' + JSON.stringify(lane))
     if (entry.tree === 'machine-local' && !(entry.lanes.length === 1 && entry.lanes[0] === 'machine-local')) problems.push(id + ': machine-local row must carry exactly ["machine-local"]')
     if (entry.tree !== 'machine-local' && entry.lanes.includes('machine-local')) problems.push(id + ': non-machine-local row carries machine-local')
-    const runnable = entry.kind === 'script' || entry.kind === 'toolchain'
+    const runnable = RUNNABLE_KINDS.has(entry.kind)
     if (runnable && !entry.lanes.some((lane) => RUN_LANES.has(lane))) problems.push(id + ': runnable row has no runnable lane')
     if (entry.argv !== null && entry.argv !== undefined) {
       if (!Array.isArray(entry.argv) || entry.argv.length === 0 || entry.argv.some((token) => typeof token !== 'string')) problems.push(id + ': argv must be a non-empty string array or null')
       else if (!/^node$/.test(entry.argv[0])) problems.push(id + ': argv does not start with node: ' + JSON.stringify(entry.argv[0]))
+      else if (quotedToken(entry.argv) !== undefined) problems.push(id + ': argv token carries shell quotes: ' + JSON.stringify(quotedToken(entry.argv)) + ' (tokens are spawn arguments)')
     } else if (entry.argvProblem === undefined) problems.push(id + ': argv is null without an argvProblem (a row must say why it has no executable form)')
     if (entry.argv === null && entry.registration === undefined) problems.push(id + ': argv-null row carries no registration (cannot-decide debt must be owned)')
+    if (entry.command !== undefined && (typeof entry.command !== 'string' || entry.command.trim() === '')) problems.push(id + ': command must be a non-empty string')
+    if (entry.timeoutMs !== undefined && (!Number.isInteger(entry.timeoutMs) || entry.timeoutMs <= 0)) problems.push(id + ': timeoutMs must be a positive integer')
+    for (const field of ['needs', 'after']) {
+      const value = entry[field]
+      if (value === undefined) continue
+      if (!Array.isArray(value) || value.some((dep) => typeof dep !== 'string' || dep.trim() === '')) problems.push(id + ': ' + field + ' must be a string id array')
+      else if (value.includes(id)) problems.push(id + ': ' + field + ' names itself')
+    }
     if (entry.registration !== undefined) {
       const registration = entry.registration
       if (registration === null || typeof registration !== 'object' || typeof registration.reason !== 'string' || registration.reason.trim() === '') problems.push(id + ': registration needs a reason')
@@ -68,6 +96,7 @@ export function validateRegistry(entries) {
       if (ci === null || typeof ci !== 'object' || Array.isArray(ci)) problems.push(id + ': ci override must be an object')
       else {
         if (ci.argv !== undefined && (!Array.isArray(ci.argv) || ci.argv.length === 0 || ci.argv[0] !== 'node' || ci.argv.some((token) => typeof token !== 'string'))) problems.push(id + ': ci.argv must be a non-empty node command (string[])')
+        if (ci.argv !== undefined && quotedToken(ci.argv) !== undefined) problems.push(id + ': ci.argv token carries shell quotes: ' + JSON.stringify(quotedToken(ci.argv)))
         if (ci.env !== undefined && (ci.env === null || typeof ci.env !== 'object' || Object.values(ci.env).some((value) => typeof value !== 'string'))) problems.push(id + ': ci.env must be a string map')
         if (ci.cwd !== undefined && typeof ci.cwd !== 'string') problems.push(id + ': ci.cwd must be a string')
         if (ci.argv === undefined && ci.env === undefined && ci.cwd === undefined) problems.push(id + ': ci override carries none of argv/env/cwd')
@@ -75,5 +104,28 @@ export function validateRegistry(entries) {
     }
     if (entry.kind === 'external' && entry.reason === undefined && entry.registration === undefined) problems.push(id + ': external row carries neither reason nor registration')
   }
+  for (const entry of entries) {
+    for (const field of ['needs', 'after']) {
+      for (const dep of Array.isArray(entry[field]) ? entry[field] : []) {
+        if (!ids.has(dep)) problems.push(entry.id + ': ' + field + ' names unknown gate ' + JSON.stringify(dep))
+      }
+    }
+  }
   return problems
+}
+
+/**
+ * Duplicate diagnostic (A1b enforces it): two rows that execute the same command are one check
+ * declared twice. Normalised on the rendered command, ignoring the tree (the path layout differs).
+ */
+export function duplicateCommands(entries) {
+  const groups = new Map()
+  for (const entry of entries) {
+    const command = Array.isArray(entry.argv) ? entry.argv.join(' ') : typeof entry.command === 'string' ? entry.command : null
+    if (command === null) continue
+    const key = command.replace(/`/g, '').replace(/\s+/g, ' ').trim()
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(entry.id)
+  }
+  return [...groups.entries()].filter(([, ids]) => ids.length > 1).map(([command, ids]) => ({ command, ids }))
 }

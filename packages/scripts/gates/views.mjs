@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * lib-gate-views — the registry -> generated views renderer (W10 M3).
+ * gates/views — the registry -> generated views renderer (manifest + CONTRIBUTING table).
  *
- * Both the generator and the verifier import this, so "what the manifest/table should say" has ONE
- * implementation. The verifier compares the committed views against these functions; the generator
- * writes them. A second renderer would be the same drift this refactor removes.
+ * Both the generator and the verifier import this, so "what the view should say" has ONE
+ * implementation. A second renderer would be the same drift the registry refactor removes.
  */
-import { LANES, profilesOf } from './gates/helpers.mjs'
+import { LANES, profilesOf } from './model.mjs'
 
 export const TABLE_HEADER = '| # | Command | Working tree |'
 
@@ -14,7 +13,7 @@ export const TABLE_HEADER = '| # | Command | Working tree |'
 export function renderGate(entry) {
   const gate = { id: entry.id, kind: entry.kind, human: entry.title, argv: entry.argv === undefined ? null : entry.argv, tree: entry.tree }
   gate.profiles = profilesOf(entry)
-  for (const field of ['argvProblem', 'reason', 'owner', 'expiry', 'localSafe', 'localSafeReason', 'drillCmd', 'noDrillReason']) {
+  for (const field of ['argvProblem', 'command', 'reason', 'owner', 'expiry', 'timeoutMs', 'localSafe', 'localSafeReason', 'drillCmd', 'noDrillReason', 'needs', 'after']) {
     if (entry[field] !== undefined) gate[field] = entry[field]
   }
   gate.lanes = [...entry.lanes].sort((left, right) => LANES.indexOf(left) - LANES.indexOf(right))

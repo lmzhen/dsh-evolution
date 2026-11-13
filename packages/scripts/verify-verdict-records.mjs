@@ -18,7 +18,7 @@
  * Usage: node <scripts-dir>/verify-verdict-records.mjs
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { validate } from './lib-verdict.mjs'
+import { validate } from './gates/report.mjs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -28,7 +28,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 // 遗留⑤ follow-up: run-gates now resolves its platform tree through lib-env.mjs (env -> workspace
 // candidates -> layout parent), so the probe tree must copy that module too; a missing import here
 // produced empty stdout and four vacuous envelope failures in CI (0.27.1 tag run).
-const NEEDED = ['run-gates.mjs', 'lib-verdict.mjs', 'lib-run-gates.mjs', 'lib-gate-scheduler.mjs', 'lib-family-version.mjs', 'lib-exemptions.mjs', 'lib-env.mjs', 'family-facts.json', 'gate-manifest.json']
+const NEEDED = ['run-gates.mjs', 'gates/report.mjs', 'gates/runner.mjs', 'gates/model.mjs', 'lib-family-version.mjs', 'lib-exemptions.mjs', 'lib-env.mjs', 'family-facts.json', 'gate-manifest.json']
 const failures = []
 const note = (message) => failures.push(message)
 
@@ -66,7 +66,9 @@ let copied = 0
 for (const name of NEEDED) {
   const from = join(HERE, name)
   if (!existsSync(from)) { console.error('verify-verdict-records: CANNOT DECIDE - ' + name + ' is not next to this fixture'); process.exit(2) }
-  writeFileSync(join(scripts, name), readFileSync(from))
+  const destination = join(scripts, name)
+  mkdirSync(dirname(destination), { recursive: true })
+  writeFileSync(destination, readFileSync(from))
   copied += 1
 }
 const run = (label, gates) => {

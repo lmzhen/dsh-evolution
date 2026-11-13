@@ -4,7 +4,7 @@
 // starts a process (the seam takes a stub); and no fixture asserts elapsed time - a budget kill
 // only ever arrives as an injected killedBy.
 import { describe, expect, it } from 'vitest'
-import { ERRNO_CLASS, KINDS, LEGAL_COMBINATIONS, MODES, classifyErrno, createRunner, decideRequires, isLegalCombination } from '../../scripts/lib-run-gates.mjs'
+import { ERRNO_CLASS, KINDS, LEGAL_COMBINATIONS, MODES, classifyErrno, createRunner, decideRequires, isLegalCombination } from '../../scripts/gates/runner.mjs'
 
 describe('decideRequires: the contract shape', () => {
   it('exports the closed sets, the errno map and a total decision function', () => {

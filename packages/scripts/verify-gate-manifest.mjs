@@ -24,8 +24,8 @@ import { familyGateRegisters } from './lib-doc-facts.mjs'
 import { familyVersion, versionReached } from './lib-family-version.mjs'
 import { softOverlay } from './lib-env.mjs'
 import { registry } from './gates/registry.mjs'
-import { validateRegistry } from './gates/helpers.mjs'
-import { renderManifestGates, renderTableRows } from './lib-gate-views.mjs'
+import { validateRegistry } from './gates/model.mjs'
+import { renderManifestGates, renderTableRows } from './gates/views.mjs'
 
 const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
