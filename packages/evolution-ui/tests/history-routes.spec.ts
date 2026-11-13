@@ -112,7 +112,6 @@ describe('skill-history routes: the read/write surface', () => {
           cells: { title: Array<{ key: string; slot: string }>; meta: Array<{ key: string; literal?: string }> }
         }>
         support: Array<{ action: string; actionKind: string; path?: string }>
-        liveHash: string | null
       }
     }>(SKILL_HISTORY_ROUTES.versions + '?name=panel-skill')
     expect(versions.status).toBe(200)

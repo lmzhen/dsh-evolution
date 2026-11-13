@@ -36,6 +36,14 @@ describe('parseSubcommand (C7 single parser, F-3/F-4)', () => {
     expect(parsed).toMatchObject({ kind: 'missing-value', name: 'extract', flag: 'start' })
   })
 
+  it('reads --proposal as the value flag the usage declares (B2b)', () => {
+    const parsed = parseSubcommand('extract alpha --proposal p1')
+    const command = parsed as { name: string; flags: Map<string, string | true>; positionals: string[] }
+    expect(command.name).toBe('extract')
+    expect(command.flags.get('proposal')).toBe('p1')
+    expect(command.positionals).toEqual(['alpha'])
+  })
+
   it('reads positionals in order and matches the name case-insensitively', () => {
     const parsed = parseSubcommand('EXTRACT a b heading --start 3')
     const command = parsed as { name: string; flags: Map<string, string | true>; positionals: string[] }

@@ -48,7 +48,7 @@ const row = (v: number, undoable: boolean): VersionRow => {
   }
 }
 
-const payload = (): VersionsPayload => ({ content: [row(1, false), row(2, true)], support: [], liveHash: 'h1' })
+const payload = (): VersionsPayload => ({ content: [row(1, false), row(2, true)], support: [] })
 
 /** The face as the slot renderer hands it over: keys as words, so assertions name the exact copy. */
 function makeFace(overrides: Partial<PanelFace> = {}): PanelFace {
@@ -122,7 +122,7 @@ describe('skill-history panel: the state machine a renderer can see', () => {
   it('discards a late rows reply for a skill the operator has already left', async () => {
     const slow = deferred<VersionsPayload>()
     render(createElement(SkillHistoryPanel, makeFace({
-      loadVersions: name => name === 'alpha' ? slow.promise : Promise.resolve({ content: [row(9, false)], support: [], liveHash: 'h9' }),
+      loadVersions: name => name === 'alpha' ? slow.promise : Promise.resolve({ content: [row(9, false)], support: [] }),
     })))
     fireEvent.click(await screen.findByText('alpha'))
     fireEvent.click(screen.getByText('beta'))

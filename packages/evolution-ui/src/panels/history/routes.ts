@@ -158,7 +158,7 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
             const row = decorate(entry, index, groups.support, false)
             return { ...row, cells: versionRowCells(row) }
           })
-          return json(200, { ok: true, data: { content, support, liveHash } })
+          return json(200, { ok: true, data: { content, support } })
         })
       },
     },

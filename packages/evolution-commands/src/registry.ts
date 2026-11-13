@@ -81,7 +81,7 @@ export const COMMAND_ENTRIES: CommandEntry[] = [
   { readonly: false, usage: 'maintain cancel [<id>]', summary: '停掉在飞的那次维护扫描（省略 id 仅当最新一条是本进程在跑的那次）' },
   { readonly: true, usage: 'params [--group <name>] [--json]', summary: '列出全部参数：分组、档位、生效时机、来源与当前值（--json 便于脚本处理）' },
   { readonly: false, usage: 'restructure <name> "<heading>" <to_file> [--plan <runId>]', summary: '把技能正文的一节移到 references 文件' },
-  { readonly: false, usage: 'extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--outcome extract|mixed] [--apply]', summary: '预览把源技能的可复用部分提取到已有类级 owner；默认 plan，--apply 才写（多根一次事务）' },
+  { readonly: false, usage: 'extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--outcome extract|mixed] [--proposal <id>] [--owner-covers] [--apply]', summary: '预览把源技能的可复用部分提取到已有类级 owner；默认 plan，--apply 才写（多根一次事务）' },
   { readonly: true, usage: 'replay', summary: '比较不同会话与重启之间的计划结果（从活动记录回填）' },
 ]
 
@@ -108,3 +108,36 @@ export function renderCommandTable(): string {
   )
   return lines.join('\n')
 }
+
+/**
+ * The flags whose declared form takes a value, DERIVED from the usage text: a flag followed by
+ * `=` or by a placeholder token (not another flag/bracket) is a value flag. Boolean flags stay
+ * out. The parser imports this, so `--proposal p1` cannot be read as a bare boolean again.
+ */
+export function entryValueFlags(entry: CommandEntry): string[] {
+  const found: string[] = []
+  const tokens = entry.usage.split(/\s+/)
+  for (let index = 0; index < tokens.length; index += 1) {
+    const raw = tokens[index] ?? ''
+    const token = raw.replace(/^\[+/, '').replace(/\]+$/, '')
+    if (!token.startsWith('--')) continue
+    const name = token.slice(2).split('=')[0] ?? ''
+    if (name === '') continue
+    if (token.includes('=')) {
+      if (!found.includes(name)) found.push(name)
+      continue
+    }
+    const next = (tokens[index + 1] ?? '').replace(/^\[+/, '')
+    if (next !== '' && !next.startsWith('--') && next !== ']' && next !== '|') {
+      if (!found.includes(name)) found.push(name)
+    }
+  }
+  return found
+}
+
+/** Union of every usage's value flags (the parse table's ONE source). */
+export const VALUE_FLAGS: readonly string[] = (() => {
+  const names: string[] = []
+  for (const entry of COMMAND_ENTRIES) for (const name of entryValueFlags(entry)) if (!names.includes(name)) names.push(name)
+  return names
+})()

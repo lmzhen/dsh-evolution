@@ -61,7 +61,7 @@ it('writes source residual and target addition in one unit', async () => {
     expect(plan.ok).toBe(true)
     if (!plan.ok) return
     const result = await lib.extract(plan.plan, 'foreground')
-    expect(result.ok).toBe(true)
+    expect(result.ok, result.message).toBe(true)
     const source = await readFile(join(root, 'source', 'SKILL.md'), 'utf8')
     const target = await readFile(join(root, 'target', 'SKILL.md'), 'utf8')
     expect(source).toContain('This capability now lives in target')
@@ -137,7 +137,7 @@ it('copies shared support, deletes exclusive support, and keeps the parent refer
     expect(plan.ok).toBe(true)
     if (!plan.ok) return
     const result = await lib.extract(plan.plan, 'foreground')
-    expect(result.ok).toBe(true)
+    expect(result.ok, result.message).toBe(true)
     expect(await readFile(join(root, 'target', 'references', 'shared.md'), 'utf8')).toBe('# shared')
     expect(await readFile(join(root, 'target', 'references', 'exclusive.md'), 'utf8')).toBe('# exclusive')
     expect(await readFile(join(root, 'source', 'references', 'shared.md'), 'utf8')).toBe('# shared')

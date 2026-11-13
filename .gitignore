@@ -9,6 +9,9 @@ src/**/*.map
 dist/
 packages/dist/
 packages/.release-staging/
+.from-dist-*/
+.next/
+
 packages/docs/
 # 0.3.31 (V5-14): interrupted-swap residue and staging `next` dirs — a failed
 # or re-run prepare-release leaves multi-MB dirs a bare `git add -A` would commit.
@@ -34,4 +37,5 @@ packages/evolution-merge-engine/vendor/out/
 # platform group names at two depths), and verify-package-map fails the release gate when they exist.
 /tsconfig.mirror.json
 /vitest.mirror.config.ts
+
 

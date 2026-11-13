@@ -14,17 +14,9 @@
  * @module @deepseek-ai/dsh-evolution-commands/parse
  */
 
-/** The flags whose declared form takes a value (`--group <name>`, `--expect <revision>`, …). */
-/**
- * Exported so the command-table gate can tie it to the table's usage lines (P2: two declarations of
- * "which flags take a value" would otherwise be free to drift apart).
- */
-export const VALUE_FLAGS: readonly string[] = [
-  // No `profile`: the word only appears in the preset row's PROSE, no command declares a value-taking
-  // `--profile`, and nothing reads `flags.get('profile')`. Kept honest by the measurement, not by
-  // leaving a name standing (independent review P2-4).
-  'group', 'to', 'timeout', 'plan', 'start', 'end', 'outcome',
-]
+/** The flags whose declared form takes a value, derived from the command table's usage lines. */
+export { VALUE_FLAGS } from './registry.ts'
+import { VALUE_FLAGS } from './registry.ts'
 
 /** One parsed command line. */
 export interface ParsedCommand {

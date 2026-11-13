@@ -33,7 +33,7 @@ describe('skill-history client api', () => {
     const api = createSkillHistoryApi(skills.fetch)
     expect(await api.skills()).toEqual([{ name: 'a', versions: 2 }])
     expect(skills.calls[0]?.path).toBe(HOST_ROUTES.skills)
-    const versions = stubFetch({ ok: true, body: { ok: true, data: { content: [], support: [], liveHash: null } } })
+    const versions = stubFetch({ ok: true, body: { ok: true, data: { content: [], support: [] } } })
     const api2 = createSkillHistoryApi(versions.fetch)
     await api2.versions('my skill')
     expect(versions.calls[0]?.path).toBe(HOST_ROUTES.versions + '?name=my%20skill')

@@ -1543,9 +1543,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ? {}
             : { mounted: { profile: mountedForDoctor.profile, dir: mountedForDoctor.profileDir, bundles: mountedForDoctor.bundles } }
           const report = await diagnose(ctx, { home: evolutionRoot(), ...mounted, runs: doctorRuns() })
-          // G6/W8 tail: --json answers the frozen DiagnosticsView (schemaVersion 2), the SAME object
-          // the diagnostics route/client card consume.
-          if (input === 'doctor --json') return ok(JSON.stringify(report.view, null, 2))
+          // W11 B2b: --json answers the WHOLE DoctorReport (installForm/conflicts/actions/pending +
+          // the frozen DiagnosticsView), not only the view — scripts were losing every finding.
+          if (input === 'doctor --json') return ok(JSON.stringify(report, null, 2))
           // G6/W8 tail: the text face ends with the SAME 7+8 view the diagnostics route answers.
           return ok(renderDoctorText(report, hostLocale))
         }
