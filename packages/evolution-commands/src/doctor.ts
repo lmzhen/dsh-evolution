@@ -18,7 +18,7 @@ import { evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, re
 import { composePresetEntry, presetRowBlock, presetRowBody, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import type { DiagnosticsView } from '@deepseek-ai/dsh-evolution-core'
 import { processScopeViolations } from '@deepseek-ai/dsh-evolution-state'
-import { assembleDoctorInputs, buildDoctorView } from './doctor-view.ts'
+import { assembleDoctorInputs, buildDoctorView, classifyInstallForm } from './doctor-view.ts'
 import { readLegacyDocumentState } from './migration.ts'
 import { readPlatformView } from './platform-view.ts'
 import type { PlatformPlugin, PlatformPreset, PlatformView } from './platform-view.ts'
@@ -760,7 +760,7 @@ export async function diagnose(
 
   const approval = ctx.get('evolutionApproval') as { readonly isEnabled?: boolean } | undefined
   const humanGated = approval?.isEnabled === true
-  const installForm: DoctorReport['installForm'] = full || preset ? (humanGated ? 'human-gated' : full ? 'full' : 'preset') : layered ? 'layered' : host ? 'host' : presetDirInstalled ? 'preset-only' : 'none'
+  const installForm: DoctorReport['installForm'] = classifyInstallForm({ full, preset, host, humanGated, layeredPreset: layered, presetDirInstalled })
   // OPT-22 (2026-09): only real double-mount rows drive the action ladder's
   // "keep exactly one" advice. The enumeration/manifest DEGRADED detail also
   // lives in `conflicts` (report + --json compatibility) — but that detail

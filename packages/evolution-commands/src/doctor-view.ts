@@ -34,6 +34,20 @@ import { COMMAND_FALLBACKS } from './command-fallback.ts'
 /** The install form the running profile was classified as (the seven values DoctorReport uses). */
 export type InstallFormId = 'full' | 'human-gated' | 'preset' | 'host' | 'layered' | 'preset-only' | 'none'
 
+/** The ONE install-form decision; callers only supply the facts their detection read. */
+export function classifyInstallForm(input: {
+  readonly full: boolean
+  readonly preset: boolean
+  readonly host: boolean
+  readonly humanGated: boolean
+  readonly layeredPreset: boolean
+  readonly presetDirInstalled: boolean
+}): InstallFormId {
+  if (input.full || input.preset) return input.humanGated ? 'human-gated' : input.full ? 'full' : 'preset'
+  if (input.host) return input.layeredPreset ? 'layered' : 'host'
+  return input.presetDirInstalled ? 'preset-only' : 'none'
+}
+
 /** One preset's probe result (reviewer/maintainer). */
 export interface PresetFacts {
   readonly registered: boolean
@@ -451,13 +465,14 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
   // Fallback only: doctor.ts passes its OWN single detection as extras.form. This branch keeps
   // the diagnostics route/tests working when no caller supplied one, and uses the same semantic
   // ids (no M1..M4 words, and an empty deployment is `none`, not a fake "session preset").
-  const detectedForm: DoctorInputs['form'] = hasAll || hasPreset
-    ? { id: humanGated ? 'human-gated' : hasAll ? 'full' : 'preset', evidence: [hasAll ? 'bundle dsh-evolution-all installed' : 'bundle dsh-evolution-preset installed', ...(humanGated ? ['approval.enabled: true'] : [])], confidence: 'declared' }
-    : hasHost
-      ? hasFamilyPreset
-        ? { id: 'layered', evidence: ['bundle dsh-evolution-host installed', 'family agent preset registered'], confidence: 'declared' }
-        : { id: 'host', evidence: ['bundle dsh-evolution-host installed'], confidence: 'declared' }
-      : { id: 'none', evidence: ['no family bundle was reported by the platform manager'], confidence: 'inferred' }
+  const detectedId = classifyInstallForm({ full: hasAll, preset: hasPreset, host: hasHost, humanGated, layeredPreset: hasFamilyPreset, presetDirInstalled: false })
+  const detectedForm: DoctorInputs['form'] = detectedId === 'full' || detectedId === 'preset' || detectedId === 'human-gated'
+    ? { id: detectedId, evidence: [hasAll ? 'bundle dsh-evolution-all installed' : 'bundle dsh-evolution-preset installed', ...(humanGated ? ['approval.enabled: true'] : [])], confidence: 'declared' }
+    : detectedId === 'layered'
+      ? { id: 'layered', evidence: ['bundle dsh-evolution-host installed', 'family agent preset registered'], confidence: 'declared' }
+      : detectedId === 'host'
+        ? { id: 'host', evidence: ['bundle dsh-evolution-host installed'], confidence: 'declared' }
+        : { id: 'none', evidence: ['no family bundle was reported by the platform manager'], confidence: 'inferred' }
   const platformVersion = hostRuntimeVersion()
   const missingServices = [
     ...SERVICES_PROBED.filter(name => get(name) === undefined),
