@@ -112,7 +112,6 @@ export function configureMergePresentation(ctx: MergePresentationContext): void 
 export * from './contracts.ts'
 export * from './skill-card.ts'
 export * from './state.ts'
-export * from './coordinator.ts'
 export * from './report.ts'
 export * from './staging.ts'
 export * from './staging-files.ts'

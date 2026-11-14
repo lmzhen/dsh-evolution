@@ -534,8 +534,6 @@
         "evolution-merge::tests/commit-recovery.spec.ts",
         "evolution-merge::tests/commit-revision-cas.spec.ts",
         "evolution-merge::tests/contracts.spec.ts",
-        "evolution-merge::tests/coordinator-v2.spec.ts",
-        "evolution-merge::tests/coordinator.spec.ts",
         "evolution-merge::tests/decision.spec.ts",
         "evolution-merge::tests/doctor.spec.ts",
         "evolution-merge::tests/domain-state.spec.ts",
@@ -1188,8 +1186,6 @@
         "evolution-merge::tests/commit-recovery.spec.ts",
         "evolution-merge::tests/commit-revision-cas.spec.ts",
         "evolution-merge::tests/contracts.spec.ts",
-        "evolution-merge::tests/coordinator-v2.spec.ts",
-        "evolution-merge::tests/coordinator.spec.ts",
         "evolution-merge::tests/decision.spec.ts",
         "evolution-merge::tests/doctor.spec.ts",
         "evolution-merge::tests/domain-state.spec.ts",
@@ -1785,8 +1781,6 @@
         "evolution-merge::tests/commit-recovery.spec.ts",
         "evolution-merge::tests/commit-revision-cas.spec.ts",
         "evolution-merge::tests/contracts.spec.ts",
-        "evolution-merge::tests/coordinator-v2.spec.ts",
-        "evolution-merge::tests/coordinator.spec.ts",
         "evolution-merge::tests/decision.spec.ts",
         "evolution-merge::tests/doctor.spec.ts",
         "evolution-merge::tests/domain-state.spec.ts",
@@ -2111,7 +2105,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 425
+      "specs": 423
     },
     "ci-only": {
       "gates": 10,
@@ -2119,16 +2113,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 425
+      "specs": 423
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 498
+      "specs": 496
     }
   },
   "specs": {
-    "total": 498,
-    "marked": 498,
+    "total": 496,
+    "marked": 496,
     "unmarked": 0
   }
 }

@@ -15,7 +15,7 @@ async function files(dir: string): Promise<string[]> {
   return out
 }
 
-it('has no legacy production writer and only the read-only v2 projection', async () => {
+it('has no legacy production writer', async () => {
   const all = await files(src)
   const writers: string[] = []
   for (const path of all) {
@@ -24,13 +24,6 @@ it('has no legacy production writer and only the read-only v2 projection', async
     if (/\bupsertRow\(/.test(text) || /\bdropRow\(/.test(text) || /\bmoveRow\(/.test(text)) writers.push(path)
   }
   expect(writers).toEqual([])
-  const coordinatorUsers: string[] = []
-  for (const path of all) {
-    if (path.endsWith('coordinator.ts')) continue
-    const text = await readFile(path, 'utf8')
-    if (text.includes('transitionLegacyForProjection(')) coordinatorUsers.push(path)
-  }
-  expect(coordinatorUsers).toEqual([])
 })
 
 it('all production state writes go through RowTx or terminal drop', async () => {
