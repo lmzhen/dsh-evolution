@@ -16,6 +16,14 @@ it('keeps needs-restructure, severity, message and dims in the route row', () =>
   expect(rows[0]?.dims).toMatchObject({ bodyChars: 41000, supportFiles: 8, churnPatches: 3 })
 })
 
+it('passes a dim core adds through without a second whitelist', () => {
+  const rows = toRouteRows([{
+    name: 'future', verdict: 'healthy', findings: [],
+    dims: { bodyChars: 12, futureMetric: 7 } as never,
+  }])
+  expect((rows[0]?.dims as unknown as { futureMetric?: number })?.futureMetric).toBe(7)
+})
+
 it('normalizes the host healthy verdict to the panel ok vocabulary', () => {
   const rows = toRouteRows([{ name: 'fine', verdict: 'healthy', findings: [] }])
   expect(rows[0]?.verdict).toBe('healthy')

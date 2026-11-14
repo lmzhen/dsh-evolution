@@ -24,6 +24,24 @@ export type RouteDims = SkillHealthWireDims
 export type RouteRow = SkillHealthWireRow
 
 /**
+ * Give the panel its complete dims contract, then pass every measured field
+ * through. A dim added in core must not need a second whitelist edit here.
+ */
+function projectDims(dims: Partial<RouteDims> & { readable?: boolean }): RouteDims {
+  const { readable: _readable, ...measured } = dims
+  return {
+    bodyChars: null,
+    bodyTokens: null,
+    supportGroups: 0,
+    supportFiles: null,
+    churnPatches: null,
+    churnReads: null,
+    stampDensityPerKb: null,
+    ...measured,
+  }
+}
+
+/**
  * Project the curator's health view into what the panel renders.
  * @param rows - `{ name, verdict, dims, findings }` per skill, as `healthView()` returns them.
  * @returns the same rows, with unreadable skills kept apart and uncalibrated rules uncounted.
@@ -49,15 +67,7 @@ export function toRouteRows(rows: ReadonlyArray<{
     })),
     ...(row.protection === undefined || row.protection === null ? {} : { protection: row.protection }),
     ...(row.hardCapHits === undefined ? {} : { hardCapHits: row.hardCapHits }),
-    ...(row.dims === undefined || row.dims === null ? {} : { dims: {
-      bodyChars: row.dims.bodyChars ?? null,
-      bodyTokens: row.dims.bodyTokens ?? null,
-      supportGroups: row.dims.supportGroups ?? 0,
-      supportFiles: row.dims.supportFiles ?? null,
-      churnPatches: row.dims.churnPatches ?? null,
-      churnReads: row.dims.churnReads ?? null,
-      stampDensityPerKb: row.dims.stampDensityPerKb ?? null,
-    } }),
+    ...(row.dims === undefined || row.dims === null ? {} : { dims: projectDims(row.dims) }),
   }))
 }
 
