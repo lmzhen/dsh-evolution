@@ -149,38 +149,3 @@ export const CSS = [
   '.evo-diag-detail{display:block;margin:var(--evo-space-2) 0 0;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base);overflow-wrap:anywhere}',
   '.evo-diag-remedy{display:block;margin:var(--evo-space-4) 0 0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
 ].join('\n')
-
-/** The slice of the DOM the injection touches (this package typechecks without DOM lib). */
-interface StyleHost {
-  querySelector(selector: string): unknown
-  /** The element shape the injection uses. `remove()` is on the real DOM element and is what the
-   * S5-08 disposer calls, so the host shape names it too - otherwise the package cannot typecheck
-   * without the DOM lib while still using the disposal the browser offers. */
-  createElement(tag: string): { dataset: Record<string, string>; textContent: string; remove(): void }
-  head: { appendChild(node: unknown): void }
-}
-
-/**
- * Inject the stylesheet once per document.
- *
- * S5-08: it RETURNS the disposer. The tag check alone answered only half the question - "is it
- * there" - and left "who takes it away" to nobody, so a hot reload (unmount, remount) found the old
- * tag, skipped the injection, and kept serving the PREVIOUS bundle CSS. skill-history hands its
- * disposer back to the fiber; this is the same shape for the same concern.
- * @param host - the document to inject into; defaults to the global one.
- * @returns the disposal; a no-op when there is no document or the tag was already present.
- */
-export function injectStyles(host?: StyleHost): () => void {
-  const doc = host ?? (globalThis as { document?: StyleHost }).document
-  if (doc === undefined) return () => {}
-  const previous = doc.querySelector('style[data-plugin-css="' + CSS_TAG_ID + '"]')
-  // P2-29: replace, don't reuse — the old owner's disposer must not be able to
-  // remove the stylesheet the surviving owner is rendering with.
-  ;(previous as { remove?: () => void } | null)?.remove?.()
-  const tag = doc.createElement('style')
-  tag.dataset.plugin = '@deepseek-ai/dsh-evolution-ui'
-  tag.dataset.pluginCss = CSS_TAG_ID
-  tag.textContent = CSS
-  doc.head.appendChild(tag)
-  return () => { tag.remove() }
-}

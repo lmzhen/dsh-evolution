@@ -23,7 +23,8 @@ import { EvolutionSettingsPage } from './SettingsPage.ts'
 import { createDiagnosticsApi, type DiagnosticsApi } from './diagnostics-state.ts'
 import { FAMILY_VERSION } from './generated-about.ts'
 import type { ConfigFormsSeat } from './seam.ts'
-import { injectStyles } from './styles.ts'
+import { injectPluginStyles } from '@lmzhen/dsh-evolution-client-kit'
+import { CSS, CSS_TAG_ID } from './styles.ts'
 
 /** The client services this half consumes. */
 export const inject = ['slots', 'locale'] as const
@@ -41,7 +42,11 @@ export const PRODUCT_BUNDLE = '@lmzhen/dsh-evolution-all'
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => injectStyles(), 'evolution-settings-ui: styles')
+  ctx.effect(() => injectPluginStyles(
+    (globalThis as { document?: Parameters<typeof injectPluginStyles>[0] }).document,
+    CSS,
+    CSS_TAG_ID,
+  ), 'evolution-settings-ui: styles')
   const seam = ctx as unknown as {
     slots: {
       inject(name: string, callback: () => Generator<unknown, void, unknown>): unknown
