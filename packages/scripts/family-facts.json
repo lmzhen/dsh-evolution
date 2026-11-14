@@ -1756,6 +1756,14 @@
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if this row ever gains a --check form (the drift check the other generators carry), delete this exemption and prove it by hand-editing the artifact",
             "renewal": "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
+          },
+          "gate-81": {
+            "reason": "the health-admission gate is a registered local cannot: a bare overlay has no health-baseline corpora, so it exits cannot-decide before any mutation; a mutation cannot flip a missing input",
+            "owner": "scripts/gates",
+            "expiry": "0.48.0",
+            "plan": "run the row on a build line that carries the health baseline and replace this exemption with a proven record; the row stays counted until then",
+            "condition": "release gate: revisit when the CI lane supplies the baseline",
+            "renewal": "Added at 0.48.0 with the gate-registration reason (expires 0.48.0)."
           }
         },
         "cannotDecideRegistered": {
