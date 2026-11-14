@@ -12,7 +12,6 @@ function defining(root: string, name: string): string[] {
 }
 
 const owners: Array<[string, string, string, string]> = [
-  ['journal', mergeRoot + '/src', 'writeJournal', 'domain/commit-journal-store.ts'],
   ['staging', mergeRoot + '/src', 'createStaging', 'staging.ts'],
   ['staged-file', mergeRoot + '/src', 'writeStagedFile', 'staging-files.ts'],
   ['receipt', coreRoot, 'unitReceiptPath', 'unit-storage.ts'],

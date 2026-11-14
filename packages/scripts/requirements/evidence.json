@@ -2365,15 +2365,6 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/commit-recovery.spec.ts#trusts a commit receipt over a stale journal",
-      "note": "third-audit complement"
-    },
-    {
-      "id": "GAP-P0-03",
-      "criterion": "AC-1",
-      "kind": "test",
-      "verdict": "pass",
-      "grade": "A",
       "ref": "evolution-merge/tests/recovery-settle.spec.ts#load() materializes the orphan verdict, then recovery upgrades it to succeeded",
       "note": "third-audit complement"
     },

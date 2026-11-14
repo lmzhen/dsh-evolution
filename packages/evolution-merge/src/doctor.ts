@@ -12,7 +12,6 @@ import { readUnitJournal } from '@deepseek-ai/dsh-evolution-core/write'
 import { migrationJournalPath, migrationReportPath, v2BackupPath } from './domain/state-bootstrap.ts'
 import { readMergeSnapshot } from './domain/merge-snapshot.ts'
 import { validateArtifacts, type RowState, type RunState, type JournalState, type EvidenceState, type StagingState } from './domain/consistency.ts'
-import { readJournal } from './domain/commit-journal-store.ts'
 import { readCommitReceipt } from './commit-receipt.ts'
 import { stagingRoot } from './staging.ts'
 import { readReconcileReport, type ReconcileReport } from './domain/reconcile.ts'
@@ -78,11 +77,6 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
     status: snapshot.blocked === undefined || !hasState ? 'ok' : 'warn',
     detail: snapshot.blocked === undefined ? 'pairs ' + String(snapshot.rows.length) + '；verify ' + String(counts.verify) + ' / pending ' + String(counts.pending) + ' / fuse ' + String(counts.fuse) + ' / skipped ' + String(counts.skipped) + ' / expired ' + String(snapshot.doctor.counts.expired) : snapshot.blocked.code + ': ' + snapshot.blocked.message,
   })
-  const recoveryRuns = new Set<string>()
-  try {
-    const raw = await io.readText(join(home, 'merge', 'recovery.json'))
-    if (raw !== null) for (const report of JSON.parse(raw) as readonly { readonly runId?: string; readonly ok?: boolean }[]) if (report.ok === true && report.runId !== undefined) recoveryRuns.add(report.runId)
-  } catch {}
   const invalid: { id: string; reason: string }[] = []
   if (snapshot.blocked !== undefined) invalid.push({ id: 'state', reason: snapshot.blocked.code })
   for (const item of snapshot.rows) {
@@ -92,10 +86,10 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
     const run: RunState = runId === undefined ? 'none' : row.state === 'pending' ? 'awaiting-approval' : 'running'
     const staging: StagingState = item.stage === null ? (row.state === 'fuse' ? 'missing' : 'none') : item.stage.state === 'present' || item.stage.state === 'reserved' ? 'kept' : row.state === 'fuse' ? 'missing' : 'none'
     const receipt = runId === undefined ? null : await readCommitReceipt(io, home, runId)
-    const phase = receipt !== null ? await readUnitJournal(io, home, receipt.unitId) : runId === undefined ? null : await readJournal(io, home, runId)
+    const phase = receipt === null ? null : await readUnitJournal(io, home, receipt.unitId)
     const journal: JournalState = phase === null ? 'none' : phase.phase === 'prepared' || phase.phase === 'target-pending' ? 'prepared' : phase.phase === 'target-written' || phase.phase === 'sources-archived' || phase.phase === 'support-pending' || phase.phase === 'source-archiving' ? 'committing' : phase.phase === 'committed' ? 'committed' : phase.phase === 'rolled-back' ? 'rolled-back' : 'failed'
     const evidence: EvidenceState = receipt === null ? 'none' : 'receipt'
-    const result = validateArtifacts({ row: artifactRow, run, staging, journal, evidence, activeRuns: run === 'running' || run === 'awaiting-approval' ? 1 : 0, ...(runId !== undefined && recoveryRuns.has(runId) ? { recovery: true } : {}) })
+    const result = validateArtifacts({ row: artifactRow, run, staging, journal, evidence, activeRuns: run === 'running' || run === 'awaiting-approval' ? 1 : 0 })
     if (!result.ok) invalid.push({ id: row.id, reason: result.reason ?? 'not-allowed' })
   }
   rows.push({ key: 'merge-state-v3', label: 'state schema', status: snapshot.blocked === undefined ? 'ok' : 'warn', detail: snapshot.blocked === undefined ? 'schemaVersion 4' : snapshot.blocked.code })
@@ -167,22 +161,5 @@ export async function mergeDoctor(io: EvolutionIoLike, home: string, configuredR
     status: 'ok',
     detail: stagingRoot(home, '<runId>'),
   })
-  try {
-    const raw = await io.readText(join(home, 'merge', 'recovery.json'))
-    if (raw !== null) {
-      const reports = JSON.parse(raw) as readonly { readonly action?: string; readonly ok?: boolean; readonly runId?: string }[]
-      const failed = reports.filter(report => report.ok !== true)
-      rows.push({
-        key: 'recovery',
-        label: '提交恢复',
-        status: failed.length === 0 ? 'ok' : 'warn',
-        detail: failed.length === 0
-          ? String(reports.length) + ' 条恢复报告，无待处理'
-          : String(failed.length) + ' 条待处理：' + failed.map(report => (report.runId ?? '?') + '=' + (report.action ?? '?')).join(', '),
-      })
-    }
-  } catch {
-    rows.push({ key: 'recovery', label: '提交恢复', status: 'unknown', detail: '无法读取 merge/recovery.json' })
-  }
   return rows
 }

@@ -5,8 +5,6 @@ import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { readUnitJournal, unitEvidencePath, writeUnitJournal, writeUnitReceipt } from '@deepseek-ai/dsh-evolution-core/write'
 import { UnitTransactions, type UnitBackend, type UnitPlan } from '../support/unit.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
-import { recoverCommitJournals } from '../../src/commit-recovery.ts'
-import { writeJournal } from '../../src/domain/commit-journal-store.ts'
 
 function backend(tree: Map<string, string>): UnitBackend {
   return {
@@ -90,14 +88,6 @@ it('refuses roll-forward when a source checkpoint is missing', async () => {
   expect(rolled.ok).toBe(false)
   if (rolled.ok) return
   expect(rolled.code).toBe('unit-rollback-blocked')
-})
-
-it('reports receipt-missing for a committed legacy journal without receipt', async () => {
-  const home = await tempRoot('dsh-rg3-rec-receipt-')
-  const io = nodeEvolutionIo()
-  await writeJournal(io, home, { runId: 'run-r', target: 'alpha', create: false, sources: [], phase: 'committed', updatedAt: new Date(1).toISOString() })
-  const reports = await recoverCommitJournals(io, home, 2)
-  expect(reports.find(item => item.runId === 'run-r')).toMatchObject({ action: 'receipt-missing', ok: false })
 })
 
 it('refuses manual recovery before any tree write', async () => {

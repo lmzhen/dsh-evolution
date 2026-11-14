@@ -7,7 +7,6 @@ const root = fileURLToPath(new URL('../..', import.meta.url))
 const owners: [string, string][] = [
   ['merge-state', 'src/domain/pair-ledger.ts'],
   ['runs', '../evolution-core/src/run-registry.ts'],
-  ['journal', 'src/domain/commit-journal-store.ts'],
   ['receipt/unit', '../evolution-core/src/skill-store.ts'],
   ['staging', 'src/staging.ts'],
   ['tree fence', '../evolution-core/src/authority.ts'],
@@ -39,7 +38,7 @@ it('RG0 writer map allows only the declared row/commit writers', () => {
   expect(commitWriters).toEqual([])
 })
 
-it('RG0 twelve owner current paths exist', () => {
+it('RG0 eleven owner current paths exist', () => {
   for (const [name, path] of owners) {
     if (name === 'engine') {
       expect(existsSync(root + '/../evolution-merge-engine/package.json') || existsSync(root + '/../evolution-merge-engine-g2/package.json'), name).toBe(true)

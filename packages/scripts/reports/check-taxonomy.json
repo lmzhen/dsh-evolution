@@ -527,11 +527,8 @@
         "evolution-merge::tests/commands.spec.ts",
         "evolution-merge::tests/commit-assembly.spec.ts",
         "evolution-merge::tests/commit-execute.spec.ts",
-        "evolution-merge::tests/commit-journal-store.spec.ts",
-        "evolution-merge::tests/commit-journal.spec.ts",
         "evolution-merge::tests/commit-plan.spec.ts",
         "evolution-merge::tests/commit-receipts.spec.ts",
-        "evolution-merge::tests/commit-recovery.spec.ts",
         "evolution-merge::tests/commit-revision-cas.spec.ts",
         "evolution-merge::tests/contracts.spec.ts",
         "evolution-merge::tests/decision.spec.ts",
@@ -683,7 +680,6 @@
         "evolution-merge::tests/undo-resume-skip.spec.ts",
         "evolution-merge::tests/undo-resume.spec.ts",
         "evolution-merge::tests/unit-claim.spec.ts",
-        "evolution-merge::tests/unit-recovery-report.spec.ts",
         "evolution-merge::tests/wire.spec.ts",
         "evolution-preset::tests/session-query-policy.spec.ts",
         "evolution-review::tests/redact.spec.ts",
@@ -1179,11 +1175,8 @@
         "evolution-merge::tests/commands.spec.ts",
         "evolution-merge::tests/commit-assembly.spec.ts",
         "evolution-merge::tests/commit-execute.spec.ts",
-        "evolution-merge::tests/commit-journal-store.spec.ts",
-        "evolution-merge::tests/commit-journal.spec.ts",
         "evolution-merge::tests/commit-plan.spec.ts",
         "evolution-merge::tests/commit-receipts.spec.ts",
-        "evolution-merge::tests/commit-recovery.spec.ts",
         "evolution-merge::tests/commit-revision-cas.spec.ts",
         "evolution-merge::tests/contracts.spec.ts",
         "evolution-merge::tests/decision.spec.ts",
@@ -1335,7 +1328,6 @@
         "evolution-merge::tests/undo-resume-skip.spec.ts",
         "evolution-merge::tests/undo-resume.spec.ts",
         "evolution-merge::tests/unit-claim.spec.ts",
-        "evolution-merge::tests/unit-recovery-report.spec.ts",
         "evolution-merge::tests/wire.spec.ts",
         "evolution-preset::tests/session-query-policy.spec.ts",
         "evolution-review::tests/redact.spec.ts",
@@ -1774,11 +1766,8 @@
         "evolution-merge::tests/commands.spec.ts",
         "evolution-merge::tests/commit-assembly.spec.ts",
         "evolution-merge::tests/commit-execute.spec.ts",
-        "evolution-merge::tests/commit-journal-store.spec.ts",
-        "evolution-merge::tests/commit-journal.spec.ts",
         "evolution-merge::tests/commit-plan.spec.ts",
         "evolution-merge::tests/commit-receipts.spec.ts",
-        "evolution-merge::tests/commit-recovery.spec.ts",
         "evolution-merge::tests/commit-revision-cas.spec.ts",
         "evolution-merge::tests/contracts.spec.ts",
         "evolution-merge::tests/decision.spec.ts",
@@ -1930,7 +1919,6 @@
         "evolution-merge::tests/undo-resume-skip.spec.ts",
         "evolution-merge::tests/undo-resume.spec.ts",
         "evolution-merge::tests/unit-claim.spec.ts",
-        "evolution-merge::tests/unit-recovery-report.spec.ts",
         "evolution-merge::tests/wire.spec.ts",
         "evolution-preset::tests/preset.spec.ts",
         "evolution-preset::tests/session-query-policy.spec.ts",
@@ -2105,7 +2093,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 423
+      "specs": 419
     },
     "ci-only": {
       "gates": 10,
@@ -2113,16 +2101,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 423
+      "specs": 419
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 496
+      "specs": 492
     }
   },
   "specs": {
-    "total": 496,
-    "marked": 496,
+    "total": 492,
+    "marked": 492,
     "unmarked": 0
   }
 }

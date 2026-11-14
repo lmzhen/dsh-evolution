@@ -1,11 +1,5 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
-import { tempRoot } from '../../../test-support/temp-home.ts'
-import { mergeDoctor } from '../../src/doctor.ts'
-import { journalPath } from '../../src/domain/commit-journal-store.ts'
 import { validateArtifacts, type ArtifactState } from '../../src/domain/consistency.ts'
 
 const state = (patch: Partial<ArtifactState>): ArtifactState => ({ row: 'verify', run: 'none', staging: 'none', journal: 'none', evidence: 'none', activeRuns: 0, ...patch })
@@ -18,34 +12,6 @@ it('allows every live/terminal run-state artifact phase', () => {
     state({ row: 'fuse', run: 'failed', staging: 'missing', recovery: true }),
     state({ row: 'merged', run: 'succeeded', staging: 'cleaned', journal: 'committed', evidence: 'receipt' }),
   ]) expect(validateArtifacts(item).ok, JSON.stringify(item)).toBe(true)
-})
-
-it('reads recovery and reports failed reports', async () => {
-  const home = await tempRoot('dsh-rg0b-doctor-io-')
-  const io = nodeEvolutionIo()
-  await mkdir(join(home, 'merge'), { recursive: true })
-  await writeFile(join(home, 'merge', 'merge-state.json'), JSON.stringify({ schemaVersion: 3, rows: [] }))
-  await writeFile(join(home, 'merge', 'recovery.json'), JSON.stringify([{ runId: 'r', ok: false, action: 'rollback' }]))
-  expect((await mergeDoctor(io, home)).find(item => item.key === 'recovery')).toMatchObject({ status: 'warn' })
-  await writeFile(join(home, 'merge', 'recovery.json'), JSON.stringify([{ runId: 'r', ok: true }]))
-  expect((await mergeDoctor(io, home)).find(item => item.key === 'recovery')).toMatchObject({ status: 'ok' })
-})
-
-it('reads every journal phase and a receipt from disk', async () => {
-  const home = await tempRoot('dsh-rg0b-doctor-journal-')
-  const io = nodeEvolutionIo()
-  await mkdir(join(home, 'merge', 'journals'), { recursive: true })
-  const decision = { shouldMerge: true, mode: 'merge-into-existing', target: 'a', sources: ['b'], rationale: 'r' }
-  await writeFile(join(home, 'merge', 'merge-state.json'), JSON.stringify({ schemaVersion: 3, rows: [{ id: 'r', pairKey: 'a|b', a: 'a', b: 'b', version: 0, createdAt: 'c', updatedAt: 'c', origin: 'agent', runId: 'run-1', state: 'fuse', target: 'a', decision, staging: { kind: 'present', ref: 'run-1/pairs/a', expiresAt: 9 }, attempts: 0 }] }))
-  for (const phase of ['prepared', 'target-written', 'sources-archived', 'committed', 'rolled-back', 'failed']) {
-    await writeFile(journalPath(home, 'run-1'), JSON.stringify({ runId: 'run-1', phase, target: 'a', sources: ['b'], updatedAt: '2026-10-23T00:00:00.000Z' }))
-    const row = (await mergeDoctor(io, home)).find(item => item.key === 'consistency')
-    expect(row?.status, phase).toBe('blocked')
-  }
-  await mkdir(join(home, 'merge', 'receipts'), { recursive: true })
-  await writeFile(journalPath(home, 'run-1'), JSON.stringify({ runId: 'run-1', phase: 'committed', target: 'a', sources: ['b'], updatedAt: '2026-10-23T00:00:00.000Z' }))
-  await writeFile(join(home, 'merge', 'receipts', 'run-1.json'), JSON.stringify({ runId: 'run-1', unitId: 'u-1', target: 'a', sources: ['b'] }))
-  expect((await mergeDoctor(io, home)).find(item => item.key === 'consistency')).toMatchObject({ status: 'blocked' })
 })
 
 it('rejects cancelled and unknown run phases for active rows', () => {

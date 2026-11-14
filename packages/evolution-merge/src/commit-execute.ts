@@ -8,7 +8,6 @@ import type { CommitMergePlan, CommitMergeResult } from '@deepseek-ai/dsh-evolut
 import { assembleStagedCommit, type CommitAssemblyPort } from './commit-assembly.ts'
 import { writeCommitReceipt, type CommitReceipt } from './commit-receipt.ts'
 import { pairKey } from './contracts.ts'
-import { writeJournal } from './domain/commit-journal-store.ts'
 import { evidenceSha256 as digestEvidence } from './domain/evidence-hash.ts'
 import type { UnitTransaction } from './unit-protocol.ts'
 import type { UnitPlan } from './unit-protocol.ts'
@@ -67,7 +66,6 @@ export async function commitStagedRun(
   if (await options.isBlocked?.(assembled.plan.target) === true) {
     return { ok: false, message: 'target is blocked by curator: ' + assembled.plan.target, plan: assembled.plan }
   }
-  const journal = { runId, target: assembled.plan.target, create: !assembled.plan.targetExists, sources: assembled.plan.sources, phase: 'prepared' as const, updatedAt: new Date(options.now()).toISOString() }
   let result: CommitMergeResult
   let evidenceSha256: string | undefined
   let warning: string | undefined
@@ -78,11 +76,10 @@ export async function commitStagedRun(
     // P1-6: the unit's run identity is the canonical parent run, not the stage key.
     const unitRunId = options.parentRunId ?? runId
     const unitPlan: UnitPlan = { runId: unitRunId, pairKey: pairKey(assembled.plan.target, first), target: assembled.plan.target, targetExists: assembled.plan.targetExists, sources: assembled.plan.sources, body: assembled.plan.body, supportFiles: assembled.plan.supportFiles, expectedTargetBody: assembled.plan.expectedTargetBody, expectedSourceBodies: assembled.plan.expectedSourceBodies, origin: options.origin, summary: options.summary, ...(options.limits === undefined ? {} : { skillLimits: options.limits }), ...(options.validationPlan === undefined ? {} : { validationPlan: options.validationPlan }), ...(options.targetRevision === undefined ? {} : { targetRevision: options.targetRevision }), ...(options.sourceRevisions === undefined ? {} : { sourceRevisions: options.sourceRevisions }), ...(options.supportDigest === undefined ? {} : { supportDigest: options.supportDigest }) }
-    try { await writeJournal(io, home, journal) } catch { /* compat mirror; unit journal is authority */ }
     const prepared = await transaction.prepare(unitPlan)
     if (!prepared.ok) return { ok: false, message: prepared.message, plan: assembled.plan }
     const committed = await transaction.commit(prepared.prepared, options.signal === undefined ? undefined : { signal: options.signal })
-    if (!committed.ok) { try { await writeJournal(io, home, { ...journal, phase: 'failed', updatedAt: new Date(options.now()).toISOString() }) } catch {} ; return { ok: false, message: committed.message, plan: assembled.plan, ...(committed.code === 'target-changed' || committed.code === 'source-changed' || committed.code === 'support-changed' ? { code: committed.code } : {}) } }
+    if (!committed.ok) return { ok: false, message: committed.message, plan: assembled.plan, ...(committed.code === 'target-changed' || committed.code === 'source-changed' || committed.code === 'support-changed' ? { code: committed.code } : {}) }
     const unitId = committed.evidence.unitId
     if (committed.evidence.unitId !== prepared.prepared.unitId && !prepared.prepared.unitId.startsWith('legacy:')) return { ok: false, message: 'unit evidence does not match prepared unitId', plan: assembled.plan }
     const finalize = (transaction as { finalize?: (unitId: string) => Promise<{ ok: true; evidence: import('@deepseek-ai/dsh-evolution-core/write').UnitEvidenceRecord } | { ok: false; message: string }> }).finalize
@@ -96,11 +93,8 @@ export async function commitStagedRun(
     result = { ok: true, message: 'merged', unitId, archived: committed.evidence.sources.filter(source => source.archived).map(source => source.name), mutations: committed.evidence.mutations }
   }
   if (!result.ok) {
-    try { await writeJournal(io, home, { ...journal, phase: 'failed', updatedAt: new Date(options.now()).toISOString() }) } catch {}
     return { ok: false, message: result.message, plan: assembled.plan }
   }
-  const committed = { ...journal, phase: 'committed' as const, updatedAt: new Date(options.now()).toISOString(), ...(result.unitId === undefined ? {} : { unitId: result.unitId }) }
-  try { await writeJournal(io, home, committed) } catch {}
   if (result.unitId === undefined) return { ok: true, plan: assembled.plan, result, warning: 'commit landed without a unitId; receipt not written' }
   const receipt: CommitReceipt = {
     runId,

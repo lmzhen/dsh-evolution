@@ -57,13 +57,6 @@ it('rejects every forbidden combination with a stable reason', () => {
   }
 })
 
-it('RG0 recovery never writes skill bytes', () => {
-  const source = readFileSync(root + '/src/commit-recovery.ts', 'utf8')
-  expect(source).not.toContain('writeText(skillBodyPath')
-  expect(source).not.toContain('writeText(skillFilePath')
-  expect(source).not.toContain('restoreFromArchive')
-})
-
 it('RG0 commit goes through one UnitTransaction only', () => {
   const source = readFileSync(root + '/src/commit-execute.ts', 'utf8')
   expect(source).toContain('options.unit ?? port.unit')

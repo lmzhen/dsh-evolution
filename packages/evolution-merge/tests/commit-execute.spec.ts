@@ -3,7 +3,6 @@ import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { commitReceiptPath, commitStagedRun, createStaging, readCommitReceipt, writeStagedFile } from '../src/index.ts'
-import { readJournal } from '../src/domain/commit-journal-store.ts'
 import { legacyUnit } from './support/legacy-unit.ts'
 
 function commitWithLegacy(io: any, home: string, runId: string, port: any, options: any) {
@@ -39,7 +38,6 @@ it('commits a staged tree and writes a receipt', async () => {
   expect(result.receipt).toMatchObject({ runId: 'run-1', unitId: 'u-1', target: 'umbrella', create: true, sources: ['a', 'b'], archived: ['a', 'b'] })
   expect(await io.readText(commitReceiptPath(home, 'run-1'))).toContain('u-1')
   expect(await readCommitReceipt(io, home, 'run-1')).toMatchObject({ unitId: 'u-1' })
-  expect(await readJournal(io, home, 'run-1')).toMatchObject({ phase: 'committed', unitId: 'u-1' })
 })
 
 
@@ -142,10 +140,9 @@ it('does not write a receipt when commit fails', async () => {
   }, { origin: 'foreground', summary: 'merge', now: () => 2000 })
   expect(result.ok).toBe(false)
   expect(await readCommitReceipt(io, home, 'run-1')).toBeNull()
-  expect(await readJournal(io, home, 'run-1')).toMatchObject({ phase: 'failed' })
 })
 
-it('keeps the journal prepared when commitMerge throws', async () => {
+it('does not write a receipt when commitMerge throws', async () => {
   const home = await tempRoot('dsh-merge-commit-throw-')
   const io = nodeEvolutionIo()
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
@@ -154,6 +151,5 @@ it('keeps the journal prepared when commitMerge throws', async () => {
     async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { throw new Error('commit unknown') },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000 })).rejects.toThrow('commit unknown')
-  expect(await readJournal(io, home, 'run-1')).toMatchObject({ phase: 'prepared' })
   expect(await readCommitReceipt(io, home, 'run-1')).toBeNull()
 })
