@@ -21,7 +21,7 @@ import { stripComments } from './lib-source-text.mjs'
 const root = process.argv[2] ?? 'packages'
 // The command surface is TypeScript: import it through a file URL (Node strips the types).
 const pkg = resolve(root, 'evolution-commands/src')
-const { COMMAND_ENTRIES, entryName, entryFlags } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
+const { COMMAND_ENTRIES, entryName, entryFlags, summaryOf } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
 const { parseSubcommand, isParseFailure } = await import(pathToFileURL(join(pkg, 'parse.ts')).href)
 const sourcePath = join(pkg, 'index.ts')
 const source = stripComments(readFileSync(sourcePath, 'utf8'))
@@ -30,7 +30,7 @@ const problems = []
 // A: the C7 shape.
 for (const entry of COMMAND_ENTRIES) {
   if (typeof entry.usage !== 'string' || entry.usage === '') problems.push('an entry carries no usage')
-  if (typeof entry.summary !== 'string' || entry.summary === '') problems.push(entry.usage + ': carries no summary')
+  if (summaryOf(entry).trim() === '') problems.push(entry.usage + ': carries no generated summary')
   if (typeof entry.readonly !== 'boolean') problems.push(entry.usage + ': carries no readonly flag (C7)')
 }
 

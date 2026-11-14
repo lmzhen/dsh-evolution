@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { describe, expect, it } from 'vitest'
-import { COMMAND_ENTRIES, renderHelpText, renderHint } from '../src/registry.ts'
+import { COMMAND_ENTRIES, renderHelpText, renderHint, summaryOf } from '../src/registry.ts'
 
 describe('command registry (WD1, 0.3.55)', () => {
   it('renders the input-declaration hint and the help from ONE table', () => {
@@ -13,9 +13,9 @@ describe('command registry (WD1, 0.3.55)', () => {
   // G5 step 5 (audit F1/F2): the README-vs-renderer command-table pin was retired - the
   // authoritative judge is `verify-command-table.mjs`, and `renderCommandTable` has no other
   // consumer (the README table is produced on the generating side).
-  it('T-WD2: every registry entry carries a non-empty summary', () => {
+  it('T-WD2: every registry entry resolves a generated summary', () => {
     for (const entry of COMMAND_ENTRIES) {
-      expect(entry.summary.trim().length, `summary for ${entry.usage}`).toBeGreaterThan(0)
+      expect(summaryOf(entry).trim().length, `summary for ${entry.usage}`).toBeGreaterThan(0)
     }
   })
 })
