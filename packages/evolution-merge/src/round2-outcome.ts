@@ -31,6 +31,11 @@ export async function recordRound2Outcome(
     ...(outcome.criteria === undefined ? {} : { criteria: outcome.criteria }),
     ...(outcome.validationIssues === undefined ? {} : { validation: { issues: outcome.validationIssues } }),
   }
+  const pair = (outcomeName: MergeReportPair['outcome'], extra: Partial<MergeReportPair> = {}, withDecision = true): MergeReportPair => ({
+    id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue,
+    ...(withDecision && row.decision !== undefined ? { decision: row.decision } : {}),
+    outcome: outcomeName, archived: [], ...extra,
+  })
   if (outcome.kind === 'merged') {
     const unitRef = { unitId: outcome.unitId ?? 'unknown', evidenceSha256: outcome.evidenceSha256 ?? 'unknown' }
     const finalize = async (): Promise<void> => {
@@ -41,22 +46,18 @@ export async function recordRound2Outcome(
       if (!removed.ok) throw new Error('row changed before commit record: ' + row.id)
       await dropStage(io, home, row.id)
     }
-    if (deferProjection) return { merged: true, finalize, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, ...(row.decision === undefined ? {} : { decision: row.decision }), outcome: 'merged', archived: outcome.archived ?? [], ...(outcome.lengths === undefined ? {} : { lengths: outcome.lengths }), ...(outcome.unitId === undefined ? {} : { unitId: outcome.unitId }), ...(outcome.target === undefined ? {} : { target: outcome.target }), ...reportExtra } }
-    {
-      await finalize()
-    }
+    if (deferProjection) return { merged: true, finalize, pair: pair('merged', { ...(outcome.lengths === undefined ? {} : { lengths: outcome.lengths }), ...(outcome.unitId === undefined ? {} : { unitId: outcome.unitId }), ...(outcome.target === undefined ? {} : { target: outcome.target }), ...reportExtra }) }
+    await finalize()
     return {
       merged: true,
-      pair: {
-        id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue,
-        ...(row.decision === undefined ? {} : { decision: row.decision }),
-        outcome: 'merged', archived: outcome.archived ?? [],
+      pair: pair('merged', {
+        ...(outcome.archived === undefined ? {} : { archived: outcome.archived }),
         ...(outcome.lengths === undefined ? {} : { lengths: outcome.lengths }),
         ...reportExtra,
         ...(outcome.unitId === undefined ? {} : { unitId: outcome.unitId }),
         ...(outcome.target === undefined ? {} : { target: outcome.target }),
         ...(outcome.validationPlan === undefined ? {} : { validationPlan: outcome.validationPlan }),
-      },
+      }),
     }
   }
   const failure: MergeFailure = outcome.failure ?? { stage: 'author', code: 'merge-failed', message: 'round2 failed', retryable: true, retryFrom: 'agent2' }
@@ -67,7 +68,7 @@ export async function recordRound2Outcome(
       return current === undefined ? false : tx.transition(row.id, { type: 'skipped', reason, origin: 'system', skipSource: 'system' }, current.version).ok
     })
     if (skipped) await dropStage(io, home, row.id)
-    return { merged: false, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, ...(row.decision === undefined ? {} : { decision: row.decision }), outcome: 'failed', archived: [], failure, ...reportExtra } }
+    return { merged: false, pair: pair('failed', { failure, ...reportExtra }) }
   }
   const cas = casExpiredHook(failure.code)
   if (cas !== null) {
@@ -79,7 +80,7 @@ export async function recordRound2Outcome(
       return moved.ok
     })
     await dropStage(io, home, row.id)
-    return { merged: false, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, ...(row.decision === undefined ? {} : { decision: row.decision }), outcome: 'failed', archived: [], failure: terminalFailure, ...reportExtra } }
+    return { merged: false, pair: pair('failed', { failure: terminalFailure, ...reportExtra }) }
   }
   if (failure.code === 'commit-failed' || failure.code === 'validation-failed') {
     // FR-EXEC-11/14: report-only failure. The pair leaves the active queue (so a later scan
@@ -98,7 +99,7 @@ export async function recordRound2Outcome(
       return current === undefined ? false : tx.remove(row.id, 'superseded', undefined, current.version).ok
     })
     if (dropped) await dropStage(io, home, row.id, row.stagingRef)
-    return { merged: false, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, outcome: 'failed', archived: [], failure } }
+    return { merged: false, pair: pair('failed', { failure }, false) }
   }
   const projected = await pairLedger(io, home, fence).transact(tx => {
     const current = tx.rows().find(item => item.id === row.id)
@@ -106,16 +107,9 @@ export async function recordRound2Outcome(
     const moved = tx.transition(row.id, { type: 'failed', failure }, current.version)
     return moved.ok && moved.row !== null ? v4ToLegacy(moved.row) : null
   })
-  if (projected === null) return { merged: false, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, outcome: 'failed', archived: [], failure: { ...failure, code: 'row-changed', message: 'row changed before failure record' }, ...reportExtra } }
-  {
-  }
+  if (projected === null) return { merged: false, pair: pair('failed', { failure: { ...failure, code: 'row-changed', message: 'row changed before failure record' }, ...reportExtra }, false) }
   return {
     merged: false,
-    pair: {
-      id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue,
-      ...(row.decision === undefined ? {} : { decision: row.decision }),
-      outcome: 'failed', archived: [], failure,
-      ...reportExtra,
-    },
+    pair: pair('failed', { failure, ...reportExtra }),
   }
 }
