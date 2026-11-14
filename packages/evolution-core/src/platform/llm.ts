@@ -2,9 +2,8 @@
  * The LLM half of the family's host platform boundary.
  *
  * Features pass a family request (route, messages, purpose); this module owns
- * the platform GenerateOptions cast, prepareCall fallback, and text assembly.
- * The purpose cast is the only compatibility point between the 0.2.1 fixed
- * union and 0.2.2's declaration-merge map.
+ * the platform GenerateOptions cast and text assembly. The purpose declaration
+ * merge below is the family's contribution to the 0.2.2 request map.
  */
 import type { GenerateOptions, StreamChunk, UserMessage } from '@deepseek-ai/dsh-llm'
 import type { Context } from '@deepseek-ai/cordis'
@@ -57,10 +56,6 @@ export interface LlmPort {
 
 interface LlmRuntimeLike {
   stream?(options: GenerateOptions): AsyncIterable<StreamChunk>
-  prepareCall?(config: GenerateOptions, signal?: AbortSignal): Promise<{
-    readonly config: Record<string, unknown>
-    stream(input: Record<string, unknown>): AsyncIterable<StreamChunk>
-  }>
 }
 
 function toOptions(request: EvolutionLlmRequest): GenerateOptions {
@@ -83,16 +78,8 @@ export function llmPort(ctx: Context): LlmPort | undefined {
   const port: LlmPort = {
     async *stream(request) {
       const options = toOptions(request)
-      if (llm.stream !== undefined) {
-        yield* llm.stream(options)
-        return
-      }
-      if (llm.prepareCall !== undefined) {
-        const call = await llm.prepareCall(options, request.signal)
-        yield* call.stream({ ...call.config, messages: request.messages, ...(request.signal === undefined ? {} : { signal: request.signal }) })
-        return
-      }
-      throw new EvolutionLlmError('transport', 'llm service has neither stream nor prepareCall')
+      if (llm.stream === undefined) throw new EvolutionLlmError('transport', 'llm service has no stream()')
+      yield* llm.stream(options)
     },
     async completeText(request) {
       let text = ''
