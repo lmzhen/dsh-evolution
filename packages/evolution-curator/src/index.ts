@@ -93,13 +93,8 @@ declare module '@deepseek-ai/cordis' {
 
 export interface Config {
   enabled?: boolean
-  /** Canonical registry id for the due-ness interval (see PARAM_ALIASES). */
+  /** Canonical registry id for the due-ness interval. */
   curatorIntervalHours?: Volatile<number | undefined>
-  /** The due-ness interval. The policy snapshot shadows it in every shipped
-   * composition — configure `curatorIntervalHours` there; that name is the
-   * canonical id. Deprecated alias (G0/S0.3): still readable, refused by
-   * writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
-  intervalHours?: number
   staleAfterDays?: Volatile<number>
   archiveAfterDays?: Volatile<number>
   /** Skill-tree root for curator scope/snapshot/archive (D2, v11) — a custom
@@ -281,13 +276,9 @@ export class EvolutionCurator extends Service {
     // G1: these twelve fields are the user-writable set (registry tier E3) and carry the
     // volatile marker, so the platform hands the plugin a live reference for each and a
     // committed settings edit reaches the running engine.
-    // No .default(): a schema default would fill this canonical key and make the
-    // deprecated alias below unreachable. The constructor resolves the default
-    // (DEFAULT_CURATOR_INTERVAL_HOURS) after the alias fallback.
+    // No .default(): the row layer resolves DEFAULT_CURATOR_INTERVAL_HOURS when
+    // the field carries no value.
     curatorIntervalHours: z.number().min(1).volatile(),
-    // Deprecated row alias (PARAM_ALIASES): still readable by readParam, refused by
-    // writes; removal was planned for 0.7.0 and is deferred (the alias still ships). Deployment-only (no `.volatile()`).
-    intervalHours: z.number().min(1),
     staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS).volatile(),
     archiveAfterDays: z.number().min(1).default(DEFAULT_ARCHIVE_AFTER_DAYS).volatile(),
     llmReview: z.boolean().default(false).volatile(),
@@ -498,9 +489,6 @@ export class EvolutionCurator extends Service {
    * @returns the current plain value, or undefined when nothing supplied one.
    */
   private rowValue(key: CuratorLiveNumberKey): number | undefined {
-    // G0/S0.4: the legacy spelling stays readable (PARAM_ALIASES) — the canonical
-    // volatile field wins, its plain alias field answers when nothing set the canonical one.
-    if (key === 'curatorIntervalHours') return unwrapLive(this.config.curatorIntervalHours) ?? this.config.intervalHours
     return unwrapLive(this.config[key])
   }
 

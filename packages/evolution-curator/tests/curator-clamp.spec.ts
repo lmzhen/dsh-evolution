@@ -13,7 +13,7 @@ import { vol } from '../../test-support/volatile-config.ts'
 // = "no boot grace" (setTimeout(0)). Every other numeric field is a threshold /
 // interval where 0 is never a legitimate meaning, so it clamps to at least 1.
 const MIN0 = ['minIdleHours', 'bootGraceSeconds']
-const MIN1 = ['intervalHours', 'staleAfterDays', 'archiveAfterDays', 'qualityWarnStaleAfterDays', 'curatorReviewMaxTokens', 'healthSoftBodyChars', 'healthStampDensityPerKb', 'healthChurnMinPatches']
+const MIN1 = ['curatorIntervalHours', 'staleAfterDays', 'archiveAfterDays', 'qualityWarnStaleAfterDays', 'curatorReviewMaxTokens', 'healthSoftBodyChars', 'healthStampDensityPerKb', 'healthChurnMinPatches']
 const ALL = [...MIN0, ...MIN1]
 
 describe('evolution-curator G3.1 numeric clamping', () => {

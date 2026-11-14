@@ -101,12 +101,6 @@ export interface Config {
   /** Skill-channel review cadence — the CANONICAL registry id (G1); shadowed by
    * the policy snapshot like the memory cadence. */
   reviewSkillInterval?: Volatile<number | undefined>
-  /** Deprecated alias of `reviewMemoryInterval` (G0/S0.3): still readable,
-   * refused by writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
-  memoryInterval?: number
-  /** Deprecated alias of `reviewSkillInterval` (G0/S0.3): still readable,
-   * refused by writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
-  skillInterval?: number
   reviewTimeoutMs?: number
   /** E3/P1-8 (v11) — TRUE semantics: this flag gates ONLY the completion
    * channel. The cadence latch stays active regardless of the value (a
@@ -156,16 +150,10 @@ export const Config = z.object({
   // first-class opt-in for deployments that want the parent context kept clean
   // or a dedicated review model.
   reviewMode: z.union([z.const('inject'), z.const('aux')]).default('aux').volatile(),
-  // G1: the canonical registry ids, merged into the row Config. No .default(): a
-  // schema default would fill the canonical key and make the deprecated alias
-  // below unreachable through the alias fallback (resolveReviewRowSettings resolves
-  // the default after it).
+  // G1: the canonical registry ids, merged into the row Config. No .default(): the
+  // resolver applies DEFAULT_REVIEW_* when the row carries no value.
   reviewMemoryInterval: z.number().min(1).volatile(),
   reviewSkillInterval: z.number().min(1).volatile(),
-  // Deprecated row aliases (PARAM_ALIASES): still read as the fallback spelling,
-  // refused by writes; removal was planned for 0.7.0 and is deferred (the alias still ships). Deployment-only (no `.volatile()`).
-  memoryInterval: z.number().min(1).default(DEFAULT_REVIEW_MEMORY_INTERVAL),
-  skillInterval: z.number().min(1).default(DEFAULT_REVIEW_SKILL_INTERVAL),
   reviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_REVIEW_TIMEOUT_MS),
   // V7-15 (0.3.44): the trigger is closed to the three known values — a typo
   // cannot silently select a fourth behavior. Note: schemastery is tolerant
@@ -298,8 +286,7 @@ export interface ReviewSettings {
  * This row's review knobs as they stand RIGHT NOW (G1 §8.3) — the base layer of the
  * precedence chain. The seven E3 keys are live: the platform hands each one a
  * reference it updates in place, so a committed settings edit needs neither a restart
- * nor a watcher. The deprecated cadence aliases stay the fallback spelling of the two
- * interval keys, and every numeric field is clamped (G3.1).
+ * nor a watcher. Every numeric field is clamped (G3.1).
  * @param rawConfig - the row config as the platform resolved it.
  * @param warn - sink for the once-per-key clamp warning.
  * @returns the row layer of the review knobs.
@@ -307,8 +294,8 @@ export interface ReviewSettings {
 export function resolveReviewRowSettings(rawConfig: Config, warn: (message: string) => void): ReviewSettings {
   const warned = new Set<string>()
   return {
-    reviewSkillInterval: clampOnce(warned, warn, 'reviewSkillInterval', unwrapLive(rawConfig.reviewSkillInterval) ?? rawConfig.skillInterval, DEFAULT_REVIEW_SKILL_INTERVAL, 1),
-    reviewMemoryInterval: clampOnce(warned, warn, 'reviewMemoryInterval', unwrapLive(rawConfig.reviewMemoryInterval) ?? rawConfig.memoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
+    reviewSkillInterval: clampOnce(warned, warn, 'reviewSkillInterval', unwrapLive(rawConfig.reviewSkillInterval), DEFAULT_REVIEW_SKILL_INTERVAL, 1),
+    reviewMemoryInterval: clampOnce(warned, warn, 'reviewMemoryInterval', unwrapLive(rawConfig.reviewMemoryInterval), DEFAULT_REVIEW_MEMORY_INTERVAL, 1),
     skillReviewTrigger: unwrapLive(rawConfig.skillReviewTrigger) ?? DEFAULT_SKILL_REVIEW_TRIGGER,
     skillReviewCompletionMinToolCalls: clampOnce(warned, warn, 'skillReviewCompletionMinToolCalls', rawConfig.skillReviewCompletionMinToolCalls, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, 1),
     reviewEnabled: liveBool(rawConfig.reviewEnabled, true),
@@ -451,28 +438,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
 
   // S2.2 (v37 P2-24) + G1: the policy snapshot shadows these three row knobs in every
   // shipped composition (host/all/preset). "This row set a value" is read as "the live
-  // reference resolves to a value" for the canonical key, and as "differs from that
-  // schema default" for a deprecated alias (the loader fills the alias default in). A
-  // key the USER set is excluded: that value wins over the policy (G1 §8.4-A), so
-  // reporting it as ineffective would be false.
-  const schemaDefaults = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: Config } } })['~standard'].validate({}).value
+  // reference resolves to a value". A key the USER set is excluded: that value wins over
+  // the policy (G1 §8.4-A), so reporting it as ineffective would be false.
   /** The value the schema fills in when nobody sets the key — for a volatile field the
    * reference is always present, so this is what "the row set nothing" resolves to. */
   const SHADOW_DEFAULTS = { reviewMode: 'aux', reviewMemoryInterval: DEFAULT_REVIEW_MEMORY_INTERVAL, reviewSkillInterval: DEFAULT_REVIEW_SKILL_INTERVAL } as const
-  const rowSupplied = (id: keyof typeof SHADOW_DEFAULTS, alias?: 'memoryInterval' | 'skillInterval'): boolean => {
+  const rowSupplied = (id: keyof typeof SHADOW_DEFAULTS): boolean => {
     // The key is a union of differently-typed volatile fields, so the read is asked as unknown:
     // unwrapLive cannot unify a union of payload types, and this site only compares against defaults.
     const canonical: unknown = unwrapLive(rawConfig[id] as LiveValue<unknown>)
-    if (canonical !== undefined && canonical !== SHADOW_DEFAULTS[id]) return true
-    return alias !== undefined && rawConfig[alias] !== undefined && rawConfig[alias] !== schemaDefaults[alias]
+    return canonical !== undefined && canonical !== SHADOW_DEFAULTS[id]
   }
-  const shadowedRowFields = ([
-    ['reviewMode', undefined],
-    ['reviewMemoryInterval', 'memoryInterval'],
-    ['reviewSkillInterval', 'skillInterval'],
-  ] as const)
-    .filter(([id, alias]) => !userSetKeys(ctx, paramRowId('evolution-review')).has(id) && rowSupplied(id, alias))
-    .map(([id]) => id)
+  const shadowedRowFields = (['reviewMode', 'reviewMemoryInterval', 'reviewSkillInterval'] as const)
+    .filter(id => !userSetKeys(ctx, paramRowId('evolution-review')).has(id) && rowSupplied(id))
   if (shadowedRowFields.length > 0) {
     let shadowWarned = false
     const warnShadowed = (): void => {

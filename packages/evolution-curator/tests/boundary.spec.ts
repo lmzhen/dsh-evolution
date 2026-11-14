@@ -26,7 +26,7 @@ afterEach(() => {
 interface SpecConfig {
   enabled?: boolean
   root?: string
-  intervalHours?: number
+  curatorIntervalHours?: number
   staleAfterDays?: number
   archiveAfterDays?: number
   minIdleHours?: number
@@ -42,7 +42,7 @@ async function mount(_home: string, config: SpecConfig = {}) {
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(mountRuntime)
   await ctx.plugin(NodeIo)
-  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, ...config })
+  await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, ...config })
   return ctx
 }
 

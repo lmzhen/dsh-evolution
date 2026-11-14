@@ -318,7 +318,7 @@ describe('evolution-curator', () => {
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
       transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24 })
     ctx.evolutionCurator.start()
     const result = await ctx.evolutionCurator.run()
     expect(Array.isArray(result.stale)).toBe(true)
@@ -335,7 +335,7 @@ describe('evolution-curator', () => {
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
     const result = await ctx.evolutionCurator.run({ ignoreGates: true })
     // No `llm` service mounted: recommend() degrades to empty nominations,
     // but the report still states the channel was enabled.
@@ -414,7 +414,7 @@ describe('evolution-curator', () => {
         // Yield nothing → no nominations, but the capture above ran.
       },
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, llmReview: true, intervalHours: 24 })
+    await ctx.plugin(EvolutionCurator, { enabled: true, llmReview: true, curatorIntervalHours: 24 })
     const skills = ctx.evolutionCurator.skills
     // Two near-duplicates form a consolidation candidate group.
     await skills.create('alpha-skill', nearBody('alpha-skill'), 'foreground')
@@ -473,7 +473,7 @@ describe('evolution-curator', () => {
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
       transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
     })
-    await ctx.plugin(EvolutionCurator, { autoStart: true, bootGraceSeconds: 0, intervalHours: 24 })
+    await ctx.plugin(EvolutionCurator, { autoStart: true, bootGraceSeconds: 0, curatorIntervalHours: 24 })
     // The boot check is deferred (never synchronous with the half-built host);
     // poll until the persisted state shows the catch-up pass landed.
     const deadline = Date.now() + 2000
@@ -496,8 +496,8 @@ describe('evolution-curator', () => {
       saveCuratorState: async (record: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean }) => { saved = record },
       transactCuratorState: async (task: StateTransactTask) => { saved = task(saved) ?? saved },
     })
-    // intervalHours = 336: a 1-day-old run is NOT due → no pass may fire.
-    await ctx.plugin(EvolutionCurator, { autoStart: true, bootGraceSeconds: 0, intervalHours: 336 })
+    // curatorIntervalHours = 336: a 1-day-old run is NOT due → no pass may fire.
+    await ctx.plugin(EvolutionCurator, { autoStart: true, bootGraceSeconds: 0, curatorIntervalHours: 336 })
     await new Promise(resolve => setTimeout(resolve, 300))
     expect(saved.runCount).toBe(3)
     expect(saved.lastSummary).toBe('seed')
@@ -1355,7 +1355,7 @@ Body of ${name}.
       saveCuratorState: async () => {},
       transactCuratorState: async () => {},
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24 })
 
     const reportsRoot = join(home, 'evolution', 'reports')
     await mkdir(reportsRoot, { recursive: true })
@@ -1471,7 +1471,7 @@ Body of ${name}.
     // into the live references the loader would hand out (a `vol()` reference
     // reaching the schema is rejected — see the sibling curator-settings spec for
     // that idiom, which constructs the instance directly instead).
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true, curatorReviewTimeoutMs: 25 })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true, curatorReviewTimeoutMs: 25 })
     const skills = ctx.evolutionCurator.skills
     await skills.create('stale-src', basicBody('stale-src'), 'foreground')
     // Idle past the STALE window (default 30 days) but below the ARCHIVE window
@@ -1510,7 +1510,7 @@ Body of ${name}.
       saveCuratorState: async () => {},
       transactCuratorState: async () => {},
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
     const skills = ctx.evolutionCurator.skills
     await skills.create('stale-src', basicBody('stale-src'), 'foreground')
     const longAgo = new Date(Date.now() - 45 * 86_400_000).toISOString()
@@ -1548,7 +1548,7 @@ Body of ${name}.
       saveCuratorState: async () => {},
       transactCuratorState: async () => {},
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
     const skills = ctx.evolutionCurator.skills
     await skills.create('umbrella-skill', basicBody('umbrella-skill'), 'foreground')
     await skills.create('stale-src', basicBody('stale-src'), 'foreground')
@@ -1589,7 +1589,7 @@ Body of ${name}.
       saveCuratorState: async () => {},
       transactCuratorState: async () => {},
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
     const skills = ctx.evolutionCurator.skills
     const body = basicBody
     await skills.create('umbrella-skill', body('umbrella-skill'), 'foreground')
@@ -1636,7 +1636,7 @@ Body of ${name}.
       saveCuratorState: async () => {},
       transactCuratorState: async () => {},
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
     const skills = ctx.evolutionCurator.skills
     // Two nearly-identical skills: the deterministic scanner sees nothing
     // (both fresh), only the dedup pool can surface them as candidates.
@@ -1672,7 +1672,7 @@ Body of ${name}.
       saveCuratorState: async () => {},
       transactCuratorState: async () => {},
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
     const skills = ctx.evolutionCurator.skills
     const near = nearBody
     // Both fresh: in the dedup pool but in NO stale pool.
@@ -1730,7 +1730,7 @@ Body of ${name}.
       saveCuratorState: async () => {},
       transactCuratorState: async () => {},
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
     const skills = ctx.evolutionCurator.skills
     const body = basicBody
     await skills.create('umbrella-skill', body('umbrella-skill'), 'foreground')
@@ -1772,7 +1772,7 @@ Body of ${name}.
     await nodeEvolutionIo().writeText(zPath, JSON.stringify({ ...base, runId: 'mtime-new', startedAt: '2026-08-29T01:00:00.000Z', finishedAt: '2026-08-29T01:00:00.000Z' }))
     await utimes(aPath, new Date('2026-08-29T00:00:00.000Z'), new Date('2026-08-29T00:00:00.000Z'))
     await utimes(zPath, new Date('2026-08-30T00:00:00.000Z'), new Date('2026-08-30T00:00:00.000Z'))
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24 })
     const report = await ctx.evolutionCurator.latestReport()
     expect(report?.runId).toBe('startedat-new-but-mtime-old')
     // The fallback is still the mtime: a pair that declares NO time at all is ordered by the
@@ -1799,7 +1799,7 @@ Body of ${name}.
     })
     // Due state + no `agents` service: the idle gate would otherwise block the
     // run forever on a headless/scheduled composition — the default fails open.
-    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false, intervalHours: 24, minIdleHours: 2 })
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false, curatorIntervalHours: 24, minIdleHours: 2 })
     const open = await ctx.evolutionCurator.run()
     expect(open.skipped).toBeUndefined()
     expect(open.report.runId).toBeTruthy()
@@ -1816,7 +1816,7 @@ Body of ${name}.
       saveCuratorState: async () => {},
       transactCuratorState: async () => {},
     })
-    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false, intervalHours: 24, minIdleHours: 2, minIdleFailOpen: false })
+    await ctx.plugin(EvolutionCurator, { enabled: true, autoStart: false, curatorIntervalHours: 24, minIdleHours: 2, minIdleFailOpen: false })
     const closed = await ctx.evolutionCurator.run()
     expect(closed.skipped).toBe('active-session')
     ctx.evolutionCurator.stop()
@@ -1828,7 +1828,7 @@ Body of ${name}.
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     // NO evolutionState service: stateless composition.
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24 })
     const first = await ctx.evolutionCurator.run()
     expect(first.skipped).toBe('first-run-deferred(stateless)')
     const second = await ctx.evolutionCurator.run()
@@ -1929,7 +1929,7 @@ Body of ${name}.
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
     // Direct construction bypasses the schema `.min(1)`; the assembly clamp
     // must warn loudly.
-    new EvolutionCurator(ctx, { enabled: false, intervalHours: 0, staleAfterDays: vol(NaN) })
+    new EvolutionCurator(ctx, { enabled: false, curatorIntervalHours: 0, staleAfterDays: vol(NaN) })
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
     warnSpy.mockRestore()
   })
@@ -1942,7 +1942,7 @@ Body of ${name}.
       stream: async function* () { throw new Error('llm provider down') },
     })
     ctx.provide('evolutionPolicy', { get: () => ({ curatorModel: 'model-x' }) })
-    await ctx.plugin(EvolutionCurator, { enabled: true, llmReview: true, intervalHours: 24 })
+    await ctx.plugin(EvolutionCurator, { enabled: true, llmReview: true, curatorIntervalHours: 24 })
     const spy = vi.spyOn(ctx.logger, 'warn')
     const nominations = await (ctx.evolutionCurator as unknown as { recommend(names: string[]): Promise<{ prunings: string[]; consolidations: unknown[]; warnings: string[] }> }).recommend(['sql-backup', 'SQL-restore'])
     // E-52: the swallow must be observable — warn, and no nominations, no throw.
@@ -2022,7 +2022,7 @@ describe('P2-5 (v15)/v16: control-plane mutators serialize on the mutex chain', 
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, autoStart: false })
     const curator = ctx.evolutionCurator
     // Hold the mutex exactly the way run()/consolidate() hold it.
     const internals = curator as unknown as { acquireMutex(): Promise<() => void> }
@@ -2044,7 +2044,7 @@ describe('P2-5 (v15)/v16: control-plane mutators serialize on the mutex chain', 
     const ctx = new Context()
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
-    await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+    await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, autoStart: false })
     const curator = ctx.evolutionCurator
     const internals = curator as unknown as { acquireMutex(): Promise<() => void> }
     const release = await internals.acquireMutex()
@@ -2065,7 +2065,7 @@ it('P3 (v17): two queued control-plane mutators run SERIALLY (no overlap, FIFO)'
   const ctx = new Context()
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
-  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+  await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, autoStart: false })
   const curator = ctx.evolutionCurator
   // Instrument the two mutator bodies to detect overlap.
   const events: string[] = []
@@ -2116,7 +2116,7 @@ it('v17: a REAL in-flight run holds the mutex — a second run skips (already-ru
   const ctx = new Context()
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
-  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+  await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, autoStart: false })
   const curator = ctx.evolutionCurator
   let started = 0
   let releaseFirst!: () => void
@@ -2169,7 +2169,7 @@ it('P1-10 (v38): an unvalidated usage-sidecar key reaches no path, no suppressio
     ...base,
     exists: async (path: string) => { probed.push(path); return await base.exists(path) },
   }, { default: true })
-  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+  await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
   const skills = ctx.evolutionCurator.skills
   await skills.create('stale-real', basicBody('stale-real'), 'foreground')
   await skills.create('idle-real', basicBody('idle-real'), 'foreground')
@@ -2235,7 +2235,7 @@ it('P2-17 (v38): a FAILED archive does not read as "already archived" for its me
     saveCuratorState: async () => {},
     transactCuratorState: async () => {},
   })
-  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+  await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
   const skills = ctx.evolutionCurator.skills
   await skills.create('umbrella-skill', basicBody('umbrella-skill'), 'foreground')
   await skills.create('narrow-src', basicBody('narrow-src'), 'foreground')
@@ -2301,7 +2301,7 @@ it('P2-18 (v38): the executed consolidation carries its mode into the run report
     saveCuratorState: async () => {},
     transactCuratorState: async () => {},
   })
-  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, llmReview: true })
+  await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, llmReview: true })
   const skills = ctx.evolutionCurator.skills
   await skills.create('umbrella-skill', basicBody('umbrella-skill'), 'foreground')
   await skills.create('stale-src', basicBody('stale-src'), 'foreground')

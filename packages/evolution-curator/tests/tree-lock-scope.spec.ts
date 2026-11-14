@@ -24,7 +24,7 @@ it('G1/1.5: an operator restore does not wait for a pass parked in its whole-tre
   const ctx = new Context()
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
-  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24 })
+  await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24 })
   const skills = ctx.evolutionCurator.skills
   await skills.create('restore-me', BODY('restore-me', 'body'), 'foreground')
   await skills.archive('restore-me', {}, 'foreground')

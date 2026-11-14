@@ -11,7 +11,7 @@ async function mount(autoStart = false) {
   const ctx = new Context()
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(NodeIo)
-  await ctx.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart })
+  await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, autoStart })
   return ctx
 }
 
@@ -28,7 +28,7 @@ describe('evolution-curator single-instance contract', () => {
     await ctxB.plugin(EvolutionIoRegistry)
     await ctxB.plugin(NodeIo)
     const warnSpy = vi.spyOn(ctxB.logger, 'warn')
-    await ctxB.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: true })
+    await ctxB.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, autoStart: true })
     const yielded = warnSpy.mock.calls.map(call => String(call[0])).find(text => text.includes('YIELDS'))
     warnSpy.mockRestore()
     expect(yielded).toContain(evolutionHome())
@@ -71,7 +71,7 @@ describe('evolution-curator single-instance contract', () => {
     const ctxB = new Context()
     await ctxB.plugin(EvolutionIoRegistry)
     await ctxB.plugin(NodeIo)
-    await ctxB.plugin(EvolutionCurator, { enabled: true, intervalHours: 24, autoStart: false })
+    await ctxB.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, autoStart: false })
     const yielded = ctxB.evolutionCurator
     // run() refuses (the existing contract)...
     expect((await yielded.run({ ignoreGates: true })).skipped).toBe('instance-held')

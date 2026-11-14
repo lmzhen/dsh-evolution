@@ -144,7 +144,7 @@ describe('curator parameter surface (G1: row config, precedence and the cross-fi
     const failClosed = mutableVol(true)
     // No `agents` service at all: fail-open lets the pass through, fail-closed defers it.
     const curator = new EvolutionCurator(ctx, {
-      enabled: true, autoStart: false, intervalHours: 24, minIdleHours: vol(2), minIdleFailOpen: failClosed.ref,
+      enabled: true, autoStart: false, curatorIntervalHours: 24, minIdleHours: vol(2), minIdleFailOpen: failClosed.ref,
     })
     expect((await curator.run()).skipped).toBeUndefined()
     failClosed.set(false)
