@@ -1670,6 +1670,32 @@
               "provenAt": "2026-11-14T18:37:08.018Z",
               "provenSha": "103816f26a7e917ea55e2379ebe5099ecb211d109c373c33a3e5b5e8c11830ca"
             }
+          ],
+          "ci-only-20": [
+            {
+              "mutate": {
+                "file": "packages/evolution-core/src/write.ts",
+                "find": "export * from './unit-journal.ts'",
+                "replace": "export * from './unit-journal-missing.ts'"
+              },
+              "expect": "red",
+              "note": "the ./write subpath must export every write-engine module; a missing unit-journal export makes verify-core-surface red",
+              "provenAt": "2026-11-14T18:38:06.030Z",
+              "provenSha": "9f17d0bae636a05fa3c9e5312dfc2c1c2e95eec564b26b883aa6f9f9bb731bc4"
+            }
+          ],
+          "ci-only-26": [
+            {
+              "mutate": {
+                "file": "packages/scripts/family-test-lines.json",
+                "find": "\"spec\": \"packages/evolution-activity/tests/learning-graph/graph.spec.ts\"",
+                "replace": "\"specX\": \"packages/evolution-activity/tests/learning-graph/graph.spec.ts\""
+              },
+              "expect": "red",
+              "note": "every test-line entry must carry spec/id/expectLine/status/reasonRef/expiry/owner; dropping spec makes --strict red",
+              "provenAt": "2026-11-14T18:38:09.122Z",
+              "provenSha": "bed11f0be501041ff4ced0750c8bb415d4ea12dd5cc36e06fcddb581098d42c4"
+            }
           ]
         },
         "mutationExempt": {
