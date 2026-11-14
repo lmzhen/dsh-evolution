@@ -1462,6 +1462,19 @@
               "provenAt": "2026-10-14T08:37:13.545Z",
               "provenSha": "e3de8de517159eb3500246cab38fa3b13d85b7c67491c8969695543fda04220f"
             }
+          ],
+          "gate-60": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-about.mjs",
+                "find": "const RELATIVE = 'evolution-ui/src/panels/settings/generated-about.ts'",
+                "replace": "const RELATIVE = 'evolution-ui/src/panels/settings/generated-about-x.ts'"
+              },
+              "expect": "red",
+              "note": "the settings about constant is generated into RELATIVE; pointing the generator at a missing path makes --check red instead of silently rewriting an unread file",
+              "provenAt": "2026-11-14T18:20:29.657Z",
+              "provenSha": "41df9fc3477623bc05b26dcb53d62db4425e2dd668460cf0a2f3bdaebc82bff1"
+            }
           ]
         },
         "mutationExempt": {

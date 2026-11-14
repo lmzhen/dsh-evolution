@@ -132,34 +132,38 @@ const selfTest = process.argv.includes('--self-test')
 const sha256 = (text) => createHash('sha256').update(text).digest('hex')
 const VERDICT_OF_EXIT = { 0: 'green', 1: 'red', 2: 'cannot-decide' }
 
+/** Resolve the file a record mutates in the SAME tree its gate runs in. */
+function mutationFile(gate, relative) {
+  if (gate !== undefined && gate.tree === 'overlay') {
+    const root = softOverlay()
+    if (typeof root !== 'string' || root === '') return null
+    const overlayRelative = relative.startsWith('packages/evolution/')
+      ? relative
+      : relative.replace(/^packages\//, 'packages/evolution/')
+    return resolvePath(root, overlayRelative)
+  }
+  const candidates = [resolvePath(REPO_ROOT, relative), resolvePath(REPO_ROOT, 'evolution', relative.replace(/^packages\//, ''))]
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]
+}
+
 /** Run one record; returns { status, detail } where status is the harness's own word. */
 function runRecord(id, record) {
   const gate = gates.find((entry) => entry.id === id)
   if (gate === undefined) return { status: 'UNKNOWN-ID', detail: id + ' is not a manifest row' }
   const argv = Array.isArray(gate.argv) ? gate.argv : null
   if (argv === null) return { status: 'NOT EXECUTABLE', detail: id + ' declares no argv' }
-  // Layout-aware: the mirror resolves `packages/scripts/...` from the repo root, the overlay keeps
-  // the same file at `<repoRoot>/packages/evolution/scripts/...` (self-test and --only run on both).
-  const candidates = [resolvePath(REPO_ROOT, record.mutate.file), resolvePath(REPO_ROOT, 'evolution', record.mutate.file.replace(/^packages\//, ''))]
-  const file = candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]
+  const file = mutationFile(gate, record.mutate.file)
+  if (file === null || !existsSync(file)) return { status: 'TREE MISMATCH', detail: id + ': the ' + String(gate.tree) + ' tree for ' + record.mutate.file + ' is not available' }
   const before = readBytes(file, 'utf8')
   const beforeSha = sha256(before)
   // A red only counts when the check was GREEN before the mutation. Without this baseline a
   // record whose argv cannot even run here (a missing module, a wrong tree) would read as a
   // proven red for a reason that has nothing to do with the mutation - the exact false evidence
   // this ledger exists to prevent.
-  // The tree the RECORD mutates and the tree the CHECK runs in must be the same one: a row that
-  // runs in the overlay never reads a mirror-side patch, so its verdict would be independent of
-  // the mutation (a green baseline plus a mutated file proves nothing about the check).
-  if (gate.tree === 'overlay') {
-    return { status: 'TREE MISMATCH', detail: id + ': this row runs in the overlay while mutations are applied in the mirror - the run cannot see the patch' }
-  }
-  // FORENSICS (round 83): when a probe reports NOT PROVEN the first question is whether the patch
-  // reached the file the check actually reads, so every probe prints the resolved path, the bytes'
-  // hash before and after the write, and the child's cwd + argv.
+  const cwd = gate.tree === 'overlay' ? softOverlay() : resolvePath(HERE, '..', '..')
   console.log('[probe] ' + id + ' file=' + file + ' sha-before=' + beforeSha.slice(0, 10))
   const preDirty = dirtySet()
-  const baseline = spawnSync(process.execPath, argv[0] === 'node' ? argv.slice(1) : argv, { cwd: resolvePath(HERE, '..', '..'), encoding: 'utf8' })
+  const baseline = spawnSync(process.execPath, argv[0] === 'node' ? argv.slice(1) : argv, { cwd, encoding: 'utf8' })
   const baselineVerdict = VERDICT_OF_EXIT[baseline.status ?? 1] ?? 'red'
   if (baselineVerdict !== 'green') {
     return { status: 'NO GREEN BASELINE', detail: id + ': the check returned ' + baselineVerdict + ' BEFORE any mutation, so a red afterwards would prove nothing' }
@@ -167,7 +171,6 @@ function runRecord(id, record) {
   const occurrences = before.split(record.mutate.find).length - 1
   if (occurrences !== 1) return { status: 'PATCH NOT UNIQUE', detail: record.mutate.file + ': find occurs ' + occurrences + ' time(s)' }
   const equalValue = record.mutate.find === record.mutate.replace
-  const cwd = gate.tree === 'overlay' ? softOverlay() : resolvePath(HERE, '..', '..')
   try {
     writeBytes(file, before.replace(record.mutate.find, record.mutate.replace))
     console.log('[probe] sha-after-write=' + sha256(readBytes(file, 'utf8')).slice(0, 10))
@@ -219,8 +222,11 @@ function stampRecords(id, results) {
   let stamped = 0
   for (let i = 0; i < list.length && i < results.length; i++) {
     if (!results[i].status.startsWith('PROVEN')) continue
+    const gate = gates.find((entry) => entry.id === id)
+    const file = mutationFile(gate, list[i].mutate.file)
+    if (file === null) continue
     list[i].provenAt = new Date().toISOString()
-    list[i].provenSha = sha256(readBytes(resolvePath(HERE, '..', '..', list[i].mutate.file), 'utf8'))
+    list[i].provenSha = sha256(readBytes(file, 'utf8'))
     stamped += 1
   }
   if (stamped > 0) writeBytes(assetPath, JSON.stringify(asset, null, 2) + String.fromCharCode(10))
