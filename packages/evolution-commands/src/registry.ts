@@ -17,12 +17,14 @@ export interface CommandEntry {
   usage: string
   /** C7: true when the subcommand only READS (no skill/param write). Stored: not derivable. */
   readonly: boolean
+  /** Authored flag declarations; `usage` documents them but is not the parser's source. */
+  flags?: readonly (readonly [name: string, kind: 'boolean' | 'value'])[]
 }
 
-/** The flags the TABLE declares for one subcommand (name → `--flag`), DERIVED from its usage. */
+/** The flags the TABLE declares for one subcommand (name → `--flag`). */
 export function flagsOf(name: string): string[] {
   const entry = COMMAND_ENTRIES.find(candidate => entryName(candidate) === name)
-  return entry === undefined ? [] : entryFlags(entry)
+  return entry?.flags?.map(([flag]) => flag) ?? []
 }
 
 /**
@@ -44,42 +46,33 @@ export function entryName(entry: CommandEntry): string {
   return secondIsName ? name + ' ' + second : name
 }
 
-/** C7 shape, DERIVED: the flags a `usage` declares, in the form `--flag` (value flags keep their name). */
-export function entryFlags(entry: CommandEntry): string[] {
-  const found: string[] = []
-  for (const match of entry.usage.matchAll(/--[a-z][a-z-]*/g)) {
-    if (!found.includes(match[0])) found.push(match[0])
-  }
-  return found
-}
-
 export const COMMAND_ENTRIES: CommandEntry[] = [
   { readonly: false, usage: 'merge <subcommand> [<args>]' },
-  { readonly: true, usage: 'pending [--detail]' },
+  { readonly: true, usage: 'pending [--detail]', flags: [['--detail', 'boolean']] },
   { readonly: false, usage: 'approve <id>' },
   { readonly: false, usage: 'reject <id>' },
   { readonly: false, usage: 'release <id>' },
-  { readonly: true, usage: 'doctor [--json]' },
+  { readonly: true, usage: 'doctor [--json]', flags: [['--json', 'boolean']] },
   { readonly: false, usage: 'curator run|pause|resume|status|report|scope' },
   { readonly: true, usage: 'mutations' },
   { readonly: false, usage: 'restore' },
   { readonly: false, usage: 'skill restore <name>' },
   { readonly: true, usage: 'skill history <name>' },
-  { readonly: false, usage: 'skill undo <name> [--to v<N>]' },
+  { readonly: false, usage: 'skill undo <name> [--to v<N>]', flags: [['--to', 'value']] },
   { readonly: false, usage: 'skill pin <name>' },
   { readonly: false, usage: 'skill unpin <name>' },
   { readonly: false, usage: 'propose' },
   { readonly: true, usage: 'skills health' },
   { readonly: false, usage: 'skills refresh' },
   { readonly: false, usage: 'learn [request]' },
-  { readonly: false, usage: 'maintain [--timeout=<ms> | --facts]' },
+  { readonly: false, usage: 'maintain [--timeout=<ms> | --facts]', flags: [['--timeout', 'value'], ['--facts', 'boolean']] },
   { readonly: true, usage: 'maintain status [<id>]' },
   { readonly: true, usage: 'maintain report [<id>]' },
   { readonly: false, usage: 'maintain handoff [<id>]' },
   { readonly: false, usage: 'maintain cancel [<id>]' },
-  { readonly: true, usage: 'params [--group <name>] [--json]' },
-  { readonly: false, usage: 'restructure <name> "<heading>" <to_file> [--plan <runId>]' },
-  { readonly: false, usage: 'extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--outcome extract|mixed] [--proposal <id>] [--owner-covers] [--apply]' },
+  { readonly: true, usage: 'params [--group <name>] [--json]', flags: [['--group', 'value'], ['--json', 'boolean']] },
+  { readonly: false, usage: 'restructure <name> "<heading>" <to_file> [--plan <runId>]', flags: [['--plan', 'value']] },
+  { readonly: false, usage: 'extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--outcome extract|mixed] [--proposal <id>] [--owner-covers] [--apply]', flags: [['--start', 'value'], ['--end', 'value'], ['--outcome', 'value'], ['--proposal', 'value'], ['--owner-covers', 'boolean'], ['--apply', 'boolean']] },
   { readonly: true, usage: 'replay' },
 ]
 
@@ -114,35 +107,12 @@ export function renderCommandTable(): string {
   return lines.join('\n')
 }
 
-/**
- * The flags whose declared form takes a value, DERIVED from the usage text: a flag followed by
- * `=` or by a placeholder token (not another flag/bracket) is a value flag. Boolean flags stay
- * out. The parser imports this, so `--proposal p1` cannot be read as a bare boolean again.
- */
-export function entryValueFlags(entry: CommandEntry): string[] {
-  const found: string[] = []
-  const tokens = entry.usage.split(/\s+/)
-  for (let index = 0; index < tokens.length; index += 1) {
-    const raw = tokens[index] ?? ''
-    const token = raw.replace(/^\[+/, '').replace(/\]+$/, '')
-    if (!token.startsWith('--')) continue
-    const name = token.slice(2).split('=')[0] ?? ''
-    if (name === '') continue
-    if (token.includes('=')) {
-      if (!found.includes(name)) found.push(name)
-      continue
-    }
-    const next = (tokens[index + 1] ?? '').replace(/^\[+/, '')
-    if (next !== '' && !next.startsWith('--') && next !== ']' && next !== '|') {
-      if (!found.includes(name)) found.push(name)
-    }
-  }
-  return found
-}
-
-/** Union of every usage's value flags (the parse table's ONE source). */
+/** Union of every entry's authored value flags. */
 export const VALUE_FLAGS: readonly string[] = (() => {
   const names: string[] = []
-  for (const entry of COMMAND_ENTRIES) for (const name of entryValueFlags(entry)) if (!names.includes(name)) names.push(name)
+  for (const entry of COMMAND_ENTRIES) for (const [name, kind] of entry.flags ?? []) {
+    const bare = name.replace(/^--/, '')
+    if (kind === 'value' && !names.includes(bare)) names.push(bare)
+  }
   return names
 })()

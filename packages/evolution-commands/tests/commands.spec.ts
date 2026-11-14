@@ -547,7 +547,7 @@ describe('evolution-commands', () => {
     ctx.provide('evolutionIo', { provider: () => io })
     await ctx.plugin(Commands, { root })
     const planned = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --start "move start" --end "move end" --plan plan-1' })
-    expect(planned.kind).toBe('success')
+    expect(planned.kind, planned.text).toBe('success')
     expect(planned.text).toContain('提取计划')
     // EXT-002: a target's existence alone is not coverage evidence.
     expect(planned.text).toContain('owner-gap')

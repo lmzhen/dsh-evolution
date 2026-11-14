@@ -21,7 +21,7 @@ import { stripComments } from './lib-source-text.mjs'
 const root = process.argv[2] ?? 'packages'
 // The command surface is TypeScript: import it through a file URL (Node strips the types).
 const pkg = resolve(root, 'evolution-commands/src')
-const { COMMAND_ENTRIES, entryName, entryFlags, summaryOf } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
+const { COMMAND_ENTRIES, entryName, summaryOf } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
 const { parseSubcommand, isParseFailure } = await import(pathToFileURL(join(pkg, 'parse.ts')).href)
 const sourcePath = join(pkg, 'index.ts')
 const source = stripComments(readFileSync(sourcePath, 'utf8'))
@@ -57,7 +57,7 @@ for (const entry of COMMAND_ENTRIES) {
   if (first === '' || !/^[a-z][a-z-]*$/.test(first)) problems.push(entry.usage + ': does not start with a subcommand name')
   // E-08: entryName is hierarchical, so B compares the FIRST token of the key against the usage head.
   if (first !== entryName(entry).split(' ')[0]) problems.push(entry.usage + ': the table names it "' + entryName(entry) + '"')
-  for (const flag of entryFlags(entry)) {
+  for (const [flag] of entry.flags ?? []) {
     if (!new RegExp('\\' + flag + '(=|\\s|\\]|$|\\|)').test(entry.usage)) problems.push(entry.usage + ': mentions ' + flag + ' in an unreadable form')
   }
 }
