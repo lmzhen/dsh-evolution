@@ -1709,6 +1709,19 @@
               "provenAt": "2026-11-14T18:53:37.399Z",
               "provenSha": "6bf4d5c5a65e9381212aa0dfe18a8a19bd8ecca9ce26030d6268b75a25b66be5"
             }
+          ],
+          "gate-72": [
+            {
+              "mutate": {
+                "file": "packages/scripts/requirements.selftest.mjs",
+                "find": "if (!condition) failures.push(label + ': ' + detail)",
+                "replace": "if (condition) failures.push(label + ': ' + detail)"
+              },
+              "expect": "red",
+              "note": "the self-test must fail when an assertion is inverted; the healthy controls then enter failures, so the gate reds",
+              "provenAt": "2026-11-14T18:54:27.280Z",
+              "provenSha": "5c396a215a0787f3ae641a11513eb4782317a593b33f101f752d962bfc701ebd"
+            }
           ]
         },
         "mutationExempt": {
