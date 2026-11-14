@@ -1,6 +1,6 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { PARAM_ALIASES, canonicalWriteId, isDeprecatedParamId, readParam, resolveParamId } from '@deepseek-ai/dsh-evolution-core'
+import { PARAM_ALIASES, isDeprecatedParamId, readParam, resolveParamId } from '@deepseek-ai/dsh-evolution-core'
 
 const CANONICAL_IDS = [
   'reviewMemoryInterval', 'reviewSkillInterval', 'curatorIntervalHours',
@@ -36,22 +36,16 @@ describe('parameter id consolidation (G0/S0.2)', () => {
     expect([...CANONICAL_IDS].sort()).toEqual(entries.map(([, c]) => c).sort())
   })
 
-  it('reads the canonical name first and falls back to the legacy spelling', () => {
+  it('reads only the canonical spelling (alias input resolves, alias carriers do not)', () => {
     expect(readParam({ reviewSkillInterval: 30, skillInterval: 10 }, 'skillInterval')).toBe(30)
-    expect(readParam({ skillInterval: 10 }, 'reviewSkillInterval')).toBe(10)
-    expect(readParam({ skillInterval: 10 }, 'skillInterval')).toBe(10)
+    expect(readParam({ skillInterval: 10 }, 'reviewSkillInterval')).toBeUndefined()
+    expect(readParam({ skillInterval: 10 }, 'skillInterval')).toBeUndefined()
     expect(readParam({ memoryChars: 2_200 }, 'memoryCharLimit')).toBe(2_200)
-    expect(readParam({ reviewSkillInterval: undefined, skillInterval: 7 }, 'reviewSkillInterval')).toBe(7)
+    expect(readParam({ reviewSkillInterval: undefined }, 'reviewSkillInterval')).toBeUndefined()
   })
 
-  it('claims nothing when neither spelling is present', () => {
+  it('claims nothing when the canonical spelling is absent', () => {
     expect(readParam({}, 'reviewSkillInterval')).toBeUndefined()
     expect(readParam(undefined, 'reviewSkillInterval')).toBeUndefined()
-  })
-
-  it('accepts canonical ids on the write path and refuses deprecated ones', () => {
-    expect(canonicalWriteId('reviewSkillInterval')).toBe('reviewSkillInterval')
-    expect(() => canonicalWriteId('skillInterval')).toThrow(/deprecated/)
-    expect(() => canonicalWriteId('skillInterval')).toThrow(/reviewSkillInterval/)
   })
 })

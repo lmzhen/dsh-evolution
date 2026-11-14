@@ -5,17 +5,17 @@
  * the SAME name in two carriers (reviewMode, staleAfterDays, archiveAfterDays —
  * resolved by the existing policy-shadows-row rule) and six use DIFFERENT names.
  * This module owns the six: the policy/snapshot name is the canonical id, the
- * plugin-row name is a deprecated alias kept readable since 0.6.x. Removal was
- * planned for 0.7.0 and is deferred: the aliases still ship, so no later version
- * is claimed here.
+ * plugin-row name is a deprecated alias. The alias table survives only for the one-time
+ * legacy-document migration and the doctor's old-key report; live readers use the
+ * canonical id and its carrier no longer falls back to the legacy spelling.
  *
- * Reading stays compatible (a carrier still spelling the legacy name resolves),
- * writing is strict (the write path accepts canonical ids only, so no new
- * document is created under a deprecated name).
+ * Writing is canonical-only (a deprecated name is not a live row field in 0.48).
  * @module
  */
 
-/** Deprecated alias (plugin-row name) -> canonical id (policy/snapshot name). */
+/** Deprecated alias (plugin-row name) -> canonical id (policy/snapshot name).
+ * Retained for the one-time legacy-document migration and the doctor's old-key report;
+ * live readers use the canonical id only. */
 export const PARAM_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   memoryInterval: 'reviewMemoryInterval',
   skillInterval: 'reviewSkillInterval',
@@ -24,15 +24,6 @@ export const PARAM_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   memoryCharLimit: 'memoryChars',
   userCharLimit: 'userChars',
 })
-
-/** Canonical ids that have at least one deprecated alias, for read fallback. */
-const ALIASES_BY_CANONICAL: Readonly<Record<string, readonly string[]>> = (() => {
-  const index: Record<string, string[]> = {}
-  for (const [alias, canonical] of Object.entries(PARAM_ALIASES)) {
-    ;(index[canonical] ??= []).push(alias)
-  }
-  return index
-})()
 
 /**
  * Resolve any parameter id to its canonical form.
@@ -53,32 +44,14 @@ export function isDeprecatedParamId(id: string): boolean {
 }
 
 /**
- * Guard for the write path: only canonical ids may be written.
- * @param id - parameter id a caller intends to write.
- * @returns the canonical id.
- * @throws {Error} when the id is a deprecated alias; the message names both ids.
- */
-export function canonicalWriteId(id: string): string {
-  const canonical = PARAM_ALIASES[id]
-  if (canonical === undefined) return id
-  throw new Error(`parameter id \`${id}\` is deprecated; write \`${canonical}\` instead`)
-}
-
-/**
- * Read a parameter from a carrier that may still spell the legacy name.
+ * Read a parameter by its canonical id.
  * @param carrier - config/snapshot object to read from, or undefined.
- * @param id - canonical id (a deprecated alias is accepted and resolved first).
- * @returns the canonical value when present, else the alias value, else undefined.
+ * @param id - canonical id (an alias is resolved first, for migration callers).
+ * @returns the canonical value, or undefined.
  */
 export function readParam(carrier: object | undefined, id: string): unknown {
   if (carrier === undefined) return undefined
-  const record = carrier as Record<string, unknown>
-  const canonical = resolveParamId(id)
-  if (record[canonical] !== undefined) return record[canonical]
-  for (const alias of ALIASES_BY_CANONICAL[canonical] ?? []) {
-    if (record[alias] !== undefined) return record[alias]
-  }
-  return undefined
+  return (carrier as Record<string, unknown>)[resolveParamId(id)]
 }
 
 /** Exposure group (design §7.2): the unit a developer changes together.
@@ -332,29 +305,13 @@ export const NAMESPACE_MIGRATIONS: readonly { readonly namespace: string; readon
 )
 
 /**
- * The LEGACY settings namespace one owner package used to register through the family's
- * own seam (0.1.x). It is no longer what the platform calls the section: the platform
- * derives a settings namespace from the Loader entry id, and this registry's `owner` field
- * IS that row id, so a live lookup uses {@link paramRowId}. What remains here is the
- * migration SOURCE (G3 moves a user layer out of this string and into the row id).
- * @param owner - owner package directory name (the map's key).
- * @returns the legacy namespace that owner registered.
- * @throws when the owner has no entry in {@link PARAM_NAMESPACES}.
- */
-export function paramNamespace(owner: string): string {
-  const namespace = PARAM_NAMESPACES[owner]
-  if (namespace === undefined) throw new Error('no settings namespace registered for owner `' + owner + '` (add it to PARAM_NAMESPACES)')
-  return namespace
-}
-
-/**
  * The settings id one row's user layer lives under, or undefined when the owner publishes
  * no user layer at all (a deployment-only row: its knobs are E2 and never reach a settings
  * section). The platform derives a settings namespace from the Loader entry id and reports
  * it in `settings.describe()` / `configForms.get(entryId)`, and an owner package's row id is
  * its own name — spelled the same in every bundle patch.
  *
- * This is the id to LOOK UP with; {@link paramNamespace} keeps the legacy string the 0.1.x
+ * This is the id to LOOK UP with; {@link PARAM_NAMESPACES} keeps the legacy string the 0.1.x
  * seam registered, which is the G3 migration source and never a live lookup key.
  * @param owner - owner package directory name (the row id).
  * @returns the entry id the platform reports for that row, or undefined for a row without
