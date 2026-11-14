@@ -7,7 +7,8 @@
  *   agent    install the Evolution agent preset ROW into the profile's own patch
  *            ($DSH_HOME/profiles/<p>/cordis.patch.yml; --base ptc picks another base)
  *   layered  host + agent
- *   oneclick install the compatibility @deepseek-ai/dsh-evolution-preset bundle
+ *   oneclick REMOVED as an install target in 0.48; accepted only by --uninstall
+ *            to remove a legacy @deepseek-ai/dsh-evolution-preset bundle.
  *
  * This installer targets DSH source/debug layouts: it copies the evolution
  * packages into the profile's node_modules and writes the profile manifest.
@@ -1267,6 +1268,9 @@ function manifestCarriesBundle(profileDir, bundle) {
 export async function install(options = {}) {
   const mode = normalizeMode(options.mode ?? 'all')
   if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}; expected one of ${[...MODES].join(', ')} (or the product names variant/attach)`)
+  // 0.48: the one-click preset bundle is no longer installed. Keep the mode for the
+  // reverse path (`--uninstall --mode oneclick`) so 0.46/0.47 users can still remove it.
+  if (mode === 'oneclick') throw new Error('install-layered: --mode oneclick was removed in 0.48; the one-click preset bundle is uninstall-only (run --uninstall --mode oneclick)')
   const home = options.home ?? resolveHome(options.env)
   const profile = options.profile ?? 'web'
   const dryRun = options.dryRun === true
@@ -1296,7 +1300,6 @@ export async function install(options = {}) {
 
   const needsHost = mode === 'host' || mode === 'layered'
   const needsAgent = mode === 'agent' || mode === 'layered'
-  const needsCompat = mode === 'oneclick'
 
   // v21 (S-3): resolve the platform base PATCH before any profile mutation — the
   // old order committed bundle rows/copies and only tried to build the preset
@@ -1382,21 +1385,21 @@ export async function install(options = {}) {
     // with this one.
   }
 
-  if (mode === 'all' || needsHost || needsCompat) {
-    const bundleName = mode === 'all' ? BUNDLES.all : needsHost ? BUNDLES.host : BUNDLES.oneclick
-    // D-1 (v18): the one-click preset bundle mounts the four model rows at
+  if (mode === 'all' || needsHost) {
+    const bundleName = mode === 'all' ? BUNDLES.all : BUNDLES.host
+    // D-1 (v18): a legacy one-click preset bundle mounts the four model rows at
     // profile root; a family preset ROW mounts the same rows in preset scope.
     // Refuse unless --force explicitly confirms.
     // The sweep covers EVERY base: a family preset of any variant mounts the
-    // same model rows in preset scope, so a one-click install beside it
-    // double-mounts exactly as the standard-base preset would. Narrowing this
-    // to the base being installed is how a variant becomes an escape hatch.
-    // It is a PER-PROFILE question now: the row is written into this profile's
-    // patch, and another profile's row cannot double-mount here.
+    // same model rows in preset scope, so the two double-mount exactly as the
+    // standard-base preset would. Narrowing this to the base being installed is
+    // how a variant becomes an escape hatch. It is a PER-PROFILE question now:
+    // the row is written into this profile's patch, and another profile's row
+    // cannot double-mount here.
     const targetPatchPath = profilePatchPath(home, profile)
     const targetPatch = existsSync(targetPatchPath) ? await readFile(targetPatchPath, 'utf8') : ''
     const existingPresets = profilePresetRows(targetPatch)
-    if ((needsCompat || mode === 'all') && existingPresets.length > 0 && !force) {
+    if (mode === 'all' && existingPresets.length > 0 && !force) {
       throw new Error(
         `install-layered: profile "${profile}" already carries an Evolution agent preset row (${existingPresets.map(entry => `${entry.base} → ${entry.rowId}`).join(', ')} in ${targetPatchPath}). `
         + 'The one-click preset bundle and the layered agent preset are mutually exclusive install targets (E-33) — '
@@ -1518,7 +1521,7 @@ export async function install(options = {}) {
 /** Flag table for `--help` and for the INSTALL.md parity fixture (G2/S2.3).
  * Every flag the parser accepts appears here exactly once, with its value kind. */
 export const INSTALL_FLAGS = [
-  { flag: '--mode', value: '<all|host>', summary: 'internal install plane (default all; legacy agent/layered/oneclick are migration-only)' },
+  { flag: '--mode', value: '<all|host>', summary: 'install plane (default all); agent/layered remain migration-only; oneclick is uninstall-only since 0.48' },
   { flag: '--profile', value: '<name>', summary: 'profile directory under $DSH_HOME/profiles (default web)' },
   { flag: '--base', value: '<name>[,<name>...]', summary: 'platform agent-preset base the family preset follows (repeatable)' },
   { flag: '--home', value: '<dir>', summary: 'harness home to write into (default $DSH_HOME)' },

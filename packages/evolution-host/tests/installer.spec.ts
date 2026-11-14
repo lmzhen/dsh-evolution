@@ -147,11 +147,10 @@ describe('layered installer', () => {
 
   }, 180_000)
 
-  it('installs the compatibility one-click bundle', async () => {
+  it('refuses the removed one-click install but keeps the uninstall hint', async () => {
     const home = await tempRoot('dsh-installer-oneclick-')
-    await runInstaller(home, 'oneclick', 'web')
-    const manifest = JSON.parse(await readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
-    expect(manifest.dsh?.profile?.bundles).toContain('@deepseek-ai/dsh-evolution-preset')
+    await expect(runInstaller(home, 'oneclick', 'web')).rejects.toThrow(/removed in 0\.48.*uninstall-only/)
+    await expect(readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8')).rejects.toThrow()
   }, 60_000)
 
   it('uninstalls the layered installation without touching user data', async () => {
@@ -370,40 +369,22 @@ describe('layered installer', () => {
     }
   })
 
-  it('V6-49: layered then oneclick on one profile fails loud (E-33 mutual exclusion, 0.3.37)', async () => {
+  it('V6-49: layered then oneclick is refused because oneclick installation is removed', async () => {
     const home = await tempRoot('dsh-installer-v649-')
     await runInstaller(home, 'layered')
-    // The oneclick bundle is the preset package — host ⇄ preset cannot co-exist
-    // in one profile (shared rows would double-mount); the installer used to
-    // turn the documented accident into reality. D-1 (v18) made the check fire
-    // on the agent preset first, so the assertion pins BOTH the documented
-    // E-33 wording and the D-1-specific reason.
-    const failed = runInstaller(home, 'oneclick')
-    await expect(failed).rejects.toThrow(/mutually exclusive install targets \(E-33\)/)
-    await expect(failed).rejects.toThrow(/Evolution agent preset/)
-  }, 30_000)
+    await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/removed in 0\.48.*uninstall-only/)
+  }, 60_000)
 
-  it('V6-49: oneclick then layered fails loud (reverse order)', async () => {
+  it('V6-49: a legacy oneclick bundle still blocks a layered install (E-33 reverse)', async () => {
     const home = await tempRoot('dsh-installer-v649b-')
-    await runInstaller(home, 'oneclick')
-    // D-1 (v18): the reverse direction now refuses on the one-click bundle
-    // before the host⇄preset check — same E-33 contract, specific reason.
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-preset'] } } }), 'utf8')
     const failed = runInstaller(home, 'layered')
     await expect(failed).rejects.toThrow(/mutually exclusive install targets \(E-33\)/)
     await expect(failed).rejects.toThrow(/one-click preset bundle/)
   }, 30_000)
 
-  it('V7-18: cross-scope bundle names still hit the E-33 mutual exclusion (0.3.44)', async () => {
-    const home = await tempRoot('dsh-installer-v718-')
-    const profileDir = join(home, 'profiles', 'evo-test')
-    await mkdir(profileDir, { recursive: true })
-    // A profile carrying the host bundle under a NON-default scope — the
-    // scoped install path needs .release-staging (not available in tests),
-    // so the bundle entry is constructed directly; the mutual-exclusion
-    // check runs BEFORE the package copy either way.
-    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-host'] } } }), 'utf8')
-    await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/mutually exclusive/)
-  }, 30_000)
 
   it('0.3.54-T5: --mode agent refuses when the profile already carries evolution-all (choose-one guidance)', async () => {
     const home = await tempRoot('dsh-installer-routeb-')
@@ -422,13 +403,13 @@ describe('layered installer', () => {
     await expect(runInstaller(home, 'all', 'evo-test')).rejects.toThrow(/one-click preset bundle/)
   }, 30_000)
 
-  it('P1-3: --mode host/oneclick refuses when the profile already carries evolution-all', async () => {
+  it('P1-3: --mode host refuses an evolution-all profile; --mode oneclick is removed', async () => {
     const home = await tempRoot('dsh-installer-p13-')
     const profileDir = join(home, 'profiles', 'evo-test')
     await mkdir(profileDir, { recursive: true })
     await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-all'] } } }), 'utf8')
     await expect(runInstaller(home, 'host')).rejects.toThrow(/evolution-all/)
-    await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/evolution-all/)
+    await expect(runInstaller(home, 'oneclick')).rejects.toThrow(/removed in 0\.48/)
   }, 30_000)
 
   it('N10 (v12): --dry-run host refuses too — dry-run reads the real profile state', async () => {
@@ -453,12 +434,12 @@ describe('layered installer', () => {
     await expect(runInstaller(home, 'host', 'evo-test', ['--dry-run'])).rejects.toThrow(/mutually exclusive/)
   }, 30_000)
 
-  it('P2-2 (v13): --dry-run oneclick refuses a profile carrying the host bundle (E-33 reverse)', async () => {
+  it('P2-2 (v13): --dry-run oneclick is refused because oneclick installation is removed', async () => {
     const home = await tempRoot('dsh-installer-p22b-')
     const profileDir = join(home, 'profiles', 'evo-test')
     await mkdir(profileDir, { recursive: true })
     await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-host'] } } }), 'utf8')
-    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).rejects.toThrow(/mutually exclusive/)
+    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).rejects.toThrow(/removed in 0\.48/)
   }, 30_000)
 
   it('P1-2: --uninstall removes the evolution-all bundle row too (symmetric with host/preset)', async () => {
@@ -493,24 +474,12 @@ describe('layered installer', () => {
     await expect(runInstaller(home, 'agent', 'evo-test', ['--dry-run'])).rejects.toThrow(/one-click preset bundle/)
   }, 30_000)
 
-  it('D-1 (v18): --mode oneclick refuses when the profile patch carries an Evolution preset row', async () => {
+  it('D-1 (v18): --mode oneclick is refused before reading the profile patch', async () => {
     const home = await tempRoot('dsh-installer-d1b-')
     const profileDir = join(home, 'profiles', 'evo-test')
     await mkdir(profileDir, { recursive: true })
     await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: [] } } }), 'utf8')
-    await writeFile(join(profileDir, 'cordis.patch.yml'), [
-      '- insert:',
-      '    - id: preset-evolution',
-      "      name: '@deepseek-ai/dsh-agent-preset'",
-      '      config:',
-      '        id: evolution',
-      '',
-    ].join('\n'), 'utf8')
-    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).rejects.toThrow(/agent preset row/)
-    // ...and the exclusion is per profile: the same row in ANOTHER profile's patch
-    // mounts nothing in this one, so the install proceeds.
-    await rm(join(profileDir, 'cordis.patch.yml'))
-    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).resolves.toBeTruthy()
+    await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).rejects.toThrow(/removed in 0\.48/)
   }, 30_000)
 
   it('D-2 (v18): uninstalling host from a one-click profile keeps the packages (no phantom row)', async () => {

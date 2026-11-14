@@ -19,7 +19,7 @@ This file is the canonical statement of the product install surface. The root [I
 
 ## Internal composition (not product choices)
 
-`dsh-evolution-preset` is a migration-only compatibility bundle and is no longer published. The layered form (`host` + generated Evolution preset) remains an internal/dev installer path for sessions that must opt in through an agent preset; it is not a product install choice and must not appear in user docs.
+`dsh-evolution-preset` is a migration-only compatibility bundle and is no longer published. Its **install** path was removed in 0.48; `--uninstall --mode oneclick` remains for one version so existing profiles can be cleaned up. The layered form (`host` + generated Evolution preset) remains an internal/dev installer path for sessions that must opt in through an agent preset; it is not a product install choice and must not appear in user docs.
 
 The three historical bundles share infrastructure rows; mounting two double-registers services and the loader fails loud. Shrinking a product install means disabling rows or uninstalling `all`; the layered path is exclusive with `all` because its model rows would double-mount.
 

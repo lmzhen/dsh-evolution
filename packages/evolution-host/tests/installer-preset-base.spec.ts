@@ -371,14 +371,12 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(patch).toContain('preset-evolution-ptc')
   })
 
-  it('names the two product forms: --mode variant = layered, --mode attach = oneclick (0.3.77)', async () => {
+  it('keeps the product alias variant = layered and rejects a near-miss', async () => {
     const home = await tempRoot('dsh-preset-form-')
     const presetRoot = await presetRootWith(home, { standard: STANDARD_FIXTURE })
-    // The product names are ALIASES of the historical modes, not a second mode
-    // table: variant resolves to layered (host bundle + generated preset) and
-    // attach to the one-click preset bundle. The summary names the form, so an
-    // operator sees which of the two mutually exclusive layouts (E-33) this run
-    // installs without decoding the mode name.
+    // The product name is an ALIAS of the historical mode, not a second mode
+    // table: variant resolves to layered (host bundle + generated preset). The
+    // one-click/attach install form was removed in 0.48.
     const variant = await runInstaller(home, 'variant', ['--dry-run'], { DSH_AGENT_PRESET_ROOT: presetRoot })
     expect(variant.stdout).toContain('mode:     layered')
     expect(variant.stdout).toContain('form:     variant')
@@ -465,26 +463,6 @@ describe('agent preset bases (--base standard|ptc)', () => {
     expect(error?.stderr).toContain('packages/bundle/web-app/presets/')
   })
 
-  it('sees an installed variant row when refusing a one-click install (E-33 sweep covers every base)', async () => {
-    const home = await tempRoot('dsh-preset-base-e33-')
-    const presetRoot = await presetRootWith(home, { ptc: PTC_FIXTURE })
-    await runInstaller(home, 'agent', ['--base', 'ptc'], { DSH_AGENT_PRESET_ROOT: presetRoot })
-    expect(existsSync(patchPath(home))).toBe(true)
-    // The one-click bundle mounts the same model rows at profile root, so it must
-    // refuse beside a preset row of ANY base — a sweep narrowed to the default
-    // base would install straight into the double mount.
-    const error = await runInstaller(home, 'oneclick')
-      .then(() => null, (caught: unknown) => caught as { stderr?: string })
-    expect(error?.stderr).toContain('already carries an Evolution agent preset row')
-    expect(error?.stderr).toContain('preset-evolution-ptc')
-    // ...and the exclusion is PER PROFILE: a row in another profile's patch cannot
-    // double-mount anything here, so a second profile installs normally.
-    const other = await tempRoot('dsh-preset-base-e33-other-')
-    const otherRoot = await presetRootWith(other, { ptc: PTC_FIXTURE })
-    await runInstaller(other, 'agent', ['--base', 'ptc'], { DSH_AGENT_PRESET_ROOT: otherRoot })
-    const sibling = await run(process.execPath, [installer, '--mode', 'oneclick', '--profile', 'second', '--home', other])
-    expect(sibling.stdout).toContain('bundle:   @deepseek-ai/dsh-evolution-preset')
-  })
 
   it('keeps the base table and the shipped assets consistent (structure, not prose)', async () => {
     // One table, four consumers (base patch, row identity, display copy, refusal
