@@ -1311,16 +1311,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return err('未知的 maintain 参数：应为 `maintain`、`maintain --timeout <ms>` / `maintain --timeout=<ms>`、`maintain status [<id>]`、`maintain report [<id>]`、`maintain handoff [<id>]` 或 `maintain cancel [<id>]`。实际收到：' + input)
         }
         if (input.startsWith('extract ')) {
-          const extractParsed = parseSubcommand(rawInputTrimmed)
-          if (isParseFailure(extractParsed) || extractParsed.name !== 'extract') {
+                    if (isParseFailure(command) || command.name !== 'extract') {
             return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--owner-covers] 或 --proposal <id>')
           }
-          const source = extractParsed.positionals[0] ?? ''
-          const proposalFlag = extractParsed.flags.get('proposal')
+          const source = command.positionals[0] ?? ''
+          const proposalFlag = command.flags.get('proposal')
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法执行 extract。')
-          let target = extractParsed.positionals[1] ?? ''
-          let heading = extractParsed.positionals[2] ?? ''
+          let target = command.positionals[1] ?? ''
+          let heading = command.positionals[2] ?? ''
           let start: string | undefined
           let end: string | undefined
           let extractItems: Array<{ heading: string; start?: string; end?: string; to_skill: string }> = []
@@ -1339,14 +1338,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             if (source === '' || target === '' || heading === '') {
               return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
             }
-            const startFlag = extractParsed.flags.get('start')
-            const endFlag = extractParsed.flags.get('end')
+            const startFlag = command.flags.get('start')
+            const endFlag = command.flags.get('end')
             start = typeof startFlag === 'string' ? startFlag : undefined
             end = typeof endFlag === 'string' ? endFlag : undefined
             extractItems = [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }]
           }
-          const ownerCovers = extractParsed.flags.has('owner-covers')
-          const outcomeFlag = extractParsed.flags.get('outcome')
+          const ownerCovers = command.flags.has('owner-covers')
+          const outcomeFlag = command.flags.get('outcome')
           if (outcomeFlag !== undefined && outcomeFlag !== 'extract' && outcomeFlag !== 'mixed') {
             return err('--outcome 只能是 extract 或 mixed。')
           }
@@ -1369,7 +1368,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!built.ok) return err(built.message)
           const plan = built.plan
           const warnings = built.warnings === undefined || built.warnings.length === 0 ? '' : '\n' + built.warnings.join('\n')
-          if (!extractParsed.flags.has('apply')) {
+          if (!command.flags.has('apply')) {
             const proposal = proposalFromPlan(plan, { runId: 'cli-' + Date.now().toString(36) })
             const proposalPath = await writeProposalReport(ioRegistry.provider(), proposal).catch(() => { /* best-effort proposal report */ })
             return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=' + ownerDecisionText(plan.owner) + warnings + '\nproposal_id: ' + proposal.id + (proposalPath === undefined ? '' : '（已写入 reports）'))
@@ -1400,17 +1399,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         if (input.startsWith('restructure ')) {
         // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
-          const restParsed = parseSubcommand(rawInputTrimmed)
-          if (isParseFailure(restParsed) || restParsed.name !== 'restructure') {
+                    if (isParseFailure(command) || command.name !== 'restructure') {
             return err('用法：/evolution restructure <name> "<heading>" <to_file>')
           }
-          const name = restParsed.positionals[0] ?? ''
-          const heading = restParsed.positionals[1] ?? ''
-          const toFile = restParsed.positionals[2] ?? ''
+          const name = command.positionals[0] ?? ''
+          const heading = command.positionals[1] ?? ''
+          const toFile = command.positionals[2] ?? ''
           if (name === '' || heading === '' || toFile === '') {
             return err('用法：/evolution restructure <name> "<heading>" <to_file>')
           }
-          const planFlag = restParsed.flags.get('plan')
+          const planFlag = command.flags.get('plan')
           const planRunId = typeof planFlag === 'string' ? planFlag : undefined
           if (!toFile.startsWith('references/')) return err('to_file 必须位于 references/ 之下（日志或明细的落地位置）。')
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
