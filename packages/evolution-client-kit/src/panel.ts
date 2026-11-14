@@ -9,7 +9,7 @@ import type { SupportedLocale } from './generated/i18n.generated.ts'
 import { bindLocale, FALLBACK_LOCALE, type Translate } from './locale.ts'
 import { injectPluginStyles } from './styles.ts'
 
-export { FALLBACK_LOCALE, type Translate } from './locale.ts'
+export type { Translate } from './locale.ts'
 
 /** The feature-specific part of one sidebar panel. */
 export interface SidebarPanelSpec<Face> {

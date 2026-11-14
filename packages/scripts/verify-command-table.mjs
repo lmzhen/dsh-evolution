@@ -80,7 +80,7 @@ for (const name of tableNames) {
 // which flags take a value. Until this ran, adding a value flag to the table and forgetting the
 // parser (or vice versa) was silent drift: the parser would either swallow the next token as a value
 // or leave it as a stray positional. Both directions are asserted here.
-const { VALUE_FLAGS } = await import(pathToFileURL(join(pkg, 'parse.ts')).href)
+const { VALUE_FLAGS } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
 const takingInUsage = new Set()
 for (const entry of COMMAND_ENTRIES) {
   for (const match of entry.usage.matchAll(/--([a-z][a-z-]*)/g)) {

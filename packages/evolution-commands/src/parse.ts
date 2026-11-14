@@ -14,8 +14,7 @@
  * @module @deepseek-ai/dsh-evolution-commands/parse
  */
 
-/** The flags whose declared form takes a value, derived from the command table's usage lines. */
-export { VALUE_FLAGS } from './registry.ts'
+/** The flags whose declared form takes a value, authored in the command table. */
 import { VALUE_FLAGS } from './registry.ts'
 
 /** One parsed command line. */
