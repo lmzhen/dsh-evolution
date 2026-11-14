@@ -21,7 +21,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { familyGateRegisters } from './lib-doc-facts.mjs'
-import { familyVersion, versionReached } from './lib-family-version.mjs'
+import { familyVersion } from './lib-family-version.mjs'
+import { exemptionProblems } from './lib-exemptions.mjs'
 import { softOverlay } from './lib-env.mjs'
 import { registry } from './gates/registry.mjs'
 import { validateRegistry } from './gates/model.mjs'
@@ -358,9 +359,12 @@ const note = (criterion, subject, detail) => {
   // registered expiry never fired for the other six (measured: expiry set to the current
   // version still exited 0). Keeping one path also means a new axis cannot miss the gate.
   const entry = axisRegister.get(criterion)
-  if (entry !== undefined && familyVer !== undefined && versionReached(familyVer, entry.expiry)) {
-    problems.push((detail === undefined ? '' : detail) + ' - the ' + criterion + ' register expired at ' + entry.expiry + ' (reached by ' + familyVer + ')')
-    return
+  if (entry !== undefined && familyVer !== undefined) {
+    const problemsInEntry = exemptionProblems(entry, familyVer)
+    if (problemsInEntry.length > 0) {
+      problems.push((detail === undefined ? '' : detail) + ' - the ' + criterion + ' register: ' + problemsInEntry.join('; '))
+      return
+    }
   }
   observations.push({ criterion, subject, detail })
 }
