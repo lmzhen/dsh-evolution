@@ -74,33 +74,6 @@ function tokenize(input: string): string[] {
 
 
 /**
- * Read one SUB-FORM line: `maintain status`, `maintain report`, … — the shape the regexes used to own.
- *
- * A sub-form matches only when: the line parses, the name matches, the first positional is the sub-form,
- * and every flag the line carries is DECLARED by the table (an undeclared flag keeps the old
- * "unknown arguments" answer instead of silently becoming a bare flag).
- * @param input - the text after `/evolution`.
- * @param name - the subcommand name the table declares (e.g. `maintain`).
- * @param sub - the sub-form word (e.g. `status`).
- * @param declaredFlags - the flags the table declares for `name` (`flagsOf(name)`).
- * @returns the parsed command, or null when this line is not that sub-form.
- */
-export function subcommandOf(
-  input: string,
-  name: string,
-  sub: string,
-  declaredFlags: readonly string[],
-): ParsedCommand | null {
-  const parsed = parseSubcommand(input)
-  if (isParseFailure(parsed) || parsed.name !== name) return null
-  if (parsed.positionals[0] !== sub) return null
-  for (const flag of parsed.flags.keys()) {
-    if (!declaredFlags.includes('--' + flag)) return null
-  }
-  return parsed
-}
-
-/**
  * Parse one command line into its name, flags and positionals.
  * @param input - the text after `/evolution`.
  * @returns the parsed command, or the syntax failure that refused it.

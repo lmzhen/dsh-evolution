@@ -1,6 +1,6 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { parseSubcommand, subcommandOf } from '../src/parse.ts'
+import { parseSubcommand } from '../src/parse.ts'
 
 /**
  * G7.4 / audit F-3 + F-4: the two command-surface syntax defects, pinned at the parser.
@@ -52,14 +52,6 @@ describe('parseSubcommand (C7 single parser, F-3/F-4)', () => {
     // case can matter).
     expect(command.positionals).toEqual(['a', 'b', 'heading'])
     expect(command.flags.get('start')).toBe('3')
-  })
-
-  it('reads a SUB-FORM line and refuses an undeclared flag (C7 table)', () => {
-    const declared = ['--timeout', '--facts']
-    expect(subcommandOf('maintain status abc', 'maintain', 'status', declared)?.positionals[1]).toBe('abc')
-    expect(subcommandOf('maintain status --foo', 'maintain', 'status', declared)).toBeNull()
-    expect(subcommandOf('maintain report', 'maintain', 'report', declared)?.positionals).toEqual(['report'])
-    expect(subcommandOf('maintain', 'maintain', 'status', declared)).toBeNull()
   })
 
   it('keeps a quoted run as ONE token (the restructure form)', () => {

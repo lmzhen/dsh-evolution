@@ -38,7 +38,7 @@ import { presetProfileTarget } from './preset-source.ts'
 // G3: the write-path exclusion asks the ONE owner of <home>/profiles about THIS plane only.
 import { paramGroups, paramSurfaceRows, renderParamJson, renderParamRows, type ParamSectionView } from './params.ts'
 import { flagsOf, renderHelpText, renderHint } from './registry.ts'
-import { isParseFailure, parseSubcommand, subcommandOf } from './parse.ts'
+import { isParseFailure, parseSubcommand } from './parse.ts'
 // G7-3: the atomic writer moved to the core io seam (one implementation); re-exported so this
 // module public surface -- Commands.atomicWriteFiles, which the F-211 spec drives -- is unchanged.
 import { atomicWriteFiles } from '@deepseek-ai/dsh-evolution-core'
@@ -1146,7 +1146,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ].join('\n'))
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
-        const maintainStatus = subcommandOf(input, 'maintain', 'status', flagsOf('maintain'))
+        const maintainSub = (sub: string) => {
+          const parsed = parseSubcommand(input)
+          if (isParseFailure(parsed) || parsed.name !== 'maintain' || parsed.positionals[0] !== sub) return null
+          return [...parsed.flags.keys()].every(flag => flagsOf('maintain').includes('--' + flag)) ? parsed : null
+        }
+        const maintainStatus = maintainSub('status')
         if (maintainStatus !== null) {
           const registry = runs
           if (!registry) return err('未挂载 evolution-io 注册表：无法查看运行状态。')
@@ -1178,7 +1183,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ].filter(part => part !== '').join('\n'))
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
-        const maintainReport = subcommandOf(input, 'maintain', 'report', flagsOf('maintain'))
+        const maintainReport = maintainSub('report')
         if (maintainReport !== null) {
           const registry = runs
           if (!registry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
@@ -1213,7 +1218,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return ok(probed.text)
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
-        const maintainCancel = subcommandOf(input, 'maintain', 'cancel', flagsOf('maintain'))
+        const maintainCancel = maintainSub('cancel')
         if (maintainCancel !== null) {
           const registry = runs
           if (!registry) return err('未挂载 evolution-io 注册表：无法取消运行。')
@@ -1247,7 +1252,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return ok(`维护运行 ${record.id} 已取消：扫描会在下一个检查点停止。用 /evolution maintain status ${record.id} 查看终态。`)
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
-        const maintainHandoff = subcommandOf(input, 'maintain', 'handoff', flagsOf('maintain'))
+        const maintainHandoff = maintainSub('handoff')
         if (maintainHandoff !== null) {
           const registry = runs
           if (!registry) return err('未挂载 evolution-io 注册表：无法交付报告。')
