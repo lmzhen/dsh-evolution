@@ -120,6 +120,37 @@ export interface SkillHealthAssessment {
   findings: LintFinding[]
 }
 
+/** One finding as the health route/panel sees it (wire shape, not the engine's LintFinding). */
+export interface SkillHealthWireFinding {
+  rule: string
+  count: number
+  line: string | null
+  countIsMeaningful: boolean
+  severity?: 'warn' | 'error'
+  message?: string
+}
+
+/** Measured dimensions on the health wire; absent when the scan could not read them. */
+export interface SkillHealthWireDims {
+  bodyChars: number | null
+  bodyTokens: number | null
+  supportGroups: number
+  supportFiles: number | null
+  churnPatches: number | null
+  churnReads: number | null
+  stampDensityPerKb: number | null
+}
+
+/** One health row on the wire; `readable: false` is its own verdict, never healthy. */
+export interface SkillHealthWireRow {
+  name: string
+  verdict: 'healthy' | 'warn' | 'error' | 'unreadable' | 'needs-restructure'
+  findings: SkillHealthWireFinding[]
+  dims?: SkillHealthWireDims | null
+  protection?: string | null
+  hardCapHits?: number | null
+}
+
 /**
  * The findings for ONE body, computed by the engine that owns the judgement (G4).
  *

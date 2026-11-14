@@ -11,6 +11,7 @@
 import { HOST_ROUTES, json, methodNotAllowed } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { ProposalView } from '@deepseek-ai/dsh-evolution-core'
+import type { SkillHealthWireDims, SkillHealthWireFinding, SkillHealthWireRow } from '@deepseek-ai/dsh-evolution-core/skills'
 
 /** Where the panel asks for its rows. The ONE declaration lives in core (W1). */
 export const ROUTES = HOST_ROUTES.skillHealth
@@ -18,38 +19,9 @@ export const ROUTES = HOST_ROUTES.skillHealth
 /** Rules whose threshold is not calibrated yet: named on screen, never counted. */
 export const UNCALIBRATED_RULES: readonly string[] = ['references-sprawl']
 
-/** One finding as the client sees it. `line` is null when the position cannot be named. */
-export interface RouteFinding {
-  rule: string
-  count: number
-  line: string | null
-  countIsMeaningful: boolean
-  severity?: 'warn' | 'error'
-  message?: string
-}
-
-/** The measured dimensions behind a row, for evidence chips; absent when the scan could not read them. */
-export interface RouteDims {
-  bodyChars: number | null
-  bodyTokens: number | null
-  supportGroups: number
-  supportFiles: number | null
-  churnPatches: number | null
-  churnReads: number | null
-  stampDensityPerKb: number | null
-}
-
-/** One row as the client sees it. `readable: false` becomes its own verdict, never `healthy`. */
-export interface RouteRow {
-  name: string
-  verdict: string
-  findings: RouteFinding[]
-  dims?: RouteDims | null
-  /** Non-null when a protection marker owns the skill; the panel marks the row. */
-  protection?: string | null
-  /** Mechanical hard-cap-hit count; null when the event log was unreadable. */
-  hardCapHits?: number | null
-}
+export type RouteFinding = SkillHealthWireFinding
+export type RouteDims = SkillHealthWireDims
+export type RouteRow = SkillHealthWireRow
 
 /**
  * Project the curator's health view into what the panel renders.
@@ -58,7 +30,7 @@ export interface RouteRow {
  */
 export function toRouteRows(rows: ReadonlyArray<{
   name: string
-  verdict: string
+  verdict: RouteRow['verdict']
   findings: ReadonlyArray<{ rule: string; count: number; line?: string | null; severity?: 'warn' | 'error'; message?: string }>
   dims?: (Partial<RouteDims> & { readable?: boolean }) | null
   protection?: string | null
