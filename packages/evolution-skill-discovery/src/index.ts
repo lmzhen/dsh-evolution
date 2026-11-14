@@ -1,6 +1,7 @@
 export * from './identity.ts'
 export * from './skill-index.ts'
-export * from './view-state.ts'
+export { canProject, deriveViewState } from './view-state.ts'
+export type { MapState, PolicyState, ProjectionPhase, SearchState, ViewState, ViewStateInput } from './view-state.ts'
 export * from './domain-policy-store.ts'
 export * from './catalog-codec.ts'
 export * from './projection-journal.ts'

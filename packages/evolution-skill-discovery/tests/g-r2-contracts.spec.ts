@@ -6,7 +6,6 @@ import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import {
   DomainPolicyStore,
   ProjectionJournal,
-  ViewStateRegistry,
   applyCapturedProjection,
   canProject,
   captureCatalog,
@@ -16,6 +15,7 @@ import {
   restoreCatalog,
   type CatalogCapture,
 } from '../src/index.ts'
+import { ViewStateRegistry } from '../src/view-state.ts'
 
 const entries = [{ name: 'alpha', description: 'a' }, { name: 'beta', description: 'b' }]
 const text = [
