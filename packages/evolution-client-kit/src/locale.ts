@@ -12,6 +12,18 @@ function interpolate(text: string, values?: Readonly<Record<string, string | num
   return text.replace(/\{(\w+)\}/g, (_match, key: string) => String(values[key] ?? ''))
 }
 
+/**
+ * Fill `{slot}` placeholders, keeping an unmatched placeholder visible.
+ * This is the panel-copy contract (a missing value is a bug to see, not an empty string).
+ */
+export function fillTemplate(text: string, values?: Readonly<Record<string, string | number>>): string {
+  if (values === undefined) return text
+  return text.replace(/\{(\w+)\}/g, (match, key: string) => {
+    const value = values[key]
+    return value === undefined ? match : String(value)
+  })
+}
+
 /** Register one namespace's dictionaries and bind a fallback-first lookup. */
 export function bindLocale(
   ctx: ClientContext,

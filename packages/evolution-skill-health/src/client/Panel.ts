@@ -18,7 +18,7 @@ import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/ro
 import type { SkillHealthWireDims, SkillHealthWireFinding, SkillHealthWireRow } from '@deepseek-ai/dsh-evolution-core/skills'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
-import { EmptyState, formatLocalClock, formatLocalDateTime, isSameLocalDay } from '@lmzhen/dsh-evolution-client-kit'
+import { EmptyState, fillTemplate, formatLocalClock, formatLocalDateTime, isSameLocalDay } from '@lmzhen/dsh-evolution-client-kit'
 
 export type HealthFinding = SkillHealthWireFinding
 export type HealthDims = SkillHealthWireDims
@@ -196,19 +196,11 @@ function ruleTable(face: HealthFace, t: (key: string) => string): ReactNode {
  * @param props - the face (`{ rows, truncated, openHistory? }`) and the locale seat's translator.
  * @returns the panel body.
  */
-/** Fill the generated block's `{slot}` copies with this bundle's dictionary. */
-function fillCopy(template: string, values: Readonly<Record<string, string | number>>): string {
-  return template.replace(/\{(\w+)\}/g, (match, slot: string) => {
-    const value = values[slot]
-    return value === undefined ? match : String(value)
-  })
-}
-
 /** The shared four-state failure block, spoken through this bundle's keys. */
 function failureBlock(t: (key: string) => string, failure: RouteFailure): ReactNode {
   const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => {
     const text = t(key)
-    return values === undefined ? text : fillCopy(text, values)
+    return values === undefined ? text : fillTemplate(text, values)
   }
   return FailureBlock({ failure, t: translate, fallback: FALLBACKS['skill-health'] })
 }

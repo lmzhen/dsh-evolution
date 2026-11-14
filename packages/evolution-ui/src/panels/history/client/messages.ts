@@ -27,15 +27,5 @@ export function message(key: string, language: SupportedLocale = 'en'): string {
   return dictionary[key] ?? key
 }
 
-/**
- * Fill one template's `{slot}` placeholders.
- * @param template - the copy.
- * @param values - substitutions keyed by slot name.
- * @returns the filled copy.
- */
-export function fill(template: string, values: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (match, slot: string) => {
-    const value = values[slot]
-    return value === undefined ? match : String(value)
-  })
-}
+/** Fill one template's `{slot}` placeholders through the shared client contract. */
+export { fillTemplate as fill } from '@lmzhen/dsh-evolution-client-kit'

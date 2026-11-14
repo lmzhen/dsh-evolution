@@ -7,6 +7,7 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/messages
  */
 import { dictionaries as generatedDictionaries } from '@lmzhen/dsh-evolution-client-kit/generated/i18n/evolution-settings'
+import { fillTemplate as fill } from '@lmzhen/dsh-evolution-client-kit'
 import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
 
 /** Locale namespace this bundle registers. */
@@ -49,18 +50,8 @@ export function message(key: MessageKey, language: SupportedLocale = 'en'): stri
   return dictionary[key] ?? en[key] ?? key
 }
 
-/**
- * Fill one template's `{slot}` placeholders; an unknown slot stays standing.
- * @param template - template with `{slot}` placeholders.
- * @param values - substitutions keyed by slot name.
- * @returns the filled copy.
- */
-export function fill(template: string, values: Readonly<Record<string, string | number>>): string {
-  return template.replace(/\{(\w+)\}/g, (match, slot: string) => {
-    const value = values[slot]
-    return value === undefined ? match : String(value)
-  })
-}
+/** Fill one template's `{slot}` placeholders through the shared client contract. */
+export { fill }
 
 /**
  * Resolve one message and fill its slots in one step.
