@@ -23,12 +23,17 @@ export interface SkillIndexSourceSnapshot {
   readonly complete: boolean
 }
 
+/** One snapshot of the family-owned marker facts; all three come from the same tree read. */
+export interface SkillIndexMarkerFacts {
+  readonly managed: ReadonlySet<SkillKey>
+  readonly protected: ReadonlySet<SkillKey>
+  readonly pinned: ReadonlySet<SkillKey>
+}
+
 /** Read-only source the plugin adapter implements with `ctx.skills` + SkillLibrary. */
 export interface SkillIndexSource {
   snapshot(query: SkillIndexQuery): Promise<SkillIndexSourceSnapshot>
-  managedSkillKeys(): Promise<ReadonlySet<SkillKey>>
-  protectedSkillKeys?(): Promise<ReadonlySet<SkillKey>>
-  pinnedSkillKeys?(): Promise<ReadonlySet<SkillKey>>
+  markerFacts(): Promise<SkillIndexMarkerFacts>
 }
 
 /** One normalized per-view read model. */
@@ -55,14 +60,12 @@ export class SkillIndex {
    * @returns normalized rows and completeness; incomplete data is not hidden.
    */
   async read(query: SkillIndexQuery): Promise<SkillIndexSnapshot> {
-    const [snapshot, managed, protectedKeys, pinnedKeys] = await Promise.all([
+    const [snapshot, markers] = await Promise.all([
       this.source.snapshot(query),
-      this.source.managedSkillKeys(),
-      this.source.protectedSkillKeys?.() ?? Promise.resolve(new Set<SkillKey>()),
-      this.source.pinnedSkillKeys?.() ?? Promise.resolve(new Set<SkillKey>()),
+      this.source.markerFacts(),
     ])
     const rows = snapshot.skills
-      .map(summary => skillIndexRowOf(summary, managed.has(skillKeyOf(summary)), protectedKeys.has(skillKeyOf(summary)), pinnedKeys.has(skillKeyOf(summary))))
+      .map(summary => skillIndexRowOf(summary, markers.managed.has(skillKeyOf(summary)), markers.protected.has(skillKeyOf(summary)), markers.pinned.has(skillKeyOf(summary))))
       .sort(bySkillKey)
     return {
       viewKey: viewKeyOf(query),

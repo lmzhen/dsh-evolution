@@ -30,9 +30,7 @@ const beta = summary('beta', 'other')
 const snapshot: DomainMapSnapshot = { mapVersion: '1', domains: [node('d1')], edges: [{ ...edge(skillKeyOf(alpha)), skillHash: skillIndexRowOf(alpha, true).threeFieldHash }] }
 const source = {
   snapshot: async () => ({ skills: [alpha, beta], complete: true }),
-  managedSkillKeys: async () => new Set([skillKeyOf(alpha)]),
-  protectedSkillKeys: async () => new Set<string>(),
-  pinnedSkillKeys: async () => new Set<string>(),
+  markerFacts: async () => ({ managed: new Set([skillKeyOf(alpha)]), protected: new Set<string>(), pinned: new Set<string>() }),
 }
 const text = ['<system-reminder>', 'REUSABLE', '<available_skills>', '- alpha: alpha description', '- beta: beta description', '</available_skills>', 'FOOTER', '</system-reminder>'].join('\n')
 function decision(): PreStepDecision {

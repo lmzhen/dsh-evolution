@@ -59,17 +59,20 @@ describe('identity', () => {
 describe('SkillIndex', () => {
   it('reads a view, carries managed/modelInvocable, and preserves incomplete', async () => {
     let reads = 0
+    let markerReads = 0
     const index = new SkillIndex({
       async snapshot() {
         reads += 1
         return { skills: [summary('beta'), summary('alpha', 'other', 'user-dsh', false)], complete: false }
       },
-      async managedSkillKeys() {
-        return new Set([skillKeyOf(summary('alpha', 'other'))])
+      async markerFacts() {
+        markerReads += 1
+        return { managed: new Set([skillKeyOf(summary('alpha', 'other'))]), protected: new Set(), pinned: new Set() }
       },
     })
     const view = await index.read({ cwd: 'D:/work', scopeKey: 'agent-1' })
     expect(reads).toBe(1)
+    expect(markerReads).toBe(1)
     expect(view.complete).toBe(false)
     const alpha = view.rows.find(row => row.name === 'alpha')
     const beta = view.rows.find(row => row.name === 'beta')
@@ -83,7 +86,7 @@ describe('SkillIndex', () => {
     let reads = 0
     const index = new SkillIndex({
       async snapshot() { reads += 1; return { skills: [summary('alpha')], complete: true } },
-      async managedSkillKeys() { return new Set([skillKeyOf(summary('alpha'))]) },
+      async markerFacts() { return { managed: new Set([skillKeyOf(summary('alpha'))]), protected: new Set(), pinned: new Set() } },
     })
     await index.read({ cwd: 'D:/work' })
     await index.read({ cwd: 'D:/work' })
@@ -117,7 +120,7 @@ it('forwards the platform scope to the snapshot source', async () => {
   let seen: unknown
   const index = new SkillIndex({
     async snapshot(query) { seen = query.scope; return { skills: [], complete: true } },
-    async managedSkillKeys() { return new Set() },
+    async markerFacts() { return { managed: new Set(), protected: new Set(), pinned: new Set() } },
   })
   await index.read({ cwd: 'D:/work', scopeKey: 'a1', scope })
   expect(seen).toBe(scope)

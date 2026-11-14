@@ -18,7 +18,7 @@ import { DomainMapFileStore } from './domain-map-store.ts'
 import type { DomainMapSnapshot } from './domain-map.ts'
 import { ProjectionJournal } from './projection-journal.ts'
 import { ProjectionRuntime } from './projection-runtime.ts'
-import { SkillIndex, type SkillIndexQuery, type SkillIndexSource, type SkillIndexSourceSnapshot } from './skill-index.ts'
+import { SkillIndex, type SkillIndexMarkerFacts, type SkillIndexQuery, type SkillIndexSource, type SkillIndexSourceSnapshot } from './skill-index.ts'
 import { SkillSearchCache } from './search.ts'
 import { registerSkillSearchTool } from './tool.ts'
 import { buildGenerationRequest, resolveGenerationPort } from './generation-composition.ts'
@@ -66,14 +66,18 @@ class PlatformSource implements SkillIndexSource {
     const snapshot = await this.ctx.skills.snapshot({ cwd: query.cwd, ...query.scope === undefined ? {} : { scope: query.scope } })
     return { skills: snapshot.skills, complete: snapshot.complete }
   }
-  async managedSkillKeys(): Promise<ReadonlySet<string>> {
-    return new Set((await this.library.list()).filter(summary => summary.managed).map(summary => skillKeyOf({ provider: 'dsh-evolution', source: 'user-dsh', name: summary.name })))
-  }
-  async protectedSkillKeys(): Promise<ReadonlySet<string>> {
-    return new Set((await this.library.list()).filter(summary => summary.protectedBy !== null || summary.protectionUnknown).map(summary => skillKeyOf({ provider: 'dsh-evolution', source: 'user-dsh', name: summary.name })))
-  }
-  async pinnedSkillKeys(): Promise<ReadonlySet<string>> {
-    return new Set((await this.library.list()).filter(summary => summary.protectedBy === 'pinned').map(summary => skillKeyOf({ provider: 'dsh-evolution', source: 'user-dsh', name: summary.name })))
+  async markerFacts(): Promise<SkillIndexMarkerFacts> {
+    const summaries = await this.library.list()
+    const managed = new Set<string>()
+    const protectedKeys = new Set<string>()
+    const pinned = new Set<string>()
+    for (const summary of summaries) {
+      const key = skillKeyOf({ provider: 'dsh-evolution', source: 'user-dsh', name: summary.name })
+      if (summary.managed) managed.add(key)
+      if (summary.protectedBy !== null || summary.protectionUnknown) protectedKeys.add(key)
+      if (summary.protectedBy === 'pinned') pinned.add(key)
+    }
+    return { managed, protected: protectedKeys, pinned }
   }
 }
 
