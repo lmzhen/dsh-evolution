@@ -133,22 +133,12 @@ export async function readStaging(io: EvolutionIoLike, home: string, runId: stri
   }
 }
 
-export async function ensureStaging(io: EvolutionIoLike, home: string, input: CreateStagingInput): Promise<CreateStagingResult> {
-  const existing = await readStaging(io, home, input.runId)
-  if (existing.kind === 'present') return { ok: true, path: stagingRoot(home, input.runId), manifest: existing.value.manifest }
-  return createStaging(io, home, input)
-}
-
 export async function setStagingTarget(io: EvolutionIoLike, home: string, stageKey: string, target: string, mode?: 'merge-into-existing' | 'create-umbrella' | 'keep'): Promise<boolean> {
   const view = await readStaging(io, home, stageKey)
   if (view.kind !== 'present') return false
   const manifest = Object.assign({}, view.value.manifest, { target }, mode === undefined ? {} : { mode })
   await io.writeText(join(stagingRoot(home, stageKey), 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
   return true
-}
-
-export async function dropStaging(io: EvolutionIoLike, home: string, stageKey: string): Promise<void> {
-  await io.remove(stagingRoot(home, stageKey))
 }
 
 export interface StagingCleanupResult {

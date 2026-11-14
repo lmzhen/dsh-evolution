@@ -17,7 +17,6 @@ import { stagingRoot } from './staging.ts'
 import { readReconcileReport, type ReconcileReport } from './domain/reconcile.ts'
 import type { DoctorView } from './wire.ts'
 
-export const MERGE_DOCTOR_SCHEMA_VERSION = 3
 
 /** The global doctor's merge line; built from the DoctorView envelope, never from raw files. */
 export interface MergeDoctorFact {

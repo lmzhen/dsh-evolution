@@ -17,17 +17,11 @@
 export const CURATOR_STATE_KEY = 'primary'
 
 /** On-disk state file names (json provider, relative to its configured root). */
-export const REVIEW_STATE_FILE = 'review-state.json'
-export const CURATOR_STATE_FILE = 'curator-state.json'
-export const PENDING_STATE_FILE = 'pending-state.json'
 /** Pre-split approval store; read-only legacy, retired after the merge. */
-export const PENDING_LEGACY_FILE = 'pending.json'
 export const PENDING_ARCHIVE_FILE = 'pending-state-archive.json'
 /** Rotation sidecar of {@link PENDING_ARCHIVE_FILE} (V4-01). */
-export const PENDING_ARCHIVE_BAK_FILE = 'pending-state-archive.json.bak'
 
 /** Provider names as registered on the `evolutionStateStorage` seam. */
-export const PROVIDER_JSON = 'json'
 export const PROVIDER_DOMAIN = 'domain'
 
 /** Domain table names of the evolution storage-domain spec. */

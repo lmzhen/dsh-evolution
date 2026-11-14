@@ -13,7 +13,6 @@ export type MergeStage = 'verify' | 'decide' | 'author' | 'commit'
 export type MergeCommand = 'scan' | 'pair' | 'approve' | 'resume'
 
 export const MERGE_PAIR_STATES: readonly MergePairState[] = ['verify', 'pending', 'approved', 'fuse', 'skipped']
-export const MERGE_QUEUES: readonly MergeQueue[] = ['verify', 'pending', 'fuse', 'skipped']
 
 /** User-facing queue of one data state. verify/fuse share retry, not two tabs. */
 export function queueOf(state: MergePairState): MergeQueue {

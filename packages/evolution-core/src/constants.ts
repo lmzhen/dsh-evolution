@@ -103,7 +103,6 @@ export const UPSTREAM_LIMIT_CHARS_PER_TOKEN = 2.75
  * tokenization is needed"), matching upstream's ESTIMATE-side heuristic — "~4
  * chars/token is the usual English heuristic" (\`agent/prompt_builder.py:1179\`).
  * Estimates use this; limits use the constant above. */
-export const PLATFORM_ESTIMATE_CHARS_PER_TOKEN = 4
 export const MAX_SKILL_FILE_BYTES = 1_048_576
 
 // ── Cross-package shared tunable defaults ────────────────────────────────────
@@ -147,8 +146,6 @@ export const DEFAULT_SKILL_CONTENT_CHARS = MAX_SKILL_CONTENT_CHARS
 /** P3-19 (v14): defaults that were written twice (schema `.default()` AND the
  * clamp fallback literal) now have one home per value. */
 export const DEFAULT_REVIEW_TIMEOUT_MS = 120_000
-export const DEFAULT_REVIEW_CONTEXT_MESSAGES = 60
-export const DEFAULT_REVIEW_MESSAGE_CHARS = 2_000
 export const DEFAULT_CURATOR_BOOT_GRACE_SECONDS = 10
 export const DEFAULT_CURATOR_REVIEW_MAX_TOKENS = 2_048
 /** Threat-scan WINDOW SIZE (not a total cap — E-12: the whole text is scanned in
@@ -186,7 +183,6 @@ export const AUTHORING_DESCRIPTION_BAR = 60
  * this default only governs compositions that do not override it. It is NOT a refusal threshold:
  * the only refusal is `MAX_DESCRIPTION_LENGTH` / the row's `maxDescriptionLength`, and the catalog
  * cut is a view, not a validation. See tool-skill-manage/README.md for the three-number table. */
-export const PLATFORM_CATALOG_DESCRIPTION_DEFAULT = 500
 
 /** The split hint both size refusals share (0.5.0 V1). The same sentence used to
  * be copied into validateFrontmatter AND the patch path, and neither copy named

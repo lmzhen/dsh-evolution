@@ -71,16 +71,6 @@ export async function loadMergeState(io: EvolutionIoLike, home: string): Promise
   }
 }
 
-/** Schema probe for doctor; the only other reader of mergeStatePath. */
-export async function loadStateSchema(io: EvolutionIoLike, home: string): Promise<number | null> {
-  try {
-    const raw = await io.readText(mergeStatePath(home))
-    if (raw === null) return null
-    const parsed = JSON.parse(raw) as { schemaVersion?: unknown }
-    return typeof parsed.schemaVersion === 'number' ? parsed.schemaVersion : null
-  } catch { return null }
-}
-
 export async function rowsOf(io: EvolutionIoLike, home: string, queue?: MergeQueue): Promise<readonly MergeRow[]> {
   const loaded = await loadMergeState(io, home)
   return queue === undefined ? loaded.state.rows : loaded.state.rows.filter(row => row.queue === queue)

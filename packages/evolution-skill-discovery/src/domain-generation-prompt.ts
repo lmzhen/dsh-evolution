@@ -1,13 +1,5 @@
-import { createHash } from 'node:crypto'
-
 /** Frozen initial domain-generation prompt; caller owns schema/IDs. */
 export const DOMAIN_GENERATION_PROMPT_VERSION = 'v2'
-
-export const DOMAIN_GENERATION_PROMPT_V1 = `Group the provided skills into first-level domains.
-Use only name, description, and whenToUse; do not infer from skill bodies.
-Produce 8–12 domains that are coherent, distinct, task-recognizable, and useful as an awareness layer. A single skill is not a domain. Each domain has a name, one-sentence purpose, in-scope, out-of-scope, triggers, and evidence skill names that actually support it.
-Prefer clear boundaries over exhaustive coverage. If the evidence is weak, leave the skill unassigned rather than forcing it into a domain. Together the domains should cover the library where evidence supports it. Domain IDs are assigned by the caller.
-Return only the structured result.`
 
 export interface DomainGenerationPromptOptions {
   readonly minDomains?: number
@@ -32,7 +24,6 @@ Return only a JSON object with a "domains" array. Each domain must have title, p
 
 export const DOMAIN_GENERATION_PROMPT_V2 = buildDomainGenerationPrompt()
 
-export const DOMAIN_GENERATION_PROMPT_HASH = createHash('sha256').update(DOMAIN_GENERATION_PROMPT_V2, 'utf8').digest('hex')
 
 /** Active prompt; v1 remains frozen for traceability. */
 export const DOMAIN_GENERATION_PROMPT = DOMAIN_GENERATION_PROMPT_V2

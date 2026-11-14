@@ -40,7 +40,6 @@ export interface AdmissionThresholds {
   maxUserHitRate: number
 }
 
-export const DEFAULT_ADMISSION: AdmissionThresholds = { minUserHitRate: 0.05, maxUserHitRate: 0.25 }
 
 export function buildHealthBaseline(skills: readonly CorpusSkill[]): HealthBaseline {
   const values: Record<string, RuleAdmission> = {}
