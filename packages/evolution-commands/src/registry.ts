@@ -11,6 +11,7 @@
  */
 import { HOST_COMMANDS } from './generated/host-commands.ts'
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
+import { HOST_COMMAND_DEFS } from './host-command-defs.ts'
 
 export interface CommandEntry {
   /** The subcommand as typed after `/evolution`. Variants use `|` (curator run|pause). */
@@ -46,35 +47,11 @@ export function entryName(entry: CommandEntry): string {
   return secondIsName ? name + ' ' + second : name
 }
 
-export const COMMAND_ENTRIES: CommandEntry[] = [
-  { readonly: false, usage: 'merge <subcommand> [<args>]' },
-  { readonly: true, usage: 'pending [--detail]', flags: [['--detail', 'boolean']] },
-  { readonly: false, usage: 'approve <id>' },
-  { readonly: false, usage: 'reject <id>' },
-  { readonly: false, usage: 'release <id>' },
-  { readonly: true, usage: 'doctor [--json]', flags: [['--json', 'boolean']] },
-  { readonly: false, usage: 'curator run|pause|resume|status|report|scope' },
-  { readonly: true, usage: 'mutations' },
-  { readonly: false, usage: 'restore' },
-  { readonly: false, usage: 'skill restore <name>' },
-  { readonly: true, usage: 'skill history <name>' },
-  { readonly: false, usage: 'skill undo <name> [--to v<N>]', flags: [['--to', 'value']] },
-  { readonly: false, usage: 'skill pin <name>' },
-  { readonly: false, usage: 'skill unpin <name>' },
-  { readonly: false, usage: 'propose' },
-  { readonly: true, usage: 'skills health' },
-  { readonly: false, usage: 'skills refresh' },
-  { readonly: false, usage: 'learn [request]' },
-  { readonly: false, usage: 'maintain [--timeout=<ms> | --facts]', flags: [['--timeout', 'value'], ['--facts', 'boolean']] },
-  { readonly: true, usage: 'maintain status [<id>]' },
-  { readonly: true, usage: 'maintain report [<id>]' },
-  { readonly: false, usage: 'maintain handoff [<id>]' },
-  { readonly: false, usage: 'maintain cancel [<id>]' },
-  { readonly: true, usage: 'params [--group <name>] [--json]', flags: [['--group', 'value'], ['--json', 'boolean']] },
-  { readonly: false, usage: 'restructure <name> "<heading>" <to_file> [--plan <runId>]', flags: [['--plan', 'value']] },
-  { readonly: false, usage: 'extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--outcome extract|mixed] [--proposal <id>] [--owner-covers] [--apply]', flags: [['--start', 'value'], ['--end', 'value'], ['--outcome', 'value'], ['--proposal', 'value'], ['--owner-covers', 'boolean'], ['--apply', 'boolean']] },
-  { readonly: true, usage: 'replay' },
-]
+export const COMMAND_ENTRIES: CommandEntry[] = HOST_COMMAND_DEFS.map(def => ({
+  usage: def.usageLine,
+  readonly: def.readOnly,
+  ...(def.flags.length === 0 ? {} : { flags: def.flags.map(flag => ['--' + flag.name, flag.kind] as const) }),
+}))
 
 /** The one summary source: the generated command i18n catalog. */
 export function summaryOf(entry: CommandEntry, locale: HostLocale = 'zh'): string {
