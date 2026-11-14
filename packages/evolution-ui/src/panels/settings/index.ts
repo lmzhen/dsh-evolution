@@ -17,13 +17,13 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactNode } from 'react'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
-import { dictionaries, fill, message, NS, type MessageKey } from './messages.ts'
+import { dictionaries, NS, type MessageKey } from './messages.ts'
 import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
 import { EvolutionSettingsPage } from './SettingsPage.ts'
 import { createDiagnosticsApi, type DiagnosticsApi } from './diagnostics-state.ts'
 import { FAMILY_VERSION } from './generated-about.ts'
 import type { ConfigFormsSeat } from './seam.ts'
-import { injectPluginStyles } from '@lmzhen/dsh-evolution-client-kit'
+import { bindLocale, injectPluginStyles } from '@lmzhen/dsh-evolution-client-kit'
 import { CSS, CSS_TAG_ID } from './styles.ts'
 
 /** The client services this half consumes. */
@@ -60,35 +60,13 @@ export function apply(ctx: ClientContext): void {
     /** The platform's client settings seat (`ui-settings` provides it); absent in a bare shell. */
     get?(name: string): unknown
   }
-  let registered = false
-  ctx.effect(() => {
-    try {
-      const dispose = seam.locale.register(NS, dictionaries)
-      registered = true
-      return dispose
-    } catch (error) {
-      ctx.logger.warn(`evolution-settings-ui: the locale seat refused the "${NS}" dictionary registration (${error instanceof Error ? error.message : String(error)}) — the cards fall back to the bundle's own copy`)
-      return () => {}
-    }
-  }, NS + ': dictionaries')
-  let bound: ((key: string, values?: Readonly<Record<string, string | number>>) => string) | null = null
   const language = (): SupportedLocale => {
     const active = seam.locale.getLocale?.().active
     return (['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt'] as const).includes(active as SupportedLocale)
       ? active as SupportedLocale
       : 'en'
   }
-  const t = (key: MessageKey, values?: Readonly<Record<string, string | number>>): string => {
-    if (!registered) return message(key, language())
-    if (bound === null) {
-      try {
-        bound = seam.locale.bind(NS)
-      } catch {
-        return message(key, language())
-      }
-    }
-    return values === undefined ? bound(key) : fill(bound(key), values)
-  }
+  const t = bindLocale(ctx, NS, dictionaries, language()).t as (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
   // Read on every render, never captured: this row may activate BEFORE the settings shell that
   // provides the seat (the shell declares the very slot this registration waits on).
   const seat = (): ConfigFormsSeat | undefined => seam.get?.('configForms') as ConfigFormsSeat | undefined
