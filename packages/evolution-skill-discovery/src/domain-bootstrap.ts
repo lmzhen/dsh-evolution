@@ -66,16 +66,4 @@ export async function bootstrapDomainMapWithFacts(
   return store.commit(expectedMapVersion, { mapVersion: nextMapVersion(expectedMapVersion), domains, edges })
 }
 
-/**
- * Legacy fallback for callers that only have a name -> key mapping.
- * Production must use bootstrapDomainMapWithFacts.
- */
-export async function bootstrapDomainMap(
-  store: DomainMapStore,
-  proposal: DomainGenerationProposal,
-  skillKeys: Readonly<Record<string, SkillKey>>,
-  expectedMapVersion: string,
-): Promise<DomainMapSnapshot> {
-  const facts = Object.entries(skillKeys).map(([name, skillKey]) => ({ name, description: name, skillKey, threeFieldHash: '' }))
-  return bootstrapDomainMapWithFacts(store, proposal, facts, expectedMapVersion, { promptVersion: 'legacy', sourceDigest: 'legacy', model: 'legacy', runId: 'legacy' })
-}
+

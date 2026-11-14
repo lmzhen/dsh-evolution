@@ -840,7 +840,6 @@
         "evolution-skill-discovery::tests/catalog/io-preference.spec.ts",
         "evolution-skill-discovery::tests/catalog/rank-contract.spec.ts",
         "evolution-skill-discovery::tests/discovery.spec.ts",
-        "evolution-skill-discovery::tests/domain-bootstrap.spec.ts",
         "evolution-skill-discovery::tests/domain-description-quality.spec.ts",
         "evolution-skill-discovery::tests/domain-generation-coordinator.spec.ts",
         "evolution-skill-discovery::tests/domain-generation-llm.spec.ts",
@@ -1914,7 +1913,6 @@
         "evolution-skill-discovery::tests/catalog/io-preference.spec.ts",
         "evolution-skill-discovery::tests/catalog/rank-contract.spec.ts",
         "evolution-skill-discovery::tests/discovery.spec.ts",
-        "evolution-skill-discovery::tests/domain-bootstrap.spec.ts",
         "evolution-skill-discovery::tests/domain-description-quality.spec.ts",
         "evolution-skill-discovery::tests/domain-generation-coordinator.spec.ts",
         "evolution-skill-discovery::tests/domain-generation-llm.spec.ts",
@@ -2075,7 +2073,7 @@
     },
     "ci-only": {
       "gates": 10,
-      "specs": 73
+      "specs": 72
     },
     "full(ci=off)": {
       "gates": 62,
@@ -2083,12 +2081,12 @@
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 485
+      "specs": 484
     }
   },
   "specs": {
-    "total": 485,
-    "marked": 485,
+    "total": 484,
+    "marked": 484,
     "unmarked": 0
   }
 }
