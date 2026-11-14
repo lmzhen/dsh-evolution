@@ -39,7 +39,7 @@ import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
 import { isReviewChannelSession } from './review-channel.ts'
 import { currentReviewContext } from './review-context.ts'
-import { isCommittedWarning, nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
+import { isCommittedWarning, nodeEvolutionIo, TransactionNotInvokedError, transactIo, type EvolutionIoLike } from './io.ts'
 import { appendEvolutionEvent, eventsFile } from './evolution-events.ts'
 import { isAbsent, isPresent, isUnknown, probeAbsent, probeList, probeMtime, probePresent, probeReason, probeText, probeUnknown, type Probe } from './probe.ts'
 import { evolutionRoot } from './state-store.ts'
@@ -819,19 +819,11 @@ export class SkillLibrary {
     this.authority = authority
     this.mutationLock = mutationLock
     this.fence = fence
-    // V4-20: bind the IO backend's own transact by default. Explicit injection
-    // stays first; a backend WITHOUT transact keeps the old plain read→write
-    // (the in-process serial chain is the second layer). The wrapper adapts the
-    // backend's `(path, task)` instance signature to the standard `(io, path,
-    // task)` form the rest of the core expects, guarding the optional method
-    // rather than asserting it.
-    this.transact = transact ?? (io.transact
-      ? async (ioLike, path, task): Promise<readonly string[] | undefined> => {
-        const t = ioLike.transact
-        if (t) { await t(path, task); return undefined }
-        return await transactIo(ioLike, path, task)
-      }
-      : undefined)
+    // V4-20: bind the ONE transaction seam by default. Explicit injection stays
+    // first; a backend without transact keeps the plain read→write (the
+    // in-process serial chain is the second layer). transactIo owns the backend
+    // signature adaptation, the typed not-invoked error and committed warnings.
+    this.transact = transact ?? (io.transact ? transactIo : undefined)
     // G1/1.4 (S2-02): the queue is per ROOT and shared by every instance (see ROOT_SERIAL above); a
     // per-instance queue ordered nothing across the six services that write this tree.
     this.serial = serialForRoot(this.root)
@@ -2047,7 +2039,7 @@ export class SkillLibrary {
     })
     if (!result.ok) {
       const messages = result.errors.map(error => error.message)
-      if (messages.some(message => message.includes('transact-not-invoked') || message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
+      if (result.errors.some(error => error.code === 'transact-not-invoked')) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
       return { ok: false, message: messages.join('；') }
     }
     const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
@@ -2209,7 +2201,7 @@ export class SkillLibrary {
     })
     if (!result.ok) {
       const messages = result.errors.map(error => error.message)
-      if (messages.some(message => message.includes('transact-not-invoked') || message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
+      if (result.errors.some(error => error.code === 'transact-not-invoked')) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
       return { ok: false, message: messages.join('；') }
     }
     const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
@@ -3707,12 +3699,17 @@ export class SkillLibrary {
     let lockedBefore = before
     if (verdict === 'match' && this.transact) {
       const ran = { done: false }
-      await this.transact(this.io, target, (current) => {
-        ran.done = true
-        verdict = anchorVerdict(anchor, current)
-        if (verdict === 'match' && current !== null) lockedBefore = current
-        return verdict === 'match' ? null : current
-      })
+      try {
+        await this.transact(this.io, target, (current) => {
+          ran.done = true
+          verdict = anchorVerdict(anchor, current)
+          if (verdict === 'match' && current !== null) lockedBefore = current
+          return verdict === 'match' ? null : current
+        })
+      } catch (error) {
+        if (error instanceof TransactionNotInvokedError) return { ok: false, message: '内部错误：删除事务没有调用任务；没有删除任何东西' }
+        throw error
+      }
       if (!ran.done) return { ok: false, message: '内部错误：删除事务没有调用任务；没有删除任何东西' }
     } else if (verdict === 'match') {
       await this.io.remove(target)

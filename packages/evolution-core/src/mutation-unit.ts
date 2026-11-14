@@ -1,6 +1,6 @@
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { isCommittedWarning, isProcessAlive, transactIo } from './io.ts'
+import { isCommittedWarning, isProcessAlive, TransactionNotInvokedError, transactIo } from './io.ts'
 import { WriteKernel } from './write-kernel.ts'
 import type { UnitClaimPort } from './unit-claim.ts'
 import type { MutationOwner } from './contract.ts'
@@ -314,7 +314,8 @@ export class MutationUnit {
       try {
         lease = await this.lock.acquire()
       } catch (error) {
-        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'unit-fence-failed', message: error instanceof Error ? error.message : String(error) }] }
+        const code = error instanceof TransactionNotInvokedError ? 'transact-not-invoked' : 'unit-fence-failed'
+        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }
       }
       let claim: { release(): Promise<void> } | undefined
       if (this.claim !== undefined) {
@@ -394,6 +395,7 @@ export class MutationUnit {
           rollbackFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
         }
         const detail = rollbackFailure === '' ? message : message + '; rollback failed: ' + rollbackFailure
+        const failureCode = (error as { code?: string } | undefined)?.code === 'transact-not-invoked' ? 'transact-not-invoked' : 'write-failed'
         await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'failed', changed, error: detail })
         try {
           await this.hooks?.rolledBack?.({
@@ -413,7 +415,7 @@ export class MutationUnit {
         } catch {
           // best-effort hook; the structured write error remains authoritative
         }
-        return { ok: false, unitId, dryRun: false, changed, errors: [{ code: 'write-failed', message: detail }] }
+        return { ok: false, unitId, dryRun: false, changed, errors: [{ code: failureCode, message: detail }] }
       } finally {
         await claim?.release().catch(() => {})
         await lease.release()
@@ -443,7 +445,8 @@ export class MutationUnit {
       try {
         lease = await this.lock.acquire()
       } catch (error) {
-        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'unit-fence-failed', message: error instanceof Error ? error.message : String(error) }] }
+        const code = error instanceof TransactionNotInvokedError ? 'transact-not-invoked' : 'unit-fence-failed'
+        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }
       }
       const reverted: string[] = []
       try {
@@ -545,7 +548,7 @@ export class MutationUnit {
 
   private async applyOp(op: TreeChangeOp, baseline: string | null): Promise<string[]> {
     const result = await this.kernel.writeOne({ path: op.target, expected: baseline, next: op.kind === 'delete' ? null : op.content, ...op.skill === undefined ? {} : { skill: op.skill } }, { guardBaseline: this.transactGuard })
-    if (!result.ok) throw Object.assign(new Error(result.errors[0]?.message ?? 'write failed: ' + op.target), { noWrite: true })
+    if (!result.ok) throw Object.assign(new Error(result.errors[0]?.message ?? 'write failed: ' + op.target), { noWrite: true, code: result.errors[0]?.code })
     return [...(result.warnings ?? [])]
   }
 

@@ -141,9 +141,9 @@
       "path": "<callerSupplied>",
       "writer": "evolution-core/src/skill-store.ts",
       "serializedBy": "transact",
-      "marker": "transactIo(ioLike, path, task)",
+      "marker": "this.transact = transact ?? (io.transact ? transactIo : undefined)",
       "state": [],
-      "note": "The store's transaction helper: it prefers the backend's own transact and falls back to the seam's transactIo. The target is the caller's path — each durable target has its own row above; this row vouches for the primitive itself."
+      "note": "The store's ONE transaction seam: explicit injection wins, a backend with transact binds transactIo (typed not-invoked + committed warnings), a backend without it keeps the plain read→write. The target is the caller's path — each durable target has its own row above; this row vouches for the primitive itself."
     },
     {
       "id": "feedback-events",

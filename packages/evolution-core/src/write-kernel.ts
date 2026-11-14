@@ -1,4 +1,4 @@
-import { isCommittedWarning, transactIo, type EvolutionIoLike } from './io.ts'
+import { isCommittedWarning, TransactionNotInvokedError, transactIo, type EvolutionIoLike } from './io.ts'
 
 /** The four persistent writer kinds the family permits. */
 
@@ -12,7 +12,7 @@ export interface WriteTarget {
 
 /** A structured failure; conflict always means the target changed before/inside the write. */
 export interface WriteKernelError {
-  readonly code: 'cas-conflict' | 'write-failed' | 'compensation-blocked'
+  readonly code: 'cas-conflict' | 'write-failed' | 'compensation-blocked' | 'transact-not-invoked'
   readonly message: string
   readonly target: string
 }
@@ -115,6 +115,7 @@ export class WriteKernel {
     } catch (error) {
       if (conflict) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: error instanceof Error ? error.message : String(error), target: target.path }] }
       if (isCommittedWarning(error)) return { ok: true, changed: [target.path], errors: [], warnings: [error instanceof Error ? error.message : String(error)] }
+      if (error instanceof TransactionNotInvokedError) return { ok: false, changed: [], errors: [{ code: 'transact-not-invoked', message: error.message, target: target.path }] }
       return { ok: false, changed: [], errors: [{ code: 'write-failed', message: error instanceof Error ? error.message : String(error), target: target.path }] }
     }
     if (conflict || (!wrote && deferred)) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: 'concurrent modification detected: ' + target.path, target: target.path }] }
