@@ -1777,6 +1777,14 @@
             "plan": "run the row on a build line that carries the health baseline and replace this exemption with a proven record; the row stays counted until then",
             "condition": "release gate: revisit when the CI lane supplies the baseline",
             "renewal": "Added at 0.48.0 with the gate-registration reason (expires 0.48.0)."
+          },
+          "gate-75": {
+            "reason": "the layout-sync row is localSafe=false: its argv uses a CI workspace-relative path (../packages/scripts) that does not resolve on a dev machine, so the baseline is red before any mutation",
+            "owner": "scripts/gates",
+            "expiry": "0.48.0",
+            "plan": "prove the row in the CI workspace where the relative path resolves, or replace the argv with a layout-neutral pair; the row stays counted until then",
+            "condition": "release gate: revisit when the path is layout-neutral or the CI lane runs it",
+            "renewal": "Added at 0.48.0 from the measured local baseline red (localSafe=false)."
           }
         },
         "cannotDecideRegistered": {
