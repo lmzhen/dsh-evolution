@@ -26,10 +26,12 @@ import { exemptionProblems } from './lib-exemptions.mjs'
 import { softOverlay } from './lib-env.mjs'
 import { registry } from './gates/registry.mjs'
 import { validateRegistry } from './gates/model.mjs'
-import { renderManifestGates, renderTableRows } from './gates/views.mjs'
+import { renderManifestGates, renderTableBlock, renderTableRows, TABLE_HEADER } from './gates/views.mjs'
 
 const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
+const registryGates = renderManifestGates(registry)
+const expectedTableRows = renderTableRows(registryGates)
 // The repo root is found by walking up from the tree to the directory that owns OUR composite
 // action: the released-upstream layout puts the family at <platform>/packages/evolution, whose
 // parent is the platform's packages dir - assuming one level up pointed at upstream/packages (and
@@ -99,17 +101,18 @@ const releasePath = join(repo, '.github', 'workflows', 'release.yml')
 if (tableArmed && !existsSync(contributingPath)) { console.error('verify-gate-manifest: no CONTRIBUTING.md at ' + contributingPath); process.exit(2) }
 if (tableArmed && !existsSync(actionPath)) { console.error('verify-gate-manifest: no composite action at ' + actionPath); process.exit(2) }
 
-const tableRows = []
+const tableRows = expectedTableRows
 if (!tableArmed) console.error('verify-gate-manifest: table check NOT ARMED in this layout - no repository marker above ' + root + ' (the register records this row against the mirror tree)')
-for (const [index, line] of (tableArmed ? readFileSync(contributingPath, 'utf8') : '').split('\n').entries()) {
-  const match = /^\|\s*([0-9]+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|$/.exec(line)
-  // G0-5: strip backticks — a command cell whose code span ends the cell (`…mjs`) used to fail
-  // scriptOf's trailing-delimiter rule, silently dropping that row from declaredScripts.
-  if (match !== null) tableRows.push({ n: Number(match[1]), command: match[2].replace(/`/g, ' '), tree: match[3], line: index + 1 })
-}
-if (tableArmed && tableRows.length === 0) { console.error('verify-gate-manifest: the gate table parsed empty — refuse to report a pass on an empty parse'); process.exit(1) }
-for (const [index, row] of tableRows.entries()) {
-  if (row.n !== index + 1) problems.push('table row ' + row.line + ' is numbered ' + row.n + ' but sits at position ' + (index + 1) + ' — renumber the table (a gap hides a retired step)')
+if (tableArmed) {
+  const lines = readFileSync(contributingPath, 'utf8').split('\n')
+  const start = lines.findIndex((line) => line.startsWith(TABLE_HEADER))
+  if (start < 0) problems.push('CONTRIBUTING.md carries no gate table header (' + TABLE_HEADER + ') — the generated table is the only home of the step numbering')
+  else {
+    let end = start + 1
+    while (end < lines.length && /^\|/.test(lines[end])) end += 1
+    const actual = lines.slice(start, end).join('\n')
+    if (actual !== renderTableBlock(expectedTableRows)) problems.push('the CONTRIBUTING gate table does not match the registry rendering — rerun gen-gate-manifest.mjs')
+  }
 }
 
 /** @returns the family script a command runs: `{ name, external }`, or null when the command
@@ -137,23 +140,22 @@ for (const entry of [...MACHINE_LOCAL, ...CI_NOT_EXECUTED, ...CI_ONLY]) {
 }
 
 const declaredScripts = new Set()
-for (const row of tableRows) {
-  const script = scriptOf(row.command)
-  const isMachineLocal = /machine-local/i.test(row.tree)
+for (const gate of registryGates) {
+  const command = [...(Array.isArray(gate.argv) ? gate.argv : Array.isArray(gate.ci?.argv) ? gate.ci.argv : []), ...(typeof gate.command === 'string' ? [gate.command] : [])].join(' ')
+  if (command.trim() === '') continue
+  const script = scriptOf(command)
+  const isMachineLocal = /machine-local/i.test(String(gate.tree ?? ''))
   if (script === null) continue
-  if (script.external && !isMachineLocal) problems.push('row ' + row.n + ' (' + row.line + ') runs an absolute script path but its working tree does not say machine-local: ' + row.command)
-  if (!script.external && isMachineLocal) problems.push('row ' + row.n + ' (' + row.line + ') claims machine-local but runs an in-repo command: ' + row.command)
+  if (script.external && !isMachineLocal) problems.push('row ' + gate.id + ' runs an absolute script path but its working tree does not say machine-local: ' + command)
+  if (!script.external && isMachineLocal) problems.push('row ' + gate.id + ' claims machine-local but runs an in-repo command: ' + command)
   // A GENERATOR row registered as a gate must run in its CHECKING form: without --check it rewrites the
-  // artifact it publishes and exits 0, repairing the drift it was registered to report. The cell arrives
-  // with its Markdown code spans ALREADY UNWRAPPED (measured: spans=0 with backticks), so the command and
-  // the prose live in one string - the cell is split on non-ASCII runs and only the ASCII runs that name a
-  // generator are judged, which keeps a --check mentioned in the prose (or in another command) out of it.
-  const asciiRuns = String(row.command).split(new RegExp('[^\\x20-\\x7e]+'))
+  // artifact it publishes and exits 0, repairing the drift it was registered to report.
+  const asciiRuns = command.split(new RegExp('[^\\x20-\\x7e]+'))
   const bareGenerators = asciiRuns.filter((run) => /gen-[^\s/]*\.mjs/.test(run) && !run.includes('--check') && !GENERATOR_PRODUCERS.has((/([^\s/]*\.mjs)/.exec(run) ?? [])[1] ?? ''))
   if (!script.external && bareGenerators.length > 0) {
-    problems.push('row ' + row.n + ' (' + row.line + ') runs a generator WITHOUT --check: ' + bareGenerators[0].trim().slice(0, 70))
+    problems.push('row ' + gate.id + ' runs a generator WITHOUT --check: ' + bareGenerators[0].trim().slice(0, 70))
   }
-  if (script.external && !machineLocalNames.has(script.name)) problems.push('row ' + row.n + ' (' + row.line + ') runs ' + script.name + ', which MACHINE_LOCAL does not register (name the reason and the expiry)')
+  if (script.external && !machineLocalNames.has(script.name)) problems.push('row ' + gate.id + ' runs ' + script.name + ', which MACHINE_LOCAL does not register (name the reason and the expiry)')
   if (!script.external) declaredScripts.add(script.name)
 }
 
@@ -179,14 +181,15 @@ if (existsSync(releasePath)) {
 }
 if (platformVersion === null) problems.push('the upstream target line cannot be read from platform-line.json — it has no single source')
 else {
-  for (const row of tableRows) {
-    for (const match of row.command.matchAll(/--upstream\s+([^\s`]+)/g)) {
+  for (const gate of registryGates) {
+    const command = [...(Array.isArray(gate.argv) ? gate.argv : Array.isArray(gate.ci?.argv) ? gate.ci.argv : []), ...(typeof gate.command === 'string' ? [gate.command] : [])].join(' ')
+    for (const match of command.matchAll(/--upstream\s+([^\s`]+)/g)) {
       // A `<placeholder>` argument documents the shape without naming a machine path; only a
       // CONCRETE path can be stale, so only a concrete path is judged.
       if (match[1].startsWith('<')) continue
       const expected = 'dsh-upstream-' + platformVersion
       if (!match[1].replace(/\\/g, '/').endsWith(expected)) {
-        problems.push('row ' + row.n + ' (' + row.line + ') points --upstream at ' + match[1] + ' but release.yml declares PLATFORM_VERSION ' + platformVersion + ' (the tree must end in ' + expected + ')')
+        problems.push('row ' + gate.id + ' points --upstream at ' + match[1] + ' but release.yml declares PLATFORM_VERSION ' + platformVersion + ' (the tree must end in ' + expected + ')')
       }
     }
   }
@@ -235,20 +238,14 @@ for (const script of declaredScripts) {
 // checks judge the committed views and the CI wiring AGAINST the registry (the old direction let a
 // hand-edited table or an action text change silently re-number ids).
 for (const problem of validateRegistry(registry)) problems.push('registry: ' + problem)
-const renderedGates = renderManifestGates(registry)
-if (renderedGates.length !== manifestGates.length || JSON.stringify(renderedGates) !== JSON.stringify(manifestGates)) {
+if (registryGates.length !== manifestGates.length || JSON.stringify(registryGates) !== JSON.stringify(manifestGates)) {
   const byId = new Map(manifestGates.map((gate) => [gate.id, gate]))
-  const differing = renderedGates.filter((gate) => JSON.stringify(gate) !== JSON.stringify(byId.get(gate.id))).map((gate) => gate.id)
-  problems.push('gate-manifest.json does not match the registry rendering (first differing: ' + (differing.length === 0 ? 'row count ' + renderedGates.length + ' vs ' + manifestGates.length : differing.slice(0, 6).join(', ')) + ') - the manifest is generated; rerun gen-gate-manifest.mjs then gen-checks-fact.mjs')
-}
-const expectedTable = renderTableRows(renderedGates)
-const tableSet = tableRows.map((row) => ({ n: row.n, tree: row.tree })).sort((left, right) => left.n - right.n)
-if (JSON.stringify(tableSet) !== JSON.stringify(expectedTable.map((row) => ({ n: row.n, tree: row.tree })))) {
-  problems.push('the CONTRIBUTING gate table does not match the registry table rows (' + tableRows.length + ' vs ' + expectedTable.length + ') - the table is generated; rerun gen-gate-manifest.mjs')
+  const differing = registryGates.filter((gate) => JSON.stringify(gate) !== JSON.stringify(byId.get(gate.id))).map((gate) => gate.id)
+  problems.push('gate-manifest.json does not match the registry rendering (first differing: ' + (differing.length === 0 ? 'row count ' + registryGates.length + ' vs ' + manifestGates.length : differing.slice(0, 6).join(', ')) + ') - the manifest is generated; rerun gen-gate-manifest.mjs then gen-checks-fact.mjs')
 }
 const actionFamilyScripts = new Set([...actionText.matchAll(/scripts\/([A-Za-z0-9._-]+\.mjs)/g)].map((match) => match[1]))
 const registryCiScripts = new Set()
-for (const gate of renderedGates) {
+for (const gate of registryGates) {
   if (!gate.lanes.some((lane) => lane.startsWith('ci-'))) continue
   // Runnable rows carry argv; step rows carry a shell `command` (A1b). Both name family scripts:
   // tokenise command text on shell separators so `a.mjs && b.mjs` counts both.
@@ -276,12 +273,12 @@ for (const lane of ['ci-static', 'ci-unit']) {
 // nothing red (0.24.0 shipped 18 lint errors past every gate this way). Judge them by TOOL NAME, and let
 // a manifest entry with a reason stand in for a check this action deliberately does not run.
 for (const tool of ['typescript/lib/tsc.js', 'oxlint/bin/oxlint', 'vitest/vitest.mjs']) {
-  const row = tableRows.find((entry) => entry.command.includes(tool))
+  const row = registryGates.find((entry) => [...(Array.isArray(entry.argv) ? entry.argv : Array.isArray(entry.ci?.argv) ? entry.ci.argv : []), ...(typeof entry.command === 'string' ? [entry.command] : [])].join(' ').includes(tool))
   if (row === undefined) continue
   if (actionText.includes(tool) || laneCoveredTools.has(tool)) continue
   const registered = manifestGates.find((gate) => typeof gate.human === 'string' && gate.human.includes(tool) && typeof gate.reason === 'string')
   if (registered !== undefined) { notes.push(tool + ' is registered as a declared local check: ' + registered.reason); continue }
-  problems.push('row ' + row.n + ' declares ' + tool + ' but neither this action nor a manifest entry with a reason covers it — a deleted step would go unnoticed (G0-5)')
+  problems.push('row ' + row.id + ' declares ' + tool + ' but neither this action nor a manifest entry with a reason covers it — a deleted step would go unnoticed (G0-5)')
 }
 
 // (6) composite-action input references must be declared (v46 S1.9, finding T7-01).
@@ -325,13 +322,6 @@ for (const file of countFiles) {
   }
 }
 
-// P0-prime (R146/工具链席缺口 ③)：表格编号必须唯一 —— 编号即 id 来源，
-// 撞号会让 --check 报 stale、并让 --only/--drill <id> 目标不唯一（实测 gate-42 撞号）。
-const seenNumbers = new Map()
-for (const row of tableRows) {
-  if (seenNumbers.has(row.n)) problems.push('table row ' + row.line + ' reuses number ' + row.n + ' (already used at line ' + seenNumbers.get(row.n) + ') — a duplicate number makes --only/--drill <id> ambiguous and the generated manifest stale')
-  else seenNumbers.set(row.n, row.line)
-}
 // P0-prime（迁移角）：不可证伪必须显式声明 —— 每条 script 要么有 drillCmd，要么写明 noDrillReason，
 // 两者皆无就是"忘了加"，不得沉默通过（与「没有对象名的绿＝红」同构）。
 // ── G2/M1 (report half): four meta-criteria over the MANIFEST (the execution surface).
