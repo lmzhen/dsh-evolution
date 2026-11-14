@@ -732,12 +732,13 @@ export async function diagnose(
   let pendingTtlMs: number | null = null
   const approvalService = ctx.get('evolutionApproval') as {
     list?: (status: string) => Promise<unknown[]>
+    listReadonly?: (status: string) => Promise<unknown[]>
     ttlMs?: unknown
   } | undefined
   if (typeof approvalService?.ttlMs === 'number' && Number.isFinite(approvalService.ttlMs)) {
     pendingTtlMs = approvalService.ttlMs
   }
-  const approvalList = approvalService?.list?.bind(approvalService)
+  const approvalList = (approvalService?.listReadonly ?? approvalService?.list)?.bind(approvalService)
   if (approvalList !== undefined) {
     try {
       // R-1 (same class as the session-query probe): a wedged approval service

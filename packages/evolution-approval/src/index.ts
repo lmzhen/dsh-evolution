@@ -157,6 +157,8 @@ export type ApprovalLike = {
    * read that absence as "expires immediately". */
   ttlMs?: number
   list(status?: PendingStatus): Promise<PendingRecord[]>
+  /** Read-only window for doctor/diagnostics: never runs expireStale (no write on a read path). */
+  listReadonly?(status?: PendingStatus): Promise<PendingRecord[]>
   approve(id: string): Promise<{ ok: boolean; message: string }>
   reject(id: string): Promise<{ ok: boolean; message: string }>
   /** S2-P2-22 (0.3.80): return an ORPHANED executing record (an approve that
@@ -496,6 +498,10 @@ export class EvolutionApproval extends Service {
     // The convergence runs before EVERY read of a window, so no reader can see a record the TTL has
     // already passed (the CLI, the card and the doctor all go through here).
     await this.expireStale()
+    return await this.state().listPending(status)
+  }
+
+  async listReadonly(status: PendingStatus = 'pending'): Promise<PendingRecord[]> {
     return await this.state().listPending(status)
   }
 
