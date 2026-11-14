@@ -97,7 +97,7 @@ interface SkillHealthSnapshot {
   hardCapHits?: number | null | undefined
 }
 
-interface SkillHealthDim {
+export interface SkillHealthDim {
   bodyChars: number
   /** The same body on the token scale (limit basis) — the judged quantity. */
   bodyTokens: number

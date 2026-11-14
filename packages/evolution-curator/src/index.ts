@@ -53,7 +53,7 @@ import { WriteAnchor } from '@deepseek-ai/dsh-evolution-core/skills'
 import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBundle } from '@deepseek-ai/dsh-evolution-core'
 import { blobPath } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import type { SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core/skills'
+import type { SkillHealthAssessment, SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
 import type { Session } from '@deepseek-ai/dsh-evolution-core/platform'
 
@@ -2061,17 +2061,8 @@ export class EvolutionCurator extends Service {
   async healthView(): Promise<Array<{
     name: string
     verdict: SkillHealthVerdict
-    dims: {
-      bodyChars: number | null
-      bodyTokens: number | null
-      stampDensityPerKb: number | null
-      supportGroups: number
-      supportFiles: number | null
-      churnPatches: number | null
-      churnReads: number | null
-      readable?: boolean
-    }
-    findings: Array<{ severity: 'warn' | 'error'; rule: string; message: string; count: number }>
+    dims: Omit<Pick<SkillHealthAssessment['dims'], 'bodyChars' | 'bodyTokens' | 'stampDensityPerKb' | 'supportGroups' | 'supportFiles' | 'churnPatches' | 'churnReads'>, 'bodyChars' | 'bodyTokens'> & { readonly bodyChars: number | null; readonly bodyTokens: number | null; readonly readable?: boolean }
+    findings: SkillHealthAssessment['findings']
     hardCapHits?: number | null
     protection?: string | null
   }>> {
