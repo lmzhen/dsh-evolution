@@ -12,6 +12,20 @@ import { tempRoot } from '../../test-support/temp-home.ts'
 
 const skill = (name: string) => '---' + String.fromCharCode(10) + 'name: ' + name + String.fromCharCode(10) + 'description: Test authority lock wiring with a unique body.' + String.fromCharCode(10) + '---' + String.fromCharCode(10) + String.fromCharCode(10) + '# ' + name + String.fromCharCode(10)
 
+it('records pin and remove_file when no outer fence is held', async () => {
+  const root = await tempRoot('dsh-skill-standalone-fence-')
+  const io = nodeEvolutionIo()
+  const authority = new MutationAuthority({ io, home: join(root, 'evolution') })
+  const lib = newSkillLibrary({ config: { root: join(root, 'skills') }, io, authority: authorityFrom({ origin: 'foreground' }), mutationLock: authority.mutationLock, fence: authority.homeFence })
+  expect((await lib.create('standalone-skill', skill('standalone-skill'), 'foreground')).ok).toBe(true)
+  expect((await lib.writeSupportFile('standalone-skill', 'references/example.md', 'Example\n', 'foreground')).ok).toBe(true)
+  expect((await lib.setPinned('standalone-skill', true, 'foreground')).ok).toBe(true)
+  expect((await lib.removeSupportFile('standalone-skill', 'references/example.md', 'foreground')).ok).toBe(true)
+  expect(await lib.listMutations()).toMatchObject([
+    { action: 'create' }, { action: 'write_file' }, { action: 'pin' }, { action: 'remove_file' },
+  ])
+})
+
 it('records history for a patch while its mutation unit holds the home fence', async () => {
   const root = await tempRoot('dsh-skill-patch-fence-')
   const io = nodeEvolutionIo()
