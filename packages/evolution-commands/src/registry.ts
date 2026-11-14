@@ -1,13 +1,6 @@
 /**
- * Subcommand registry — the SINGLE SOURCE for the /evolution command surface.
- *
- * 0.3.55 (WD1): the input-declaration hint, the bare `/evolution` help output
- * and the README command table all render FROM this table; a hand-written
- * copy anywhere is drift waiting to happen (v10 R-13 proved it once).
- * PLAN S5.3 (2026-09-16): "the README command table" means the FAMILY README
- * (`packages/README.md` — the T-WD2 anchor). Package-level READMEs cite that
- * home instead of restating the table (doc-facts rule N19).
- * Keep `usage` in the exact shape a user can type after `/evolution`.
+ * Command surface rendering. HOST_COMMAND_DEFS is the one table; every renderer here reads it.
+ * Keep `usageLine` in the exact shape a user can type after `/evolution`.
  */
 import { HOST_COMMANDS } from './generated/host-commands.ts'
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
