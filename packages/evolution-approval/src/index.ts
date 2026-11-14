@@ -453,9 +453,10 @@ export class EvolutionApproval extends Service {
    * is never invoked. NOTHING a human did not approve can execute; the cost of a wrong TTL is a
    * staged write that must be staged again.
    *
-   * A sweep, not a timer: every read of the window converges it (the CLI, the settings card and the
-   * doctor all read through {@link list}), so the family does not gain a background timer that would
-   * have to be unref'd, disposed and reasoned about for process liveness.
+   * A sweep, not a timer: converging reads go through {@link list} (the CLI and the settings card),
+   * while doctor's diagnostics read goes through {@link listReadonly} and does not write; the family
+   * still does not gain a background timer that would have to be unref'd, disposed and reasoned
+   * about for process liveness.
    * @returns the ids that were closed by this sweep (empty when the TTL is off or nothing was stale).
    */
   async expireStale(): Promise<string[]> {
