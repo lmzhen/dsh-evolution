@@ -902,6 +902,10 @@ const citationFindings = []
 walkCitationSurface(familyRoot, (path, text) => {
   for (const match of text.matchAll(PLATFORM_CITATION)) {
     const cited = match[2]
+    // checkMutations records deliberately name a fixture that must NOT exist (the
+    // mutation proves the checker goes red when it is missing). Such a string is a
+    // mutation target, not a citation; judging it here would invert its meaning.
+    if (cited.endsWith('.mutation-missing.json')) continue
     const segments = cited.split('/')
     const head = segments[0]
     if (match[1] === undefined) {
