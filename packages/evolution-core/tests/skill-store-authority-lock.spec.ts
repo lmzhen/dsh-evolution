@@ -26,6 +26,18 @@ it('records pin and remove_file when no outer fence is held', async () => {
   ])
 })
 
+it('reuses the outer fence for a public mutator called inside homeFence.run', async () => {
+  const root = await tempRoot('dsh-skill-nested-fence-')
+  const io = nodeEvolutionIo()
+  const authority = new MutationAuthority({ io, home: join(root, 'evolution') })
+  const lib = newSkillLibrary({ config: { root: join(root, 'skills') }, io, authority: authorityFrom({ origin: 'foreground' }), mutationLock: authority.mutationLock, fence: authority.homeFence })
+  expect((await lib.create('nested-skill', skill('nested-skill'), 'foreground')).ok).toBe(true)
+  const nested = await authority.homeFence.run(() => lib.update('nested-skill', skill('nested-skill') + '\nUpdated inside the outer fence.\n', 'foreground'))
+  expect(nested.ok, nested.message).toBe(true)
+  expect(await lib.listVersions('nested-skill')).toHaveLength(2)
+  expect(await lib.listMutations()).toMatchObject([{ action: 'create' }, { action: 'update' }])
+})
+
 it('records history for a patch while its mutation unit holds the home fence', async () => {
   const root = await tempRoot('dsh-skill-patch-fence-')
   const io = nodeEvolutionIo()

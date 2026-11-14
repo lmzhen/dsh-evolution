@@ -69,6 +69,11 @@ export class HomeFence {
   }
 
 
+  /** True only when this async call context already holds the home tree scope. */
+  holdsTree(): boolean {
+    return this.authority.holdsInContext('tree')
+  }
+
   async run<T>(body: (lock: TreeLock) => Promise<T>): Promise<T> {
     const invoke = async (): Promise<T> => await body(lockView(this.authority))
     try {

@@ -34,6 +34,10 @@ export class MutationAuthority {
   get mutationLock(): MutationLockPort {
     return {
       acquire: async () => {
+        // A nested writer running inside an already-held home fence must reuse that
+        // exclusion, not queue behind its own lease (merge undo/consolidate call public
+        // mutators under one pass-level fence). A caller outside the fence still acquires.
+        if (this.fence.holdsTree()) return { release: async () => {} }
         const lease = await this.fence.acquire()
         return { release: async () => { await lease.release() } }
       },
