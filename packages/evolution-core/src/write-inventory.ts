@@ -137,7 +137,6 @@ export const INSTANCE_KEYS = {
 // Both caches are READONLY on purpose: the table's own shape is readonly, and copying it into a
 // mutable array would be a second source of truth for the same rows.
 let cachedSites: readonly PersistedWriteSite[] | undefined
-let cachedSymbols: Readonly<Record<string, WritePathSymbol>> | undefined
 
 /**
  * The declared persisted write sites, in file order.
@@ -164,17 +163,9 @@ export function persistedWriteSites(): readonly PersistedWriteSite[] {
   }
   const table = parseTable(JSON.parse(raw) as unknown)
   cachedSites = table.sites
-  cachedSymbols = table.symbols
   return table.sites
 }
 
-/** The inventory's symbol legend — the roots every declared path is written against, with the
- * segments the gate checks against the resolver's source.
- * @internal no production caller — the gates read the JSON asset directly. */
-export function writePathSymbols(): Readonly<Record<string, WritePathSymbol>> {
-  persistedWriteSites()
-  return cachedSymbols ?? {}
-}
 
 /** Sites serialized by the per-home instance claim, with their instance keys.
  * @internal S2.4 (PLAN 2026-09-16): no production caller — the arch guard

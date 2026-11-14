@@ -11,7 +11,7 @@
  *
  * Read-only: it reports, it never writes and never repairs.
  */
-import type { EvolutionStateStorage, PendingRecord, PendingStatus } from './index.ts'
+import type { PendingStatus } from './index.ts'
 
 /** One record that the two readings do not agree on. */
 export interface MediumDifference {
@@ -29,28 +29,3 @@ export interface MediumComparison {
   readonly differences: readonly MediumDifference[]
 }
 
-/**
- * Compare the pending state as two media read it.
- * @param left - the provider currently in use.
- * @param right - the provider the deployment would switch to.
- * @returns whether the readings agree, and every disagreement, ordered by id.
- */
-export async function comparePendingReadings(
-  left: Pick<EvolutionStateStorage, 'listPending'>,
-  right: Pick<EvolutionStateStorage, 'listPending'>,
-): Promise<MediumComparison> {
-  const [leftRecords, rightRecords] = await Promise.all([left.listPending(), right.listPending()])
-  const statusOf = (records: readonly PendingRecord[]) => new Map(records.map(record => [record.id, record.status]))
-  const leftStatus = statusOf(leftRecords)
-  const rightStatus = statusOf(rightRecords)
-  const ids = [...new Set([...leftStatus.keys(), ...rightStatus.keys()])].sort()
-  const differences: MediumDifference[] = []
-  for (const id of ids) {
-    const leftValue = leftStatus.get(id)
-    const rightValue = rightStatus.get(id)
-    if (leftValue === rightValue) continue
-    const verdict = leftValue === undefined ? 'right-only'      : rightValue === undefined ? 'left-only' : 'status-differs'
-    differences.push({ id, left: leftValue, right: rightValue, verdict })
-  }
-  return { consistent: differences.length === 0, differences }
-}

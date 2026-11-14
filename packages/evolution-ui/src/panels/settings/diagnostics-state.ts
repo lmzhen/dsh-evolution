@@ -31,12 +31,3 @@ export function createDiagnosticsApi(doFetch: typeof fetch = fetch): Diagnostics
   }
 }
 
-/**
- * Read the view once and map it onto the card's four states (loading is the caller's initial value).
- * @param doFetch - the fetch to use.
- * @returns ready with the view, or failed with the classified failure.
- */
-export async function loadDiagnostics(doFetch: typeof fetch = fetch): Promise<DiagnosticsState> {
-  const answer = await createDiagnosticsApi(doFetch).view()
-  return answer.ok ? { phase: 'ready', view: answer.data } : { phase: 'failed', failure: answer.failure }
-}

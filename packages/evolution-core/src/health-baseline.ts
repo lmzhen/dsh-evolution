@@ -65,21 +65,3 @@ export function buildHealthBaseline(skills: readonly CorpusSkill[]): HealthBasel
     values,
   }
 }
-
-/** The admission verdict for ONE rule id (contract §4): platform corpus must not trip it, and the
- * user-library hit rate must land inside the band. Every failure names the number it failed on. */
-export function admissionVerdict(
-  baseline: HealthBaseline,
-  ruleId: string,
-  thresholds: AdmissionThresholds = DEFAULT_ADMISSION,
-): { admitted: boolean; failures: string[] } {
-  const row = baseline.values[ruleId]
-  const failures: string[] = []
-  if (row === undefined) return { admitted: false, failures: ['rule ' + ruleId + ' has no baseline row'] }
-  if (baseline.corpora.platform === 0) failures.push('no platform-corpus skills measured — a vacuous 0-hit count admits any rule')
-  else if (row.platformHits !== 0) failures.push('platform corpus trips ' + ruleId + ' ' + String(row.platformHits) + ' time(s) — a rule the shipped library violates is unsatisfiable')
-  if (baseline.corpora.user === 0) failures.push('no user-library skills measured — a rate over an empty corpus proves nothing')
-  else if (row.userHitRate < thresholds.minUserHitRate) failures.push(ruleId + ' hits ' + row.userHitRate.toFixed(3) + ' of the user library, below ' + String(thresholds.minUserHitRate) + ' — too rare to be worth a rule')
-  else if (row.userHitRate > thresholds.maxUserHitRate) failures.push(ruleId + ' hits ' + row.userHitRate.toFixed(3) + ' of the user library, above ' + String(thresholds.maxUserHitRate) + ' — furniture, no signal')
-  return { admitted: failures.length === 0, failures }
-}

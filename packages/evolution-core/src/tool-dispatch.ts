@@ -421,7 +421,6 @@ export function isSkillReadToolName(name: string): boolean {
 }
 
 /** Tool names whose dispatch opens a code program, i.e. whose sub-dispatches are \`program\`. */
-const PROGRAM_TOOL_NAMES = new Set(['run_code'])
 
 /**
  * Does this signal read one skill, and did it not fail?
@@ -592,15 +591,6 @@ export function isSkillToolName(name: string): boolean {
 }
 
 /**
- * Does this dispatched tool name open a code program?
- * @param name - the dispatched tool name.
- * @returns \`true\` for the tool whose sub-dispatches are \`program\` kind.
- */
-export function isProgramToolName(name: string): boolean {
-  return PROGRAM_TOOL_NAMES.has(name)
-}
-
-/**
  * Assert that a payload really is the dispatch event it claims to be.
  *
  * The normalizer is deliberately lenient (it also folds persisted logs, where a
@@ -636,12 +626,4 @@ export function assertDispatchPayload(event: { type: string; data?: unknown }): 
   throw new ToolDispatchPayloadError(`${event.type} is not a platform dispatch event; compare signal.kind instead of event types`)
 }
 
-/**
- * Total dispatches in a log, deduplicated.
- * @param events - the log, oldest first.
- * @returns the number of distinct dispatches, one per dispatch regardless of
- * how many events carried it.
- */
-export function countDispatches(events: Iterable<{ type: string; data?: unknown }>): number {
-  return foldToolDispatches(events).length
-}
+

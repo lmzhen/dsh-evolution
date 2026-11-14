@@ -122,31 +122,4 @@ export class EvolutionIoRegistry extends Service {
   }
 }
 
-/**
- * Resolve the seam implementation for a consumer, preferring a backend the deployment mounted.
- *
- * Contract C2 (declared gaps) has no other shape: a consumer that can work on either medium asks for
- * its preference and the DEPLOYMENT decides which backends exist. The lookup is contained here because
- * the registry deliberately has no presence probe (v20 A-3 removed `hasProvider`; a presence probe goes
- * through `provider(name)`, which fails loud) — so this function is the ONE sanctioned place that turns
- * that failure into a fallback. A caller that needs a SPECIFIC backend must call `provider(name)` and
- * take the error.
- * @param registry - the seam registry (`ctx.evolutionIo`).
- * @param names - preferred provider names, most preferred first.
- * @returns the first registered preference, else the registry default.
- */
-export function preferProvider<T>(
-  registry: { provider(name?: string): T },
-  names: readonly string[],
-): T {
-  for (const name of names) {
-    try {
-      return registry.provider(name)
-    } catch {
-      // Not registered: this name is a preference, not a requirement (see the JSDoc).
-    }
-  }
-  return registry.provider()
-}
-
 export default EvolutionIoRegistry

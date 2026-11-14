@@ -4,7 +4,7 @@ import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
 import type { Agent } from '@deepseek-ai/dsh-evolution-core/platform'
-import type { SkillSearch, SkillSearchQuery, SkillSearchResponse } from './search.ts'
+import type { SkillSearchQuery, SkillSearchResponse } from './search.ts'
 
 /** Search dependency supplied by the composition; absent search degrades. */
 export interface SkillSearchProvider {
@@ -101,7 +101,3 @@ export function registerSkillSearchTool(ctx: Context, provider: SkillSearchProvi
   }))
 }
 
-/** @returns true only for a search implementation; used by composition wiring. */
-export function isSkillSearch(value: unknown): value is SkillSearch {
-  return typeof value === 'object' && value !== null && typeof (value as { search?: unknown }).search === 'function'
-}
