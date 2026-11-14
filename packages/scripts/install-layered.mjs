@@ -764,13 +764,9 @@ export async function install(options = {}) {
     home,
     profile,
     profileDir,
-    base: null,
-    bases: [],
     copied: [],
     missingEntrypoints: [],
     bundle: null,
-    agentPreset: null,
-    agentPresets: [],
   }
 
   if (mode === 'all') {
@@ -938,23 +934,12 @@ if (isMain) {
       // branch above indents correctly) — realign with the surrounding try.
       console.log(`scope:    ${EVOLUTION_SCOPE}`)
       console.log(`mode:     ${result.mode}`)
-      console.log(`form:     ${result.form}${result.form === 'variant' ? ' (session opt-in: original presets carry no family rows)' : result.form === 'attach' ? ' (profile-level: every session carries the family rows)' : ''}`)
+      console.log(`form:     ${result.form}`)
       console.log(`profile:  ${result.profile} (${result.profileDir})`)
       if (result.bundle) console.log(`bundle:   ${result.bundle}`)
       console.log(`copied:   ${result.copied.length} evolution packages`)
       if (result.missingEntrypoints.length > 0) {
         console.log(`unbuilt:  ${result.missingEntrypoints.length} packages lack lib/index.js — build them first, or boot the profile with a TS loader`)
-      }
-      const notApplied = (result.agentPresets ?? []).filter((preset) => !preset.installed && preset.reason !== 'already current')
-      for (const preset of result.agentPresets ?? []) {
-        console.log(`preset:   ${preset.rowId} → ${preset.patchPath}${preset.installed ? '' : ` (${preset.reason})`}`)
-      }
-      // G1.4 (contract C8): an install that left a preset row un-applied is NOT a success. The row
-      // differing from what a fresh generation writes is a decision only the user can make (--force),
-      // so the run reports it and exits non-zero instead of printing an installed-looking surface.
-      if (notApplied.length > 0) {
-        console.log(`halfDone: ${notApplied.length} preset row(s) left un-applied — re-run with --force to replace a differing block`)
-        if (!options.dryRun) process.exitCode = 1
       }
       if (options.dryRun) console.log('dry-run:  no files were written')
     }
