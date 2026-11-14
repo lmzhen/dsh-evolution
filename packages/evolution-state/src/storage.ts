@@ -25,7 +25,6 @@ export * from './record-contract.ts'
 // U-2 added an optional options bag (namespace, stamp, session ids) for a medium
 // that cannot use the in-tree literals.
 export * from './conformance.ts'
-export * from './medium-comparison.ts'
 export * from './medium-declaration.ts'
 
 /** 0.3.17 (S3.3): the claim lifecycle as ONE transition table — BOTH
