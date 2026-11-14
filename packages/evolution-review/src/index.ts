@@ -96,7 +96,9 @@ export interface Config {
    * a turn advances by its tool-call count, minimum 1, or by 1 when the turn
    * itself carried the memory signal). Shadowed by the policy snapshot in every
    * shipped composition — configure `reviewMemoryInterval` on the
-   * `evolution-policy` row instead (v37 P2-24). */
+   * `evolution-policy` row instead (v37 P2-24). G0/S0.3: the removed live-row
+   * aliases `memoryInterval`/`skillInterval` are migration input only; live
+   * writes name `reviewMemoryInterval`/`reviewSkillInterval`. */
   reviewMemoryInterval?: Volatile<number | undefined>
   /** Skill-channel review cadence — the CANONICAL registry id (G1); shadowed by
    * the policy snapshot like the memory cadence. */

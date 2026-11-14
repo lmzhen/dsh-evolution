@@ -71,9 +71,9 @@ export interface Config {
   maxSkillNameLength?: Volatile<number>
   maxDescriptionLength?: Volatile<number>
   /** Read cap for SKILL.md writes — the CANONICAL registry id (G1) and a LIVE row
-   * field; the deprecated alias below is the fallback spelling. No schema default:
-   * the alias carries it, and a default on the canonical key would fill it and make
-   * the alias unreachable. */
+   * field; G0/S0.3: the removed live-row alias `maxSkillContentChars` is migration
+   * input only. No schema default: the alias carries it, and a default on the
+   * canonical key would fill it and make the alias unreachable. */
   skillContentChars?: Volatile<number | undefined>
   /** Refuse a move that would leave a dangling reference, or verify it — the
    * CANONICAL registry id (G1). The user layer sits above the policy stages,

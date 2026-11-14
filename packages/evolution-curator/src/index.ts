@@ -93,7 +93,8 @@ declare module '@deepseek-ai/cordis' {
 
 export interface Config {
   enabled?: boolean
-  /** Canonical registry id for the due-ness interval. */
+  /** Canonical registry id for the due-ness interval. G0/S0.3: the legacy alias
+   * `intervalHours` is migration/doctor input only; live rows use `curatorIntervalHours`. */
   curatorIntervalHours?: Volatile<number | undefined>
   staleAfterDays?: Volatile<number>
   archiveAfterDays?: Volatile<number>

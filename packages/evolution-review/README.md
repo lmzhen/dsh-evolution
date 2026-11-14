@@ -24,7 +24,7 @@ Subagent-origin, background-visibility, and review-child sessions are excluded. 
 The package emits `evolution/review-scheduled`, `evolution/review-completed`, `evolution/review-error`, and an aux `evolution/plan-applied` ledger entry. `reviewTimeoutMs` bounds the aux loop. Review cadence state is persisted when `evolution-state` is available; without it, cadence can reset between turns.
 
 **Removed metadata:** `reviewProvider`, `reviewContextMessages`, `reviewMessageChars`, `reviewMaxDepth` and `reviewToolAllow` were declared but never read, so they are gone from the registry and the bundles. Provider/model come from the parent session header; the tool allowlist is the parent's tools intersected with the family allowlist.
-`memoryInterval` and `skillInterval` were removed from the live row schema in 0.48. They survive only in the family's old-document migration table and doctor's old-key report; a deployment config that still spells them must be rewritten to `reviewMemoryInterval` and `reviewSkillInterval`.
+`memoryInterval` and `skillInterval` were removed from the live row schema in 0.48 (G0/S0.3). They survive only in the family's old-document migration table and doctor's old-key report; a deployment config that still spells them must be rewritten to `reviewMemoryInterval` and `reviewSkillInterval`.
 
 
 ## Known limitations and migration

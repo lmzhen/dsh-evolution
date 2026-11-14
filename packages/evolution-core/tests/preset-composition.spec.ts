@@ -114,47 +114,6 @@ describe('composePresetComposition (0.3.15)', () => {
   })
 })
 
-describe('the shared row-override table (0.3.77, G1 single-source)', () => {
-  it('is DATA both generation paths read — the composer and the source installer agree byte-for-byte', async () => {
-    // Before 0.3.77 each path carried its own hand-kept copy of this table and
-    // they stayed byte-identical by hand. The pin below fails the moment either
-    // side grows a copy again: the entries live in row-overrides.json only, and
-    // both implementations are required to produce the same bytes from it.
-    const standard = '- id: persona\n  name: "@deepseek-ai/dsh-persona"\n\n- id: tool-skill\n  name: "@deepseek-ai/dsh-tool-skill"\n'
-    const delta = '- id: tool-memory\n  name: "@deepseek-ai/dsh-memory/tools"\n'
-    const composed = composePresetComposition(standard, delta)
-    const { loadRowOverrides } = await import('@deepseek-ai/dsh-evolution-core/composition')
-    const table = loadRowOverrides()
-    expect(table.length).toBeGreaterThan(0)
-    for (const override of table) {
-      for (const line of override.lines) expect(composed).toContain(line)
-      expect(override.missingReason.length).toBeGreaterThan(0)
-    }
-    // The source installer's helper, evaluated in a subprocess the way
-    // installer-preset-base.spec does (the script ships no type declarations),
-    // must return the SAME bytes for the SAME input.
-    const installer = fileURLToPath(new URL('../../scripts/install-layered.mjs', import.meta.url))
-    const script = [
-      `import * as installer from ${JSON.stringify(pathToFileURL(installer).href)}`,
-      `process.stdout.write(Buffer.from(installer.generateAgentPreset(${JSON.stringify(standard)}, ${JSON.stringify(delta)}), 'utf8').toString('base64'))`,
-    ].join('\n')
-    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
-    expect(Buffer.from(stdout, 'base64').toString('utf8')).toBe(composed)
-
-    // Neither implementation may inline the table again: the distinctive config
-    // line exists in the JSON and nowhere else.
-    for (const file of ['../src/composition/composer.ts', '../../scripts/install-layered.mjs']) {
-      expect(readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8'), file).not.toContain('catalogDescriptionMaxLength')
-    }
-    // ...and the JSON is the table the package SHIPS (files + exports), or an
-    // installed copy would throw at compose time.
-    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')) as
-      { files?: unknown; exports?: Record<string, unknown> }
-    expect(Array.isArray(manifest.files) ? manifest.files : []).toContain('row-overrides.json')
-    expect((manifest.exports ?? {})['./row-overrides.json']).toBe('./row-overrides.json')
-  })
-})
-
 describe('composePresetRow / mergePresetRow (G6: declarative presets)', () => {
   const identity = {
     rowId: 'evolution-preset',
@@ -328,7 +287,7 @@ describe('the profile-patch form (G6: insert entry, base extraction, removal)', 
   })
 })
 
-describe('the source installer emits the same bytes (install-layered.mjs parity)', () => {
+describe('preset patch fixtures (source installer preset generation retired in 0.48)', () => {
   const identity = {
     rowId: 'preset-evolution',
     id: 'evolution',
@@ -356,39 +315,6 @@ describe('the source installer emits the same bytes (install-layered.mjs parity)
   ].join('\n')
   const otherRow = '- id: keep-me\n  name: "@deepseek-ai/dsh-other"\n'
   const patched = mergePresetRow(otherRow, composePresetEntry(basePatch, delta, identity), identity.rowId)
-
-  it('composes, extracts, merges and removes to the same bytes as the installer', async () => {
-    // The installer is a source-tree tool with no type declarations and no build step, so its
-    // twins are evaluated in a subprocess; a drift in ANY of the five functions fails here.
-    const installer = fileURLToPath(new URL('../../scripts/install-layered.mjs', import.meta.url))
-    const entry = composePresetEntry(basePatch, delta, identity)
-    const script = [
-      `import * as installer from ${JSON.stringify(pathToFileURL(installer).href)}`,
-      'const out = {',
-      `  plugins: installer.basePresetPlugins(${JSON.stringify(basePatch)}),`,
-      `  entry: installer.composePresetEntry(${JSON.stringify(basePatch)}, ${JSON.stringify(delta)}, ${JSON.stringify(identity)}),`,
-      `  seeded: installer.mergePresetRow('[]\\n', ${JSON.stringify(entry)}, ${JSON.stringify(identity.rowId)}),`,
-      `  removed: installer.removePresetRow(${JSON.stringify(patched)}, ${JSON.stringify(identity.rowId)}),`,
-      `  composed: installer.generateAgentPreset(${JSON.stringify(basePatch)}, ${JSON.stringify(delta)}),`,
-      '}',
-      'process.stdout.write(Buffer.from(JSON.stringify(out), "utf8").toString("base64"))',
-    ].join('\n')
-    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script])
-    const installerBytes = JSON.parse(Buffer.from(stdout, 'base64').toString('utf8')) as Record<string, string>
-    const core = {
-      plugins: basePresetPlugins(basePatch),
-      entry,
-      seeded: mergePresetRow('[]\n', entry, identity.rowId),
-      removed: removePresetRow(patched, identity.rowId),
-      composed: composePresetComposition(basePatch, delta),
-    }
-    for (const key of Object.keys(core) as Array<keyof typeof core>) expect(installerBytes[key], key).toBe(core[key])
-    // ...and the parity is not vacuous: the entry really carries the base rows and the delta.
-    expect(core.entry.startsWith('- insert:\n    - id: preset-evolution\n')).toBe(true)
-    expect(core.entry).toContain('          - id: persona')
-    expect(core.entry).toContain('          - id: tool-memory')
-    expect(core.entry).toContain('catalogDescriptionMaxLength: 60')
-  })
 
   it('replaces the platform empty-list seed instead of extending it', () => {
     // The platform seeds a fresh profile patch with `[]` (`packages/boot/app-boot/src/profile.ts`,

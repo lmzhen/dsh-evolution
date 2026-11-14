@@ -14,4 +14,4 @@ Default layered memory provider backed by `MEMORY.md` and `USER.md`. It register
 
 An explicit row/user value wins. Otherwise an already mounted evolution-policy budget takes precedence over the package fallback. The row budget controls what the store enforces; the policy budget controls what review plans against, so an explicit mismatch is warned about and surfaced by doctor.
 
-`memoryCharLimit` and `userCharLimit` were removed from the live row schema in 0.48; the only row keys are `memoryChars` and `userChars`. The old names survive only in the family's old-document migration table and doctor's old-key report, so a deployment config that still spells them must be rewritten. `threatExemptLabels` is deployment security configuration and defaults to empty.
+`memoryCharLimit` and `userCharLimit` were removed from the live row schema in 0.48 (G0/S0.3); the only row keys are `memoryChars` and `userChars`. The old names survive only in the family's old-document migration table and doctor's old-key report, so a deployment config that still spells them must be rewritten. `threatExemptLabels` is deployment security configuration and defaults to empty.

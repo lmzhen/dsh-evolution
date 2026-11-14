@@ -18,14 +18,16 @@ export const inject = ['memory', 'evolutionIo']
 export interface Config {
   providerName?: string
   /** Store-enforced character budget for MEMORY.md — the CANONICAL registry id
-   * (G1) and a LIVE row field (registry tier E3). The policy row's `memoryChars`
+   * (G1) and a LIVE row field (registry tier E3). G0/S0.3: the removed live-row
+   * alias `memoryCharLimit` is migration/doctor input only. The policy row's `memoryChars`
    * is the same semantic on the review-planner side; the two are NOT
    * auto-synchronised — `/evolution doctor` reports the divergence (budgetIssues).
    * This is the only row key in 0.48; the store resolves
    * DEFAULT_MEMORY_CHAR_LIMIT when the row carries nothing. */
   memoryChars?: Volatile<number | undefined>
   /** Store-enforced character budget for USER.md — the CANONICAL registry id (G1),
-   * a live row field on the same terms as `memoryChars`. */
+   * a live row field on the same terms as `memoryChars`. G0/S0.3: `userCharLimit`
+   * is migration/doctor input only. */
   userChars?: Volatile<number | undefined>
   addDatePrefix?: Volatile<boolean>
   root?: string
