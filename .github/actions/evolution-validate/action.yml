@@ -267,6 +267,14 @@ runs:
           echo "release evidence: skipped on non-tag dry run"
         fi
 
+    - name: "Release tarball audit"
+      shell: bash
+      working-directory: upstream
+      run: |
+        RANGE="^$(node -p "require('./platform-line.json').floor")"
+        node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist \
+          --version "${RELEASE_VERSION#v}" --platform-range "$RANGE"
+
     - name: "Packed install: full import against the npm platform"
       shell: bash
       working-directory: upstream

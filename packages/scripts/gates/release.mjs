@@ -62,17 +62,21 @@ export const release = [
   }),
 
   gate("gate-59", {
-    kind: "external",
+    kind: "step",
+    runBy: "action",
     tree: "overlay",
     title: "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
+    command: "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
     lanes: ["ci-release"],
     reason: "action step — executed by its lane/action step, not by run-gates",
   }),
 
   gate("gate-74", {
-    kind: "external",
+    kind: "step",
+    runBy: "action",
     tree: "overlay",
     title: "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
+    command: "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
     lanes: ["ci-release","ci-windows"],
     reason: "action step — executed by its lane/action step, not by run-gates",
   }),
