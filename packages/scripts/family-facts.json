@@ -1566,6 +1566,32 @@
               "provenAt": "2026-11-14T18:27:49.489Z",
               "provenSha": "02230a7bfb3ff835d243fa97e66d5df9ebbafe42b2eebe41128120f7a6e43573"
             }
+          ],
+          "gate-52": [
+            {
+              "mutate": {
+                "file": "packages/scripts/verify-subagent-single-source.mjs",
+                "find": "const OWNER = 'evolution-core/src/subagent/channel.ts'",
+                "replace": "const OWNER = 'evolution-core/src/subagent/channel-missing.ts'"
+              },
+              "expect": "red",
+              "note": "the single-caller guard requires the channel owner file to exist; pointing OWNER at a missing file makes the guard red on the real tree",
+              "provenAt": "2026-11-14T18:28:34.782Z",
+              "provenSha": "b9f25321f6553cb6d331e2670bac7ff61b7c548c5f38231b1769b57457b8f8d7"
+            }
+          ],
+          "gate-54": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-client-seam.mjs",
+                "find": "const templates = join(scriptsDir, 'templates', 'client')",
+                "replace": "const templates = join(scriptsDir, 'templates', 'client-missing')"
+              },
+              "expect": "red",
+              "note": "the client seam is generated from scripts/templates/client; a missing template directory makes --check crash red instead of producing a stale write",
+              "provenAt": "2026-11-14T18:28:49.609Z",
+              "provenSha": "0c75d79ce0d4d0827181cd0e3d292934dc0bf34f55638460a6d640bb3550a689"
+            }
           ]
         },
         "mutationExempt": {
