@@ -1475,6 +1475,45 @@
               "provenAt": "2026-11-14T18:20:29.657Z",
               "provenSha": "41df9fc3477623bc05b26dcb53d62db4425e2dd668460cf0a2f3bdaebc82bff1"
             }
+          ],
+          "gate-62": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-client-guards.mjs",
+                "find": "const SOURCE = join(rootArg, 'evolution-core/src/guards.ts')",
+                "replace": "const SOURCE = join(rootArg, 'evolution-core/src/guards-missing.ts')"
+              },
+              "expect": "red",
+              "note": "the guard token is generated from guards.ts; pointing the generator at a missing source makes --check red instead of rewriting a stale token",
+              "provenAt": "2026-11-14T18:23:15.710Z",
+              "provenSha": "dad3cfa10d4a059c8a287ea2d2f3fcb2e330f86211d802c24b0edde2e5944711"
+            }
+          ],
+          "gate-63": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-client-tokens.mjs",
+                "find": "const RELATIVE = 'src/tokens.ts'",
+                "replace": "const RELATIVE = 'src/tokens-x.ts'"
+              },
+              "expect": "red",
+              "note": "the client token constant is generated into RELATIVE; changing the target makes --check red instead of silently rewriting an unread file",
+              "provenAt": "2026-11-14T18:23:17.089Z",
+              "provenSha": "abcf151380eb95a3ecd24a6a89e2b3a6697614c36b2d65c311d53d7836f1605f"
+            }
+          ],
+          "gate-64": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-param-client-view.mjs",
+                "find": "'evolution-approval.enabled': 'Enable approval pipeline'",
+                "replace": "'evolution-approval.enabled': 'Enable approval pipeline X'"
+              },
+              "expect": "red",
+              "note": "the parameter client view is generated from the labels; changing one label makes the committed view stale, so --check must red",
+              "provenAt": "2026-11-14T18:23:18.690Z",
+              "provenSha": "1cc5396a32bc2d1689415f49c8a751049cf26a781a8d3befbf95bd7aa54528b7"
+            }
           ]
         },
         "mutationExempt": {
