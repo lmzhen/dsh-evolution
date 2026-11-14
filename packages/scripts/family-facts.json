@@ -1618,6 +1618,19 @@
               "provenAt": "2026-11-14T18:29:29.952Z",
               "provenSha": "32084ce2f7af213f8c555f58da144d3ef4f00afeebb2af4665fe0f07b1f37461"
             }
+          ],
+          "gate-58": [
+            {
+              "mutate": {
+                "file": "packages/evolution-merge-engine/UPSTREAM.json",
+                "find": "\"path\": \"node/bench/baseline.json\"",
+                "replace": "\"path\": \"node/bench/baseline-missing.json\""
+              },
+              "expect": "red",
+              "note": "UPSTREAM.json names the vendored files; pointing one entry at a missing path must make verify-upstream red",
+              "provenAt": "2026-11-14T18:32:40.282Z",
+              "provenSha": "95212e1771db348e374a4a06a93e922f006fd45d7a585704ecdb63a07af82d23"
+            }
           ]
         },
         "mutationExempt": {
