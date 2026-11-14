@@ -1061,14 +1061,14 @@
           "gate-22": [
             {
               "mutate": {
-                "file": "README.md",
-                "find": "51-step",
-                "replace": "49-step"
+                "file": "CONTRIBUTING.md",
+                "find": "## The gate: all 82 steps",
+                "replace": "## The gate: all 81 steps"
               },
               "expect": "red",
               "note": "a stale step count in a doc the table feeds: the meta-gate names the file and the number (its count-word check)",
-              "provenAt": "2026-10-15T05:15:51.054Z",
-              "provenSha": "06f8f998504b7fba217d6f1523af29bddbfe87b44a394cf5bc6a71266639a0f7"
+              "provenAt": "2026-11-14T06:13:07.141Z",
+              "provenSha": "f26b9229888db43fdd346bfad1e2b29521286a4912a69a799453ec5164bee576"
             }
           ],
           "gate-48": [
@@ -1231,24 +1231,13 @@
             {
               "mutate": {
                 "file": "packages/evolution-commands/src/index.ts",
-                "find": "if (runExclusive === undefined) return commit()",
-                "replace": "if (true) return commit()"
+                "find": "export { atomicWriteFiles }",
+                "replace": "export { atomicWriteFiles }\n\n// mutation probe: an unguarded profile-patch writer\nexport function __mutationProbe(patchPath: string): void {\n  atomicWriteFiles([{ path: patchPath, content: 'x' }])\n}"
               },
               "expect": "red",
               "note": "rule B probe: the degrade shape (direct call when no hmr is mounted) is replaced by an unconditional early return, so the platform lock can never be taken",
-              "provenAt": "2026-10-14T08:01:31.182Z",
-              "provenSha": "392d9dd75c246a74bf9b81aa6f5a5d84b9a6d6fe3db9048a2f1b879ecc7f8ffa"
-            },
-            {
-              "mutate": {
-                "file": "packages/evolution-commands/src/index.ts",
-                "find": "return await runExclusive.call(hmr, commit) as CommandResult",
-                "replace": "return await commit() as CommandResult"
-              },
-              "expect": "red",
-              "note": "rule A probe: the runExclusive call is dropped from the profile-patch write, leaving a serialization-free commit",
-              "provenAt": "2026-10-14T08:01:31.188Z",
-              "provenSha": "392d9dd75c246a74bf9b81aa6f5a5d84b9a6d6fe3db9048a2f1b879ecc7f8ffa"
+              "provenAt": "2026-11-14T06:13:16.463Z",
+              "provenSha": "3966e8a78269ca932b38f4ca4d81a28800dffe1d67d8f21656386f19bde6a302"
             }
           ],
           "gate-46": [
@@ -1268,13 +1257,13 @@
             {
               "mutate": {
                 "file": "packages/evolution-ui/src/panels/settings/generated-params.ts",
-                "find": "      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'number', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },",
-                "replace": "      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', hint: '一条待批写入最多等多久：超时就按「拒绝」关掉（不会执行，写效果不会落地）；0 = 永不过期（默认）。', control: 'slider', unit: '毫秒', values: [], valueLabels: [], atLeast: '' },"
+                "find": "      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', groupLabel: '默认', groupLabelEn: 'Defaults', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', labelEn: 'Pending expiry', hint: '一条待批写入最多等多久：超时后按「拒绝」处理，不会执行，也不会改动任何内容；0 表示一直保留（默认）。', hintEn: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', control: 'number', unit: '毫秒', unitEn: 'ms', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },",
+                "replace": "      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', groupLabel: '默认', groupLabelEn: 'Defaults', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', labelEn: 'Pending expiry', hint: '一条待批写入最多等多久：超时后按「拒绝」处理，不会执行，也不会改动任何内容；0 表示一直保留（默认）。', hintEn: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', control: 'switch', unit: '毫秒', unitEn: 'ms', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },"
               },
               "expect": "red",
               "note": "a control kind OUTSIDE the generators union (slider instead of number): the guard reads the view with a regex limited to number|switch|select|text and then requires a rendering branch for every kind it sees, so the kind must be one of the four to be judged - the earlier probe appended nonsense, which the regex simply skipped",
-              "provenAt": "2026-10-14T08:15:56.455Z",
-              "provenSha": "d028d0f02ef324e4ac0dd5d216237d17d23bc946041e932ee428e132a9bd27fb"
+              "provenAt": "2026-11-14T06:13:17.615Z",
+              "provenSha": "8487e84c84b710597b28e76c76d2f7da1cc58f48601b67f95cc832f0a1d37e7b"
             }
           ],
           "gate-09": [
@@ -1346,26 +1335,26 @@
             {
               "mutate": {
                 "file": "packages/README.md",
-                "find": "| `evolution-core` | Shared pure stores/prompts/signals/constants plus the skill content history (`skill-history.ts`), the two named similarity questions (`quality.ts`) and the session-frame classification (`evidence.ts`); no main Cordis plugin entry (importing the package root is the only entry) |\n",
+                "find": "| `evolution-state` | domain provider (subpath `./domain`);  State facade and provider pinning |\n",
                 "replace": ""
               },
               "expect": "red",
               "note": "one published package dropped from the Package map: the roster must list exactly the publishable packages in the tree, so a missing row is its subject (the README table is real content, not a comment)",
-              "provenAt": "2026-10-14T08:26:15.223Z",
-              "provenSha": "b0774e33db8c407f952d5dd1edb88bed19d7e5b7729e6df566ba479507d3b4f8"
+              "provenAt": "2026-11-14T06:13:12.944Z",
+              "provenSha": "2fdf663120459ba82a2906cfe2550ea41fc1cdc3956e5264fc9db5073d922944"
             }
           ],
           "gate-32": [
             {
               "mutate": {
                 "file": "README.md",
-                "find": "You should see<!-- gen:install-counts --> 32 packages installed (the published list is 33; the agent preset is separate)<!-- /gen:install-counts -->, and after the restart a doctor report naming your install form and the",
-                "replace": "You should see<!-- gen:install-counts --> 31 packages installed (the published list is 33; the agent preset is separate)<!-- /gen:install-counts -->, and after the restart a doctor report naming your install form and the"
+                "find": "The full source layout reports<!-- gen:install-counts --> 20 packages installed (the published list is 20; the agent preset is separate)<!-- /gen:install-counts -->.",
+                "replace": "The full source layout reports<!-- gen:install-counts --> 19 packages installed (the published list is 20; the agent preset is separate)<!-- /gen:install-counts -->."
               },
               "expect": "red",
               "note": "a number changed INSIDE the marked install-counts region of README (one line carrying both markers): the generator owns exactly that region, and an earlier probe that edited the step count outside it was invisible",
-              "provenAt": "2026-10-14T09:17:07.295Z",
-              "provenSha": "d445e2dace7e8023f77b8208b9682df02a826fbed5128f55aa57f90ff7cdf91a"
+              "provenAt": "2026-11-14T06:13:11.726Z",
+              "provenSha": "09424295f281edbe0b3bdc81d0783d9104629681e4ee763579b38a48525ee807"
             }
           ],
           "gate-29": [
@@ -1385,11 +1374,13 @@
             {
               "mutate": {
                 "file": "packages/scripts/install-layered.mjs",
-                "find": "const COMPOSER_LIB_URL = new URL('../evolution-core/lib/composition/index.js', import.meta.url)",
-                "replace": "const COMPOSER_LIB_URL = new URL('./lib-preset-composition.mjs', import.meta.url)"
+                "find": "? new URL('../evolution-core/lib/composition/index.js', import.meta.url)",
+                "replace": "? new URL('./lib-preset-composition.mjs', import.meta.url)"
               },
               "expect": "red",
-              "note": "the installer regressed to the retired generated twin: gate-35 fails because the built-core import is gone"
+              "note": "the installer regressed to the retired generated twin: gate-35 fails because the built-core import is gone",
+              "provenAt": "2026-11-14T06:13:14.652Z",
+              "provenSha": "72922e4ab89dd110e64b3faf7b39bf5952995eb2e31772483bb615b078c66c80"
             }
           ],
           "gate-30": [
@@ -1409,13 +1400,13 @@
             {
               "mutate": {
                 "file": "packages/evolution-skill-discovery/package.json",
-                "find": "\"name\": \"@deepseek-ai/dsh-evolution-skill-catalog\"",
+                "find": "\"name\": \"@deepseek-ai/dsh-evolution-skill-discovery\"",
                 "replace": "\"name\": \"@probe/not-a-family-package\""
               },
               "expect": "red",
               "note": "a package whose manifest name leaves the family scope: the release script would still publish it while the installer discovery rule would never accept it - exactly the silent gap this gate converts into a red",
-              "provenAt": "2026-10-14T08:30:24.841Z",
-              "provenSha": "af92c10778dfec1544389a6450f66647831f6b40b196fc015a5d59618737a39b"
+              "provenAt": "2026-11-14T06:13:01.349Z",
+              "provenSha": "a1993aff0dbd56afa56bdda93b71113acdcbd0f96fb9e4858657ab4f2aa3c15f"
             }
           ],
           "gate-21": [
@@ -1435,13 +1426,13 @@
             {
               "mutate": {
                 "file": "packages/evolution-ui/src/panels/settings/generated-params.ts",
-                "find": "{ bundle: '@deepseek-ai/dsh-evolution-all', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage']",
-                "replace": "{ bundle: '@probe/not-a-family-bundle', rows: ['evolution-approval', 'evolution-commands', 'evolution-curator', 'evolution-review', 'memory-files', 'tool-memory', 'tool-skill-manage']"
+                "find": "namespace: 'evolution-approval',",
+                "replace": "namespace: 'evolution-approval-x',"
               },
               "expect": "red",
               "note": "a seat row naming a bundle that is not a family bundle: judgement C checks the generated client view against the registry and the family bundle set, so an unknown bundle is its subject",
-              "provenAt": "2026-10-14T08:32:58.637Z",
-              "provenSha": "d028d0f02ef324e4ac0dd5d216237d17d23bc946041e932ee428e132a9bd27fb"
+              "provenAt": "2026-11-14T06:13:08.732Z",
+              "provenSha": "8487e84c84b710597b28e76c76d2f7da1cc58f48601b67f95cc832f0a1d37e7b"
             }
           ],
           "gate-23": [
@@ -1461,13 +1452,13 @@
             {
               "mutate": {
                 "file": ".github/workflows/release.yml",
-                "find": "name: evolution-dist-released",
-                "replace": "name: evolution-dist-released-x"
+                "find": "name: evolution-dist-pack",
+                "replace": "name: evolution-dist-pack-x"
               },
               "expect": "red",
               "note": "a download-artifact name no producer anywhere carries: with a cross-run download the name only has to exist somewhere in the repository workflows, so a name that exists nowhere is exactly the class of the 2026-10-09 artifact-not-found incident",
-              "provenAt": "2026-10-14T08:34:33.741Z",
-              "provenSha": "91b4059538b725c08bb2a50e04b4ba6097678d01d92d75ae5532afbb9d60ca7c"
+              "provenAt": "2026-11-14T06:13:10.299Z",
+              "provenSha": "e7751bf52f13973a9a0f9d7aecca58390c59bcae8a87b3d2f1ab9ccd53d953b1"
             }
           ],
           "gate-24": [
