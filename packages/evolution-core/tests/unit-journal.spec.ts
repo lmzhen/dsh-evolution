@@ -57,6 +57,8 @@ it('checks the current journal phase inside transact instead of trusting a stale
     remove: async () => { stored = '' },
     list: async () => [],
     exists: async () => stored !== '',
+    rename: async () => {},
+    copy: async () => {},
     transact: async (_path, task) => {
       const next = await task(stored)
       stored = next ?? ''

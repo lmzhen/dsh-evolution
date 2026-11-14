@@ -613,7 +613,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "6ee3d3cd2222a40db4d5e1bb91f79ebb54258fd5d400c107a91dad6bf84f2cb1",
+        "sha256": "312135999fa0d0df514688e5e8984c530bb4ae307b6695655e7c848cda94240d",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -1235,7 +1235,7 @@
                 "replace": "export { atomicWriteFiles }\n\n// mutation probe: an unguarded profile-patch writer\nexport function __mutationProbe(patchPath: string): void {\n  atomicWriteFiles([{ path: patchPath, content: 'x' }])\n}"
               },
               "expect": "red",
-              "note": "rule B probe: the degrade shape (direct call when no hmr is mounted) is replaced by an unconditional early return, so the platform lock can never be taken",
+              "note": "synthetic forward tripwire: the original preset-install writer (and its runExclusive call) was retired, so the guard now reports 0 current writers; this probe injects an unguarded profile-patch writer and requires the scan to catch it. It proves the pattern/strip-comments matcher still works, not that a live writer exists",
               "provenAt": "2026-11-14T06:13:16.463Z",
               "provenSha": "3966e8a78269ca932b38f4ca4d81a28800dffe1d67d8f21656386f19bde6a302"
             }
@@ -1261,7 +1261,7 @@
                 "replace": "      { id: 'evolution-approval.pendingTtlMs', group: 'deployment', groupLabel: '默认', groupLabelEn: 'Defaults', doc: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', label: '待批过期时间', labelEn: 'Pending expiry', hint: '一条待批写入最多等多久：超时后按「拒绝」处理，不会执行，也不会改动任何内容；0 表示一直保留（默认）。', hintEn: 'How long a staged write may wait before it expires: expired writes are closed as rejected and are NEVER executed; 0 (the default) means the window never expires.', control: 'switch', unit: '毫秒', unitEn: 'ms', values: [], valueLabels: [], valueLabelsEn: [], atLeast: '' },"
               },
               "expect": "red",
-              "note": "a control kind OUTSIDE the generators union (slider instead of number): the guard reads the view with a regex limited to number|switch|select|text and then requires a rendering branch for every kind it sees, so the kind must be one of the four to be judged - the earlier probe appended nonsense, which the regex simply skipped",
+              "note": "declaring a switch field without a C6 exception: B checks exception <=> no platform piece, so a switch/select field absent from client-exceptions.json is its subject (the number -> switch mutation reaches that branch)",
               "provenAt": "2026-11-14T06:13:17.615Z",
               "provenSha": "8487e84c84b710597b28e76c76d2f7da1cc58f48601b67f95cc832f0a1d37e7b"
             }
@@ -1430,7 +1430,7 @@
                 "replace": "namespace: 'evolution-approval-x',"
               },
               "expect": "red",
-              "note": "a seat row naming a bundle that is not a family bundle: judgement C checks the generated client view against the registry and the family bundle set, so an unknown bundle is its subject",
+              "note": "removing a card namespace from the generated client view leaves an owner with registry rows but no card: judgement C compares the generated view against the registry owner set, so an owner without a card is its subject",
               "provenAt": "2026-11-14T06:13:08.732Z",
               "provenSha": "8487e84c84b710597b28e76c76d2f7da1cc58f48601b67f95cc832f0a1d37e7b"
             }

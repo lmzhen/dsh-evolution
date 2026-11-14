@@ -692,7 +692,7 @@
     {
       "id": "gate-36",
       "kind": "script",
-      "human": "`node packages/scripts/verify-lock-usage.mjs packages`（G6-②：**写 profile patch 的源文件必须调用平台的 HMR 锁** `runExclusive`，且必须保留平台自己的降级形状 `hmr === undefined ? 直接调用 : 加锁`；独立 CLI 的安装器无 ctx 不在范围内 ✓。drill：① 把 `runExclusive` 改名 ⇒ 必红（\"without calling the platform HMR lock\"）；② 保留锁但删掉降级分支 ⇒ 必红；撤回即绿 ✓。**注**：初版探针只看\"字符串出现\"⇒ 注释里的 `hmr.runExclusive(apply)` 就让 drill 空过 ✗ ⇒ 已改为**剥注释后按调用形态匹配** ✓）",
+      "human": "`node packages/scripts/verify-lock-usage.mjs packages`（G6-②：**写 profile patch 的源文件必须调用平台的 HMR 锁** `runExclusive`，且保留 `hmr === undefined ? 直接调用 : 加锁` 的降级形状；独立 CLI 安装器无 ctx 不在范围。**现状**：preset-install writer 已在 6dd91e3b 退役，检查器当前 0 writer ⇒ 本 gate 保留为合成 tripwire。drill：注入一个未加锁的 `atomicWriteFiles(...patchPath...)` writer ⇒ 必红（\"without calling the platform HMR lock\"）；撤回即绿 ✓。**注**：初版探针只看字符串出现 ⇒ 注释里的 `hmr.runExclusive(apply)` 让 drill 空过 ✗ ⇒ 已改为剥注释后按调用形态匹配 ✓）",
       "argv": [
         "node",
         "packages/scripts/verify-lock-usage.mjs",
