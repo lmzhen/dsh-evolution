@@ -92,7 +92,6 @@ export async function projectRecoveredUnit(options: {
     await options.onPhase?.('stage-drop')
     await dropStage(options.io, options.home, stageRowId)
   }
-  await options.onPhase?.('pair-index')
   await options.onPhase?.('run-meta')
   const meta = await readRunMeta(options.io, options.home, options.runId)
   await writeRunMeta(options.io, options.home, { version: 1, runId: options.runId, ...(meta?.pid === undefined ? {} : { pid: meta.pid }), phase: 'settled', ...(options.interrupted === true ? { stopReason: 'interrupted' } : {}), reportRef: reportPath, pairCount: 1, ...(meta?.parentRunId === undefined ? {} : { parentRunId: meta.parentRunId }), ...(meta?.stagingRef === undefined ? {} : { stagingRef: meta.stagingRef }), ...(meta?.pairs === undefined ? {} : { pairs: meta.pairs }), createdAt: meta?.createdAt ?? new Date(at).toISOString(), updatedAt: new Date(at).toISOString() })

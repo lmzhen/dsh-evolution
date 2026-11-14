@@ -39,7 +39,7 @@ it('routes A/B/C/D and never rolls back a committed unit', async () => {
 })
 
 it('fault-injects recovery projection points and retries without rollback', async () => {
-  for (const phase of ['merge-receipt', 'report', 'pair-index', 'run-meta', 'settle']) {
+  for (const phase of ['merge-receipt', 'report', 'run-meta', 'settle']) {
     const home = await homeFor('committed')
     const calls: string[] = []
     let fired = false

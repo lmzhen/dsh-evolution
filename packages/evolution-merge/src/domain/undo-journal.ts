@@ -3,23 +3,22 @@ import { readTextOrNull } from './read-probe.ts'
 import { join } from 'node:path'
 import { transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { JournalProtocol, JournalRecovery } from '@deepseek-ai/dsh-evolution-core'
-export type UndoPairPhase = 'pending' | 'restore-target' | 'restore-source' | 'receipt' | 'pair-index' | 'run-meta' | 'done'
+export type UndoPairPhase = 'pending' | 'restore-target' | 'restore-source' | 'receipt' | 'run-meta' | 'done'
 export interface UndoPairState { readonly pairKey: string; readonly unitId: string; readonly phase: UndoPairPhase; readonly message?: string }
 export interface UndoJournal { readonly version: 1; readonly runId: string; readonly phase: 'prepared' | 'running' | 'settled'; readonly pairs: readonly UndoPairState[]; readonly updatedAt: string }
 
 /**
- * The undo journal's protocol (W9-commit-protocol §3.1): `pair-index` and `run-meta` are explicit
- * phases, because "the receipt was written but the pair index was not" is exactly the state a
- * restart has to recognise.
+ * The undo journal's protocol (W9-commit-protocol §3.1): `receipt` and `run-meta` are explicit
+ * phases, because "the receipt was written but the run metadata was not" is exactly the state a
+ * restart has to recognise. The pair-index ledger is gone in 0.48, so it has no phase.
  */
 export const UNDO_PAIR_PROTOCOL: JournalProtocol<UndoPairPhase> = {
-  phases: ['pending', 'restore-target', 'restore-source', 'receipt', 'pair-index', 'run-meta', 'done'],
+  phases: ['pending', 'restore-target', 'restore-source', 'receipt', 'run-meta', 'done'],
   next: {
     pending: ['restore-target', 'receipt', 'done'],
     'restore-target': ['restore-source', 'receipt'],
     'restore-source': ['receipt'],
-    receipt: ['pair-index'],
-    'pair-index': ['run-meta'],
+    receipt: ['run-meta'],
     'run-meta': ['done'],
     done: [],
   },
@@ -30,7 +29,6 @@ export const UNDO_PAIR_PROTOCOL: JournalProtocol<UndoPairPhase> = {
       case 'restore-target':
       case 'restore-source':
       case 'receipt':
-      case 'pair-index':
       case 'run-meta': return 'continue'
       default: return 'refuse'
     }

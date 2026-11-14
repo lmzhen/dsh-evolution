@@ -117,8 +117,6 @@ async function runUndoSteps(options: UndoOperationOptions): Promise<UndoResult> 
     }
     const existing = await readUndoReceipt(options.io, options.home, options.runId, pairKey)
     if (existing !== null) {
-      await markPhase('pair-index')
-      await options.onPhase?.('pair-index', pairKey)
       await markPhase('run-meta')
       await options.onPhase?.('run-meta', pairKey)
       await settleRun(options.io, options.home, options.runId, pairKey, allPairKeys, options.now())
@@ -129,8 +127,6 @@ async function runUndoSteps(options: UndoOperationOptions): Promise<UndoResult> 
     if (checked.done) {
       await options.onPhase?.('receipt', pairKey)
     await writeUndoReceipt(options.io, options.home, { version: 1, runId: options.runId, ...(receipt.parentRunId === undefined ? {} : { parentRunId: receipt.parentRunId }), pairKey, unitId: receipt.unitId, evidenceSha256: receipt.evidenceSha256 ?? unitEvidenceDigest(checked.evidence), target: receipt.target, sources: checked.evidence.sources.map(source => source.name), restoredTargetHash: receipt.create ? null : digest(checked.evidence.target.before), restoredSourceHashes: Object.fromEntries(checked.evidence.sources.map(source => [source.name, contentHash(source.before)])), at: options.now() })
-      await markPhase('pair-index')
-      await options.onPhase?.('pair-index', pairKey)
       await markPhase('run-meta')
       await options.onPhase?.('run-meta', pairKey)
       await settleRun(options.io, options.home, options.runId, pairKey, allPairKeys, options.now())
@@ -152,7 +148,6 @@ async function runUndoSteps(options: UndoOperationOptions): Promise<UndoResult> 
     await writeUndoJournal(options.io, options.home, { version: 1, runId: options.runId, phase: 'running', pairs: pairs.map(pair => pair.pairKey === pairKey ? phase('receipt') : pair), updatedAt: new Date(options.now()).toISOString() })
     await options.onPhase?.('receipt', pairKey)
     await writeUndoReceipt(options.io, options.home, { version: 1, runId: options.runId, ...(receipt.parentRunId === undefined ? {} : { parentRunId: receipt.parentRunId }), pairKey, unitId: receipt.unitId, evidenceSha256: receipt.evidenceSha256 ?? unitEvidenceDigest(checked.evidence), target: receipt.target, sources: checked.evidence.sources.map(source => source.name), restoredTargetHash: receipt.create ? null : digest(checked.evidence.target.before), restoredSourceHashes: Object.fromEntries(checked.evidence.sources.map(source => [source.name, contentHash(source.before)])), at: options.now() })
-    await options.onPhase?.('pair-index', pairKey)
     await options.onPhase?.('run-meta', pairKey)
     await settleRun(options.io, options.home, options.runId, pairKey, allPairKeys, options.now())
     undone.push(pairKey)
