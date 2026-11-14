@@ -27,7 +27,7 @@ export function bindLocale(
       registered = true
       return dispose
     } catch (error) {
-      ctx.logger.warn(namespace + ': the locale seat refused the dictionary (' + String(error) + '); falling back to the bundle copy')
+      ctx.logger.warn(namespace + ': the locale seat refused the dictionary (' + String(error) + '); falls back to the bundle copy')
       return () => {}
     }
   }, namespace + ': locale')

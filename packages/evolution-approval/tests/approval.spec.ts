@@ -232,7 +232,12 @@ describe('evolution-approval', () => {
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'live', args: {}, origin: 'background_review' })
     const id = decision.pendingId!
     const running = ctx.evolutionApproval.approve(id)
-    await new Promise(resolve => setTimeout(resolve, 25)) // let the claim land
+    // Poll instead of assuming 25 ms is enough on a loaded CI worker; the claim is
+    // the state this test needs, not a wall-clock delay.
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      if ((await ctx.evolutionApproval.list('executing')).some(item => item.id === id)) break
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
     const refused = await ctx.evolutionApproval.release(id)
     expect(refused.ok).toBe(false)
     expect(refused.message).toContain('正在运行的批准或拒绝')
