@@ -30,19 +30,22 @@ export function bindLocale(
   namespace: string,
   dictionaries: LocaleDictionaries,
   fallback: SupportedLocale = FALLBACK_LOCALE,
+  register = true,
 ): { readonly t: Translate; readonly label: () => string } {
   const seam = ctx as unknown as { readonly locale: { register(namespace: string, dictionaries: LocaleDictionaries): () => void; bind(namespace: string): (key: string) => string } }
-  let registered = false
-  ctx.effect(() => {
-    try {
-      const dispose = seam.locale.register(namespace, dictionaries)
-      registered = true
-      return dispose
-    } catch (error) {
-      ctx.logger.warn(namespace + ': the locale seat refused the dictionary (' + String(error) + '); falls back to the bundle copy')
-      return () => {}
-    }
-  }, namespace + ': locale')
+  let registered = !register
+  if (register) {
+    ctx.effect(() => {
+      try {
+        const dispose = seam.locale.register(namespace, dictionaries)
+        registered = true
+        return dispose
+      } catch (error) {
+        ctx.logger.warn(namespace + ': the locale seat refused the dictionary (' + String(error) + '); falls back to the bundle copy')
+        return () => {}
+      }
+    }, namespace + ': locale')
+  }
   const own = dictionaries[fallback] ?? dictionaries.en
   const lookup = (key: string): string => {
     const fallbackText = own[key] ?? key

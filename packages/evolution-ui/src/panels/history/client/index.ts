@@ -9,7 +9,8 @@ import { registerSidebarPanel, PAGE_SURFACE_CSS, ROUTES, type ConfigFormsSeat, t
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import type { DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
 import { createDiagnosticsApi } from '../../settings/diagnostics-state.ts'
-import { fill as settingsFill, message as settingsMessage, NS as SETTINGS_NS } from '../../settings/messages.ts'
+import { dictionaries as settingsDictionaries, NS as SETTINGS_NS } from '../../settings/messages.ts'
+import { bindLocale } from '@lmzhen/dsh-evolution-client-kit'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import { NS, dictionaries } from './messages.ts'
 import { CSS, CSS_TAG_ID } from './styles.ts'
@@ -47,11 +48,7 @@ export function apply(ctx: ClientContext): void {
       return entries.some(entry => entry.options?.id === (view === 'merge' ? 'merge' : 'skill-health'))
     } catch { return false }
   }
-  const pendingT = (key: string, values?: Readonly<Record<string, string | number>>): string => {
-    let template: string
-    try { template = (ctx as unknown as { locale: { bind(ns: string): (key: string) => string } }).locale.bind(SETTINGS_NS)(key) } catch { template = settingsMessage(key as never) }
-    return values === undefined ? template : settingsFill(template, values)
-  }
+  const pendingT = bindLocale(ctx, SETTINGS_NS, settingsDictionaries, 'en', false).t
   const historyFace = (t: Translate): PanelFace => ({
     t,
     format: (key, values) => t(key, values),
