@@ -1592,6 +1592,32 @@
               "provenAt": "2026-11-14T18:28:49.609Z",
               "provenSha": "0c75d79ce0d4d0827181cd0e3d292934dc0bf34f55638460a6d640bb3550a689"
             }
+          ],
+          "gate-53": [
+            {
+              "mutate": {
+                "file": "packages/scripts/verify-host-routes.mjs",
+                "find": "if (published.length !== 19)",
+                "replace": "if (published.length !== 20)"
+              },
+              "expect": "red",
+              "note": "the host route table publishes a frozen 19 paths; changing the expected count makes the verifier red on the real tree",
+              "provenAt": "2026-11-14T18:29:28.639Z",
+              "provenSha": "83fef0990c5a25213808493553e9e46b97743ccc5e29efd0b20aa31f1bb5cdf6"
+            }
+          ],
+          "gate-79": [
+            {
+              "mutate": {
+                "file": "packages/scripts/verify-line-identity.mjs",
+                "find": "const allowed = new Set(policy.allowedKinds ?? [])",
+                "replace": "const allowed = new Set(policy.allowedKindsX ?? [])"
+              },
+              "expect": "red",
+              "note": "line identity compares every row kind against the policy allowlist; dropping the allowlist makes the real family rows mismatch",
+              "provenAt": "2026-11-14T18:29:29.952Z",
+              "provenSha": "32084ce2f7af213f8c555f58da144d3ef4f00afeebb2af4665fe0f07b1f37461"
+            }
           ]
         },
         "mutationExempt": {
