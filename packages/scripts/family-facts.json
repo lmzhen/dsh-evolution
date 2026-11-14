@@ -1722,6 +1722,45 @@
               "provenAt": "2026-11-14T18:54:27.280Z",
               "provenSha": "5c396a215a0787f3ae641a11513eb4782317a593b33f101f752d962bfc701ebd"
             }
+          ],
+          "gate-80": [
+            {
+              "mutate": {
+                "file": "packages/scripts/verify-graph-edges.mjs",
+                "find": "process.exit(args.report ? 0 : result.exit)",
+                "replace": "process.exit(args.report ? 1 : result.exit)"
+              },
+              "expect": "red",
+              "note": "the report mode must still be able to fail when its own verdict is forced red; flipping the report exit proves the gate can red",
+              "provenAt": "2026-11-14T18:55:18.726Z",
+              "provenSha": "c60c6cfafecc49fade9ff60cb610ca8915cdc94ce94555bd77bffbd68585ab0b"
+            }
+          ],
+          "ci-only-19": [
+            {
+              "mutate": {
+                "file": "packages/scripts/verify-contract-anchors.selftest.mjs",
+                "find": "expect: { grade: 'symbol', symbol: 'ToolCallId' },",
+                "replace": "expect: { grade: 'missing', symbol: 'ToolCallId' },"
+              },
+              "expect": "red",
+              "note": "the contract-anchor self-test must fail when an expected grade is wrong; changing the first fixture grade makes the selftest red",
+              "provenAt": "2026-11-14T18:55:20.200Z",
+              "provenSha": "16b24d0cf1135de1e33fce501e1bd4bafe5f90db7ea11f0fa0561b582ece6b47"
+            }
+          ],
+          "ci-only-21": [
+            {
+              "mutate": {
+                "file": "packages/scripts/family-facts.json",
+                "find": "\"reason\": \"the ledger itself: its declared state is cannot-decide while records are missing, so a mutation cannot flip it to red\"",
+                "replace": "\"reasonX\": \"the ledger itself: its declared state is cannot-decide while records are missing, so a mutation cannot flip it to red\""
+              },
+              "expect": "red",
+              "note": "every mutation exemption must carry a reason; removing the reason from gate-49 makes verify-exemptions red",
+              "provenAt": "2026-11-14T18:55:21.523Z",
+              "provenSha": "3e618b3a7ed704630fd1bcacb2140dc5be30d3c742afb3a5e876733debf370bf"
+            }
           ]
         },
         "mutationExempt": {
