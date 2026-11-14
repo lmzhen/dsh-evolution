@@ -283,11 +283,11 @@ runs:
       working-directory: upstream
       run: |
         # Kept alongside the packed smoke: this one still proves the Windows
-        # installer shape (bundle row, preset row, journal, no double mount).
-        # It is NOT the packed-family evidence; see the step above for that.
+        # installer shape (bundle row, journal, no double mount) for the product
+        # install form. Legacy layered/agent install paths were removed in 0.48.
         HOME_DIR="$(mktemp -d)"
         node packages/evolution/scripts/install-layered.mjs \
-          --home "$HOME_DIR" --profile web --mode layered
+          --home "$HOME_DIR" --profile web --mode all
         node packages/evolution/scripts/verify-profile-bundles.mjs "$HOME_DIR/profiles/web"
         test -f "$HOME_DIR/profiles/web/.evolution-install.json"
         test -f "$HOME_DIR/profiles/web/cordis.patch.yml"

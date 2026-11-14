@@ -19,9 +19,9 @@ This file is the canonical statement of the product install surface. The root [I
 
 ## Internal composition (not product choices)
 
-`dsh-evolution-preset` is a migration-only compatibility bundle and is no longer published. Its **install** path was removed in 0.48; `--uninstall --mode oneclick` remains for one version so existing profiles can be cleaned up. The layered form (`host` + generated Evolution preset) remains an internal/dev installer path for sessions that must opt in through an agent preset; it is not a product install choice and must not appear in user docs.
+`dsh-evolution-preset` is a migration-only compatibility bundle and is no longer published. Its **install** path was removed in 0.48; `--uninstall --mode oneclick` remains for one version so existing profiles can be cleaned up. The legacy `agent` and `layered` install paths were removed in the same release; only `--uninstall --mode agent|layered|oneclick` remains, for one version, so a 0.46/0.47 profile can be cleaned up.
 
-The three historical bundles share infrastructure rows; mounting two double-registers services and the loader fails loud. Shrinking a product install means disabling rows or uninstalling `all`; the layered path is exclusive with `all` because its model rows would double-mount.
+The historical bundles share infrastructure rows; mounting two double-registers services and the loader fails loud. Shrinking a product install means disabling rows or uninstalling `all`; a leftover legacy preset row or one-click bundle is exclusive with `all` because its model rows would double-mount.
 
 ## Validation status
 
@@ -49,9 +49,9 @@ Preset bases and preconditions are single-sourced in [evolution-agent/README.md]
 
 ## Installer flags
 
-`install-layered.mjs` accepts: `--mode`, `--profile`, `--base`, `--home`, `--from-dist`, `--dry-run`, `--force`, `--check-presets`, `--uninstall`, `--help`.
+`install-layered.mjs` accepts: `--mode`, `--profile`, `--base`, `--home`, `--from-dist`, `--dry-run`, `--force`, `--uninstall`, `--help`.
 
-`--mode all` is the product install; `--mode host` is the advanced infrastructure plane. `--base` is repeatable; `--dry-run` reports changes without writing. `--from-dist <dir>` installs the packed release tarballs (`prepare-release` output) instead of the source tree; the CI packed-install guard uses it. Legacy agent/layered/oneclick values remain migration-only and are not product choices.
+`--mode all` is the product install; `--mode host` is the advanced infrastructure plane. `--base` narrows legacy preset-row removal during `--uninstall`; `--dry-run` reports changes without writing. `--from-dist <dir>` installs the packed release tarballs (`prepare-release` output) instead of the source tree; the CI packed-install guard uses it. Legacy agent/layered/oneclick values are accepted only by `--uninstall` and are not product choices.
 
 ## Merge control axes
 

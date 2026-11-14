@@ -59,7 +59,7 @@ The full source layout reports<!-- gen:install-counts --> 20 packages installed 
 | `all` | Default product installation | Memory and skill tools in every session; evolution workbench (history/pending/merge/health) and the diagnostics card on Web/desktop GUI |
 | `host` | Advanced composition only | Infrastructure without the model memory/skill rows; not the product default |
 
-Use `all` for normal installs. The old `preset` and layered forms are internal migration paths, not product choices. See [packages/INSTALL.md](packages/INSTALL.md) for exact session behavior and [INSTALL.md](INSTALL.md) for commands.
+Use `all` for normal installs. The old `preset`, `agent` and layered install forms were removed in 0.48; their modes remain accepted only by `--uninstall` for one version. See [packages/INSTALL.md](packages/INSTALL.md) for exact session behavior and [INSTALL.md](INSTALL.md) for commands.
 
 ## Common commands
 
