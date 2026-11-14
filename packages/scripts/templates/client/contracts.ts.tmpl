@@ -33,9 +33,6 @@ export interface DiagnosticsView {
   readonly runtime: readonly DiagnosticRow[]
 }
 
-/** The installation form the doctor reports (W8 install-form-detected row). */
-export type InstallFormId = 'M1' | 'M2' | 'M3' | 'M4'
-
 /** One surface's command-face path(s) — the client `fallbacks.generated.ts` table's row type. */
 export interface FallbackHint {
   readonly command: string
