@@ -617,7 +617,7 @@ Existing.
     }
     expect(validate({ maxSkillNameLength: 0 })).toBe(false)
     expect(validate({ maxDescriptionLength: -1 })).toBe(false)
-    expect(validate({ maxSkillContentChars: 0 })).toBe(false)
+    expect(validate({ skillContentChars: 0 })).toBe(false)
     expect(validate({ maxSkillFileBytes: -5 })).toBe(false)
     expect(validate({})).toBe(true)
     expect(validate({ maxSkillNameLength: 1 })).toBe(true)
@@ -670,7 +670,7 @@ Existing.
     await ctx.plugin(ToolSkillManage, {
       maxSkillNameLength: NaN,
       maxDescriptionLength: NaN,
-      maxSkillContentChars: NaN,
+      skillContentChars: NaN,
       maxSkillFileBytes: NaN,
     })
     const longName = 'n'.repeat(65)

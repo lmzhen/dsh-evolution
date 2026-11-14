@@ -327,7 +327,7 @@ describe('doctor (WB2, 0.3.55)', () => {
   it('reports the legacy settings document, and what is still unmigrated (G3)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-legacy-'))
     try {
-      await writeFile(join(home, 'settings.yaml'), 'evolution-memory:\n  memoryCharLimit: 2200\nui-chat:\n  transcriptView: standard\n', 'utf8')
+      await writeFile(join(home, 'settings.yaml'), 'evolution-memory:\n  memoryChars: 2200\nui-chat:\n  transcriptView: standard\n', 'utf8')
       const report = await diagnose(legacyStub(home, {}), { home })
       expect(report.legacy.state).toBe('pending')
       expect(report.legacy.pending).toEqual(['memory-files.memoryChars'])
@@ -343,7 +343,7 @@ describe('doctor (WB2, 0.3.55)', () => {
   it('reports the legacy document as settled once every value sits on its row (G3)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-legacy-done-'))
     try {
-      await writeFile(join(home, 'settings.yaml'), 'evolution-memory:\n  memoryCharLimit: 2200\n', 'utf8')
+      await writeFile(join(home, 'settings.yaml'), 'evolution-memory:\n  memoryChars: 2200\n', 'utf8')
       const report = await diagnose(legacyStub(home, { memoryChars: 2200 }), { home })
       expect(report.legacy.state).toBe('migrated')
       expect(renderDoctorText(report)).toContain('every family value sits on its row')
@@ -870,13 +870,13 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
     const home = await mkdtemp(join(tmpdir(), 'doctor-budget-'))
     try {
       const report = await diagnose(runtime(
-        { memoryCharLimit: 5000, userCharLimit: 1375, memorySource: 'config', userSource: 'policy' },
+        { memoryChars: 5000, userChars: 1375, memorySource: 'config', userSource: 'policy' },
         { get: () => ({ memoryChars: 2200, userChars: 1375 }) },
       ), { home })
       // The review plans against memoryChars=2200 while the store enforces 5000:
       // an explicit contradiction (or a row mounted before the policy existed).
       expect(report.budgetIssues).toHaveLength(1)
-      expect(report.budgetIssues[0]).toContain('memoryCharLimit=5000')
+      expect(report.budgetIssues[0]).toContain('memoryChars=5000')
       expect(report.budgetIssues[0]).toContain('memoryChars=2200')
       expect(report.actions.some(action => action.includes('Align the memory budget'))).toBe(true)
       const text = renderDoctorText(report)
@@ -960,7 +960,7 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
     const home = await mkdtemp(join(tmpdir(), 'doctor-budget-ok-'))
     try {
       const agree = await diagnose(runtime(
-        { memoryCharLimit: 2200, userCharLimit: 1375, memorySource: 'policy', userSource: 'policy' },
+        { memoryChars: 2200, userChars: 1375, memorySource: 'policy', userSource: 'policy' },
         { get: () => ({ memoryChars: 2200, userChars: 1375 }) },
       ), { home })
       expect(agree.budgetIssues).toEqual([])

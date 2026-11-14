@@ -7,10 +7,10 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import * as MemoryFiles from '../../src/files/index.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 
-// MemoryCharLimit/userCharLimit 0 is never an "unbounded" meaning (a 0 limit
+// memoryChars/userChars 0 is never an "unbounded" meaning (a 0 limit
 // would truncate every entry to nothing; MemoryStore keeps its own internal
 // defense), so all three clamp to at least 1.
-const FIELDS = ['memoryCharLimit', 'userCharLimit', 'maxConsolidationFailures'] as const
+const FIELDS = ['memoryChars', 'userChars', 'maxConsolidationFailures'] as const
 
 async function mount(config: Record<string, unknown> = {}) {
   const ctx = new Context()
@@ -35,15 +35,13 @@ describe('memory-files G3.1 numeric clamping', () => {
       expect(() => parse({ [field]: 0 }), `${field} 0`).toThrow()
       expect(() => parse({ [field]: -1 }), `${field} -1`).toThrow()
     }
-    expect(Number.isNaN(plainField({ memoryCharLimit: NaN }, 'memoryCharLimit'))).toBe(true)
+    expect(Number.isNaN(plainField({ memoryChars: NaN }, 'memoryChars'))).toBe(true)
     expect(plainField({ maxConsolidationFailures: Infinity }, 'maxConsolidationFailures')).toBe(Infinity)
   })
 
   // G1: the four E3 registry keys are the row's live fields — the loader hands the
-  // plugin a reference whose value it updates in place, which is what makes a
-  // committed settings edit apply without a restart. The deprecated aliases stay
-  // plain deployment fields (they are never user-writable).
-  it('G1: the E3 keys parse into live references, the deprecated aliases stay plain', () => {
+  // committed settings edit apply without a restart.
+  it('G1: the E3 keys parse into live references', () => {
     const canonical = plainField({ memoryChars: 5000, userChars: 900, addDatePrefix: true, maxConsolidationFailures: 4 }, 'memoryChars')
     expect(canonical).toBe(5000)
     expect(plainField({ userChars: 900 }, 'userChars')).toBe(900)
@@ -51,13 +49,12 @@ describe('memory-files G3.1 numeric clamping', () => {
     expect(plainField({ maxConsolidationFailures: 4 }, 'maxConsolidationFailures')).toBe(4)
     const parsed = parse({ memoryChars: 5000 }) as Record<string, unknown>
     expect(typeof (parsed.memoryChars as { get?: unknown }).get, 'the canonical key is a reference').toBe('function')
-    expect(typeof parsed.memoryCharLimit, 'the alias is a plain deployment field').toBe('number')
   })
 
   it('assembly applies a NaN numeric config without crashing and keeps the provider working', async () => {
     // NaN passes the schema, so the assembly clamp corrects it; the provider
     // must still register and write.
-    const ctx = await mount({ memoryCharLimit: NaN, userCharLimit: NaN, maxConsolidationFailures: NaN })
+    const ctx = await mount({ memoryChars: NaN, userChars: NaN, maxConsolidationFailures: NaN })
     const result = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'user prefers terse' }])
     expect(result.ok).toBe(true)
     expect(await ctx.memory.read('memory')).toContain('user prefers terse')
@@ -66,8 +63,8 @@ describe('memory-files G3.1 numeric clamping', () => {
   // P2-23 (v37): a fractional char limit reached the store unchanged, and the
   // `memory` tool declares `limit` as an integer — the platform then rejected the
   // tool's output AFTER the write had landed, so the model saw a failed write.
-  it('P2-23: a fractional memoryCharLimit is floored before it reaches the store', async () => {
-    const ctx = await mount({ memoryCharLimit: 21_000.5, userCharLimit: 1_375.75 })
+  it('P2-23: a fractional memoryChars is floored before it reaches the store', async () => {
+    const ctx = await mount({ memoryChars: 21_000.5, userChars: 1_375.75 })
     const added = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'user prefers terse' }])
     expect(added.ok).toBe(true)
     // floor, never round: the configured limit is an upper bound, so the store

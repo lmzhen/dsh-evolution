@@ -8,9 +8,8 @@
  * mounted policy, an explicit contradiction warns once, and the effective budget
  * (+ which surface won) is published as `evolutionMemoryBudget` for doctor.
  *
- * "Unset" is read as "equal to the schema default": the loader fills defaults
- * into the row config, so a row that pins the default value explicitly is
- * indistinguishable from one that omits it (documented in the package README).
+ * "Unset" is the absence of the canonical live field; an explicit value is
+ * always config, even when it happens to equal the policy or factory default.
  */
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -22,8 +21,8 @@ import { tempRoot } from '../../../test-support/temp-home.ts'
 import { mutableVol } from '../../../test-support/volatile-config.ts'
 
 interface Budget {
-  memoryCharLimit: number
-  userCharLimit: number
+  memoryChars: number
+  userChars: number
   memorySource: string
   userSource: string
 }
@@ -57,8 +56,8 @@ describe('memory budget surfaces (S2-12③)', () => {
     const ctx = await context({ memoryChars: 4000, userChars: 900 })
     await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-budget-') })
     const budget = budgetOf(ctx)
-    expect(budget.memoryCharLimit).toBe(4000)
-    expect(budget.userCharLimit).toBe(900)
+    expect(budget.memoryChars).toBe(4000)
+    expect(budget.userChars).toBe(900)
     expect(budget.memorySource).toBe('policy')
     expect(budget.userSource).toBe('policy')
   })
@@ -68,7 +67,7 @@ describe('memory budget surfaces (S2-12③)', () => {
     await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-budget-') })
     const budget = budgetOf(ctx)
     expect(budget.memorySource).toBe('default')
-    expect(budget.memoryCharLimit).toBe(2200)
+    expect(budget.memoryChars).toBe(2200)
   })
 
   it('an EXPLICIT limit wins, and contradicting the policy warns once', async () => {
@@ -76,12 +75,12 @@ describe('memory budget surfaces (S2-12③)', () => {
     // The spy must exist BEFORE the row mounts: the contradiction is reported
     // during assembly, not on first use.
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
-    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-budget-'), memoryCharLimit: 5000 })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-budget-'), memoryChars: 5000 })
     const budget = budgetOf(ctx)
-    expect(budget.memoryCharLimit).toBe(5000)
+    expect(budget.memoryChars).toBe(5000)
     expect(budget.memorySource).toBe('config')
     // The user limit was left unset, so it still follows the policy.
-    expect(budget.userCharLimit).toBe(1375)
+    expect(budget.userChars).toBe(1375)
     expect(budget.userSource).toBe('policy')
     const contradiction = warnSpy.mock.calls.filter(call => String(call[0]).includes('contradicts evolution-policy'))
     expect(contradiction).toHaveLength(1)
@@ -92,9 +91,9 @@ describe('memory budget surfaces (S2-12③)', () => {
   it('an explicit value EQUAL to the policy is not a contradiction', async () => {
     const ctx = await context({ memoryChars: 4000, userChars: 1375 })
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
-    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-budget-'), memoryCharLimit: 4000 })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-budget-'), memoryChars: 4000 })
     const budget = budgetOf(ctx)
-    expect(budget.memoryCharLimit).toBe(4000)
+    expect(budget.memoryChars).toBe(4000)
     expect(budget.memorySource).toBe('config')
     expect(warnSpy.mock.calls.filter(call => String(call[0]).includes('contradicts evolution-policy'))).toHaveLength(0)
   })
@@ -106,7 +105,7 @@ describe('memory budget surfaces (S2-12③)', () => {
     const ctx = await context({ memoryChars: 2200, userChars: 1375 })
     await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-canonical-'), memoryChars: 5000 })
     const budget = budgetOf(ctx)
-    expect(budget.memoryCharLimit).toBe(5000)
+    expect(budget.memoryChars).toBe(5000)
     expect(budget.memorySource).toBe('config')
   })
 
@@ -116,9 +115,9 @@ describe('memory budget surfaces (S2-12③)', () => {
     const userBudget = mutableVol<number | undefined>(30)
     MemoryFiles.apply(ctx, { root: await tempRoot('dsh-memory-user-'), memoryChars: userBudget.ref })
     const budget = budgetOf(ctx)
-    expect(budget.memoryCharLimit, 'the user layer is the highest-priority surface').toBe(30)
+    expect(budget.memoryChars, 'the user layer is the highest-priority surface').toBe(30)
     expect(budget.memorySource).toBe('user')
-    expect(budget.userCharLimit, 'an unset key still follows the policy').toBe(900)
+    expect(budget.userChars, 'an unset key still follows the policy').toBe(900)
     expect(budget.userSource).toBe('policy')
     // The store itself must judge by the user value: a 40-char entry is refused
     // against the 30-char limit the user set, not the policy's 4000.
@@ -132,12 +131,11 @@ describe('memory budget surfaces (S2-12③)', () => {
     expect(accepted.ok).toBe(true)
   })
 
-  it('a value equal to the SCHEMA DEFAULT is treated as unset (documented limitation)', async () => {
+  it('an explicit canonical value is config even when it equals the policy value', async () => {
     const ctx = await context({ memoryChars: 2200, userChars: 1375 })
-    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-budget-'), memoryCharLimit: 2200 })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-budget-'), memoryChars: 2200 })
     const budget = budgetOf(ctx)
-    // Indistinguishable from an omitted value — the loader fills the default in.
-    expect(budget.memorySource).toBe('policy')
-    expect(budget.memoryCharLimit).toBe(2200)
+    expect(budget.memorySource).toBe('config')
+    expect(budget.memoryChars).toBe(2200)
   })
 })

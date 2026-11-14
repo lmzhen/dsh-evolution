@@ -29,12 +29,6 @@ export interface Config {
   /** Store-enforced character budget for USER.md — the CANONICAL registry id (G1),
    * a live row field on the same terms as `memoryChars`. */
   userChars?: Volatile<number | undefined>
-  /** Deprecated alias of `memoryChars` (G0/S0.3): still readable, refused by
-   * writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
-  memoryCharLimit?: number
-  /** Deprecated alias of `userChars` (G0/S0.3): still readable, refused by
-   * writes; removal was planned for 0.7.0 and is deferred (the alias still ships — see the package README). */
-  userCharLimit?: number
   addDatePrefix?: Volatile<boolean>
   root?: string
   /** How many consolidation failures one turn tolerates before the tool tells the model to stop retrying. */
@@ -52,14 +46,10 @@ export interface Config {
 // platform's own volatile rows are unannotated for the same reason.
 export const Config = z.object({
   providerName: z.string().default('files'),
-  // The canonical registry ids. No .default() on either one: a schema default would
-  // fill the canonical key and make the deprecated alias below unreachable through
-  // the store's alias fallback (DEFAULT_MEMORY_CHAR_LIMIT /
-  // DEFAULT_USER_CHAR_LIMIT are resolved there).
+  // The canonical registry ids. No .default(): the store resolves
+  // DEFAULT_MEMORY_CHAR_LIMIT / DEFAULT_USER_CHAR_LIMIT when the row carries nothing.
   memoryChars: z.number().min(1).volatile(),
   userChars: z.number().min(1).volatile(),
-  memoryCharLimit: z.number().min(1).default(DEFAULT_MEMORY_CHAR_LIMIT),
-  userCharLimit: z.number().min(1).default(DEFAULT_USER_CHAR_LIMIT),
   addDatePrefix: z.boolean().default(false).volatile(),
   root: z.string().default(''),
   maxConsolidationFailures: z.number().min(1).default(DEFAULT_CONSOLIDATION_FAILURES).volatile(),
@@ -119,13 +109,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const snapshot = policy?.get?.()
     return { memory: snapshot?.memoryChars, user: snapshot?.userChars }
   }
-  // The row fills SCHEMA DEFAULTS into the deprecated alias, so "the operator set
-  // the alias" is read as "differs from that default" — the same test the review
-  // row uses for shadowed fields. A row that pins the alias default is therefore
-  // indistinguishable from one that omits it, and follows the policy like the
-  // latter.
-  const aliasDefaults = (Config as unknown as { ['~standard']: { validate(input: unknown): { value: Record<'memoryCharLimit' | 'userCharLimit', number> } } })['~standard'].validate({}).value
-  const ALIAS_OF = { memoryChars: 'memoryCharLimit', userChars: 'userCharLimit' } as const
   const DEFAULTS = { memoryChars: DEFAULT_MEMORY_CHAR_LIMIT, userChars: DEFAULT_USER_CHAR_LIMIT } as const
   /**
    * The live value of one canonical budget key (G1 §8.3).
@@ -135,36 +118,28 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const canonicalBudget = (id: 'memoryChars' | 'userChars'): number | undefined =>
     unwrapLive(id === 'memoryChars' ? rawConfig.memoryChars : rawConfig.userChars)
   /**
-   * Whether the OPERATOR set this budget on THIS ROW (G0/S0.4 + G1).
-   *
-   * The canonical key answers through its live reference — a user-layer value
-   * arrives the same way, which is what keeps a user choice ahead of the policy —
-   * and the deprecated alias through the default comparison above. The pair is
-   * documented in the Config JSDoc and reported by /evolution doctor (budgetIssues).
+   * Whether the OPERATOR set this budget on THIS ROW (G0/S0.4 + G1). The canonical
+   * key answers through its live reference — a user-layer value arrives the same
+   * way, which is what keeps a user choice ahead of the policy.
    * @param id - the canonical registry id.
    * @returns whether the row or the user supplied a value.
    */
-  const explicitBudget = (id: 'memoryChars' | 'userChars'): boolean => {
-    if (canonicalBudget(id) !== undefined) return true
-    const alias = rawConfig[ALIAS_OF[id]]
-    return alias !== undefined && alias !== aliasDefaults[ALIAS_OF[id]]
-  }
+  const explicitBudget = (id: 'memoryChars' | 'userChars'): boolean => canonicalBudget(id) !== undefined
   /**
-   * The budget one key resolves to (G1 §8.4-A): the row's own value — canonical or
-   * alias — over the mounted policy, over the package default.
+   * The budget one key resolves to (G1 §8.4-A): the row's own canonical value over
+   * the mounted policy, over the package default.
    * @param id - the canonical registry id.
    * @returns the resolved, unclamped budget.
    */
   const budget = (id: 'memoryChars' | 'userChars'): number => {
-    const explicit = canonicalBudget(id) ?? (explicitBudget(id) ? rawConfig[ALIAS_OF[id]] : undefined)
+    const explicit = canonicalBudget(id)
     if (explicit !== undefined) return explicit
     const policy = policyBudget()
     return (id === 'memoryChars' ? policy.memory : policy.user) ?? DEFAULTS[id]
   }
-  // BOTH spellings carry the RESOLVED value downstream, so the store, the budget
-  // view and the doctor read one number whichever name the deployment wrote.
-  const memoryChars = (): number => floorLimit(field('memoryCharLimit', budget('memoryChars'), DEFAULT_MEMORY_CHAR_LIMIT))
-  const userChars = (): number => floorLimit(field('userCharLimit', budget('userChars'), DEFAULT_USER_CHAR_LIMIT))
+  // One resolved number feeds the store, the budget view and doctor.
+  const memoryChars = (): number => floorLimit(field('memoryChars', budget('memoryChars'), DEFAULT_MEMORY_CHAR_LIMIT))
+  const userChars = (): number => floorLimit(field('userChars', budget('userChars'), DEFAULT_USER_CHAR_LIMIT))
   const consolidationFailures = (): number => field('maxConsolidationFailures', rawConfig.maxConsolidationFailures, DEFAULT_CONSOLIDATION_FAILURES)
   const addDatePrefix = (): boolean => liveBool(rawConfig.addDatePrefix)
   // The one disagreement this plugin can see at load: an EXPLICIT row value that
@@ -283,8 +258,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // change at run time, and a policy mounted after this row is visible too.
   // `source` names the winning surface; 'user' is the highest-priority one.
   ctx.provide('evolutionMemoryBudget', {
-    get memoryCharLimit(): number { return memoryChars() },
-    get userCharLimit(): number { return userChars() },
+    get memoryChars(): number { return memoryChars() },
+    get userChars(): number { return userChars() },
     get memorySource(): string { return limitSource('memoryChars') },
     get userSource(): string { return limitSource('userChars') },
     get policyMemoryChars(): number | undefined { return policyBudget().memory },

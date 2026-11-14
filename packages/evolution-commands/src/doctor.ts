@@ -822,7 +822,7 @@ export async function diagnose(
   const queryIssues = await sessionQueryIssues(ctx)
   if (queryIssues.length > 0) actions.push('Session search is degraded: isolate the session named above (or wait for the platform fix described in the family maintenance notes) before retrying the same query')
   if (paramIssues.length > 0) actions.push('Review the parameter divergences above: /evolution params shows every row with its source, /evolution policy set writes a user value, and a declared-but-unreachable row needs its owning plugin row mounted in this profile.')
-  if (budgetIssues.length > 0) actions.push('Align the memory budget: leave memory-files memoryCharLimit/userCharLimit UNSET so the store follows evolution-policy, or set both surfaces to the same value (the review plans against the policy value while the store enforces its own)')
+  if (budgetIssues.length > 0) actions.push('Align the memory budget: leave memory-files memoryChars/userChars UNSET so the store follows evolution-policy, or set both surfaces to the same value (the review plans against the policy value while the store enforces its own)')
   // S0-4 (v43 G-1 / J-1): the one state a user cannot see for themselves. The gate
   // answers per session BY DESIGN, so an all-false process looks exactly like a
   // deployment where every session is an original-preset session; only the row
@@ -900,7 +900,7 @@ async function mergeDoctorLine(ctx: { get(name: string): unknown }): Promise<Mer
 
 /**
  * S2-12③ (FLOW5-4): the memory budget is configured in TWO places —
- * `memory-files`' `memoryCharLimit`/`userCharLimit` (what the STORE enforces)
+ * `memory-files`' `memoryChars`/`userChars` (what the STORE enforces)
  * and `evolution-policy`'s `memoryChars`/`userChars` (what the review PLANS
  * against; `memory-files` follows the policy only for an UNSET limit). A
  * disagreement therefore means an explicit contradiction, or a `memory-files`
@@ -986,19 +986,19 @@ async function sessionQueryIssues(ctx: { get(name: string): unknown }): Promise<
 
 function memoryBudgetIssues(ctx: { get(name: string): unknown }): string[] {
   const budget = ctx.get('evolutionMemoryBudget') as {
-    memoryCharLimit?: number
-    userCharLimit?: number
+    memoryChars?: number
+    userChars?: number
     memorySource?: string
     userSource?: string
   } | undefined
   const policy = (ctx.get('evolutionPolicy') as { get?: () => { memoryChars?: number; userChars?: number } } | undefined)?.get?.()
   if (budget === undefined || policy === undefined) return []
   const issues: string[] = []
-  if (budget.memoryCharLimit !== undefined && policy.memoryChars !== undefined && budget.memoryCharLimit !== policy.memoryChars) {
-    issues.push(`store enforces memoryCharLimit=${budget.memoryCharLimit} (source: ${budget.memorySource ?? 'unknown'}) while evolution-policy declares memoryChars=${policy.memoryChars} — the review plans against the policy value and the store refuses what exceeds its own`)
+  if (budget.memoryChars !== undefined && policy.memoryChars !== undefined && budget.memoryChars !== policy.memoryChars) {
+    issues.push(`store enforces memoryChars=${budget.memoryChars} (source: ${budget.memorySource ?? 'unknown'}) while evolution-policy declares memoryChars=${policy.memoryChars} — the review plans against the policy value and the store refuses what exceeds its own`)
   }
-  if (budget.userCharLimit !== undefined && policy.userChars !== undefined && budget.userCharLimit !== policy.userChars) {
-    issues.push(`store enforces userCharLimit=${budget.userCharLimit} (source: ${budget.userSource ?? 'unknown'}) while evolution-policy declares userChars=${policy.userChars} — same divergence as the memory limit`)
+  if (budget.userChars !== undefined && policy.userChars !== undefined && budget.userChars !== policy.userChars) {
+    issues.push(`store enforces userChars=${budget.userChars} (source: ${budget.userSource ?? 'unknown'}) while evolution-policy declares userChars=${policy.userChars} — same divergence as the memory limit`)
   }
   return issues
 }

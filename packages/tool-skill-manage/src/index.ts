@@ -82,10 +82,6 @@ export interface Config {
   /** Warn about an oversize support file, or refuse the write — the CANONICAL
    * registry id (G1). */
   supportFileCharPolicy?: Volatile<SupportFileCharPolicy | undefined>
-  /** Deprecated alias of `skillContentChars` (G0/S0.3): still readable, refused
-   * by writes; removal was planned for 0.7.0 and is deferred (the alias still
-   * ships — see the package README). */
-  maxSkillContentChars?: number
   maxSkillFileBytes?: Volatile<number>
   /** When true, create/update refuse a description over the 60-char authoring bar (default: advisory feedback only). */
   descriptionStrict?: Volatile<boolean>
@@ -120,16 +116,11 @@ export const Config = z.object({
   // write with a meaningless message instead of failing at configuration time.
   maxSkillNameLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxNameLength).volatile(),
   maxDescriptionLength: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxDescriptionLength).volatile(),
-  // G1: the canonical registry ids, merged into the row Config. No .default() on
-  // skillContentChars: a schema default would fill the canonical key and make the
-  // deprecated alias below unreachable (rowSettings resolves the default after it).
+  // G1: the canonical registry id, merged into the row Config. No .default():
+  // rowSettings applies the factory default when the row carries no value.
   skillContentChars: z.number().min(1).volatile(),
   citationPolicy: z.union([z.const('verify'), z.const('refuse')]).volatile(),
   supportFileCharPolicy: z.union([z.const('report'), z.const('enforce')]).volatile(),
-  // Deprecated alias of skillContentChars (PARAM_ALIASES): the fallback spelling,
-  // refused by writes; removal was planned for 0.7.0 and is deferred (the alias
-  // still ships). Deployment-only (no `.volatile()`).
-  maxSkillContentChars: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillContentChars),
   maxSkillFileBytes: z.number().min(1).default(DEFAULT_SKILL_LIMITS.maxSkillFileBytes).volatile(),
   descriptionStrict: z.boolean().default(false).volatile(),
   // V10-03 (P2-18): default empty — the strict ANY-hit-blocks threat scan is
@@ -658,12 +649,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   /**
    * This row's write knobs as they stand RIGHT NOW (G1 §8.3) — the base layer of the
    * precedence chain. The ten E3 keys are live references the platform updates in
-   * place, and the deprecated `maxSkillContentChars` alias stays the fallback spelling
-   * of `skillContentChars`. Every numeric field is clamped (V6-06).
+   * place. Every numeric field is clamped (V6-06).
    * @returns the row layer of the write settings.
    */
   const rowSettings = (): SkillSettings => ({
-    skillContentChars: limit('maxSkillContentChars', unwrapLive(rawConfig.skillContentChars) ?? rawConfig.maxSkillContentChars, DEFAULT_SKILL_LIMITS.maxSkillContentChars),
+    skillContentChars: limit('skillContentChars', unwrapLive(rawConfig.skillContentChars), DEFAULT_SKILL_LIMITS.maxSkillContentChars),
     maxSkillFileBytes: limit('maxSkillFileBytes', rawConfig.maxSkillFileBytes, DEFAULT_SKILL_LIMITS.maxSkillFileBytes),
     maxSkillNameLength: limit('maxSkillNameLength', rawConfig.maxSkillNameLength, DEFAULT_SKILL_LIMITS.maxNameLength),
     maxDescriptionLength: limit('maxDescriptionLength', rawConfig.maxDescriptionLength, DEFAULT_SKILL_LIMITS.maxDescriptionLength),

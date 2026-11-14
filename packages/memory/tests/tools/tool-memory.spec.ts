@@ -251,7 +251,7 @@ describe('tool-memory', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     // 21000.5 is the reported deployment value: the schema passes it (.min(1)).
-    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-'), memoryCharLimit: 21_000.5 })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-evolution-tmp-'), memoryChars: 21_000.5 })
     await ctx.plugin(ToolMemory, {})
     const declared = (ctx.tools.get('memory') as unknown as {
       output: { schema: { properties: Record<string, { type?: string } | undefined> } }
