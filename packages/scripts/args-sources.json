@@ -7,6 +7,5 @@
     "gate-29": {
       "<plane home>": "the plane home directory the run audits; the CI job supplies it as the checkout home and forwards --home"
     }
-  },
-  "composites": {}
+  }
 }

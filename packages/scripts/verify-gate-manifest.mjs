@@ -74,8 +74,6 @@ const notes = []
 // still fails the registry. A malformed table is a hard failure - 「no declarations」 would hide
 // exactly the rows the table exists to declare.
 let argsSources = {}
-let composites = {}
-try { composites = JSON.parse(readFileSync(join(root, 'scripts', 'args-sources.json'), 'utf8')).composites ?? {} } catch { composites = {} }
 const argsPath = join(root, 'scripts', 'args-sources.json')
 if (existsSync(argsPath)) {
   try { argsSources = JSON.parse(readFileSync(argsPath, 'utf8')).sources ?? {} }
@@ -375,9 +373,7 @@ for (const gate of manifestGates) {
   // (R1) executability: the row must declare ONE executable command, and the script it names must
   // exist in the tree the row declares. gate-34 (a composite prose cell: six commands in one row)
   // is the live specimen - its reason is named, not guessed.
-  if (composites[gate.id] !== undefined) {
-    // a declared composite has no single argv by design - emit no observation
-  } else if (argvRow === null || argvRow.length === 0) {
+  if (argvRow === null || argvRow.length === 0) {
     note('executability', gate.id, (gate.argvProblem === undefined ? 'declares no argv' : gate.argvProblem) + ' - declare one executable command (split the cell or add an argv with a value source)')
   } else if (argvRow[0].startsWith('-')) {
     note('executability', gate.id, 'argv[0]=' + JSON.stringify(argvRow[0]) + ' is not a command - name the script the row runs')
@@ -408,12 +404,7 @@ for (const gate of manifestGates) {
     if (typeof declaredSources[token[0]] === 'string' && declaredSources[token[0]].trim() !== '') continue
     note('no-placeholders', gate.id, 'the row carries ' + token[0] + ' - declare the value (an args source) or register the row as pending')
   }
-  // (R3) expiry due: a registered exemption the family version has reached is red, not permanent.
-  if (typeof gate.expiry === 'string' && gate.expiry.trim() !== '') {
-    const due = familyVer === undefined ? null : versionReached(familyVer, gate.expiry)
-    if (due === true) note('expiry-due', gate.id, 'expiry ' + gate.expiry + ' is reached by ' + String(familyVer) + ' - close the exemption or move it with a reason')
-  }
-// The axis register escalates: a note stays a note during migration, but once the family version
+  // The axis register escalates: a note stays a note during migration, but once the family version
 // reaches the register entry's own expiry the same observation becomes a PROBLEM - the debt's
 // expiry is what makes it self-enforcing instead of a hint that outlives its migration.
 // Declared drills: how a row's green can be turned red (one home: scripts/drill-declarations.json,
