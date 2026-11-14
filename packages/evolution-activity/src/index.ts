@@ -303,25 +303,6 @@ export async function loadActivityState(root: string, io: EvolutionIoLike): Prom
 }
 
 /**
- * H-06: the read barrier over the sidecar — records only, no corruption
- * verdict. @internal Test-only: no production caller (verified by grep
- * 2026-09-16); replay consumes {@link loadActivityState} — the V24-13 claim
- * that `loadActivity` "HAS a production consumer — evolution-replay" was
- * inaccurate (PLAN S5.2). Kept exported so the published surface does not
- * break. The single-writer rule is unchanged: `apply()`'s transact listener
- * remains the only WRITE path. Consumers that must not read an unreadable
- * sidecar as "no history" use {@link loadActivityState}.
- */
-export async function loadActivity(root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> {
-  return (await loadActivityState(root, io)).records
-}
-
-/** Read durable review history without a plan-record read. */
-export async function loadReviewActivity(root: string, io: EvolutionIoLike): Promise<EvolutionReviewActivityRecord[]> {
-  return parseActivityReviews(await io.readText(activityFile(root)))
-}
-
-/**
  * The WRITE side's quarantine predicate: should these bytes be preserved under `.corrupt` before a
  * current-version file replaces them?
  *

@@ -6,8 +6,10 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike, type EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, REVIEW_TEXT_PREVIEW_CHARS, activityFile, apply, applyActivityEvent, applyReviewActivityEvent, loadActivity, parseActivityContent, serializeActivity, type EvolutionActivityRecord } from '../src/index.ts'
+import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, REVIEW_TEXT_PREVIEW_CHARS, activityFile, apply, applyActivityEvent, applyReviewActivityEvent, loadActivityState, parseActivityContent, serializeActivity, type EvolutionActivityRecord } from '../src/index.ts'
 import { tempHome } from '../../test-support/temp-home.ts'
+
+const loadActivity = async (root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> => (await loadActivityState(root, io)).records
 
 function payload(overrides: Partial<EvolutionPlanAppliedEvent> = {}): EvolutionPlanAppliedEvent {
   return {

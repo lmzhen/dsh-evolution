@@ -151,11 +151,6 @@ export class ProjectionRuntime {
     this.lastByAgent.set(String(agent.id), report)
   }
 
-  /** @returns current state for diagnostics, if this process has seen the view. */
-  stateFor(viewKey: string, mapVersion: string, policyDigest: string): ViewState | undefined {
-    return this.states.get(viewKey, mapVersion, policyDigest, this.ports.codecVersion)
-  }
-
   private async restore(agent: Agent, viewKey: string, decision: PreStepDecision, currentCapture?: CatalogCapture): Promise<PreStepDecision> {
     const record = await this.ports.journal.latest(String(agent.id), viewKey, this.ports.codecVersion)
     const history = this.ports.history?.(agent)
