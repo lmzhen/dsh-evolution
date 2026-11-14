@@ -1888,7 +1888,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/run-record.spec.ts#all committed pairs undone becomes undone",
+      "ref": "evolution-merge/tests/gates/rg2b-undo.spec.ts#undoes a committed pair, writes undo receipt and marks the run undone",
       "note": "combined anchor set (audit re-check)"
     },
     {
@@ -1897,7 +1897,7 @@
       "kind": "test",
       "verdict": "pass",
       "grade": "A",
-      "ref": "evolution-merge/tests/run-record.spec.ts#partial undone remains succeeded",
+      "ref": "evolution-merge/tests/run-detail.spec.ts#maps an undone pair to undone, not merged (W11 D)",
       "note": "combined anchor set (audit re-check)"
     },
     {
