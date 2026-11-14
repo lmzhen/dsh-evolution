@@ -1,5 +1,5 @@
 // @tier pre-tag
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
 import { loadUsage } from '@deepseek-ai/dsh-evolution-core'
@@ -189,4 +189,29 @@ it('commitMerge refuses protected builtin and ghost target directory', async () 
   await mkdir(join(root, 'ghost'))
   expect((await lib.commitMerge({ ...plan, target: 'ghost' })).ok).toBe(false)
   expect(await lib.read('ghost')).toBeNull()
+})
+
+it('treats a zero-byte target SKILL.md as present, not as a missing skill', async () => {
+  const root = await tempRoot('dsh-commit-merge-zero-byte-')
+  const lib = new SkillLibrary(root)
+  await lib.create('target-skill', BODY('target-skill'), 'subagent')
+  await lib.create('src-a', BODY('src-a'), 'foreground')
+  // C-14: an existing but empty SKILL.md is "present and corrupt", never "absent". The merge
+  // target check already accepts it (currentTarget !== null); applyTreeChange must agree.
+  await writeFile(join(root, 'target-skill', 'SKILL.md'), '')
+  const sourceBody = (await lib.read('src-a')) ?? ''
+  const result = await lib.commitMerge({
+    target: 'target-skill',
+    targetExists: true,
+    sources: ['src-a'],
+    body: BODY('target-skill', '## Merged\n'),
+    supportFiles: [],
+    expectedTargetBody: '',
+    expectedSourceBodies: [{ name: 'src-a', body: sourceBody }],
+    origin: 'foreground',
+    summary: 'zero-byte target merge',
+  })
+  expect(result.ok).toBe(true)
+  expect(await lib.read('target-skill')).toContain('## Merged')
+  expect(await lib.read('src-a')).toBeNull()
 })

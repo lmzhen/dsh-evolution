@@ -3334,7 +3334,7 @@ export class SkillLibrary {
       if (badName) return { ok: false, message: badName }
       const dir = this.dirOf(name)
       const body = await this.io.readText(join(dir, 'SKILL.md'))
-      if (!body) return { ok: false, message: '技能「' + name + '」不存在。' }
+      if (body === null) return { ok: false, message: '技能「' + name + '」不存在。' }
       const protection = root.protection === 'write'
         ? await this.writeProtection(name, plan.origin)
         : root.protection === 'delete'
