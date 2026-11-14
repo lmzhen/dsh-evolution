@@ -76,29 +76,23 @@ for (const name of tableNames) {
   const answered = new RegExp("'" + name + "'").test(source) || new RegExp('\\b' + name + '\\b').test(source)
   if (!answered) problems.push('the table declares "' + name + '" but the command source never answers it')
 }
-// D (P2): the parser's value-flag list and the table's usage lines are two declarations of ONE fact —
-// which flags take a value. Until this ran, adding a value flag to the table and forgetting the
-// parser (or vice versa) was silent drift: the parser would either swallow the next token as a value
-// or leave it as a stray positional. Both directions are asserted here.
+// D (P2/D3): the parser's value-flag list and the table's authored `flags` kinds are two
+// declarations of ONE fact — which flags take a value. Parse the table, not the prose: the
+// usage line is documentation, while `flags` is the declaration the help/surface read.
 const { VALUE_FLAGS } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
-const takingInUsage = new Set()
+const takingInFlags = new Set()
 for (const entry of COMMAND_ENTRIES) {
-  for (const match of entry.usage.matchAll(/--([a-z][a-z-]*)/g)) {
-    // Value-taking in a USAGE line means the flag is followed by `=` or by a value token — not by the
-    // closing bracket of an optional group (`[--facts]`) and not by another flag.
-    const tail = entry.usage.slice(match.index + match[0].length)
-    if (tail.startsWith('=') || /^\s+(?!\[?--)[^\s\]|]/.test(tail)) takingInUsage.add(match[1])
-  }
+  for (const [name, kind] of entry.flags ?? []) if (kind === 'value') takingInFlags.add(name.replace(/^--/, ''))
 }
-for (const flag of takingInUsage) {
+for (const flag of takingInFlags) {
   if (!VALUE_FLAGS.includes(flag)) {
-    problems.push('the table spells --' + flag + ' with a value, but the parser does not list it in VALUE_FLAGS ' +
+    problems.push('the table declares --' + flag + ' as value-taking, but the parser does not list it in VALUE_FLAGS ' +
       '(it would leave the value as a stray positional)')
   }
 }
 for (const flag of VALUE_FLAGS) {
-  if (!takingInUsage.has(flag)) {
-    problems.push('the parser lists --' + flag + ' as value-taking, but no usage line spells it with a value ' +
+  if (!takingInFlags.has(flag)) {
+    problems.push('the parser lists --' + flag + ' as value-taking, but no table entry declares that kind ' +
       '(a stale entry: it would swallow the next token)')
   }
 }
