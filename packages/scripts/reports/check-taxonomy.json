@@ -602,7 +602,6 @@
         "evolution-merge::tests/gates/rg7-install.spec.ts",
         "evolution-merge::tests/history-port.spec.ts",
         "evolution-merge::tests/host-capabilities.spec.ts",
-        "evolution-merge::tests/indexes.spec.ts",
         "evolution-merge::tests/ledger-v2.spec.ts",
         "evolution-merge::tests/library-adapter.spec.ts",
         "evolution-merge::tests/markdown.spec.ts",
@@ -1240,7 +1239,6 @@
         "evolution-merge::tests/gates/rg7-install.spec.ts",
         "evolution-merge::tests/history-port.spec.ts",
         "evolution-merge::tests/host-capabilities.spec.ts",
-        "evolution-merge::tests/indexes.spec.ts",
         "evolution-merge::tests/ledger-v2.spec.ts",
         "evolution-merge::tests/library-adapter.spec.ts",
         "evolution-merge::tests/markdown.spec.ts",
@@ -1822,7 +1820,6 @@
         "evolution-merge::tests/gates/rg7-install.spec.ts",
         "evolution-merge::tests/history-port.spec.ts",
         "evolution-merge::tests/host-capabilities.spec.ts",
-        "evolution-merge::tests/indexes.spec.ts",
         "evolution-merge::tests/ledger-v2.spec.ts",
         "evolution-merge::tests/library-adapter.spec.ts",
         "evolution-merge::tests/markdown.spec.ts",
@@ -2063,7 +2060,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 410
+      "specs": 409
     },
     "ci-only": {
       "gates": 10,
@@ -2071,16 +2068,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 410
+      "specs": 409
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 482
+      "specs": 481
     }
   },
   "specs": {
-    "total": 482,
-    "marked": 482,
+    "total": 481,
+    "marked": 481,
     "unmarked": 0
   }
 }
