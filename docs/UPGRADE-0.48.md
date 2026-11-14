@@ -15,7 +15,7 @@
 0.48 仍接受旧模式的**卸载**，但不再安装它们：
 
 ```bash
-node install-layered.mjs --uninstall --mode preset
+node install-layered.mjs --uninstall --mode layered   # preset-only / preset 形态（宿主 preset row）
 node install-layered.mjs --uninstall --mode layered
 node install-layered.mjs --uninstall --mode oneclick
 ```

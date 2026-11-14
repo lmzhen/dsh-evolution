@@ -1842,52 +1842,52 @@
             "renewal": "Renewed at 0.48.0 (expiry 0.49.0): the W11 0.48 reset did not remove this debt; the plan is unchanged and due in 0.49."
           },
           "gate-01": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.48.0 (expiry 0.49.0): the W11 0.48 reset did not remove this debt; the plan is unchanged and due in 0.49."
+            "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-02": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.48.0 (expiry 0.49.0): the W11 0.48 reset did not remove this debt; the plan is unchanged and due in 0.49."
+            "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-03": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.48.0 (expiry 0.49.0): the W11 0.48 reset did not remove this debt; the plan is unchanged and due in 0.49."
+            "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-04": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.48.0 (expiry 0.49.0): the W11 0.48 reset did not remove this debt; the plan is unchanged and due in 0.49."
+            "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-05": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.48.0 (expiry 0.49.0): the W11 0.48 reset did not remove this debt; the plan is unchanged and due in 0.49."
+            "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "ci-only-13": {
-            "reason": "OVERLAY-TREE ROW: the check runs in the overlay while mutations are applied in the mirror, so the run cannot see the patch (the prover refuses it with TREE MISMATCH by design); proving it needs an overlay-tree mutation mode, which does not exist yet",
+            "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
-            "plan": "add an overlay-tree mutation mode to verify-mutations, prove these rows in that mode, then delete their exemptions",
+            "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
-            "renewal": "Renewed at 0.48.0 (expiry 0.49.0): the W11 0.48 reset did not remove this debt; the plan is unchanged and due in 0.49."
+            "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-27": {
             "reason": "BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mutation in this repo can red it without first building",
