@@ -435,6 +435,54 @@ export class MergeUnitTransactions implements UnitTransaction {
     }
   }
 
+  /** Finish the idempotent support writes from the prepared snapshot, or name the drift. */
+  private async completeSupport(
+    snapshot: NonNullable<Awaited<ReturnType<typeof readUnitSnapshot>>>,
+    journal: NonNullable<Awaited<ReturnType<typeof readUnitJournal>>>,
+  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }> {
+    let liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })))
+    const supportMatches = (): boolean => liveSupport.every(file => file.content === (snapshot.supportAfter.find(item => item.path === file.path)?.content ?? null))
+    if (supportMatches()) return { ok: true }
+    if (!["support-pending", "sources-archived", "unit-written"].includes(journal.phase) || this.options.backend.restoreSupportFile === undefined)
+      return { ok: false, message: "support file live hash does not match the prepared support; manual recovery required" }
+    for (const file of snapshot.supportAfter) await this.options.backend.restoreSupportFile(snapshot.target, file.path, file.content)
+    liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })))
+    return supportMatches() ? { ok: true } : { ok: false, message: "support file could not be completed from the prepared snapshot" }
+  }
+
+  /** The complete evidence record both settlement paths write. */
+  private async evidenceFor(
+    unitId: string,
+    snapshot: NonNullable<Awaited<ReturnType<typeof readUnitSnapshot>>>,
+    journal: NonNullable<Awaited<ReturnType<typeof readUnitJournal>>>,
+    targetAfter: string,
+  ): Promise<UnitEvidenceRecord> {
+    const checkpoints = journal.checkpoints ?? []
+    return {
+      schemaVersion: 1,
+      unitId,
+      runId: snapshot.runId,
+      planDigest: snapshot.planDigest,
+      state: "complete",
+      target: {
+        before: snapshot.targetBefore,
+        after: targetAfter,
+        supportDigest: createHash("sha256").update(JSON.stringify(snapshot.supportAfter)).digest("hex"),
+        created: !snapshot.targetExists,
+      },
+      sources: snapshot.sourceBefore.map((source) => ({
+        name: source.name,
+        before: source.body,
+        after: null,
+        archived: checkpoints.some((item) => item.source === source.name),
+        absorbedInto: snapshot.target,
+      })),
+      mutations: 0,
+      ...(snapshot.validationPlan === undefined ? {} : { validationPlan: snapshot.validationPlan }),
+      at: this.now(),
+    }
+  }
+
   async finalize(unitId: string) {
     return await this.withRecoveryFence(async () => this.finalizeUnlocked(unitId))
   }
@@ -474,41 +522,9 @@ export class MergeUnitTransactions implements UnitTransaction {
     const liveSource = liveSources.find(source => source.body !== null);
     if (liveSource !== undefined)
       return { ok: false as const, code: "unit-rollback-blocked" as const, message: "source is still live: " + liveSource.name };
-    let liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
-    const supportMatches = () => liveSupport.every(file => file.content === (snapshot.supportAfter.find(item => item.path === file.path)?.content ?? null));
-    if (!supportMatches()) {
-      // Crash after the sources are archived but before the support files land: finish the
-      // idempotent support write from the prepared snapshot, then re-check.
-      if (!["support-pending", "sources-archived", "unit-written"].includes(journal.phase) || this.options.backend.restoreSupportFile === undefined)
-        return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file live hash does not match the prepared support; manual recovery required" };
-      for (const file of snapshot.supportAfter) await this.options.backend.restoreSupportFile(snapshot.target, file.path, file.content);
-      liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
-      if (!supportMatches())
-        return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file could not be completed from the prepared snapshot" };
-    }
-    const evidence: UnitEvidenceRecord = {
-      schemaVersion: 1,
-      unitId,
-      runId: snapshot.runId,
-      planDigest: snapshot.planDigest,
-      state: "complete",
-      target: {
-        before: snapshot.targetBefore,
-        after: (await this.options.backend.readSkill(snapshot.target)) ?? "",
-        supportDigest: createHash("sha256").update(JSON.stringify(snapshot.supportAfter)).digest("hex"),
-        created: !snapshot.targetExists,
-      },
-      sources: snapshot.sourceBefore.map((source) => ({
-        name: source.name,
-        before: source.body,
-        after: null,
-        archived: checkpoints.some((item) => item.source === source.name),
-        absorbedInto: snapshot.target,
-      })),
-      mutations: 0,
-      ...(snapshot.validationPlan === undefined ? {} : { validationPlan: snapshot.validationPlan }),
-      at: this.now(),
-    };
+    const support = await this.completeSupport(snapshot, journal)
+    if (!support.ok) return { ok: false as const, code: "unit-rollback-blocked" as const, message: support.message }
+    const evidence = await this.evidenceFor(unitId, snapshot, journal, (await this.options.backend.readSkill(snapshot.target)) ?? "")
     if (receipt?.evidenceSha256 !== undefined && unitEvidenceDigest(evidence) !== receipt.evidenceSha256)
       return { ok: false as const, code: "unit-rollback-blocked" as const, message: "receipt evidence hash does not match rebuilt evidence" };
     await writeUnitEvidence(this.options.io, this.options.home, evidence);
@@ -547,41 +563,9 @@ export class MergeUnitTransactions implements UnitTransaction {
     const liveSource = liveSources.find(source => source.body !== null);
     if (liveSource !== undefined)
       return { ok: false as const, code: "unit-rollback-blocked" as const, message: "source is still live: " + liveSource.name };
-    let liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
-    const supportMatches = () => liveSupport.every(file => file.content === (snapshot.supportAfter.find(item => item.path === file.path)?.content ?? null));
-    if (!supportMatches()) {
-      // Crash after the sources are archived but before the support files land: finish the
-      // idempotent support write from the prepared snapshot, then re-check.
-      if (!["support-pending", "sources-archived", "unit-written"].includes(journal.phase) || this.options.backend.restoreSupportFile === undefined)
-        return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file live hash does not match the prepared support; manual recovery required" };
-      for (const file of snapshot.supportAfter) await this.options.backend.restoreSupportFile(snapshot.target, file.path, file.content);
-      liveSupport = await Promise.all(snapshot.supportAfter.map(async file => ({ path: file.path, content: await this.options.backend.readSupportFile(snapshot.target, file.path) })));
-      if (!supportMatches())
-        return { ok: false as const, code: "unit-rollback-blocked" as const, message: "support file could not be completed from the prepared snapshot" };
-    }
-    const evidence: UnitEvidenceRecord = {
-      schemaVersion: 1,
-      unitId,
-      runId: snapshot.runId,
-      planDigest: snapshot.planDigest,
-      state: "complete",
-      target: {
-        before: snapshot.targetBefore,
-        after: targetAfter,
-        supportDigest: createHash("sha256").update(JSON.stringify(snapshot.supportAfter)).digest("hex"),
-        created: !snapshot.targetExists,
-      },
-      sources: snapshot.sourceBefore.map((source) => ({
-        name: source.name,
-        before: source.body,
-        after: null,
-        archived: checkpoints.some((item) => item.source === source.name),
-        absorbedInto: snapshot.target,
-      })),
-      mutations: 0,
-      ...(snapshot.validationPlan === undefined ? {} : { validationPlan: snapshot.validationPlan }),
-      at: this.now(),
-    };
+    const support = await this.completeSupport(snapshot, journal)
+    if (!support.ok) return { ok: false as const, code: "unit-rollback-blocked" as const, message: support.message }
+    const evidence = await this.evidenceFor(unitId, snapshot, journal, targetAfter)
     await writeUnitEvidence(this.options.io, this.options.home, evidence);
     await writeUnitJournal(this.options.io, this.options.home, { ...journal, phase: "committed", checkpoints, updatedAt: this.now() });
     return { ok: true as const, evidence };
