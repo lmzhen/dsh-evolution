@@ -7,6 +7,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { FALLBACK_LOCALE } from './panel.ts'
 import type { LocaleDictionaries } from './seam.ts'
 import type { ReactNode } from 'react'
+import { injectPluginStyles } from './styles.ts'
 
 /** One feature view contribution. */
 export interface WorkbenchViewSpec<Face> {
@@ -31,17 +32,6 @@ interface WorkbenchSeam {
   }
 }
 
-function injectStyles(doc: Document | undefined, css: string, tagId: string): () => void {
-  if (doc === undefined) return () => {}
-  const previous = doc.querySelector('style[data-plugin-css="' + tagId + '"]')
-  previous?.remove()
-  const tag = doc.createElement('style')
-  tag.setAttribute('data-plugin-css', tagId)
-  tag.textContent = css
-  doc.head.appendChild(tag)
-  return () => { tag.remove() }
-}
-
 /**
  * Register one view into `evolution.workbench.view`.
  * @param ctx - client cordis context.
@@ -60,7 +50,7 @@ export function registerWorkbenchView<Face>(ctx: ClientContext, spec: WorkbenchV
       return () => {}
     }
   }, spec.namespace + ': locale')
-  ctx.effect(() => injectStyles(typeof document === 'undefined' ? undefined : document, spec.styles.css, spec.styles.tagId), spec.namespace + ': styles')
+  ctx.effect(() => injectPluginStyles(typeof document === 'undefined' ? undefined : document, spec.styles.css, spec.styles.tagId), spec.namespace + ': styles')
   const fallback = spec.dictionaries[FALLBACK_LOCALE]
   const lookup = (key: string): string => {
     const own = fallback[key] ?? key

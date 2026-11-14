@@ -6,6 +6,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import type { ClientSeam, LocaleDictionaries } from './seam.ts'
 import type { SupportedLocale } from './generated/i18n.generated.ts'
+import { injectPluginStyles } from './styles.ts'
 
 /** Dictionary lookup used by the panel body and row label. */
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
@@ -51,19 +52,6 @@ function interpolate(text: string, values?: Readonly<Record<string, string | num
   return text.replace(/\{(\w+)\}/g, (_match, key: string) => String(values[key] ?? ''))
 }
 
-function injectStyles(doc: Document | undefined, css: string, tagId: string): () => void {
-  if (doc === undefined) return () => {}
-  const previous = doc.querySelector('style[data-plugin-css="' + tagId + '"]')
-  // P2-29: a new owner must OUTLIVE the old owner's disposer. Replace the tag
-  // instead of reusing it: the old disposer then removes a detached node.
-  previous?.remove()
-  const tag = doc.createElement('style')
-  tag.setAttribute('data-plugin-css', tagId)
-  tag.textContent = css
-  doc.head.append(tag)
-  return () => { tag.remove() }
-}
-
 /**
  * Register one sidebar row and its main body under one lifecycle.
  * @param ctx - the client context carrying the slots and locale seats.
@@ -82,7 +70,7 @@ export function registerSidebarPanel<Face>(ctx: ClientContext, spec: SidebarPane
       return () => {}
     }
   }, spec.namespace + ': locale')
-  ctx.effect(() => injectStyles(typeof document === 'undefined' ? undefined : document, spec.styles.css, spec.styles.tagId), spec.namespace + ': styles')
+  ctx.effect(() => injectPluginStyles(typeof document === 'undefined' ? undefined : document, spec.styles.css, spec.styles.tagId), spec.namespace + ': styles')
 
   const fallback = spec.dictionaries[spec.fallback ?? FALLBACK_LOCALE] ?? spec.dictionaries.en
   const lookup = (key: string): string => {

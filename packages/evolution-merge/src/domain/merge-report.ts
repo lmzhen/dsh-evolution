@@ -22,9 +22,5 @@ export interface MergeReport {
   readonly threat?: { readonly body: string; readonly source: string }
   readonly createdAt: string
 }
-export interface MergeReportRef {
-  readonly path: string
-  readonly digest: string
-  readonly writtenAt: string
-}
+
 
