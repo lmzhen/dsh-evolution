@@ -226,9 +226,9 @@ runs:
       env:
         NPM_SCOPE: ${{ inputs.npm_scope }}
       run: |
-        # W11 A3b: the release lane owns the post-pack audit (gate-59) and packed smoke (gate-74)
-        # plus the range/registry/mutation rows; gate-74 needs gate-59, so the audit always judges
-        # the tarballs before the smoke reads them.
+        # W11 A3b: the release lane owns the range/registry/mutation rows. gate-59/74 are
+        # runBy:"action": the audit step below runs before evidence, and the packed smoke runs
+        # after it; run-gates skips them.
         RANGE="$(node -p "require('./platform-line.json').floor")"
         export RANGE
         node packages/evolution/scripts/run-gates.mjs ci --lane ci-release --concurrency 1 --json-out "$RUNNER_TEMP/gates-release.json"
@@ -242,6 +242,14 @@ runs:
         # stays green is a real defect and fails here. This is the half CI never ran, which is why a
         # stale probe signature could only be discovered by hand.
         node packages/evolution/scripts/verify-mutations.mjs --probes --no-stamp --baseline=json:"$RUNNER_TEMP/probe-baseline.json" --json
+    - name: "Release tarball audit"
+      shell: bash
+      working-directory: upstream
+      run: |
+        RANGE="^$(node -p "require('./platform-line.json').floor")"
+        node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist \
+          --version "${RELEASE_VERSION#v}" --platform-range "$RANGE"
+
     - name: Assemble the release evidence planes (W10/W11)
       shell: bash
       working-directory: upstream
@@ -266,14 +274,6 @@ runs:
         else
           echo "release evidence: skipped on non-tag dry run"
         fi
-
-    - name: "Release tarball audit"
-      shell: bash
-      working-directory: upstream
-      run: |
-        RANGE="^$(node -p "require('./platform-line.json').floor")"
-        node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist \
-          --version "${RELEASE_VERSION#v}" --platform-range "$RANGE"
 
     - name: "Packed install: full import against the npm platform"
       shell: bash

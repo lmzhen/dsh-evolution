@@ -989,7 +989,7 @@
             "expiry": "0.49.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
-            "plan": "reduce this axis to 0 rows by its expiry; a renewal without a row reduction is refused",
+            "plan": "0.49 must reduce or close the pending axis; 0.48 kept the rows unchanged by the explicit W11 §30.87 exception (not a pass).",
             "note": "2026-11-12 re-measured: W9 added verify-exemptions.mjs, which carries the axis definition row | 2026-11-12 re-measured: gen-protection-view.mjs carries an axis definition | 2026-11-12 re-measured: the consumer ledger adds one axis definition row | 2026-11-12 re-measured: verify-contract-anchors.selftest.mjs adds an axis definition | 2026-11-13 re-measured: W10 M5 changes no gate-table rows | 2026-11-13 A1b: the duplicate table/twin rows were deleted, so the carrier debt dropped 7 -> 4 (real row reduction, not a renewal).",
             "renewal": "Renewed at 0.48.0 (expiry 0.49.0): the W11 0.48 reset did not remove this debt; the plan is unchanged and due in 0.49."
           }
@@ -1846,7 +1846,7 @@
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
+            "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-02": {
@@ -1854,7 +1854,7 @@
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
+            "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-03": {
@@ -1862,7 +1862,7 @@
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
+            "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-04": {
@@ -1870,7 +1870,7 @@
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
+            "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-05": {
@@ -1878,7 +1878,7 @@
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
+            "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "ci-only-13": {
@@ -1886,7 +1886,7 @@
             "owner": "scripts/verify-mutations",
             "expiry": "0.49.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
-            "condition": "if the prover gains an overlay-tree mode (mutate the overlay copy, run there, restore both), delete these exemptions and prove them",
+            "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Reason corrected at 0.48.0: the old text claimed overlay mutation mode did not exist; the remaining reason is the aggregate nature of the row."
           },
           "gate-27": {

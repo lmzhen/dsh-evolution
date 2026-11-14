@@ -727,8 +727,8 @@ export async function diagnose(
   let executingCount: number | null = null
   // T4-09/A51: the staged window's expiry, so doctor can say WHICH of the three human-confirmation
   // states is in force — 0 means "waits for ever", which is the shipped default and must be visible
-  // as such rather than implied by an absence. Reading it also runs the convergence: every count
-  // below therefore EXCLUDES records the TTL has already closed.
+  // as such rather than implied by an absence. Doctor reads the window WITHOUT convergence
+  // (listReadonly): a record whose TTL passed is still counted until /evolution pending converges it.
   let pendingTtlMs: number | null = null
   const approvalService = ctx.get('evolutionApproval') as {
     list?: (status: string) => Promise<unknown[]>
@@ -802,7 +802,8 @@ export async function diagnose(
   if (pendingCount === null && services.approval) actions.push('Approval service is mounted but pending listing failed — check the evolution state service.')
   // T4-09/A51: the staged window's third state. Only the NON-default speaks: "waits for ever" is the
   // shipped setting, and reporting a default as a finding is noise. Note the counts above were read
-  // THROUGH the service, so a record the TTL has already closed is not in them.
+  // through listReadonly, so a record whose TTL passed is still included until the operator reads
+  // /evolution pending (which converges the window).
   if (pendingTtlMs !== null && pendingTtlMs > 0) {
     actions.push(`Staged writes expire after ${pendingTtlMs} ms (evolution-approval.pendingTtlMs): an expired write is closed as rejected and is never executed.`)
   }

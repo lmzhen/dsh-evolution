@@ -15,9 +15,8 @@
 0.48 仍接受旧模式的**卸载**，但不再安装它们：
 
 ```bash
-node install-layered.mjs --uninstall --mode layered   # preset-only / preset 形态（宿主 preset row）
-node install-layered.mjs --uninstall --mode layered
-node install-layered.mjs --uninstall --mode oneclick
+node install-layered.mjs --uninstall --mode layered   # preset-only / layered（host bundle + preset row）
+node install-layered.mjs --uninstall --mode oneclick  # preset / oneclick（legacy preset bundle）
 ```
 
 只运行 doctor 报出的那一种。`--base` 仅在收窄 legacy preset row 时使用。卸载后按 `INSTALL.md` 重新安装：
