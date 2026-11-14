@@ -3,6 +3,7 @@ import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { assertUnitJournalTransition, readUnitJournal, unitJournalPath, writeUnitJournal, type UnitJournal } from '../src/unit-journal.ts'
+import type { EvolutionIoLike } from '../src/io.ts'
 
 it('journals monotonic phases and rejects terminal/backwards transitions', () => {
   expect(() => { assertUnitJournalTransition('prepared', 'target-pending') }).not.toThrow()
@@ -42,4 +43,25 @@ it('keeps unitId stable while the nested journal key is separate', async () => {
   await writeUnitJournal(io, home, journal)
   expect(await readUnitJournal(io, home, 'j-nested')).toEqual(journal)
   expect(unitJournalPath(home, 'run-3:abc')).not.toBe(unitJournalPath(home, 'j-nested'))
+})
+
+it('checks the current journal phase inside transact instead of trusting a stale pre-read', async () => {
+  const committed: UnitJournal = { schemaVersion: 1, unitId: 'run-race', runId: 'run-race', planDigest: 'd', target: 'alpha', sources: [], phase: 'committed', storageKey: 'k', snapshotSha256: 'c'.repeat(64), updatedAt: 1 }
+  let stored = JSON.stringify(committed)
+  const io: EvolutionIoLike = {
+    processScope: 'single-process',
+    // A deliberately stale external read: the old implementation used this value and would
+    // overwrite the committed journal; the fix must only trust the value transact hands it.
+    readText: async () => null,
+    writeText: async (_path, content) => { stored = content },
+    remove: async () => { stored = '' },
+    list: async () => [],
+    exists: async () => stored !== '',
+    transact: async (_path, task) => {
+      const next = await task(stored)
+      stored = next ?? ''
+    },
+  }
+  await expect(writeUnitJournal(io, '/home', { ...committed, phase: 'target-written' })).rejects.toThrow(/terminal/)
+  expect(JSON.parse(stored).phase).toBe('committed')
 })

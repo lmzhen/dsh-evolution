@@ -64,18 +64,26 @@ export function assertUnitJournalTransition(from: UnitJournalPhase, to: UnitJour
   if (unitJournalPhaseRank(to) <= unitJournalPhaseRank(from)) throw new Error('unit-journal-nonmonotonic:' + from + '->' + to)
 }
 
+function parseUnitJournal(raw: string | null): UnitJournal | null {
+  if (raw === null) return null
+  try { return JSON.parse(raw) as UnitJournal } catch { return null }
+}
+
 export async function writeUnitJournal(io: EvolutionIoLike, home: string, journal: UnitJournal, scope: UnitJournalScope = 'merge'): Promise<string> {
   const key = journal.journalId ?? journal.unitId
   const path = unitJournalPath(home, key, scope)
-  const existing = await readUnitJournal(io, home, key, scope)
-  if (existing !== null) assertUnitJournalTransition(existing.phase, journal.phase)
   const content = JSON.stringify(journal, null, 2) + '\n'
-  await transactIo(io, path, () => content)
+  // The read and the monotonicity assertion share the write's critical section; reading them
+  // outside transact left a window where two writers both validated the old phase and the
+  // slower one silently overwrote a committed journal.
+  await transactIo(io, path, (current) => {
+    const existing = parseUnitJournal(current)
+    if (existing !== null) assertUnitJournalTransition(existing.phase, journal.phase)
+    return content
+  })
   return path
 }
 
 export async function readUnitJournal(io: EvolutionIoLike, home: string, unitId: string, scope: UnitJournalScope = 'merge'): Promise<UnitJournal | null> {
-  const raw = await io.readText(unitJournalPath(home, unitId, scope))
-  if (raw === null) return null
-  try { return JSON.parse(raw) as UnitJournal } catch { return null }
+  return parseUnitJournal(await io.readText(unitJournalPath(home, unitId, scope)))
 }
