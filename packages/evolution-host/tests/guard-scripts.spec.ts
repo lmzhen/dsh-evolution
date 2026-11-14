@@ -32,6 +32,13 @@ const eventPairing = join(scripts, 'verify-event-pairing.mjs')
 // one deliberate-violation run (0.3.26 V4-30).
 const psRoot = fileURLToPath(new URL('../../', import.meta.url))
 
+// D6: the checks-fact generator ships --check; until this call point existed the
+// derived declarations could go stale without any gate or test noticing.
+it('gen-checks-fact --check is fresh', async () => {
+  const { stdout, stderr } = await run(process.execPath, [join(scripts, 'gen-checks-fact.mjs'), '--check'], { cwd: psRoot })
+  expect(stdout + stderr).toContain('in sync')
+})
+
 describe('guard scripts (V4-30 sentry)', () => {
   it('dependency-closure passes on the real tree and fails on a vacuum root', async () => {
     // the real-tree pass belongs to gate-06 (run-gates/CI); this case keeps the FIXTURE half,
