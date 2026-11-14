@@ -1811,6 +1811,102 @@
             "plan": "prove the row in the CI workspace where the relative path resolves, or replace the argv with a layout-neutral pair; the row stays counted until then",
             "condition": "release gate: revisit when the path is layout-neutral or the CI lane runs it",
             "renewal": "Added at 0.48.0 from the measured local baseline red (localSafe=false)."
+          },
+          "gate-59": {
+            "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-74": {
+            "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-67": {
+            "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-68": {
+            "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-69": {
+            "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-70": {
+            "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-71": {
+            "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-73": {
+            "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "ci-only-18": {
+            "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-56": {
+            "reason": "external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-57": {
+            "reason": "external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
+          },
+          "gate-78": {
+            "reason": "external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor",
+            "owner": "scripts/release",
+            "expiry": "0.49.0",
+            "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
+            "condition": "release gate: revisit when the step becomes a script with a test anchor",
+            "renewal": "Added at 0.48.0 from the measured step/external classification; no unproven checkMutations record was kept."
           }
         },
         "cannotDecideRegistered": {
