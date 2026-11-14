@@ -2,7 +2,7 @@
  * Skipped filtering: a pair the operator marked as not-worth-merging stays out of automatic
  * screening until mergeSkippedTtlDays expires. Explicit /merge pair ignores this set.
  */
-import { pairKey, type MergeRow } from './contracts.ts'
+import type { MergeRow } from './contracts.ts'
 
 export function skippedPairKeys(rows: readonly MergeRow[], ttlDays: number, now: number): ReadonlySet<string> {
   const keys = new Set<string>()
@@ -15,6 +15,3 @@ export function skippedPairKeys(rows: readonly MergeRow[], ttlDays: number, now:
   return keys
 }
 
-export function isSkippedPair(keys: ReadonlySet<string>, a: string, b: string): boolean {
-  return keys.has(pairKey(a, b))
-}

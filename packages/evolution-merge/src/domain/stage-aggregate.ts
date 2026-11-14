@@ -4,7 +4,7 @@ import { isAbsolute, join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { readPairLedger } from './pair-ledger.ts'
 import { readStagingIndex, writeStagingIndex, type StagingEntry } from './staging-index.ts'
-import { createStaging, dropStaging, ensureStaging, readStaging, setStagingTarget, type CreateStagingInput, type CreateStagingResult } from '../staging.ts'
+import { createStaging, readStaging, setStagingTarget, type CreateStagingInput, type CreateStagingResult } from '../staging.ts'
 
 /**
  * Old production staging writers (grep baseline at Batch 1b-1). Their production
@@ -198,11 +198,9 @@ export async function adoptLegacyProduction(io: EvolutionIoLike, home: string): 
 }
 
 /** Production stage-tree facade. These wrappers keep the low-level tree module private to StageAggregate. */
-export async function ensureStageTree(io: EvolutionIoLike, home: string, input: CreateStagingInput): Promise<CreateStagingResult> { return await ensureStaging(io, home, input) }
 export async function createStageTree(io: EvolutionIoLike, home: string, input: CreateStagingInput): Promise<CreateStagingResult> { return await createStaging(io, home, input) }
 export async function readStageTree(io: EvolutionIoLike, home: string, runId: string): Promise<Awaited<ReturnType<typeof readStaging>>> { return await readStaging(io, home, runId) }
 export async function setStageTreeTarget(io: EvolutionIoLike, home: string, stageKey: string, target: string, mode?: 'merge-into-existing' | 'create-umbrella' | 'keep'): Promise<boolean> { return await setStagingTarget(io, home, stageKey, target, mode) }
-export async function dropStageTree(io: EvolutionIoLike, home: string, stageKey: string): Promise<void> { await dropStaging(io, home, stageKey) }
 export async function writeStageIndex(io: EvolutionIoLike, home: string, entry: StagingEntry): Promise<void> { await writeStagingIndex(io, home, entry) }
 export async function readStageIndex(io: EvolutionIoLike, home: string, rowId: string, now = Date.now()): Promise<StagingEntry | null> { return await readStagingIndex(io, home, rowId, now) }
 

@@ -18,6 +18,3 @@ export function resolveLimitsSnapshot(policy?: Parameters<typeof policyStageLimi
 export function limitsSnapshotOf(skillLimits: SkillLimits): MergeLimitsSnapshot {
   return { skillLimits, limitsDigest: createHash('sha256').update(canonical(skillLimits)).digest('hex') }
 }
-export function mergeLimitFinding(path: string, limit: string, observed: number, limitValue: number): { readonly rule: string; readonly path: string; readonly severity: 'block'; readonly code: 'limit'; readonly limit: string; readonly observed: number; readonly limitValue: number; readonly message: string } {
-  return { rule: 'limit', path, severity: 'block', code: 'limit', limit, observed, limitValue, message: path + ' exceeds ' + limit + ' (' + String(observed) + ' > ' + String(limitValue) + ')' }
-}

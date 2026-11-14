@@ -114,7 +114,6 @@ export function buildBodyView(snapshot: MergeSnapshot, ref: BodyRef, text: strin
   return { wireVersion: 1, readAt: snapshot.readAt, name: ref.name, side: ref.side, text: body, markdown: true, truncated, totalBytes: Buffer.byteLength(text, 'utf8') }
 }
 export function buildHistoryView(snapshot: MergeSnapshot): HistoryView { return { wireVersion: 1, readAt: snapshot.readAt, items: snapshot.history } }
-export function buildRunView(snapshot: MergeSnapshot, runId: string): RunView | null { const run = snapshot.runs.find(item => item.record.id === runId); return run === undefined ? null : runView(run, snapshot.readAt) }
 export function buildRunDetail(snapshot: MergeSnapshot, runId: string): RunDetail | null {
   const run = snapshot.runs.find(item => item.record.id === runId); if (run === undefined) return null
   return { ...runView(run, snapshot.readAt, true), ...(run.meta === null ? {} : { meta: { phase: run.meta.phase, ...(run.meta.approval === undefined ? {} : { approval: run.meta.approval }) } }), ...(run.reportRef === null ? {} : { reportRef: run.reportRef }), pairs: run.pairs.map(pair => ({ pairKey: pair.pairKey, a: pair.pairKey.split('\u0000')[0] ?? '', b: pair.pairKey.split('\u0000')[1] ?? '', outcome: pair.result === 'kept' ? 'kept' : pair.result === 'failed' ? 'failed' : pair.result === 'cancelled' ? 'cancelled' : pair.result === 'undone' ? 'undone' : 'merged', ...(pair.target === undefined ? {} : { target: { requested: pair.target } }) })), pairsTruncated: false }

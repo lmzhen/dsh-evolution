@@ -76,4 +76,3 @@ export function buildRound2Prompt(row: MergeRow, decision: MergeDecision, mode: 
   return (mode === 'fresh' ? ['基于已持久化的 decision。', ...head, ...body] : [...head, ...body]).join('\n')
 }
 
-export function buildStandbyPrompt(): string { return STANDBY_PROMPT }

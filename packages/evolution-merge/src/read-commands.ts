@@ -7,7 +7,6 @@ import { readMergeSnapshot } from './domain/merge-snapshot.ts'
 import type { LiveRowFacts } from './domain/live-facts.ts'
 import { buildFacts, toRowFact } from './surface/merge-view.ts'
 import { formatFacts, formatSnapshotQueue, formatSnapshotStatus } from './status.ts'
-import { mergeUsage } from './commands.ts'
 
 export async function handleReadOnlyMergeCommand(
   command: MergeCliCommand,
@@ -41,6 +40,3 @@ export async function handleReadOnlyMergeCommand(
   return formatSnapshotQueue(rows.filter(row => row.queue === 'skipped'), 'skipped')
 }
 
-export function mergeCommandHelp(): string {
-  return mergeUsage()
-}
