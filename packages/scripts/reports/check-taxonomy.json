@@ -554,14 +554,12 @@
         "evolution-merge::tests/gates/rg1-no-downgrade.spec.ts",
         "evolution-merge::tests/gates/rg1-real-fixture.spec.ts",
         "evolution-merge::tests/gates/rg1-reconcile.spec.ts",
-        "evolution-merge::tests/gates/rg1b-1-additive.spec.ts",
         "evolution-merge::tests/gates/rg1b-apply.spec.ts",
         "evolution-merge::tests/gates/rg1b-real-home.spec.ts",
         "evolution-merge::tests/gates/rg1b-reconcile.spec.ts",
         "evolution-merge::tests/gates/rg1b-runtime.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-backup.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-schema4.spec.ts",
-        "evolution-merge::tests/gates/rg1b2a-stage.spec.ts",
         "evolution-merge::tests/gates/rg1b2b-core-fields.spec.ts",
         "evolution-merge::tests/gates/rg1b2b-stage-lifecycle.spec.ts",
         "evolution-merge::tests/gates/rg1b3-body.spec.ts",
@@ -1191,14 +1189,12 @@
         "evolution-merge::tests/gates/rg1-no-downgrade.spec.ts",
         "evolution-merge::tests/gates/rg1-real-fixture.spec.ts",
         "evolution-merge::tests/gates/rg1-reconcile.spec.ts",
-        "evolution-merge::tests/gates/rg1b-1-additive.spec.ts",
         "evolution-merge::tests/gates/rg1b-apply.spec.ts",
         "evolution-merge::tests/gates/rg1b-real-home.spec.ts",
         "evolution-merge::tests/gates/rg1b-reconcile.spec.ts",
         "evolution-merge::tests/gates/rg1b-runtime.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-backup.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-schema4.spec.ts",
-        "evolution-merge::tests/gates/rg1b2a-stage.spec.ts",
         "evolution-merge::tests/gates/rg1b2b-core-fields.spec.ts",
         "evolution-merge::tests/gates/rg1b2b-stage-lifecycle.spec.ts",
         "evolution-merge::tests/gates/rg1b3-body.spec.ts",
@@ -1772,14 +1768,12 @@
         "evolution-merge::tests/gates/rg1-no-downgrade.spec.ts",
         "evolution-merge::tests/gates/rg1-real-fixture.spec.ts",
         "evolution-merge::tests/gates/rg1-reconcile.spec.ts",
-        "evolution-merge::tests/gates/rg1b-1-additive.spec.ts",
         "evolution-merge::tests/gates/rg1b-apply.spec.ts",
         "evolution-merge::tests/gates/rg1b-real-home.spec.ts",
         "evolution-merge::tests/gates/rg1b-reconcile.spec.ts",
         "evolution-merge::tests/gates/rg1b-runtime.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-backup.spec.ts",
         "evolution-merge::tests/gates/rg1b2a-schema4.spec.ts",
-        "evolution-merge::tests/gates/rg1b2a-stage.spec.ts",
         "evolution-merge::tests/gates/rg1b2b-core-fields.spec.ts",
         "evolution-merge::tests/gates/rg1b2b-stage-lifecycle.spec.ts",
         "evolution-merge::tests/gates/rg1b3-body.spec.ts",
@@ -2061,7 +2055,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 409
+      "specs": 407
     },
     "ci-only": {
       "gates": 10,
@@ -2069,16 +2063,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 409
+      "specs": 407
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 481
+      "specs": 479
     }
   },
   "specs": {
-    "total": 481,
-    "marked": 481,
+    "total": 479,
+    "marked": 479,
     "unmarked": 0
   }
 }
