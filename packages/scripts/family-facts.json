@@ -1631,6 +1631,32 @@
               "provenAt": "2026-11-14T18:32:40.282Z",
               "provenSha": "95212e1771db348e374a4a06a93e922f006fd45d7a585704ecdb63a07af82d23"
             }
+          ],
+          "gate-76": [
+            {
+              "mutate": {
+                "file": "packages/scripts/probes.json",
+                "find": "\"mutation\": \"packages/evolution-core/tests/platform-line.mutation.json\"",
+                "replace": "\"mutation\": \"packages/evolution-core/tests/platform-line.mutation-missing.json\""
+              },
+              "expect": "red",
+              "note": "the probe registry names an existing mutation fixture; a missing fixture makes verify-probes red",
+              "provenAt": "2026-11-14T18:34:31.860Z",
+              "provenSha": "7378a6ea5898fd3169c2d975374c635216e474912ad9a25332fbe9101026127c"
+            }
+          ],
+          "gate-77": [
+            {
+              "mutate": {
+                "file": "packages/scripts/requirements/data.json",
+                "find": "\"id\": \"FR-DATA-01\"",
+                "replace": "\"id\": \"FR-DATA-02\""
+              },
+              "expect": "red",
+              "note": "the requirements registry forbids duplicate ids; duplicating FR-DATA-01 as FR-DATA-02 makes verify-requirements red",
+              "provenAt": "2026-11-14T18:34:35.173Z",
+              "provenSha": "28007b0d57416ab504766e5eb5786ed9263036706a70cc10eac2c2ebe8173c2e"
+            }
           ]
         },
         "mutationExempt": {
