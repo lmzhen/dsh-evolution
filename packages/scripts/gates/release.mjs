@@ -23,7 +23,7 @@ export const release = [
     // Release-only product: .release-staging exists only after pack. In CI the family tree is the
     // workspace checkout and the artifact lives under upstream/, so the override runs there.
     lanes: ["ci-release"],
-    after: ["gate-16", "gate-74"],
+    after: ["gate-16"],
     ci: { cwd: "upstream", argv: ["node","packages/evolution/scripts/verify-platform-ranges.mjs","--manifest-dir","packages/evolution/.release-staging","--our-scope","$NPM_SCOPE"] },
   }),
 
@@ -62,21 +62,18 @@ export const release = [
   }),
 
   gate("gate-59", {
-    kind: "step",
+    kind: "external",
     tree: "overlay",
     title: "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
-    command: "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
     lanes: ["ci-release"],
     reason: "action step — executed by its lane/action step, not by run-gates",
   }),
 
   gate("gate-74", {
-    kind: "step",
+    kind: "external",
     tree: "overlay",
     title: "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
-    command: "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
     lanes: ["ci-release","ci-windows"],
-    needs: ["gate-59"],
     reason: "action step — executed by its lane/action step, not by run-gates",
   }),
 

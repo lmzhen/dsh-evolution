@@ -1537,8 +1537,7 @@
         "ci"
       ],
       "after": [
-        "gate-16",
-        "gate-74"
+        "gate-16"
       ],
       "lanes": [
         "ci-release"
@@ -1622,12 +1621,11 @@
     },
     {
       "id": "gate-59",
-      "kind": "step",
+      "kind": "external",
       "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
       "argv": null,
       "tree": "overlay",
       "profiles": [],
-      "command": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
       "reason": "action step — executed by its lane/action step, not by run-gates",
       "lanes": [
         "ci-release"
@@ -1635,16 +1633,12 @@
     },
     {
       "id": "gate-74",
-      "kind": "step",
+      "kind": "external",
       "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
       "argv": null,
       "tree": "overlay",
       "profiles": [],
-      "command": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",
       "reason": "action step — executed by its lane/action step, not by run-gates",
-      "needs": [
-        "gate-59"
-      ],
       "lanes": [
         "ci-release",
         "ci-windows"
