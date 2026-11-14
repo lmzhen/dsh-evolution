@@ -1514,6 +1514,45 @@
               "provenAt": "2026-11-14T18:23:18.690Z",
               "provenSha": "1cc5396a32bc2d1689415f49c8a751049cf26a781a8d3befbf95bd7aa54528b7"
             }
+          ],
+          "gate-61": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-bundle-patches.mjs",
+                "find": "const target = declared === undefined ? join(root, \"evolution-\" + form, \"cordis.patch.yml\") : resolve(root, declared)",
+                "replace": "const target = declared === undefined ? join(root, \"evolution-\" + form, \"cordis.patch-x.yml\") : resolve(root, declared)"
+              },
+              "expect": "red",
+              "note": "each bundle patch is generated at target; pointing the generator at a missing file makes --check report the committed patch stale",
+              "provenAt": "2026-11-14T18:25:33.930Z",
+              "provenSha": "792020ec03fde7a9930a6065e5de349e0be2d95fce7e50239017426f87b8f8b4"
+            }
+          ],
+          "gate-65": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-param-docs.mjs",
+                "find": "const target = docsPath(root)",
+                "replace": "const target = docsPath(root) + \"-x\""
+              },
+              "expect": "red",
+              "note": "PARAMETERS.md is generated at docsPath(root); changing the target makes --check see no previous file and red",
+              "provenAt": "2026-11-14T18:25:35.713Z",
+              "provenSha": "3cb1c947c5b52527a23049343ffb567ddc70136b522865cb5a30bc09dcea6ea4"
+            }
+          ],
+          "gate-66": [
+            {
+              "mutate": {
+                "file": "packages/scripts/gen-requirements.mjs",
+                "find": "const paths = docsPaths(root)",
+                "replace": "const paths = docsPaths(root + \"-x\")"
+              },
+              "expect": "red",
+              "note": "the requirements/traceability docs are generated at docsPaths(root); a shifted root makes --check red instead of writing outside the tree",
+              "provenAt": "2026-11-14T18:25:38.767Z",
+              "provenSha": "7d857f6fe770d9bbd44523ea43df2e20a225563871236a8c9c4f34ed090b7cce"
+            }
           ]
         },
         "mutationExempt": {
