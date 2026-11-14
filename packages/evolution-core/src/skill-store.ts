@@ -51,7 +51,7 @@ import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPa
 import { makeSerialQueue } from './serial.ts'
 import { supportRefs } from './support-refs.ts'
 import { selectSections } from './section-selection.ts'
-import { MutationUnit, fileMutationLock, type MutationLockPort, type MutationResult, type MutationUnitHooks } from './mutation-unit.ts'
+import { MutationUnit, fileMutationLock, type MutationLockPort, type MutationResult, type MutationUnitHooks, type MutationUnitOptions } from './mutation-unit.ts'
 import { mutationLockFrom } from './mutation-authority.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
@@ -880,6 +880,17 @@ export class SkillLibrary {
     }
   }
 
+
+  /** The one MutationUnit constructor: storage ports are fixed here, callers pass the rest. */
+  private commitUnit(options: Omit<MutationUnitOptions, 'io' | 'journal' | 'snapshots'>): MutationUnit {
+    return new MutationUnit({
+      io: this.io,
+      journal: unitJournalPort(this.io, dirname(this.root)),
+      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
+      ...options,
+    })
+  }
+
   private lockPort(): MutationLockPort {
     if (this.mutationLock !== undefined) return this.mutationLock
     // Fail loud outside tests: production skill writes must use the family authority fence.
@@ -905,13 +916,10 @@ export class SkillLibrary {
   /** Recover every prepared tree-change snapshot in the shared unit store. */
   async recoverPreparedUnits(): Promise<MutationResult[]> {
     const home = dirname(this.root)
-    const unit = new MutationUnit({
-      io: this.io,
+    const unit = this.commitUnit({
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
       lock: this.lockPort(),
-      journal: unitJournalPort(this.io, home),
-      snapshots: unitSnapshotPort(this.io, home),
     })
     const results = await unit.recoverPrepared()
     await pruneTreeChangeUnits(this.io, home).catch(() => {})
@@ -1849,12 +1857,9 @@ export class SkillLibrary {
     // create on another instance/process, and the later write silently
     // overwrote the winner's bytes (double audit, double event). In-lock
     // re-check: current bytes present -> structured refusal, nothing written.
-    const unit = new MutationUnit({
-      io: this.io,
+    const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       nested: true,
-      journal: unitJournalPort(this.io, dirname(this.root)),
-      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       transactGuard: false,
       hooks: {
         undone: async () => {
@@ -2001,12 +2006,9 @@ export class SkillLibrary {
       return { ok: true, message: `技能「${name}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: dir }
     }
     const onDisk = finalContent.trimEnd() + '\n'
-    const unit = new MutationUnit({
-      io: this.io,
+    const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       lock: this.lockPort(),
-      journal: unitJournalPort(this.io, dirname(this.root)),
-      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {
@@ -2176,12 +2178,9 @@ export class SkillLibrary {
       return outcome.result
     }
     const onDisk = outcome.write
-    const unit = new MutationUnit({
-      io: this.io,
+    const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       lock: this.lockPort(),
-      journal: unitJournalPort(this.io, dirname(this.root)),
-      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {
@@ -3182,14 +3181,10 @@ export class SkillLibrary {
         this.notifyMutation({ action: 'restructure', name, skillDir: dir })
       },
     }
-    const home = dirname(this.root)
-    const unit = new MutationUnit({
-      io: this.io,
+    const unit = this.commitUnit({
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
       lock: this.lockPort(),
-      journal: unitJournalPort(this.io, home),
-      snapshots: unitSnapshotPort(this.io, home),
       hooks,
       validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
     })
@@ -3298,14 +3293,10 @@ export class SkillLibrary {
         for (const name of roots) this.notifyMutation({ action: 'extract', name, skillDir: this.dirOf(name) })
       },
     }
-    const home = dirname(this.root)
-    const unit = new MutationUnit({
-      io: this.io,
+    const unit = this.commitUnit({
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
       lock: this.lockPort(),
-      journal: unitJournalPort(this.io, home),
-      snapshots: unitSnapshotPort(this.io, home),
       hooks,
       validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
     })
@@ -3387,12 +3378,9 @@ export class SkillLibrary {
       landing.push({ kind: op.kind, target: op.target, content: op.kind === 'write' ? op.content : null, previous, expected: op.expected, skill, dir: owner.dir, rel })
     }
     const unitId = plan.unitId ?? 'u-' + Date.now().toString(36) + '-' + (nextUnitSeq += 1).toString(36)
-    const unit = new MutationUnit({
-      io: this.io,
+    const unit = this.commitUnit({
       limits: this.limits,
       ...(plan.nested === true ? { nested: true as const } : { lock: this.lockPort() }),
-      journal: unitJournalPort(this.io, dirname(this.root)),
-      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       now: () => Date.now(),
     })
@@ -3629,13 +3617,10 @@ export class SkillLibrary {
     if (current !== null && content.trimEnd() === current.trimEnd()) {
       return { ok: true, message: `支撑文件「${filePath}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: target }
     }
-    const unit = new MutationUnit({
-      io: this.io,
+    const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       serial: this.serial,
       lock: this.lockPort(),
-      journal: unitJournalPort(this.io, dirname(this.root)),
-      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {
