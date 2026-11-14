@@ -14,14 +14,18 @@ export function buildSurface(defs: readonly CommandDef[], prefix: string): Comma
   return { wireVersion: 1, prefix, commands: defs.filter(def => def.surface !== false).map(def => ({ id: def.id, words: def.words, flags: def.flags, positional: def.positional, readOnly: def.readOnly, needsRun: def.needsRun, defaults: defaults(def), rowActions: (def.rowActions ?? []).map(action => ({ id: action.id, command: action.command, confirm: action.confirm === true })), fallback: def.fallback })), fallback: defs.filter(def => def.surface !== false && (def.rowActions === undefined || def.rowActions.length === 0)).map(def => ({ id: def.id, command: def.fallback })) }
 }
 export function parseCommand(defs: readonly CommandDef[], argv: readonly string[]): ParsedCommand {
-  const [verb, ...rest] = argv
+  const verb = argv[0]
   if (verb === undefined || verb === 'help' || verb === '--help' || verb === '-h') return { ok: true, id: 'help', values: {}, help: true }
-  const candidates = defs.filter(item => item.words.includes(verb))
-  const def = candidates.find(item => rest.filter(token => token.startsWith('--')).every(token => {
+  // A def's `words` is a prefix of the argv; a longer match wins (maintain status over maintain).
+  const candidates = defs.filter(item => item.words.length > 0 && item.words.every((word, index) => argv[index] === word))
+  const restOf = (item: CommandDef): readonly string[] => argv.slice(item.words.length)
+  const ordered = [...candidates].sort((left, right) => right.words.length - left.words.length)
+  const def = ordered.find(item => restOf(item).filter(token => token.startsWith('--')).every(token => {
     const name = token.slice(2).split('=')[0] ?? ''
     return item.flags.some(flag => flag.name === name)
-  })) ?? candidates[0]
+  })) ?? ordered[0]
   if (def === undefined) return { ok: false, code: 'usage', message: 'unknown command: ' + verb }
+  const rest = restOf(def)
   const values: Record<string, string | true> = {}
   const positional: string[] = []
   for (let index = 0; index < rest.length; index += 1) {
