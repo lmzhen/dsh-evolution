@@ -21,17 +21,17 @@ import { stripComments } from './lib-source-text.mjs'
 const root = process.argv[2] ?? 'packages'
 // The command surface is TypeScript: import it through a file URL (Node strips the types).
 const pkg = resolve(root, 'evolution-commands/src')
-const { COMMAND_ENTRIES, entryName, summaryOf } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
+const { HOST_COMMAND_DEFS, entryName, summaryOf } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
 const { parseSubcommand, isParseFailure } = await import(pathToFileURL(join(pkg, 'parse.ts')).href)
 const sourcePath = join(pkg, 'index.ts')
 const source = stripComments(readFileSync(sourcePath, 'utf8'))
 const problems = []
 
 // A: the C7 shape.
-for (const entry of COMMAND_ENTRIES) {
-  if (typeof entry.usage !== 'string' || entry.usage === '') problems.push('an entry carries no usage')
-  if (summaryOf(entry).trim() === '') problems.push(entry.usage + ': carries no generated summary')
-  if (typeof entry.readonly !== 'boolean') problems.push(entry.usage + ': carries no readonly flag (C7)')
+for (const entry of HOST_COMMAND_DEFS) {
+  if (typeof entry.usageLine !== 'string' || entry.usageLine === '') problems.push('an entry carries no usage')
+  if (summaryOf(entry).trim() === '') problems.push(entry.usageLine + ': carries no generated summary')
+  if (typeof entry.readOnly !== 'boolean') problems.push(entry.usageLine + ': carries no readonly flag (C7)')
 }
 
 
@@ -39,33 +39,33 @@ for (const entry of COMMAND_ENTRIES) {
 // FIRST match. The key is hierarchical now, so this asserts what the fix rests on: no two entries may
 // derive the same key (before the fix: nine collisions across maintain and skill).
 const seenNames = new Map()
-for (const entry of COMMAND_ENTRIES) {
+for (const entry of HOST_COMMAND_DEFS) {
   const name = entryName(entry)
   const firstUsage = seenNames.get(name)
   if (firstUsage !== undefined) {
-    problems.push('two table entries derive the same name "' + name + '": "' + firstUsage + '" and "' + entry.usage + '" — flagsOf would silently take the first (E-08)')
+    problems.push('two table entries derive the same name "' + name + '": "' + firstUsage + '" and "' + entry.usageLine + '" — flagsOf would silently take the first (E-08)')
   } else {
-    seenNames.set(name, entry.usage)
+    seenNames.set(name, entry.usageLine)
   }
 }
 
 // B: the usage line reads as documentation FOR this entry: its first token is the name the table
 // derives, and every flag it mentions is well-formed (`--flag` or `--flag=<value>`). A usage string is
 // NOT a command line — brackets, <placeholders> and `|` variants are how the table talks to a reader.
-for (const entry of COMMAND_ENTRIES) {
-  const first = entry.usage.split(' ')[0].split('|')[0]
-  if (first === '' || !/^[a-z][a-z-]*$/.test(first)) problems.push(entry.usage + ': does not start with a subcommand name')
+for (const entry of HOST_COMMAND_DEFS) {
+  const first = entry.usageLine.split(' ')[0].split('|')[0]
+  if (first === '' || !/^[a-z][a-z-]*$/.test(first)) problems.push(entry.usageLine + ': does not start with a subcommand name')
   // E-08: entryName is hierarchical, so B compares the FIRST token of the key against the usage head.
-  if (first !== entryName(entry).split(' ')[0]) problems.push(entry.usage + ': the table names it "' + entryName(entry) + '"')
-  for (const [flag] of entry.flags ?? []) {
-    if (!new RegExp('\\' + flag + '(=|\\s|\\]|$|\\|)').test(entry.usage)) problems.push(entry.usage + ': mentions ' + flag + ' in an unreadable form')
+  if (first !== entryName(entry).split(' ')[0]) problems.push(entry.usageLine + ': the table names it "' + entryName(entry) + '"')
+  for (const flag of entry.flags ?? []) {
+    if (!new RegExp('\\--' + flag.name + '(=|\\s|\\]|$|\\|)').test(entry.usageLine)) problems.push(entry.usageLine + ': mentions --' + flag.name + ' in an unreadable form')
   }
 }
 
 // C: dispatch ↔ table, both directions.
 // E-08: the DISPATCH speaks one token, so C compares the key FIRST token; the injectivity assertion
 // below is what covers the sub-level.
-const tableNames = new Set(COMMAND_ENTRIES.map((entry) => entryName(entry).split(' ')[0]))
+const tableNames = new Set(HOST_COMMAND_DEFS.map((entry) => entryName(entry).split(' ')[0]))
 const dispatched = new Set()
 for (const match of source.matchAll(/([A-Za-z]+Parsed)\.name [!=]== '([a-z]+)'/g)) dispatched.add(match[2])
 for (const match of source.matchAll(/subcommandOf\(input, '([a-z]+)'/g)) dispatched.add(match[1])
@@ -81,8 +81,8 @@ for (const name of tableNames) {
 // usage line is documentation, while `flags` is the declaration the help/surface read.
 const { VALUE_FLAGS } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
 const takingInFlags = new Set()
-for (const entry of COMMAND_ENTRIES) {
-  for (const [name, kind] of entry.flags ?? []) if (kind === 'value') takingInFlags.add(name.replace(/^--/, ''))
+for (const entry of HOST_COMMAND_DEFS) {
+  for (const flag of entry.flags ?? []) if (flag.kind === 'value') takingInFlags.add(flag.name)
 }
 for (const flag of takingInFlags) {
   if (!VALUE_FLAGS.includes(flag)) {
@@ -104,5 +104,5 @@ if (problems.length > 0) {
   for (const problem of problems) console.error('  ' + problem)
   process.exit(1)
 }
-console.log('verify-command-table: OK — ' + COMMAND_ENTRIES.length + ' table entr(ies), ' +
+console.log('verify-command-table: OK — ' + HOST_COMMAND_DEFS.length + ' table entr(ies), ' +
   dispatched.size + ' parser-dispatched name(s); ' + regexBranches + ' branch(es) still dispatched by their own regex')

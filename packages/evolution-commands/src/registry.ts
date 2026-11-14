@@ -11,21 +11,13 @@
  */
 import { HOST_COMMANDS } from './generated/host-commands.ts'
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
-import { HOST_COMMAND_DEFS } from './host-command-defs.ts'
-
-export interface CommandEntry {
-  /** The subcommand as typed after `/evolution`. Variants use `|` (curator run|pause). */
-  usage: string
-  /** C7: true when the subcommand only READS (no skill/param write). Stored: not derivable. */
-  readonly: boolean
-  /** Authored flag declarations; `usage` documents them but is not the parser's source. */
-  flags?: readonly (readonly [name: string, kind: 'boolean' | 'value'])[]
-}
+import { HOST_COMMAND_DEFS, type HostCommandDef } from './host-command-defs.ts'
+export { HOST_COMMAND_DEFS } from './host-command-defs.ts'
 
 /** The flags the TABLE declares for one subcommand (name → `--flag`). */
 export function flagsOf(name: string): string[] {
-  const entry = COMMAND_ENTRIES.find(candidate => entryName(candidate) === name)
-  return entry?.flags?.map(([flag]) => flag) ?? []
+  const entry = HOST_COMMAND_DEFS.find(candidate => entryName(candidate) === name)
+  return entry?.flags.map(flag => '--' + flag.name) ?? []
 }
 
 /**
@@ -38,23 +30,12 @@ export function flagsOf(name: string): string[] {
  * still resolve: the one call site that named an entry by a name the key no longer produced was the preset
  * dispatch branch, and it now asks for the entry own key (`preset install`).
  */
-export function entryName(entry: CommandEntry): string {
-  // `noUncheckedIndexedAccess` makes both index reads `string | undefined`; destructuring with a
-  // default says the same thing without two casts (the CI build line proved it).
-  const [head = '', second = ''] = entry.usage.split(' ')
-  const name = head.split('|')[0] ?? ''
-  const secondIsName = /^[a-z][a-z-]*$/.test(second) && !second.startsWith('--')
-  return secondIsName ? name + ' ' + second : name
+export function entryName(entry: HostCommandDef): string {
+  return entry.words.join(' ')
 }
 
-export const COMMAND_ENTRIES: CommandEntry[] = HOST_COMMAND_DEFS.map(def => ({
-  usage: def.usageLine,
-  readonly: def.readOnly,
-  ...(def.flags.length === 0 ? {} : { flags: def.flags.map(flag => ['--' + flag.name, flag.kind] as const) }),
-}))
-
 /** The one summary source: the generated command i18n catalog. */
-export function summaryOf(entry: CommandEntry, locale: HostLocale = 'zh'): string {
+export function summaryOf(entry: HostCommandDef, locale: HostLocale = 'zh'): string {
   const text = (HOST_COMMANDS as Record<string, Partial<Record<HostLocale, string>>>)['summary.' + entryName(entry)]?.[locale]
   if (text === undefined) throw new Error('registry: no generated summary for ' + entryName(entry) + ' (' + locale + ')')
   return text
@@ -62,7 +43,7 @@ export function summaryOf(entry: CommandEntry, locale: HostLocale = 'zh'): strin
 
 /** The input-declaration hint (single line, ` | `-separated). */
 export function renderHint(): string {
-  return COMMAND_ENTRIES.map(entry => entry.usage).join(' | ')
+  return HOST_COMMAND_DEFS.map(entry => entry.usageLine).join(' | ')
 }
 
 /** The bare `/evolution` help body (one line per subcommand). */
@@ -70,16 +51,16 @@ export function renderHelpText(locale: HostLocale = 'zh'): string {
   // First line first: the platform's command row collapses to the output's FIRST LINE, and a list
   // whose first line is a subcommand reads like that subcommand was what ran.
   const header = HOST_COMMANDS['help.subcommands'][locale] ?? HOST_COMMANDS['help.subcommands'].en
-  return [header.replace('{count}', String(COMMAND_ENTRIES.length)), '', ...COMMAND_ENTRIES
-    .map(entry => `  ${entry.usage.padEnd(44)} ${summaryOf(entry, locale)}`)]
+  return [header.replace('{count}', String(HOST_COMMAND_DEFS.length)), '', ...HOST_COMMAND_DEFS
+    .map(entry => `  ${entry.usageLine.padEnd(44)} ${summaryOf(entry, locale)}`)]
     .join('\n')
 }
 
 /** Markdown command table fragment for README surfaces (T-WD2 pins it).
  * `|` inside a usage (curator run|pause|…) is escaped for the table cell. */
 export function renderCommandTable(): string {
-  const lines = COMMAND_ENTRIES.map(entry =>
-    `| \`/evolution ${entry.usage.replace(/\|/g, '\\|')}\` | ${summaryOf(entry, 'zh')} |`,
+  const lines = HOST_COMMAND_DEFS.map(entry =>
+    `| \`/evolution ${entry.usageLine.replace(/\|/g, '\\|')}\` | ${summaryOf(entry, 'zh')} |`,
   )
   return lines.join('\n')
 }
@@ -87,9 +68,8 @@ export function renderCommandTable(): string {
 /** Union of every entry's authored value flags. */
 export const VALUE_FLAGS: readonly string[] = (() => {
   const names: string[] = []
-  for (const entry of COMMAND_ENTRIES) for (const [name, kind] of entry.flags ?? []) {
-    const bare = name.replace(/^--/, '')
-    if (kind === 'value' && !names.includes(bare)) names.push(bare)
+  for (const entry of HOST_COMMAND_DEFS) for (const flag of entry.flags) {
+    if (flag.kind === 'value' && !names.includes(flag.name)) names.push(flag.name)
   }
   return names
 })()
