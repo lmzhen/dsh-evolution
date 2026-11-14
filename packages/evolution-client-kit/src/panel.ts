@@ -6,14 +6,12 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import type { ClientSeam, LocaleDictionaries } from './seam.ts'
 import type { SupportedLocale } from './generated/i18n.generated.ts'
+import { bindLocale, FALLBACK_LOCALE, type Translate } from './locale.ts'
 import { injectPluginStyles } from './styles.ts'
 
-/** Dictionary lookup used by the panel body and row label. */
-export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
+export { FALLBACK_LOCALE, type Translate } from './locale.ts'
 
 /** The feature-specific part of one sidebar panel. */
-export const FALLBACK_LOCALE = 'en' as const
-
 export interface SidebarPanelSpec<Face> {
   /** The row id; the keyed main body uses the same value. */
   id: string
@@ -47,11 +45,6 @@ export function requireClientSeats(ctx: unknown, owner: string): ClientSeam {
   return candidate as ClientSeam
 }
 
-function interpolate(text: string, values?: Readonly<Record<string, string | number>>): string {
-  if (values === undefined) return text
-  return text.replace(/\{(\w+)\}/g, (_match, key: string) => String(values[key] ?? ''))
-}
-
 /**
  * Register one sidebar row and its main body under one lifecycle.
  * @param ctx - the client context carrying the slots and locale seats.
@@ -59,27 +52,8 @@ function interpolate(text: string, values?: Readonly<Record<string, string | num
  */
 export function registerSidebarPanel<Face>(ctx: ClientContext, spec: SidebarPanelSpec<Face>): void {
   const seam = ctx as unknown as ClientSeam
-  let registered = false
-  ctx.effect(() => {
-    try {
-      const dispose = seam.locale.register(spec.namespace, spec.dictionaries)
-      registered = true
-      return dispose
-    } catch (error) {
-      ctx.logger.warn(spec.namespace + ': the locale seat refused the dictionary (' + String(error) + '); the panel falls back to the bundle copy')
-      return () => {}
-    }
-  }, spec.namespace + ': locale')
   ctx.effect(() => injectPluginStyles(typeof document === 'undefined' ? undefined : document, spec.styles.css, spec.styles.tagId), spec.namespace + ': styles')
-
-  const fallback = spec.dictionaries[spec.fallback ?? FALLBACK_LOCALE] ?? spec.dictionaries.en
-  const lookup = (key: string): string => {
-    const own = fallback[key] ?? key
-    if (!registered) return own
-    try { return seam.locale.bind(spec.namespace)(key) } catch { return own }
-  }
-  const t: Translate = (key, values) => interpolate(lookup(key), values)
-  const label = (): string => lookup('entry.label')
+  const { t, label } = bindLocale(ctx, spec.namespace, spec.dictionaries, spec.fallback ?? FALLBACK_LOCALE)
 
   seam.slots.inject('sidebar.panellist', function* () {
     yield seam.slots.register(

@@ -4,7 +4,7 @@
  * @module @deepseek-ai/dsh-evolution-client-kit
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { FALLBACK_LOCALE } from './panel.ts'
+import { bindLocale } from './locale.ts'
 import type { LocaleDictionaries } from './seam.ts'
 import type { ReactNode } from 'react'
 import { injectPluginStyles } from './styles.ts'
@@ -39,29 +39,8 @@ interface WorkbenchSeam {
  */
 export function registerWorkbenchView<Face>(ctx: ClientContext, spec: WorkbenchViewSpec<Face>): void {
   const seam = ctx as unknown as WorkbenchSeam
-  let registered = false
-  ctx.effect(() => {
-    try {
-      const dispose = seam.locale.register(spec.namespace, spec.dictionaries)
-      registered = true
-      return dispose
-    } catch (error) {
-      ctx.logger.warn(spec.namespace + ': locale refused (' + String(error) + '); the view falls back to the bundle copy')
-      return () => {}
-    }
-  }, spec.namespace + ': locale')
   ctx.effect(() => injectPluginStyles(typeof document === 'undefined' ? undefined : document, spec.styles.css, spec.styles.tagId), spec.namespace + ': styles')
-  const fallback = spec.dictionaries[FALLBACK_LOCALE]
-  const lookup = (key: string): string => {
-    const own = fallback[key] ?? key
-    if (!registered) return own
-    try { return seam.locale.bind(spec.namespace)(key) } catch { return own }
-  }
-  const t = (key: string, values?: Readonly<Record<string, string | number>>): string => {
-    const template = lookup(key)
-    if (values === undefined) return template
-    return template.replace(/\{(\w+)\}/g, (match: string, slot: string) => values[slot] === undefined ? match : String(values[slot]))
-  }
+  const { t } = bindLocale(ctx, spec.namespace, spec.dictionaries)
   seam.slots.inject('evolution.workbench.view', function* () {
     yield seam.slots.register({
       name: 'evolution.workbench.view',
