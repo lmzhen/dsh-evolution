@@ -891,6 +891,39 @@ export class SkillLibrary {
     })
   }
 
+  /** The one frontmatter pipeline for create/update/patch; patch keeps its cap checks outside. */
+  private prepareBody(
+    content: string,
+    name: string,
+    current: string | null,
+    mode: 'skill' | 'patch',
+  ): { ok: true; body: string; onDisk: string; norm: ReturnType<typeof normalizeFrontmatter> }
+    | { ok: false; message: string; validation: boolean } {
+    const validation = validateFrontmatter(content, name, this.limits, current ?? undefined)
+    if (validation) return { ok: false, message: validation, validation: true }
+    const norm = normalizeFrontmatter(content)
+    if (norm.issues.length > 0) {
+      const issue = norm.issues[0]
+      return {
+        ok: false,
+        message: mode === 'skill'
+          ? `技能「${name}」的 frontmatter 无法自动修复：${issue}：请用双引号包住取值后重试。`
+          : `frontmatter 无法自动修复（${issue}）。`,
+        validation: false,
+      }
+    }
+    const body = norm.changed ? norm.content : content
+    if (norm.changed) {
+      const revalidated = validateFrontmatter(body, name, this.limits, current ?? undefined)
+      if (revalidated) return { ok: false, message: revalidated, validation: false }
+    }
+    if (mode === 'skill') {
+      const threat = this.contentThreatBlock(body)
+      if (threat) return { ok: false, message: threat, validation: false }
+    }
+    return { ok: true, body, onDisk: body.trimEnd() + '\n', norm }
+  }
+
   private lockPort(): MutationLockPort {
     if (this.mutationLock !== undefined) return this.mutationLock
     // Fail loud outside tests: production skill writes must use the family authority fence.
@@ -1795,23 +1828,12 @@ export class SkillLibrary {
     // C-12 (v10 audit): the inline badName() copy is gone (see setPinned).
     const bad = this.badName(normalized)
     if (bad) return { ok: false, message: bad }
-    const validation = validateFrontmatter(content, normalized, this.limits)
-    if (validation) {
-      if (exceedsContentLimit(content, this.limits.maxSkillContentChars)) await this.recordHardCapHit(normalized, content.length, 'create')
-      return { ok: false, message: validation }
+    const prepared = this.prepareBody(content, normalized, null, 'skill')
+    if (!prepared.ok) {
+      if (prepared.validation && exceedsContentLimit(content, this.limits.maxSkillContentChars)) await this.recordHardCapHit(normalized, content.length, 'create')
+      return { ok: false, message: prepared.message }
     }
-    // 0.3.11: frontmatter normalization happens at the write point — the
-    // platform catalog parses strict YAML, so unquoted plain scalars carrying
-    // `: ` (etc.) would silently make the skill invisible to the platform.
-    const norm = normalizeFrontmatter(content)
-    if (norm.issues.length > 0) return { ok: false, message: `技能「${normalized}」的 frontmatter 无法自动修复：${norm.issues[0]}：请用双引号包住取值后重试。` }
-    const finalContent = norm.changed ? norm.content : content
-    if (norm.changed) {
-      const revalidated = validateFrontmatter(finalContent, normalized, this.limits)
-      if (revalidated) return { ok: false, message: revalidated }
-    }
-    const threat = this.contentThreatBlock(finalContent)
-    if (threat) return { ok: false, message: threat }
+    const { onDisk, norm } = prepared
     const dir = this.dirOf(normalized)
     if (await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `技能「${normalized}」已存在。` }
     // v21 (D-6): NTFS and macOS default filesystems match names case-
@@ -1848,9 +1870,6 @@ export class SkillLibrary {
     // (or, for the review channel, pinned) tree it does not own.
     const protection = await this.writeProtection(normalized, origin)
     if (protection) return { ok: false, message: `技能「${normalized}」受保护（${protection}）。` }
-    // F-337: hash the bytes that actually land on disk (write uses
-    // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
-    const onDisk = finalContent.trimEnd() + '\n'
     const createPath = join(dir, 'SKILL.md')
     // P3 (v17): the already-exists refusal moves INSIDE the cross-process
     // transact — the lock-free probe above could be raced by a concurrent
@@ -1975,21 +1994,11 @@ export class SkillLibrary {
     const limitProbe = await probeText(this.io, path)
     if (isUnknown(limitProbe)) console.warn(`skill-store: could not re-read ${path} for the shrink exemption (${limitProbe.reason}); validating without it — an over-limit repair is refused, not accepted`)
     const currentForLimit = isPresent(limitProbe) ? limitProbe.value : null
-    const validation = validateFrontmatter(content, name, this.limits, currentForLimit)
-    if (validation) {
-      if (exceedsContentLimit(content, this.limits.maxSkillContentChars)) await this.recordHardCapHit(name, content.length, 'update')
-      return { ok: false, message: validation }
+    const prepared = this.prepareBody(content, name, currentForLimit, 'skill')
+    if (!prepared.ok) {
+      if (prepared.validation && exceedsContentLimit(content, this.limits.maxSkillContentChars)) await this.recordHardCapHit(name, content.length, 'update')
+      return { ok: false, message: prepared.message }
     }
-    // 0.3.11: normalize at the write point (see create) — same reasoning.
-    const norm = normalizeFrontmatter(content)
-    if (norm.issues.length > 0) return { ok: false, message: `技能「${name}」的 frontmatter 无法自动修复：${norm.issues[0]}：请用双引号包住取值后重试。` }
-    const finalContent = norm.changed ? norm.content : content
-    if (norm.changed) {
-      const revalidated = validateFrontmatter(finalContent, name, this.limits, currentForLimit)
-      if (revalidated) return { ok: false, message: revalidated }
-    }
-    const threat = this.contentThreatBlock(finalContent)
-    if (threat) return { ok: false, message: threat }
     let current: string | null
     try {
       current = await this.io.readText(path)
@@ -2002,10 +2011,10 @@ export class SkillLibrary {
       await this.cleanupGhostDir(path)
       return { ok: false, message: `技能「${name}」不存在。` }
     }
-    if (finalContent.trimEnd() === current.trimEnd()) {
+    if (prepared.body.trimEnd() === current.trimEnd()) {
       return { ok: true, message: `技能「${name}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: dir }
     }
-    const onDisk = finalContent.trimEnd() + '\n'
+    const onDisk = prepared.onDisk
     const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       lock: this.lockPort(),
@@ -2037,7 +2046,7 @@ export class SkillLibrary {
     }
     const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
     const retention = contentRetentionFeedback({ name, action: 'update', before: current, after: onDisk })
-    return { ok: true, message: `技能「${name}」已更新。${warning}${retention === null ? '' : '\n' + retention}`, path: dir, ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}) }
+    return { ok: true, message: `技能「${name}」已更新。${warning}${retention === null ? '' : '\n' + retention}`, path: dir, ...(prepared.norm.changed ? { normalizedFrontmatterFields: prepared.norm.fields } : {}) }
   }
 
   async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
@@ -2109,18 +2118,10 @@ export class SkillLibrary {
       let writeContent = patched
       let normalizedFields: string[] | undefined
       if (target === skillMd) {
-        const validation = validateFrontmatter(patched, name, this.limits, md)
-        if (validation) return { result: { ok: false, message: `补丁被拒绝：${validation}` }, write: null }
-        // 0.3.11: normalize at the write point (see create) — a patch may edit
-        // the frontmatter directly.
-        const norm = normalizeFrontmatter(patched)
-        if (norm.issues.length > 0) return { result: { ok: false, message: `补丁被拒绝：frontmatter 无法自动修复（${norm.issues[0]}）。` }, write: null }
-        if (norm.changed) {
-          writeContent = norm.content
-          normalizedFields = norm.fields
-          const revalidated = validateFrontmatter(writeContent, name, this.limits, md)
-          if (revalidated) return { result: { ok: false, message: `补丁被拒绝：${revalidated}` }, write: null }
-        }
+        const prepared = this.prepareBody(patched, name, md, 'patch')
+        if (!prepared.ok) return { result: { ok: false, message: `补丁被拒绝：${prepared.message}` }, write: null }
+        writeContent = prepared.body
+        if (prepared.norm.changed) normalizedFields = prepared.norm.fields
       }
       if (Buffer.byteLength(writeContent, 'utf8') > this.limits.maxSkillFileBytes && target !== skillMd) {
         return { result: { ok: false, message: `修补后的文件超过 ${this.limits.maxSkillFileBytes} 字节。` }, write: null }
