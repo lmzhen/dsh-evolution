@@ -1696,6 +1696,19 @@
               "provenAt": "2026-11-14T18:38:09.122Z",
               "provenSha": "bed11f0be501041ff4ced0750c8bb415d4ea12dd5cc36e06fcddb581098d42c4"
             }
+          ],
+          "ci-only-23": [
+            {
+              "mutate": {
+                "file": "packages/evolution-core/src/params.ts",
+                "find": "{ id: 'reviewSkillInterval',",
+                "replace": "{ id: 'reviewSkillIntervalX',"
+              },
+              "expect": "red",
+              "note": "every declared parameter must have a reader; renaming the id leaves code reading the old id, so verify-param-consumers must red",
+              "provenAt": "2026-11-14T18:53:37.399Z",
+              "provenSha": "6bf4d5c5a65e9381212aa0dfe18a8a19bd8ecca9ce26030d6268b75a25b66be5"
+            }
           ]
         },
         "mutationExempt": {
