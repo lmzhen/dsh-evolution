@@ -442,10 +442,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         // G7.4/C7: the ONE parser answers the shape.
-        const pendingParsed = parseSubcommand(input)
-        if (!isParseFailure(pendingParsed) && pendingParsed.name === 'pending'
-          && pendingParsed.positionals.length === 0
-          && [...pendingParsed.flags.keys()].every(flag => flag === 'detail')) {
+        const command = parseSubcommand(input)
+        if (!isParseFailure(command) && command.name === 'pending'
+          && command.positionals.length === 0
+          && [...command.flags.keys()].every(flag => flag === 'detail')) {
           // 0.3.17 (S3.3): 'executing' rows (a previous approve crashed
           // mid-run) stay visible — approve will refuse to re-run them.
           // v29 CMD-05: the two lists come from independent provider
@@ -471,7 +471,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // F-328: `--detail` renders each record's staged args so an operator
           // reviews what approve will actually replay (the summary alone is a
           // 120-char label). The default (collapsed) view is unchanged.
-          const detailed = pendingParsed.flags.get('detail') === true
+          const detailed = command.flags.get('detail') === true
           // A staged write is a DECISION someone has to make, so the row carries when it was staged
           // and who staged it: an abandoned record and one from a minute ago must not look alike.
           // The words are this command surface's own. (Audit F-7: the family is NOT monolingual — the
@@ -857,8 +857,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ? ok('已向本会话发送学习请求，请现在执行。')
             : ok('学习请求已排入本会话队列：本宿主没有唤醒通道，会在你下一条消息时读取。')
         }
-        const factsParsed = parseSubcommand(input)
-        if (!isParseFailure(factsParsed) && factsParsed.name === 'maintain' && factsParsed.flags.get('facts') === true && factsParsed.positionals.length === 0) {
+        if (!isParseFailure(command) && command.name === 'maintain' && command.flags.get('facts') === true && command.positionals.length === 0) {
           // 0-token deterministic preview (011 §12-1 v12): facts block only,
           // no subagent call, no cooldown (the cooldown guards LLM calls).
           // PLAN S5.4 (2026-09-16, audit P2-22): the preview skipped the M-02
@@ -914,19 +913,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // and `[ =]` after it accept both spellings; trailing whitespace was
         // already tolerated and stays tolerated.
         // G7.4/C7: --timeout <ms> and --timeout=<ms> are the same flag to the parser.
-        const maintainParsed = parseSubcommand(input)
         // An UNDECLARED flag keeps the old 'unknown arguments' answer: the table declares what this
         // subcommand accepts (C7), so a typo cannot silently become a bare flag.
-        const maintainFlagsDeclared = [...(isParseFailure(maintainParsed) ? [] : maintainParsed.flags.keys())]
+        const maintainFlagsDeclared = [...(isParseFailure(command) ? [] : command.flags.keys())]
           .every(flag => flagsOf('maintain').includes('--' + flag))
-        if (!isParseFailure(maintainParsed) && maintainParsed.name === 'maintain' && maintainParsed.positionals.length === 0 && maintainFlagsDeclared) {
+        if (!isParseFailure(command) && command.name === 'maintain' && command.positionals.length === 0 && maintainFlagsDeclared) {
           // User-command maintenance RUN (design 011; async since 0.19.0 / S2).
           // Deterministic facts + one-shot subagent → a validated plan that is
           // PERSISTED as this run's report; the command only points at it. No
           // writes to the skill tree, no auto execution, fail-closed when a
           // dependency is missing. `--timeout <ms>` overrides the deadline for
           // THIS run — no file edit, no restart.
-          const timeoutFlag = maintainParsed.flags.get('timeout')
+          const timeoutFlag = command.flags.get('timeout')
           const runTimeoutMs = typeof timeoutFlag === 'string' ? Number(timeoutFlag) : (config.maintainTimeoutMs ?? 600_000)
           // V6-29 (0.3.36): AbortSignal.timeout throws a RangeError above 2^32-1
           // — reject the domain explicitly instead of surfacing the platform
@@ -1147,9 +1145,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
         const maintainSub = (sub: string) => {
-          const parsed = parseSubcommand(input)
-          if (isParseFailure(parsed) || parsed.name !== 'maintain' || parsed.positionals[0] !== sub) return null
-          return [...parsed.flags.keys()].every(flag => flagsOf('maintain').includes('--' + flag)) ? parsed : null
+          if (isParseFailure(command) || command.name !== 'maintain' || command.positionals[0] !== sub) return null
+          return [...command.flags.keys()].every(flag => flagsOf('maintain').includes('--' + flag)) ? command : null
         }
         const maintainStatus = maintainSub('status')
         if (maintainStatus !== null) {
@@ -1502,10 +1499,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return ok(replay.compare().report)
         }
         // G7.4/C7: the ONE parser answers the shape (flag order and `=` tolerated, F-4).
-        const paramsParsed = parseSubcommand(input)
-        if (!isParseFailure(paramsParsed) && paramsParsed.name === 'params'
-          && paramsParsed.positionals.length === 0
-          && [...paramsParsed.flags.keys()].every(flag => flag === 'group' || flag === 'json')) {
+        if (!isParseFailure(command) && command.name === 'params'
+          && command.positionals.length === 0
+          && [...command.flags.keys()].every(flag => flag === 'group' || flag === 'json')) {
           // S4.1: the READ face over the registry. Read-only and 0-token — the
           // text renders in the command surface, exactly like `maintain --facts`.
           const provider = ctx.get('settings') as SettingsProviderLike | undefined
@@ -1528,14 +1524,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             }
           }
           const rows = paramSurfaceRows(sections, PARAM_EXPOSURE)
-          const groupFlag = paramsParsed.flags.get('group')
+          const groupFlag = command.flags.get('group')
           // A flag VALUE keeps the caller's case (F-4): an unknown group now reaches E-308's list.
           const group = typeof groupFlag === 'string' ? groupFlag : undefined
           const selected = group === undefined ? rows : rows.filter(row => row.group === group)
           if (group !== undefined && selected.length === 0) {
             return err(hostError('e-308-unknown-parameter-group-group', { a1: group, a2: paramGroups(PARAM_EXPOSURE).join(', ') }))
           }
-          if (paramsParsed.flags.get('json') === true) return ok(renderParamJson(selected))
+          if (command.flags.get('json') === true) return ok(renderParamJson(selected))
           return ok(renderParamRows(selected, { providerMounted: provider !== undefined }))
         }
         if (input === 'doctor' || input === 'doctor --json') {
