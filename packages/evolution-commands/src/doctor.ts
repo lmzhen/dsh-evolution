@@ -18,7 +18,7 @@ import { evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, re
 import { composePresetEntry, presetRowBlock, presetRowBody, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import type { DiagnosticsView } from '@deepseek-ai/dsh-evolution-core'
 import { processScopeViolations } from '@deepseek-ai/dsh-evolution-state'
-import { assembleDoctorInputs, buildDoctorView, classifyInstallForm } from './doctor-view.ts'
+import { assembleDoctorInputs, buildDoctorView, classifyInstallForm, type InstallFormId } from './doctor-view.ts'
 import { readLegacyDocumentState } from './migration.ts'
 import { readPlatformView } from './platform-view.ts'
 import type { PlatformPlugin, PlatformPreset, PlatformView } from './platform-view.ts'
@@ -246,7 +246,7 @@ export interface DoctorReport {
    * per-session install reported `none` and the action ladder advised
    * installing `all` — which double-mounts the preset's model rows (the
    * exact conflict this report flags). */
-  installForm: 'full' | 'human-gated' | 'host' | 'preset' | 'layered' | 'preset-only' | 'none'
+  installForm: InstallFormId
   /** Aggregated across ALL profiles under `home` (N13, v12): doctor answers
    * "is any profile carrying an evolution bundle / which install forms exist"
    * — not "what this runtime mounted". `services.review` is the runtime-side
