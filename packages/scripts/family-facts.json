@@ -1553,6 +1553,19 @@
               "provenAt": "2026-11-14T18:25:38.767Z",
               "provenSha": "7d857f6fe770d9bbd44523ea43df2e20a225563871236a8c9c4f34ed090b7cce"
             }
+          ],
+          "gate-82": [
+            {
+              "mutate": {
+                "file": "packages/scripts/verify-i18n.mjs",
+                "find": "if (uiFiles.length !== 4)",
+                "replace": "if (uiFiles.length !== 3)"
+              },
+              "expect": "red",
+              "note": "the four ui catalogs are a pinned invariant; changing the expected count makes the verifier red on the real tree",
+              "provenAt": "2026-11-14T18:27:49.489Z",
+              "provenSha": "02230a7bfb3ff835d243fa97e66d5df9ebbafe42b2eebe41128120f7a6e43573"
+            }
           ]
         },
         "mutationExempt": {
