@@ -1657,6 +1657,19 @@
               "provenAt": "2026-11-14T18:34:35.173Z",
               "provenSha": "28007b0d57416ab504766e5eb5786ed9263036706a70cc10eac2c2ebe8173c2e"
             }
+          ],
+          "gate-55": [
+            {
+              "mutate": {
+                "file": "packages/scripts/traceability.json",
+                "find": "\"id\": \"A-01\"",
+                "replace": "\"id\": \"A-99\""
+              },
+              "expect": "red",
+              "note": "the traceability universe is closed; an unknown id must make verify-traceability red",
+              "provenAt": "2026-11-14T18:37:08.018Z",
+              "provenSha": "103816f26a7e917ea55e2379ebe5099ecb211d109c373c33a3e5b5e8c11830ca"
+            }
           ]
         },
         "mutationExempt": {
