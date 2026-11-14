@@ -102,7 +102,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 65 | node packages/evolution/scripts/gen-param-docs.mjs packages/evolution --check | overlay |
 | 66 | node packages/evolution/scripts/gen-requirements.mjs packages/evolution --check | overlay |
 | 67 | node packages/scripts/inject-evolution-paths.mjs upstream/tsconfig.base.json tsconfig.base.json | mirror |
-| 68 | node packages/evolution/scripts/install-layered.mjs --home "$HOME_DIR" --profile web --mode layered | overlay |
+| 68 | node packages/evolution/scripts/install-layered.mjs --home "$HOME_DIR" --profile web --mode all | overlay |
 | 69 | node packages/evolution/scripts/lib-line-header.mjs --ci --policy packages/evolution/scripts/line-policy.json | overlay |
 | 70 | node packages/evolution/scripts/prepare-release.mjs "${ARGS[@]}" | overlay |
 | 71 | node packages/evolution/scripts/publish-scoped.mjs --no-provenance --dry-run | overlay |

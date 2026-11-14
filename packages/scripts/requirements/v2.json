@@ -231,7 +231,7 @@
       "criteria": [
         {
           "id": "AC-1",
-          "text": "unit-written 崩溃不回滚已提交 merge；重启后树保持已提交、finalize 成功；receipt/journal 恢复路径由 commit-recovery/recovery-settle 覆盖"
+          "text": "unit-written 崩溃不回滚已提交 merge；重启后树保持已提交、finalize 成功；receipt/unit journal 恢复路径覆盖"
         }
       ],
       "supersedes": [],

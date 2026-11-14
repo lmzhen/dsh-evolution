@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-13T03:13:15.928Z",
-  "tree": "462e38fb",
+  "measuredAt": "2026-11-14T09:18:40.248Z",
+  "tree": "fe9426ab",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -654,106 +654,6 @@
       "owner": "evolution-host"
     },
     {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-app-boot",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-agent-preset",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-persona",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-skill",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-executor-ptc",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-present",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-memory/tools",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-session-query",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-web-app",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer-preset-base.spec.ts",
-      "id": "@deepseek-ai/dsh-base",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer-preset-base.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
       "spec": "packages/evolution-host/tests/installer.spec.ts",
       "id": "@deepseek-ai/dsh-app-boot",
       "kind": "platform",
@@ -786,46 +686,6 @@
     {
       "spec": "packages/evolution-host/tests/installer.spec.ts",
       "id": "@deepseek-ai/dsh-base",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer.spec.ts",
-      "id": "@deepseek-ai/dsh-persona",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer.spec.ts",
-      "id": "@deepseek-ai/dsh-tools",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-skill",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-host"
-    },
-    {
-      "spec": "packages/evolution-host/tests/installer.spec.ts",
-      "id": "@deepseek-ai/dsh-tool-session-query",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",

@@ -9,7 +9,6 @@ it('allows every live/terminal run-state artifact phase', () => {
     state({ row: 'verify', run: 'running', activeRuns: 1, hasOwner: true }),
     state({ row: 'pending', run: 'awaiting-approval', activeRuns: 1, hasOwner: true }),
     state({ row: 'fuse', run: 'orphan', staging: 'kept' }),
-    state({ row: 'fuse', run: 'failed', staging: 'missing', recovery: true }),
     state({ row: 'merged', run: 'succeeded', staging: 'cleaned', journal: 'committed', evidence: 'receipt' }),
   ]) expect(validateArtifacts(item).ok, JSON.stringify(item)).toBe(true)
 })

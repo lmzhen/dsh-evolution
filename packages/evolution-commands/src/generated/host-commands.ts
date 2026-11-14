@@ -464,14 +464,14 @@ export const HOST_COMMANDS = {
       "pt": "atualizado — uma nova geração corresponde byte a byte a este arquivo"
     },
     "doctor.presetDiffers": {
-      "zh": "与最新生成不同 — 这是安装时快照；重新运行安装器（/evolution preset install）以重新生成",
-      "en": "DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate",
-      "ja": "最新の生成結果と異なります — インストール時のスナップショットです。インストーラー（/evolution preset install）を再実行して再生成してください",
-      "es": "DIFIERE de una generación nueva — es una instantánea del momento de instalar; vuelve a ejecutar el instalador (/evolution preset install) para regenerarla",
-      "fr": "DIFFÈRE d’une nouvelle génération — c’est un instantané de l’installation ; relancez l’installateur (/evolution preset install) pour la régénérer",
-      "de": "WEICHT von einer neuen Erzeugung ab — es ist ein Installations-Snapshot; Installer erneut ausführen (/evolution preset install), um ihn neu zu erzeugen",
-      "ru": "ОТЛИЧАЕТСЯ от новой генерации — это снимок на момент установки; запустите установщик повторно (/evolution preset install)",
-      "pt": "DIFERE de uma nova geração — é um instantâneo do momento da instalação; execute o instalador novamente (/evolution preset install)"
+      "zh": "与最新生成不同 — 这是安装时快照；重新运行安装器（all/host）以重新生成",
+      "en": "DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (all/host) to regenerate",
+      "ja": "最新の生成結果と異なります — インストール時のスナップショットです。インストーラー（all/host）を再実行して再生成してください",
+      "es": "DIFIERE de una generación nueva — es una instantánea del momento de instalar; vuelve a ejecutar el instalador (all/host) para regenerarla",
+      "fr": "DIFFÈRE d’une nouvelle génération — c’est un instantané de l’installation ; relancez l’installateur (all/host) pour la régénérer",
+      "de": "WEICHT von einer neuen Erzeugung ab — es ist ein Installations-Snapshot; Installer erneut ausführen (all/host), um ihn neu zu erzeugen",
+      "ru": "ОТЛИЧАЕТСЯ от новой генерации — это снимок на момент установки; запустите установщик повторно (all/host)",
+      "pt": "DIFERE de uma nova geração — é um instantâneo do momento da instalação; execute o instalador novamente (all/host)"
     },
     "doctor.presetUnknown": {
       "zh": "未知 — 无法重新生成（{detail}）",

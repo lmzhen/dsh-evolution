@@ -260,20 +260,19 @@
     },
     {
       "id": "A-16",
-      "disposition": "adopted",
+      "disposition": "no-action",
       "design": [
         "W10"
       ],
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [
-        "beh-installer-layered"
-      ],
+      "probes": [],
       "gates": [
         "gate-67"
       ],
-      "evidence": "C"
+      "evidence": "C",
+      "note": "legacy layered/preset installer retired in 0.48; current all/host install is covered by gate-67 and the installer specs"
     },
     {
       "id": "A-17",
@@ -366,7 +365,7 @@
     },
     {
       "id": "A-22",
-      "disposition": "adopted",
+      "disposition": "no-action",
       "design": [
         "W3",
         "W10"
@@ -374,13 +373,12 @@
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [
-        "beh-installer-layered"
-      ],
+      "probes": [],
       "gates": [
         "gate-67"
       ],
-      "evidence": "C"
+      "evidence": "C",
+      "note": "legacy layered/preset installer retired in 0.48; current all/host install is covered by gate-67 and the installer specs"
     },
     {
       "id": "B-01",
@@ -811,7 +809,7 @@
     },
     {
       "id": "C-12",
-      "disposition": "adopted",
+      "disposition": "no-action",
       "design": [
         "W3",
         "W10"
@@ -819,13 +817,12 @@
       "files": [
         "packages/scripts/install-layered.mjs"
       ],
-      "probes": [
-        "beh-installer-layered"
-      ],
+      "probes": [],
       "gates": [
         "gate-67"
       ],
-      "evidence": "C"
+      "evidence": "C",
+      "note": "legacy layered/preset installer retired in 0.48; current all/host install is covered by gate-67 and the installer specs"
     }
   ],
   "budget": {

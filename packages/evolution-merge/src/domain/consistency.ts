@@ -13,7 +13,6 @@ export interface ArtifactState {
   readonly evidence: EvidenceState
   readonly activeRuns: number
   readonly hasOwner?: boolean
-  readonly recovery?: boolean
 }
 
 export interface ConsistencyResult { readonly ok: boolean; readonly reason?: string }
@@ -30,14 +29,6 @@ const ALLOWED: readonly ArtifactState[] = [
   { row: 'fuse', run: 'running', staging: 'kept', journal: 'none', evidence: 'none', activeRuns: 1 },
   { row: 'fuse', run: 'failed', staging: 'kept', journal: 'none', evidence: 'none', activeRuns: 0 },
   { row: 'fuse', run: 'orphan', staging: 'kept', journal: 'none', evidence: 'none', activeRuns: 0 },
-  { row: 'fuse', run: 'none', staging: 'none', journal: 'none', evidence: 'none', activeRuns: 0, recovery: true },
-  { row: 'fuse', run: 'failed', staging: 'none', journal: 'none', evidence: 'none', activeRuns: 0, recovery: true },
-  { row: 'fuse', run: 'orphan', staging: 'none', journal: 'none', evidence: 'none', activeRuns: 0, recovery: true },
-  { row: 'fuse', run: 'running', staging: 'none', journal: 'none', evidence: 'none', activeRuns: 1, recovery: true },
-  { row: 'fuse', run: 'none', staging: 'missing', journal: 'none', evidence: 'none', activeRuns: 0, recovery: true },
-  { row: 'fuse', run: 'failed', staging: 'missing', journal: 'none', evidence: 'none', activeRuns: 0, recovery: true },
-  { row: 'fuse', run: 'orphan', staging: 'missing', journal: 'none', evidence: 'none', activeRuns: 0, recovery: true },
-  { row: 'fuse', run: 'running', staging: 'missing', journal: 'none', evidence: 'none', activeRuns: 1, recovery: true },
   { row: 'fuse', run: 'running', staging: 'kept', journal: 'committing', evidence: 'none', activeRuns: 1 },
   { row: 'skipped', run: 'none', staging: 'none', journal: 'none', evidence: 'none', activeRuns: 0 },
   { row: 'merged', run: 'succeeded', staging: 'cleaned', journal: 'committed', evidence: 'receipt', activeRuns: 0 },
@@ -47,7 +38,6 @@ const ALLOWED: readonly ArtifactState[] = [
 function same(a: ArtifactState, b: ArtifactState): boolean {
   return a.row === b.row && a.run === b.run && a.staging === b.staging && a.journal === b.journal
     && a.evidence === b.evidence && a.activeRuns === b.activeRuns
-    && (b.recovery ?? false) === (a.recovery ?? false)
 }
 
 export function validateArtifacts(state: ArtifactState): ConsistencyResult {
@@ -56,7 +46,7 @@ export function validateArtifacts(state: ArtifactState): ConsistencyResult {
   if (ALLOWED.some(item => same(state, item))) return { ok: true }
   if (state.row === 'pending' && state.staging !== 'none') return { ok: false, reason: 'pending-staging' }
   if (state.row === 'skipped' && state.run === 'running') return { ok: false, reason: 'skipped-running' }
-  if (state.row === 'fuse' && state.staging === 'missing' && state.recovery !== true) return { ok: false, reason: 'fuse-lost-staging' }
+  if (state.row === 'fuse' && state.staging === 'missing') return { ok: false, reason: 'fuse-lost-staging' }
   if (state.journal === 'committed' && state.evidence !== 'receipt') return { ok: false, reason: 'committed-no-evidence' }
   if (state.row === 'merged' && state.journal === 'rolled-back') return { ok: false, reason: 'committed-rollback' }
   return { ok: false, reason: 'not-allowed' }

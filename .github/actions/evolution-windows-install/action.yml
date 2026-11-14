@@ -140,16 +140,17 @@ runs:
       env:
         DIST_DIR: ${{ inputs.dist_dir }}
       run: |
-        # The Windows-specific half: the installer's profile patch shape (bundle row, preset row,
+        # The Windows-specific half: the installer's profile patch shape (bundle row,
         # journal, no double mount) is what a Windows path bug breaks first. With DIST_DIR set the
         # guard installs the PACKED tarballs (installer --from-dist), i.e. the bytes users receive.
+        # 0.48 ships only all/host; the legacy layered install path is gone.
         HOME_DIR="$(mktemp -d)"
         if [[ -n "${DIST_DIR}" ]]; then
           node packages/evolution/scripts/install-layered.mjs \
-            --home "$HOME_DIR" --profile web --mode layered --from-dist "$DIST_DIR"
+            --home "$HOME_DIR" --profile web --mode all --from-dist "$DIST_DIR"
         else
           node packages/evolution/scripts/install-layered.mjs \
-            --home "$HOME_DIR" --profile web --mode layered
+            --home "$HOME_DIR" --profile web --mode all
         fi
         node packages/evolution/scripts/verify-profile-bundles.mjs "$HOME_DIR/profiles/web"
         test -f "$HOME_DIR/profiles/web/.evolution-install.json"

@@ -21,10 +21,8 @@ export interface Config {
    * (G1) and a LIVE row field (registry tier E3). The policy row's `memoryChars`
    * is the same semantic on the review-planner side; the two are NOT
    * auto-synchronised — `/evolution doctor` reports the divergence (budgetIssues).
-   * A row may spell either this name or the deprecated alias below. No schema
-   * default: the alias carries it, and a default on the canonical key would fill
-   * it and leave the alias unreachable (the store resolves
-   * DEFAULT_MEMORY_CHAR_LIMIT after the alias fallback). */
+   * This is the only row key in 0.48; the store resolves
+   * DEFAULT_MEMORY_CHAR_LIMIT when the row carries nothing. */
   memoryChars?: Volatile<number | undefined>
   /** Store-enforced character budget for USER.md — the CANONICAL registry id (G1),
    * a live row field on the same terms as `memoryChars`. */

@@ -1,14 +1,12 @@
 # Evolution agent layer — DELTA ONLY.
 #
-# This file is the incremental part of the Evolution preset, NOT a full
-# composition. `install-layered.mjs` (agent/layered modes; V6-52, 0.3.37 —
-# oneclick installs the preset BUNDLE row instead of writing this file)
-# generates the installed preset as ONE `- insert:` row inside the target profile's own patch
-# (`<home>/profiles/<profile>/cordis.patch.yml`; 0.2.x removed the preset directory)
-# by concatenating the RUNTIME platform's `standard` preset composition with
-# this delta (rc.53): the standard rows come from the dsh being installed
-# against, so the preset follows whatever platform version the user actually
-# has — rc, release, or any future line — instead of vendoring one baseline's
+# This is the legacy delta of the Evolution preset. 0.48 removed the installer
+# composition path that consumed it; the file stays only so an existing 0.47
+# profile's preset row remains readable and uninstallable. No new profile is
+# generated from it.
+# Historical note: the standard rows came from the dsh being installed
+# against, so the preset followed whatever platform version the user actually
+# had — rc, release, or any future line — instead of vendoring one baseline's
 # rows forever.
 #
 # The host bundle provides memory/skill services; this preset only exposes

@@ -138,6 +138,16 @@ describe('layered installer', () => {
     expect(manifest.dsh?.profile?.bundles).toEqual(['@deepseek-ai/dsh-base'])
   }, 60_000)
 
+  it('uninstalls a legacy one-click profile without touching user data', async () => {
+    const home = await tempRoot('dsh-installer-uninstall-oneclick-')
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-preset'), { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-evolution-preset'] } } }), 'utf8')
+    await runInstaller(home, 'oneclick', 'evo-test', ['--uninstall'])
+    const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8')) as { dsh?: { profile?: { bundles?: string[] } } }
+    expect(manifest.dsh?.profile?.bundles).toEqual(['@deepseek-ai/dsh-base'])
+  }, 60_000)
+
   it('uninstalls a legacy preset row from the profile patch', async () => {
     const home = await tempRoot('dsh-installer-uninstall-row-')
     const profileDir = join(home, 'profiles', 'evo-test')

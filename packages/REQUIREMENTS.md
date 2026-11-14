@@ -1242,7 +1242,7 @@ approve/resume 必须后台，命令立即返回 run id（FR-RUN-02/FR-APP-07）
 
 崩溃恢复不得回滚已提交 merge；journal 记录真实分段；恢复先读 receipt/unit（FR-LIFE-02、FR-VAL-08）
 
-- AC-1 unit-written 崩溃不回滚已提交 merge；重启后树保持已提交、finalize 成功；receipt/journal 恢复路径由 commit-recovery/recovery-settle 覆盖 → pass (A)
+- AC-1 unit-written 崩溃不回滚已提交 merge；重启后树保持已提交、finalize 成功；receipt/unit journal 恢复路径覆盖 → pass (A)
 
 ### GAP-P0-04 engine 部署输入 allowlist：宿主不得写 offline/autoprovision/embedbackend/rankmode...
 

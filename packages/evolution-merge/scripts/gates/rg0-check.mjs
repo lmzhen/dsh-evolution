@@ -19,11 +19,14 @@ const src = join(packageRoot, 'src')
 const checks = []
 const add = (name, ok, detail) => checks.push({ name, ok, detail })
 
-const owners = ['state.ts', 'commit-execute.ts', 'domain/commit-journal-store.ts', 'staging.ts', 'target-claim.ts', 'adapters/library.ts']
+const owners = ['state.ts', 'commit-execute.ts', 'staging.ts', 'target-claim.ts', 'adapters/library.ts']
 for (const path of owners) add('owner:' + path, existsSync(join(src, path)), 'owner path exists')
 
-const recovery = existsSync(join(src, 'commit-recovery.ts')) ? readFileSync(join(src, 'commit-recovery.ts'), 'utf8') : ''
-add('recovery-no-skill-write', recovery !== '' && !recovery.includes('writeText(skillBodyPath') && !recovery.includes('writeText(skillFilePath') && !recovery.includes('restoreFromArchive'), 'recovery must not write skills')
+// W11 §30.11: the legacy commit journal and its recovery module are gone; the
+// receipt/unit journal is the only recovery record. This replaces the old
+// "recovery must not write skills" check — there is no recovery module left.
+const legacyJournal = ['commit-recovery.ts', 'domain/commit-journal-store.ts']
+add('no-legacy-commit-journal', legacyJournal.every(path => !existsSync(join(src, path))), 'legacy commit journal must stay deleted')
 const commit = existsSync(join(src, 'commit-execute.ts')) ? readFileSync(join(src, 'commit-execute.ts'), 'utf8') : ''
 add('commit-port-only', commit.includes('port.commitMerge') && !commit.includes('applyTreeChange'), 'commit via CommitPort')
 
@@ -34,7 +37,7 @@ add('no-raw-tree-writer', raw.length === 0, raw.length === 0 ? 'none' : raw.join
 const matrix = join(artifact, 'ownership-matrix.md')
 add('matrix-present', existsSync(matrix), matrix)
 const matrixText = existsSync(matrix) ? readFileSync(matrix, 'utf8') : ''
-for (const owner of ['merge-state 行', 'runs 索引', 'commit journal', 'receipt/unit evidence', 'staging', 'tree fence', 'target claim', 'eligibility facts', 'Facts/QueuePage', 'CommandSpec/Surface', 'engine', 'UI client']) add('matrix-row:' + owner, matrixText.includes(owner), 'owner row present')
+for (const owner of ['merge-state 行', 'runs 索引', 'receipt/unit evidence', 'staging', 'tree fence', 'target claim', 'eligibility facts', 'Facts/QueuePage', 'CommandSpec/Surface', 'engine', 'UI client']) add('matrix-row:' + owner, matrixText.includes(owner), 'owner row present')
 
 let commitSha = args.get('--commit') ?? 'unknown'
 if (commitSha === 'unknown') try { commitSha = execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() } catch {}

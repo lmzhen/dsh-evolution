@@ -11,7 +11,7 @@ const dialFields: Array<[string, string]> = [
   ['reviewEnabled', '../../evolution-review/src/index.ts'],
   ['memoryEnabled', '../../memory/src/tools/index.ts'],
   ['autoStart', '../../evolution-curator/src/index.ts'],
-  ['intervalHours', '../../evolution-curator/src/index.ts'],
+  ['curatorIntervalHours', '../../evolution-curator/src/index.ts'],
   ['minIdleHours', '../../evolution-curator/src/index.ts'],
   ['threatExemptLabels', '../../evolution-core/src/skill-store.ts'],
   ['catalogDescriptionMaxLength', '../../evolution-host/cordis.patch.yml'],

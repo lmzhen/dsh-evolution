@@ -28,7 +28,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 ## library（技能库）
 
-| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
+| 参数 | 档 | 生效 | 权威面 | owner | 旧名（仅迁移；0.48 不再读取） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
 | `protectedSkillNames` | E2 | none | cordis | evolution-core | — | 无（deployment） | Skills the lifecycle never archives or rewrites. |
 | `manageUnmanaged` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Let curation touch skills with no family metadata. |
@@ -44,7 +44,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 ## write-caps（写入上限）
 
-| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
+| 参数 | 档 | 生效 | 权威面 | owner | 旧名（仅迁移；0.48 不再读取） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
 | `skillContentChars` | E3 | live | cordis | tool-skill-manage | maxSkillContentChars | 卡：tool-skill-manage | Character cap on a SKILL.md body (tighten-only). |
 | `maxSkillFileBytes` | E3 | live | cordis | tool-skill-manage | — | 卡：tool-skill-manage | Byte cap on one support file (tighten-only). |
@@ -63,7 +63,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 ## review（会话回顾）
 
-| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
+| 参数 | 档 | 生效 | 权威面 | owner | 旧名（仅迁移；0.48 不再读取） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
 | `reviewSkillInterval` | E3 | live | cordis | evolution-review | skillInterval | 卡：evolution-review | Tool calls between skill-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself used a skill. |
 | `reviewMemoryInterval` | E3 | live | cordis | evolution-review | memoryInterval | 卡：evolution-review | Tool calls between memory-review injections: a turn advances by its tool-call count (a turn with none counts as one), or by 1 when the turn itself touched memory. |
@@ -77,7 +77,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 ## memory（记忆）
 
-| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
+| 参数 | 档 | 生效 | 权威面 | owner | 旧名（仅迁移；0.48 不再读取） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
 | `memoryChars` | E3 | live | cordis | memory-files | memoryCharLimit | 卡：memory-files | Character budget the memory store enforces for MEMORY.md. |
 | `userChars` | E3 | live | cordis | memory-files | userCharLimit | 卡：memory-files | Character budget the memory store enforces for USER.md. |
@@ -88,7 +88,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 ## curator（技能整理）
 
-| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
+| 参数 | 档 | 生效 | 权威面 | owner | 旧名（仅迁移；0.48 不再读取） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
 | `curatorIntervalHours` | E3 | live | cordis | evolution-curator | intervalHours | 卡：evolution-curator | Minimum hours between deterministic curation passes. |
 | `staleAfterDays` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Inactive days before a skill counts as stale. |
@@ -110,7 +110,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 ## deployment（安装配置）
 
-| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
+| 参数 | 档 | 生效 | 权威面 | owner | 旧名（仅迁移；0.48 不再读取） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
 | `evolution-review.root` | E1 | none | cordis | evolution-review | — | 无（path） | Skill-tree root for review-created skills (empty = shared default). |
 | `evolution-review.skillsRoot` | E1 | none | cordis | evolution-review | — | 无（path） | Retired alias of root; a value here fails the load (V27 G2.4). |
@@ -145,14 +145,12 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `evolution-commands.maintainTimeoutMs` | E2 | none | cordis | evolution-commands | — | 无（internal） | Timeout of one maintenance run started from the command surface. |
 | `evolution-maintenance.probeTimeoutMs` | E2 | none | cordis | evolution-maintenance | — | 无（internal） | Model-facing budget of one maintenance_probe call — a hang guard, not a latency budget. |
 | `skill-usage.supportReadToolNames` | E2 | none | cordis | skill-usage | — | 无（internal） | Tool names whose file reads are attributed to support files. |
-| `install.mode` | E4 | restart | install | scripts | — | 无（install） | Install target plane (values all / host; the legacy layered preset path is internal-only). |
-| `install.basePreset` | E4 | restart | install | scripts | — | 无（install） | Agent-preset base the layered install composes from (--base). |
+| `install.mode` | E4 | restart | install | scripts | — | 无（install） | Install target plane (values all / host; legacy modes are uninstall-only in 0.48). |
 | `install.home` | E4 | restart | install | scripts | — | 无（install） | Harness home the installer writes into (--home). |
-| `install.presetRowOverrides` | E4 | restart | install | scripts | — | 无（install） | Preset row overrides the installer injects (row-overrides.json). |
 
 ## merge（技能合并）
 
-| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |
+| 参数 | 档 | 生效 | 权威面 | owner | 旧名（仅迁移；0.48 不再读取） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
 | `mergeApproval` | E3 | live | cordis | evolution-merge | — | 卡：evolution-merge | Pause after round 1 and put the pair in the pending queue instead of authoring round 2 automatically. |
 | `mergeSkippedTtlDays` | E3 | live | cordis | evolution-merge | — | 卡：evolution-merge | Days a skipped pair stays out of screening; 0 means it never expires. |

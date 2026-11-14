@@ -1691,11 +1691,11 @@
     {
       "id": "gate-68",
       "kind": "step",
-      "human": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
+      "human": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode all",
       "argv": null,
       "tree": "overlay",
       "profiles": [],
-      "command": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
+      "command": "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode all",
       "reason": "mutating/helper step — registered, not run by run-gates (contract 5c)",
       "lanes": [
         "ci-windows"
@@ -2042,17 +2042,6 @@
       "mutation": "packages/evolution-host/tests/doc-facts.mutation.json",
       "evidence": "A",
       "note": "doc facts are single-sourced; strict violations and machine drift exit 1"
-    },
-    {
-      "id": "beh-installer-layered",
-      "kind": "beh",
-      "owner": "platform-backend-01",
-      "files": [
-        "packages/evolution-host/tests/installer.spec.ts"
-      ],
-      "mutation": "packages/evolution-host/tests/installer-layered.mutation.json",
-      "evidence": "A",
-      "note": "layered install writes host bundle + agent preset row into the profile patch the platform reads"
     }
   ]
 }

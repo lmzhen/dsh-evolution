@@ -34,7 +34,7 @@ skill 是封装任务流程的模块：一个 `SKILL.md` 正文，加上可选�
 
 ## 安装
 
-环境要求、两种内部分层路径和升级步骤见 [INSTALL.md](INSTALL.md)。默认安装完整形态：
+环境要求、两种安装形态和升级步骤见 [INSTALL.md](INSTALL.md)。默认安装完整形态：
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-all
@@ -44,7 +44,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 
 桌面 GUI 将 `--profile web` 改为 `--profile desktop`。安装后可让 Agent 记住一条项目事实，再开新会话确认记忆已注入；`doctor` 用于检查安装形态和服务状态，不能替代实际读写验证。
 
-完整源码布局的安装结果为 36 个包；发布清单共 36 个包，agent preset 单独计算。
+完整源码布局的安装结果为 20 个包；发布清单共 20 个包，agent preset 单独计算。0.48 只保留 `all`/`host` 两种安装形态；旧的 one-click preset 和分层预设安装已移除，模式仅保留一个版本的卸载入口。
 
 ## 安装形态
 

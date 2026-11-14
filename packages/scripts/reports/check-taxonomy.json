@@ -567,9 +567,7 @@
         "evolution-merge::tests/gates/rg1b3-routes.spec.ts",
         "evolution-merge::tests/gates/rg1b3-snapshot.spec.ts",
         "evolution-merge::tests/gates/rg2-legacy.spec.ts",
-        "evolution-merge::tests/gates/rg2-model.spec.ts",
         "evolution-merge::tests/gates/rg2-schema.spec.ts",
-        "evolution-merge::tests/gates/rg2-transition.spec.ts",
         "evolution-merge::tests/gates/rg2a-finalize.spec.ts",
         "evolution-merge::tests/gates/rg2a-parent-runmeta.spec.ts",
         "evolution-merge::tests/gates/rg2a-report.spec.ts",
@@ -632,9 +630,6 @@
         "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/row-fact-reason.spec.ts",
         "evolution-merge::tests/row-tx-transact.spec.ts",
-        "evolution-merge::tests/row-tx.spec.ts",
-        "evolution-merge::tests/row-v2.spec.ts",
-        "evolution-merge::tests/row-v3.spec.ts",
         "evolution-merge::tests/row-v4-failure.spec.ts",
         "evolution-merge::tests/rules.spec.ts",
         "evolution-merge::tests/run-detail.spec.ts",
@@ -1213,9 +1208,7 @@
         "evolution-merge::tests/gates/rg1b3-routes.spec.ts",
         "evolution-merge::tests/gates/rg1b3-snapshot.spec.ts",
         "evolution-merge::tests/gates/rg2-legacy.spec.ts",
-        "evolution-merge::tests/gates/rg2-model.spec.ts",
         "evolution-merge::tests/gates/rg2-schema.spec.ts",
-        "evolution-merge::tests/gates/rg2-transition.spec.ts",
         "evolution-merge::tests/gates/rg2a-finalize.spec.ts",
         "evolution-merge::tests/gates/rg2a-parent-runmeta.spec.ts",
         "evolution-merge::tests/gates/rg2a-report.spec.ts",
@@ -1278,9 +1271,6 @@
         "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/row-fact-reason.spec.ts",
         "evolution-merge::tests/row-tx-transact.spec.ts",
-        "evolution-merge::tests/row-tx.spec.ts",
-        "evolution-merge::tests/row-v2.spec.ts",
-        "evolution-merge::tests/row-v3.spec.ts",
         "evolution-merge::tests/row-v4-failure.spec.ts",
         "evolution-merge::tests/rules.spec.ts",
         "evolution-merge::tests/run-detail.spec.ts",
@@ -1802,9 +1792,7 @@
         "evolution-merge::tests/gates/rg1b3-routes.spec.ts",
         "evolution-merge::tests/gates/rg1b3-snapshot.spec.ts",
         "evolution-merge::tests/gates/rg2-legacy.spec.ts",
-        "evolution-merge::tests/gates/rg2-model.spec.ts",
         "evolution-merge::tests/gates/rg2-schema.spec.ts",
-        "evolution-merge::tests/gates/rg2-transition.spec.ts",
         "evolution-merge::tests/gates/rg2a-finalize.spec.ts",
         "evolution-merge::tests/gates/rg2a-parent-runmeta.spec.ts",
         "evolution-merge::tests/gates/rg2a-report.spec.ts",
@@ -1867,9 +1855,6 @@
         "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/row-fact-reason.spec.ts",
         "evolution-merge::tests/row-tx-transact.spec.ts",
-        "evolution-merge::tests/row-tx.spec.ts",
-        "evolution-merge::tests/row-v2.spec.ts",
-        "evolution-merge::tests/row-v3.spec.ts",
         "evolution-merge::tests/row-v4-failure.spec.ts",
         "evolution-merge::tests/rules.spec.ts",
         "evolution-merge::tests/run-detail.spec.ts",
@@ -2086,7 +2071,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 417
+      "specs": 412
     },
     "ci-only": {
       "gates": 10,
@@ -2094,16 +2079,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 417
+      "specs": 412
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 490
+      "specs": 485
     }
   },
   "specs": {
-    "total": 490,
-    "marked": 490,
+    "total": 485,
+    "marked": 485,
     "unmarked": 0
   }
 }

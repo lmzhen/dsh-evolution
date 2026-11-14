@@ -30,8 +30,8 @@ export const steps = [
   gate("gate-68", {
     kind: "step",
     tree: "overlay",
-    title: "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
-    command: "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode layered",
+    title: "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode all",
+    command: "node packages/evolution/scripts/install-layered.mjs --home \"$HOME_DIR\" --profile web --mode all",
     lanes: ["ci-windows"],
     reason: "mutating/helper step — registered, not run by run-gates (contract 5c)",
   }),

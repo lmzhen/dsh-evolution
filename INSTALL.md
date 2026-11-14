@@ -42,7 +42,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-host
 
 ## 互斥
 
-`all` 与 `host` 共享基础行，混挂会在启动时重复注册并失败。切换形态时先移除旧形态，再安装新形态。旧的 `preset` 和分层预设已退役，不再发布，也不作为安装选项。
+`all` 与 `host` 共享基础行，混挂会在启动时重复注册并失败。切换形态时先移除旧形态，再安装新形态。0.48 只保留 all/host 两种安装形态；旧的 one-click preset 与分层预设安装已移除，`--uninstall --mode oneclick|agent|layered` 仅保留一个版本用于清理 0.47 及更早的 profile。
 
 ## 升级
 
@@ -54,7 +54,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-host
 4. 升级家族 bundle：
 
 ```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.44.0
+dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.48.0
 ```
 
 5. 重启后运行 `/evolution doctor`，再实际写一次记忆、改一次技能。

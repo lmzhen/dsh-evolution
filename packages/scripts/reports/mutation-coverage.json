@@ -28,12 +28,6 @@
       "tree": "overlay"
     },
     {
-      "probe": "beh-installer-layered",
-      "signature": "9aa1efc1f1e6b96072a88dd1257af15b2b5aa86a9916e4b6e997ac62e2b96ad0",
-      "provenAt": "2026-11-10T16:17:51.810Z",
-      "tree": "overlay"
-    },
-    {
       "probe": "beh-memory-interpolation",
       "signature": "0661112aefceb36d281a8fd2063b5fe82daf83254551ace6aec7942c8809c158",
       "provenAt": "2026-11-13T17:00:39.371Z",

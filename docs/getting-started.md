@@ -18,10 +18,10 @@ dsh-evolution 在 DeepSeek Harness 中增加三类能力：
 |---|---|---|
 | **all（默认）** | 大多数会话都需要完整工具 | 记忆/技能工具、技能历史工作台（历史/待批/合并/健康）、平台插件参数卡 |
 | **host** | 只要后台整理，不给模型 memory/skill_manage | 整理和报告可用；自动复盘与用量统计不生效 |
-| **preset** | 旧配置迁移 | 接近 all，但没有工作台页面与参数卡 |
-| **分层预设** | 只在选定会话提供工具 | host + Evolution 预设；原预设会话没有家族工具或自动行为 |
 
-这些形态互斥。默认安装 all：
+0.48 只保留 all/host 两种安装形态；旧的 one-click preset 与分层预设安装已移除，仅保留一个版本的卸载模式。
+
+两种形态互斥。默认安装 all：
 
 ```bash
 dsh plugin --profile web add @lmzhen/dsh-evolution-all

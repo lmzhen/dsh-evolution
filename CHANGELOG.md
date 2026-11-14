@@ -1,3 +1,13 @@
+## 0.48.0 (architecture reset) — 单一事实、删除死地平线、安装只留 all/host
+
+> **范围（W11 §30 Wave 0–1 已落地；Wave 2–3 见实现记录）**：① 正确性修复（0 字节 SKILL.md、unit-journal TOCTOU、ParamCard retry、skill_search 单次全树扫描、mutation 锚点重锚）；② 删除 merge 旧 coordinator/state-v3、旧 commit journal/recovery 与双 doctor recovery 行；③ 删除 client-kit 无消费者展示面、rowConfigs/surface catalog、8 个零引用脚本；④ installer 只保留 `all`/`host` 安装，oneclick/agent/layered 仅保留一个版本的卸载入口；⑤ 删除 0.2.1 投影/LLM 兼容分支；⑥ 删除 review/curator/skill/memory 的显式参数旧名读取，`PARAM_ALIASES` 仅保留为旧文档迁移与 doctor 旧键报告。
+>
+> **破坏性变更（0.x，按 W11 §8）**：merge 删除 `MergeEvent`/`TransitionResult`/`transitionLegacyForProjection` 导出与 `state-v3` 模块；旧 `merge/journals/*.json` 不再读取，`commit-recovery`/`commit-journal-store` 文件删除，doctor 的 recovery 行消失。client-kit 删除 `AsyncResource`、`StateNotice`、`StatusChip`/`FilterChip`、`DisclosureGroup`、`TimeText`、`ActionMenu`/`ActionMenuProps`、`CommandCopyButton`/`copyAction` 及对应类型。core 删除 `canonicalWriteId`、`paramNamespace`。installer 删除 `--mode oneclick|agent|layered` 的**安装**路径与 `--check-presets`；`--base` 仅用于卸载时收窄 legacy preset row。参数旧名 `memoryInterval`/`skillInterval`/`intervalHours`/`maxSkillContentChars`/`memoryCharLimit`/`userCharLimit` 不再被 live row 读取。
+>
+> **迁移（0.47→0.48）**：① 旧 profile 的 preset/oneclick/layered 安装先运行 `install-layered.mjs --uninstall --mode <旧模式>`（一个版本窗口），再按 `all`/`host` 安装；② `cordis.yml` 或部署配置中的旧参数名改写为 canonical：`reviewMemoryInterval`、`reviewSkillInterval`、`curatorIntervalHours`、`skillContentChars`、`memoryChars`、`userChars`；旧文档 `settings.yaml(.imported)` 仍由启动迁移读取，用户层只写 canonical；③ merge 的 receipt/unit journal 自动恢复，旧 commit journal 不再迁移（0.47 已完成收口，0.48 只读 receipt/unit）；④ 平台 floor `0.2.2-rc.0`，0.2.1 宿主不再支持。
+>
+> **验证（本地，2026-11-14）**：`run-gates local` exit 0；Wave 1 各包套件与 tsc 见 W11 §30.9–§30.20；pre-tag/CI/发布验收见发布报告。净源码/脚本删除与残余登记见 W11 §30 与 PROGRAM §7。
+
 ## 0.47.0 (consolidation) — 全量债务收口：门禁单源、写路径单门面、merge/installer 单源、settings 单传输
 
 > **范围（W11 A–F，25 个 P0 全关）**：① 门禁内核 `packages/scripts/gates/{model,report,runner,views}.mjs` + 注册表 112→90 行，无 runnable `argv:null`，重复命令硬红；pre/post-tag/ci lanes 与 release `needs` 单源。② 写路径只走 `transactIo`（unit/journal/lease 全部收敛），undo 用 `kernel.restore` CAS。③ merge 删除 legacy writer/route source：`MergeRouteSource` 只剩 snapshot+bodyRef，`facts.ts`/`wire-projection.ts`/`metrics.ts` 删除；`undone` 不再误报 merged。④ installer 抽出唯一 `SourceTree`（source/staging/dist 同校验），packed 依赖钉回 `^familyVersion`。⑤ Doctor 单 `DoctorReport`、installForm 七个语义值单源；settings 只走平台 `configForms`，family HTTP settings surface 删除。⑥ F：死 UI/导出/spec/旧 tarball 清理，params-docs 不再假绿。

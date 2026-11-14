@@ -184,7 +184,7 @@
  *       literals only. Render one with `errorText('<scenario>', { a1: ... })`.
  *   N22. a settings namespace is spelled in the registry, never in a domain: the
  *       owner → namespace map (`PARAM_NAMESPACES`) is the one home, and a package
- *       reads it through `paramNamespace(owner)`. A private `X_SETTINGS_NAMESPACE`
+ *       reads the live row id through `paramRowId(owner)`. A private `X_SETTINGS_NAMESPACE`
  *       constant, or a `?? X_SETTINGS_NAMESPACE` fallback beside the map read, is
  *       a second copy that the registry cannot see — the three that existed here
  *       were all equal to their map entry, so the fallback could never fire and
@@ -1782,7 +1782,7 @@ function walk(dir) {
       // N22 (C3, 0.8.0): the namespace comes from the registry — see the docblock.
       if (rel.includes('/src/')) {
         for (const split of namespaceSplits(text)) {
-          violations.push(`${rel}: settings namespace spelled here (${split}) — the owner → namespace map in evolution-core owns it (rule N22); read it with paramNamespace(owner)`)
+          violations.push(`${rel}: settings namespace spelled here (${split}) — the owner → namespace map in evolution-core owns it (rule N22); read the live row id with paramRowId(owner)`)
         }
       }
       // N34 (S2.9/T3-10): the settings user layer has ONE reader — see the docblock.
@@ -2025,7 +2025,7 @@ const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
       && settingsUserLayerReads('// prose: the user layer is read once, in core').length === 0],
     ['N22', () => namespaceSplits("export const CURATOR_SETTINGS_NAMESPACE = 'evolution-curator'").length === 1
       && namespaceSplits("PARAM_NAMESPACES['evolution-curator'] ?? CURATOR_SETTINGS_NAMESPACE").length === 1
-      && namespaceSplits("const ns = paramNamespace('evolution-curator')").length === 0
+      && namespaceSplits("const ns = paramRowId('evolution-curator')").length === 0
       && namespaceSplits("  'evolution-curator': 'evolution-curator',").length === 0],
     // The four SHAPES the first version of this rule missed (0.8.0 review): an API that
     // writes only when called a certain way, the promise face under an alias, the same

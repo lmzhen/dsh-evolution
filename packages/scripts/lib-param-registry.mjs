@@ -309,7 +309,7 @@ export function renderParamDocs(registry, check) {
     const rows = registry.entries.filter(entry => entry.group === group)
     if (rows.length === 0) continue
     const label = registry.groupLabels?.[group]
-    lines.push('## ' + group + (label === undefined ? '' : '（' + label + '）'), '', '| 参数 | 档 | 生效 | 权威面 | owner | 旧名（deprecated） | 设置面 | 说明 |', '|---|---|---|---|---|---|---|---|')
+    lines.push('## ' + group + (label === undefined ? '' : '（' + label + '）'), '', '| 参数 | 档 | 生效 | 权威面 | owner | 旧名（仅迁移；0.48 不再读取） | 设置面 | 说明 |', '|---|---|---|---|---|---|---|---|')
     for (const entry of rows) {
       const legacy = (aliasOf[entry.id] ?? []).join(', ') || '—'
       // The exposure column answers the reader's actual question about a knob they cannot find on
