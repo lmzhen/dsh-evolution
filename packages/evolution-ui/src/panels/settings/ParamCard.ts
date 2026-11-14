@@ -354,11 +354,6 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
   // (compose the row), or projecting that row failed (read the log). They must never read the
   // same, and none of them may be a blank card.
   if (snapshot.status === 'unavailable') {
-    if (snapshot.reason === 'transport') {
-      return createElement('div', { className: 'evolution-param-note', role: 'status' },
-        createElement('p', null, t('unavailable')),
-        createElement('button', { type: 'button', onClick: () => { (props as unknown as { retry?: () => void }).retry?.() } }, t('approvalRetry')))
-    }
     const key: MessageKey = snapshot.reason === 'seat-missing'
       ? 'seatMissing'
       : snapshot.reason === 'projection-failed' ? 'projectionFailed' : 'unavailable'
