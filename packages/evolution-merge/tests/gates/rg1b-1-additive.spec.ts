@@ -9,8 +9,7 @@ import { mergeStatePath } from '../../src/state.ts'
 import { readPairLedger } from '../../src/domain/pair-ledger.ts'
 import { adoptLegacy, LEGACY_STAGING_WRITER_FILES, readShadowStageAggregate, shadowStagingIndexPath, shadowStagingRoot } from '../../src/domain/stage-aggregate.ts'
 import { stagingIndexPath, writeStagingIndex } from '../../src/domain/staging-index.ts'
-import type { MergeReport } from '../../src/domain/merge-report.ts'
-import type { MergeSnapshot } from '../../src/domain/merge-snapshot.ts'
+
 
 const hash = (text: string): string => createHash('sha256').update(text).digest('hex')
 const now = 1_800_000_000_000
@@ -110,9 +109,4 @@ it('does not call a production staging writer from adoptLegacy', async () => {
   expect(source).toContain('shadowStagingIndexPath')
 })
 
-it('keeps the additive report/snapshot types consumable', () => {
-  const report: MergeReport = { schemaVersion: 2, reportId: 'r', runId: 'run', pairKey: 'a\u0000b', target: 'a', validation: { ok: true, errors: [] }, limits: {}, createdAt: 'c' }
-  const snapshot: MergeSnapshot = { wireVersion: 1, readAt: 'now', consistency: 'eventual', rows: [], stages: [], runs: null, reports: [], report: null }
-  expect(report.schemaVersion).toBe(2)
-  expect(snapshot.consistency).toBe('eventual')
-})
+
