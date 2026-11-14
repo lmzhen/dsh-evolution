@@ -26,12 +26,6 @@ export interface EvolutionEvent<TPayload = unknown> {
   readonly payload: TPayload
 }
 
-/** A lifecycle service implemented by a capability package. */
-export interface EvolutionLifecycleService {
-  /** Stable service name used in diagnostics. */
-  readonly name: string
-}
-
 /** Legal kind of one pending write. The runtime source stays in state-storage. */
 export type PendingKind = 'memory' | 'skill' | 'capability'
 

@@ -12,7 +12,6 @@ import type { V4Row } from './row-v4.ts'
 import { isV3Row, type V3Row } from './row-v3.ts'
 import { transactMergeState, type V4RowTx } from './schema4.ts'
 
-export type PairRow = V3Row
 export interface PairLedgerRead {
   readonly schemaVersion: 3
   readonly ledgerVersion?: number

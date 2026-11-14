@@ -27,7 +27,4 @@ export interface MergeReportRef {
   readonly digest: string
   readonly writtenAt: string
 }
-export interface MergeReportWriter {
-  write(report: MergeReport): Promise<MergeReportRef>
-  read(runId: string): Promise<MergeReport | null>
-}
+

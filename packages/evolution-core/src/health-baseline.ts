@@ -33,14 +33,6 @@ export interface HealthBaseline {
   values: Record<string, RuleAdmission>
 }
 
-export interface AdmissionThresholds {
-  /** A user-library hit rate below this is too rare to be worth a rule. */
-  minUserHitRate: number
-  /** …and above this it is furniture (every skill trips it, so it carries no signal). */
-  maxUserHitRate: number
-}
-
-
 export function buildHealthBaseline(skills: readonly CorpusSkill[]): HealthBaseline {
   const values: Record<string, RuleAdmission> = {}
   for (const rule of RULES) values[rule.id] = { platformHits: 0, userHits: 0, userHitRate: 0 }

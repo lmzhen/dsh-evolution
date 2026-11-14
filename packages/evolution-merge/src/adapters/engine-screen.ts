@@ -33,7 +33,6 @@ export interface CandidateSelection {
   readonly candidatePairs?: number
 }
 
-export type ScreeningCandidates = readonly MergeCandidate[] & { readonly candidatePairs?: number }
 
 export interface EngineScreeningDeps {
   readonly io: EvolutionIoLike

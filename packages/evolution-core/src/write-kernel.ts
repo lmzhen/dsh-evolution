@@ -1,7 +1,6 @@
 import { isCommittedWarning, transactIo, type EvolutionIoLike } from './io.ts'
 
 /** The four persistent writer kinds the family permits. */
-export type WriteUnitKind = 'skill' | 'state' | 'merge' | 'curator'
 
 /** One planned write: expected is the baseline read before the plan, next is the new bytes. */
 export interface WriteTarget {

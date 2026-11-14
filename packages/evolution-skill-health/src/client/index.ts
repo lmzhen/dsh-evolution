@@ -16,7 +16,6 @@ import { requireClientSeats } from '@lmzhen/dsh-evolution-client-kit'
 export const inject = ['slots', 'locale']
 
 /** The host half hands the panel a way to read its rows (a read-only route on the host side). */
-export type HealthFaceLoader = () => Promise<HealthFace>
 
 export { PANEL_ID, PANEL_ORDER }
 

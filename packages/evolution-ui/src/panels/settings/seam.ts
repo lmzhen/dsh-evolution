@@ -39,22 +39,6 @@ export interface ParamSectionSnapshot {
   stale?: boolean
 }
 
-/** The reactive source the renderer binds to a `use<Name>` seat. */
-export interface ParamSectionSource {
-  getSnapshot(): ParamSectionSnapshot
-  subscribe(listener: () => void): () => void
-  /**
-   * T5-11/A66: the seat ARRIVED (or was replaced) — bind it and wake every listener.
-   *
-   * The source re-probes on every READ, which covers a card that has not rendered yet; it does not
-   * cover a card that already rendered its "no settings surface" state, because nothing tells React to
-   * read again. `ctx.inject` is the platform's own arrival channel (it runs the callback when the
-   * service appears and re-runs it when the service changes), so the bundle subscribes there instead of
-   * inventing a timer.
-   */
-  revive(): void
-}
-
 /** One ordered field operation; client-kit owns the shape. */
 export type SettingsPathOpLike = ConfigPathOpLike
 
@@ -86,16 +70,6 @@ export interface RowConfigViewProps {
 export interface RowConfigForm {
   readonly state: ConfigFormSnapshotLike
   readonly mutate: (ops: readonly SettingsPathOpLike[], revision?: number) => Promise<boolean>
-}
-
-/** Options a plugins.row.config registration carries (the Plugins page's keyed slot). */
-export interface RowConfigRegisterOptions {
-  name: 'plugins.row.config'
-  /** The Plugins page key: <bundle package>#<row id>. */
-  key: string
-  order?: number
-  label?: () => string
-  locale?: string
 }
 
 /** The locale seat; client-kit owns the shape. */
