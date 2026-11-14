@@ -312,9 +312,9 @@
       "path": "<evolutionHome>/merge/unit-journals/** | <evolutionHome>/units/skill/journals/**",
       "writer": "evolution-core/src/unit-journal.ts",
       "serializedBy": "transact",
-      "marker": "transactIo(io, path, () => content)",
+      "marker": "transactIo(io, path, (current) => {",
       "state": [],
-      "note": "Phase transitions are validated against the existing journal before the transaction; the write itself is the shared transactIo path."
+      "note": "Phase transitions are validated against the current journal inside the transactIo callback; the callback returns the new bytes only after the monotonicity check."
     },
     {
       "id": "run-lease",
