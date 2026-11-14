@@ -17,12 +17,14 @@ import { collectReadSkillNames } from '../src/tool-dispatch.ts'
 import { foldTurnEvents } from '../src/signals.ts'
 import { evolutionProjectionHistoryProjection, sessionEvidenceIndex, sessionLastEventTime, sessionReadNames, sessionTurnSignals } from '../src/session-projection.ts'
 import { EvolutionProjections } from '../src/runtime/projections.ts'
+import { EvolutionPlatform } from '../src/runtime/platform.ts'
 
 /** A context with the store and the projection registry the family's units register into. */
 async function mounted(): Promise<{ ctx: Context; session: ReturnType<Context['sessions']['create']> }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(EvolutionPlatform)
   await ctx.plugin(EvolutionProjections)
   const session = ctx.sessions.create(SessionId('projection-spec'))
   session.append('turn/start', { turn: 1 })
@@ -75,6 +77,7 @@ describe('evolution session projections (G4)', () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(EvolutionPlatform)
     await ctx.plugin(EvolutionProjections)
     const session = ctx.sessions.create(SessionId('projection-empty'))
     // The pure reader's three-state answer: an empty LOG is "cannot classify", while a log whose

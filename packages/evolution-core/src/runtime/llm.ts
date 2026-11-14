@@ -4,7 +4,8 @@
  */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import { EvolutionLlmError, llmPort, modelRoute, type EvolutionLlmFailureKind, type EvolutionLlmRequest, type LlmPort, type ModelRoute, type StreamChunk } from '../platform/index.ts'
+import { EvolutionLlmError, modelRoute, type EvolutionLlmFailureKind, type EvolutionLlmRequest, type LlmPort, type ModelRoute, type StreamChunk } from '../platform/index.ts'
+import type { EvolutionPlatform } from './platform.ts'
 
 export interface EvolutionLlmInput {
   readonly purpose: EvolutionLlmRequest['purpose']
@@ -29,8 +30,8 @@ export class EvolutionLlm extends Service {
   }
 
   protected [Service.init](): void {
-    const platform = this.ctx.get('evolutionPlatform') as { ports?: { llm?: import('../platform/llm.ts').LlmPort } } | undefined
-    this.port = platform?.ports?.llm ?? llmPort(this.ctx)
+    const platform = this.ctx.get('evolutionPlatform') as EvolutionPlatform | undefined
+    this.port = platform?.ports.llm
     if (this.port === undefined) this.ctx.logger.warn('evolution-core-runtime: llm service unavailable; model calls fail with llm-unavailable')
   }
 

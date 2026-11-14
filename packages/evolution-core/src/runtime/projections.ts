@@ -6,7 +6,8 @@
  */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import { projectionPort, type ProjectionHandleLike, type Session } from '../platform/index.ts'
+import { type ProjectionHandleLike, type Session } from '../platform/index.ts'
+import type { EvolutionPlatform } from './platform.ts'
 import {
   evolutionActivityProjection,
   evolutionEvidenceProjection,
@@ -40,8 +41,8 @@ export class EvolutionProjections extends Service {
   }
 
   protected async [Service.init](): Promise<void> {
-    const platform = this.ctx.get('evolutionPlatform') as { ports?: { projections?: import('../platform/projections.ts').ProjectionPort } } | undefined
-    const port = platform?.ports?.projections ?? projectionPort(this.ctx)
+    const platform = this.ctx.get('evolutionPlatform') as EvolutionPlatform | undefined
+    const port = platform?.ports.projections
     if (port === undefined) {
       this.markDegraded('sessionProjections service unavailable')
       return
