@@ -324,6 +324,33 @@
       "marker": "transactIo(this.io, path, (raw)",
       "state": [],
       "note": "Lease acquire/heartbeat/release all use transactIo now: the old private fallback did not tolerate a committed-fsync warning, so acquire could report failure after the active lease had landed."
+    },
+    {
+      "id": "write-kernel-run",
+      "path": "<evolutionHome>/units/**",
+      "writer": "evolution-core/src/write-kernel.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(this.io, target.path, invoke)",
+      "state": [],
+      "note": "Run/task path: the kernel no longer carries its own direct-write fallback; transactIo is the one seam and reports a typed not-invoked error."
+    },
+    {
+      "id": "write-kernel-write-one",
+      "path": "<evolutionHome>/units/**",
+      "writer": "evolution-core/src/write-kernel.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(this.io, target.path, task)",
+      "state": [],
+      "note": "Single-target CAS path: same transactIo seam."
+    },
+    {
+      "id": "mutation-lock",
+      "path": "<evolutionHome>/.mutation-lock",
+      "writer": "evolution-core/src/mutation-unit.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, path, task)",
+      "state": [],
+      "note": "fileMutationLock updates the lock record through transactIo; no private direct-write fallback remains."
     }
   ]
 }

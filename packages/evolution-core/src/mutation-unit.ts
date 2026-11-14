@@ -1,6 +1,6 @@
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { isCommittedWarning, isProcessAlive, type transactIo } from './io.ts'
+import { isCommittedWarning, isProcessAlive, transactIo } from './io.ts'
 import { WriteKernel } from './write-kernel.ts'
 import type { UnitClaimPort } from './unit-claim.ts'
 import type { MutationOwner } from './contract.ts'
@@ -601,23 +601,7 @@ export function fileMutationLock(
   const sleep = options.sleep ?? defaultSleep
 
   const update = async (task: (current: string | null) => string | null): Promise<void> => {
-    if (io.transact !== undefined) {
-      let ran = false
-      await io.transact(path, current => {
-        ran = true
-        return task(current)
-      })
-      if (!ran) throw new Error('mutation-lock-transact-not-run: ' + path)
-      return
-    }
-    const current = await io.readText(path)
-    const next = task(current)
-    try {
-      if (next === null) await io.remove(path)
-      else await io.writeText(path, next)
-    } catch (error) {
-      if (!isCommittedWarning(error)) throw error
-    }
+    await transactIo(io, path, task)
   }
 
   return {

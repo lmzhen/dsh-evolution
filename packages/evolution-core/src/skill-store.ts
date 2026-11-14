@@ -2041,7 +2041,7 @@ export class SkillLibrary {
     })
     if (!result.ok) {
       const messages = result.errors.map(error => error.message)
-      if (messages.some(message => message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
+      if (messages.some(message => message.includes('transact-not-invoked') || message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
       return { ok: false, message: messages.join('；') }
     }
     const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
@@ -2203,7 +2203,7 @@ export class SkillLibrary {
     })
     if (!result.ok) {
       const messages = result.errors.map(error => error.message)
-      if (messages.some(message => message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
+      if (messages.some(message => message.includes('transact-not-invoked') || message.includes('mutation-lock-transact-not-run') || message.includes('did not invoke the task'))) return { ok: false, message: '内部错误：写事务没有调用任务；未执行任何写入' }
       return { ok: false, message: messages.join('；') }
     }
     const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`

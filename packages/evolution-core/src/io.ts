@@ -77,6 +77,15 @@ export interface EvolutionIoLike {
   mtime?(this: void, path: string): Promise<number | null>
 }
 
+/** A backend's transact returned without ever calling the task; nothing was written. */
+export class TransactionNotInvokedError extends Error {
+  readonly code = 'transact-not-invoked'
+  constructor(path: string) {
+    super('transact-not-invoked: ' + path)
+    this.name = 'TransactionNotInvokedError'
+  }
+}
+
 /**
  * Run `task` inside `io.transact` when the backend provides it; otherwise fall
  * back to a plain read → task → write/remove sequence (no cross-process lock —
@@ -97,9 +106,15 @@ export async function transactIo(
   // two-phase caller could then roll back a visible write. The durability loss
   // is still observable — it is logged, not swallowed.
   const committedOnly = (error: unknown): boolean => isCommittedWarning(error)
+  let invoked = false
+  const invoke = async (current: string | null): Promise<string | null> => {
+    invoked = true
+    return await task(current)
+  }
   if (io.transact) {
     try {
-      await io.transact(path, task)
+      await io.transact(path, invoke)
+      if (!invoked) throw new TransactionNotInvokedError(path)
       return
     } catch (error) {
       if (!committedOnly(error)) throw error
@@ -108,7 +123,7 @@ export async function transactIo(
     }
   }
   const current = await io.readText(path)
-  const next = await task(current)
+  const next = await invoke(current)
   if (next === null) await io.remove(path)
   // C-07: a byte-identical result is a no-op — the same V5-03
   // short-circuit the node backend's transact already has. Without it every

@@ -1,4 +1,4 @@
-import { isCommittedWarning, type EvolutionIoLike } from './io.ts'
+import { isCommittedWarning, transactIo, type EvolutionIoLike } from './io.ts'
 
 /** The four persistent writer kinds the family permits. */
 export type WriteUnitKind = 'skill' | 'state' | 'merge' | 'curator'
@@ -75,13 +75,7 @@ export class WriteKernel {
     }
     try {
       if (this.transact !== undefined) await this.transact(this.io, target.path, invoke)
-      else if (this.io.transact !== undefined) await this.io.transact(target.path, invoke)
-      else {
-        const current = await this.io.readText(target.path)
-        const next = await invoke(current)
-        if (next === null && current !== null) await this.io.remove(target.path)
-        else if (next !== null && next !== current) await this.io.writeText(target.path, next)
-      }
+      else await transactIo(this.io, target.path, invoke)
     } catch (error) {
       if (conflict) throw Object.assign(new Error('concurrent modification detected: ' + target.path), { noWrite: true })
       if (isCommittedWarning(error)) return { warnings: [error instanceof Error ? error.message : String(error)] }
@@ -116,13 +110,7 @@ export class WriteKernel {
     }
     try {
       if (this.transact !== undefined) await this.transact(this.io, target.path, task)
-      else if (this.io.transact !== undefined) await this.io.transact(target.path, task)
-      else {
-        const current = await this.io.readText(target.path)
-        const next = task(current)
-        if (next === null && current !== null) await this.io.remove(target.path)
-        else if (next !== null && next !== current) await this.io.writeText(target.path, next)
-      }
+      else await transactIo(this.io, target.path, task)
     } catch (error) {
       if (conflict) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: error instanceof Error ? error.message : String(error), target: target.path }] }
       if (isCommittedWarning(error)) return { ok: true, changed: [target.path], errors: [], warnings: [error instanceof Error ? error.message : String(error)] }
