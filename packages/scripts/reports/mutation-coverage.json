@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-13T20:59:37.151Z",
+  "generatedAt": "2026-11-14T07:40:49.702Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -101,8 +101,8 @@
     },
     {
       "probe": "decl-configforms-seat",
-      "signature": "893b2f4badb86b1e7008bda4ac509af28ad48b7df6b4193a19576bbb725cf857",
-      "provenAt": "2026-11-13T17:00:39.401Z",
+      "signature": "4eafb2b47d1db15ea4ac16621ae65c143ddcb3a3da02d26954214924d3c3858d",
+      "provenAt": "2026-11-14T07:40:49.694Z",
       "tree": "overlay"
     },
     {

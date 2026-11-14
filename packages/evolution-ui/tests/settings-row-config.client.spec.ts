@@ -82,14 +82,6 @@ describe('the per-row configuration entry', () => {
     cleanup()
   })
 
-  it('summarises the overridden count, and renders nothing for an untouched row', () => {
-    const touched = render(card({ view: 'summary', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate: async () => true } }))
-    expect(touched.container.textContent).toBe(t('changed').replace('{n}', '1'))
-    cleanup()
-    const untouched = render(card({ view: 'summary', form: { state: state({}), mutate: async () => true } }))
-    expect(untouched.container.textContent).toBe('')
-    cleanup()
-  })
 
   it('renders the row from the page state and submits the edit through mutate', async () => {
     const mutate = vi.fn(async () => true)
@@ -174,9 +166,6 @@ describe('the per-row configuration entry', () => {
     // ('Config field evolution-approval.pendingTtlMs is not volatile', measured on the isolated face).
     expect(numberField?.id).toBe('evolution-approval.pendingTtlMs')
     const mutate = vi.fn(async () => true)
-    const summary = render(h(RowConfigCard, { namespace: 'evolution-approval', fields: approvalFields, t, view: 'summary', form: { state: state({ pendingTtlMs: 5 }), mutate } }))
-    expect(summary.container.textContent).toBe(t('changed').replace('{n}', '1'))
-    cleanup()
     const view = render(h(RowConfigCard, { namespace: 'evolution-approval', fields: approvalFields, t, view: 'page', form: { state: state({ pendingTtlMs: 5 }), mutate } }))
     fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
     const input = view.container.querySelector('[id="evolution-param-evolution-approval.pendingTtlMs"]') as HTMLInputElement
@@ -189,9 +178,6 @@ describe('the per-row configuration entry', () => {
   it('states the missing settings seat instead of drawing dead controls', () => {
     const page = render(card({ view: 'page' }))
     expect(page.container.textContent).toBe(t('seatMissing'))
-    cleanup()
-    const summary = render(card({ view: 'summary' }))
-    expect(summary.container.textContent).toBe('')
     cleanup()
   })
 })

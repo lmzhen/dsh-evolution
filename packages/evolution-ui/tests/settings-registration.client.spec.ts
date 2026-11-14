@@ -13,9 +13,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { FAMILY_VERSION } from '../src/panels/settings/generated-about.ts'
-import { apply, inject, SECTION_ID, SECTION_ORDER } from '../src/panels/settings/index.ts'
+import { apply, inject, PRODUCT_BUNDLE, SECTION_ID, SECTION_ORDER } from '../src/panels/settings/index.ts'
 import { CLIENT_PARAM_SECTIONS } from '../src/panels/settings/generated-params.ts'
-import { PRODUCT_BUNDLE } from '../src/panels/settings/generated-surface.ts'
 import { formatText, NAMESPACE_TITLES, type MessageKey } from '../src/panels/settings/messages.ts'
 
 /** The copy the page renders, resolved the way the registered translator resolves it. */

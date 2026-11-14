@@ -17,7 +17,6 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactNode } from 'react'
 import { CLIENT_PARAM_SECTIONS } from './generated-params.ts'
-import { PRODUCT_BUNDLE } from './generated-surface.ts'
 import { dictionaries, fill, message, NS, type MessageKey } from './messages.ts'
 import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated/i18n'
 import { EvolutionSettingsPage } from './SettingsPage.ts'
@@ -32,6 +31,9 @@ export const inject = ['slots', 'locale'] as const
 /** Section id and nav order (the platform's own sections sit at 0/10/15/20). */
 export const SECTION_ID = 'evolution'
 export const SECTION_ORDER = 25
+
+/** The one product bundle whose install-scope line this section decorates. */
+export const PRODUCT_BUNDLE = '@lmzhen/dsh-evolution-all'
 
 /**
  * Register the locale namespace, the settings section with its nav icon, and the bundle's
