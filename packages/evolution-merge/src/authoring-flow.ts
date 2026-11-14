@@ -54,8 +54,23 @@ export type AuthoringResult =
   | { readonly ok: true; readonly tree: StagedTree; readonly validationPlan: import('./domain/validation-plan.ts').ValidationPlan; readonly commit: Extract<CommitStagedResult, { readonly ok: true }>; readonly lengths: Readonly<Record<string, number>> }
   | { readonly ok: false; readonly code?: string; readonly message: string; readonly findings?: readonly RuleFinding[]; readonly lengths?: Readonly<Record<string, number>> }
 
+/** The target facts both authoring entries may refuse on before writing anything. */
+export async function targetAdmission(
+  target: string,
+  targetCard: Pick<SkillCard, 'managed' | 'protectionUnknown' | 'protectedBy'> | undefined,
+  createMode: boolean,
+  isBlocked?: (name: string) => boolean | Promise<boolean>,
+): Promise<{ readonly code: string; readonly message: string } | null> {
+  if (target.includes('/') || target.includes(':')) return { code: 'target-invalid', message: 'target must be a bare skill name: ' + target }
+  if (!createMode && targetCard !== undefined) {
+    if (targetCard.managed !== true) return { code: 'target-not-managed', message: 'target is not family-managed: ' + target }
+    if (targetCard.protectionUnknown === true || targetCard.protectedBy != null) return { code: 'target-protected', message: 'target is protected (' + (targetCard.protectedBy ?? 'unknown') + '): ' + target }
+  }
+  if (!createMode && await isBlocked?.(target) === true) return { code: 'target-blocked', message: 'target is blocked by curator: ' + target }
+  return null
+}
+
 export async function runAuthoring(options: RunAuthoringOptions): Promise<AuthoringResult> {
-  if (options.target.includes('/') || options.target.includes(':')) return { ok: false, code: 'target-invalid', message: 'target must be a bare skill name: ' + options.target }
   const targetCard = options.cards.find(card => card.name === options.target)
   // A decision can name a fresh target yet say merge-into-existing (the model's vocabulary is
   // about intent, not existence). The target card is the authoritative existence fact: when it is
@@ -64,11 +79,8 @@ export async function runAuthoring(options: RunAuthoringOptions): Promise<Author
   const requestedMode = options.mode ?? (targetCard === undefined ? 'create-umbrella' : 'merge-into-existing')
   const mode = requestedMode === 'merge-into-existing' && targetCard === undefined ? 'create-umbrella' : requestedMode
   const createMode = mode === 'create-umbrella'
-  if (!createMode && targetCard !== undefined) {
-    if (targetCard.managed !== true) return { ok: false, code: 'target-not-managed', message: 'target is not family-managed: ' + options.target }
-    if (targetCard.protectionUnknown === true || targetCard.protectedBy != null) return { ok: false, code: 'target-protected', message: 'target is protected (' + (targetCard.protectedBy ?? 'unknown') + '): ' + options.target }
-  }
-  if (!createMode && await options.isBlocked?.(options.target) === true) return { ok: false, code: 'target-blocked', message: 'target is blocked by curator: ' + options.target }
+  const targetRefusal = await targetAdmission(options.target, targetCard, createMode, options.isBlocked)
+  if (targetRefusal !== null) return { ok: false, code: targetRefusal.code, message: targetRefusal.message }
   const stageKey = options.stageKey ?? options.runId
   if (options.reuseStaging === true) {
     if (!await setStagingTarget(options.io, options.home, stageKey, options.target, mode)) return { ok: false, code: 'staging-missing', message: 'staging missing or unreadable: ' + stageKey }

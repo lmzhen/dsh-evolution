@@ -21,6 +21,7 @@ import type { StageToolContext } from './stage-tool.ts'
 import type { ScanRound2Outcome } from './scan-run.ts'
 import { manifestFilesOf, missingManifestFile, parseAuthoringManifest } from './domain/authoring-manifest.ts'
 import { MERGE_PROMPT_VERSION, promptHashOf } from './prompts.ts'
+import { targetAdmission } from './authoring-flow.ts'
 
 export interface NewChildAuthoringOptions {
   readonly io: EvolutionIoLike
@@ -51,14 +52,10 @@ export async function runNewChildAuthoring(
   decision: MergeDecision,
   signal: AbortSignal,
 ): Promise<ScanRound2Outcome> {
-  if (decision.target.includes('/') || decision.target.includes(':')) return { kind: 'failed', failure: { stage: 'author', code: 'target-invalid', message: 'target must be a bare skill name: ' + decision.target, retryable: false, retryFrom: 'none' } }
   const targetCard = options.cards.find(card => card.name === decision.target)
   const createMode = decision.mode === 'create-umbrella'
-  if (!createMode && targetCard !== undefined) {
-    if (targetCard.managed !== true) return { kind: 'failed', failure: { stage: 'author', code: 'target-not-managed', message: 'target is not family-managed: ' + decision.target, retryable: false, retryFrom: 'none' } }
-    if (targetCard.protectionUnknown === true || targetCard.protectedBy != null) return { kind: 'failed', failure: { stage: 'author', code: 'target-protected', message: 'target is protected: ' + decision.target, retryable: false, retryFrom: 'none' } }
-  }
-  if (!createMode && await options.isBlocked?.(decision.target) === true) return { kind: 'failed', failure: { stage: 'author', code: 'target-blocked', message: 'target is blocked by curator: ' + decision.target, retryable: false, retryFrom: 'none' } }
+  const targetRefusal = await targetAdmission(decision.target, targetCard, createMode, options.isBlocked)
+  if (targetRefusal !== null) return { kind: 'failed', failure: { stage: 'author', code: targetRefusal.code, message: targetRefusal.message, retryable: false, retryFrom: 'none' } }
   const at = options.now()
   // NFR-06: an expired stage is never reused and never re-presented. Drop its tree and
   // index and author into a fresh one; the recorded decision anchors still guard the
