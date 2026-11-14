@@ -125,8 +125,8 @@
     },
     {
       "probe": "decl-platform-contract",
-      "signature": "b20c8cd1c6f97949d20b5270f58761eafbb695483072f2125134419812a25e51",
-      "provenAt": "2026-11-14T18:14:32.503Z",
+      "signature": "45258004232cef76b2245b07566b4e783073ca150e0d34c35114df977b1182d2",
+      "provenAt": "2026-11-14T22:16:04.898Z",
       "tree": "overlay"
     },
     {
