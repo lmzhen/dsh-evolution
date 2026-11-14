@@ -1,5 +1,6 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { PLATFORM_LINE } from '../src/platform-line.generated.ts'
@@ -46,5 +47,10 @@ describe('platform line single source (G1-S1/S2/S3)', () => {
     expect(() => parsePlatformLine('{"version":"0.2.1-rc.2"}', source)).toThrow(/missing the floor/)
     expect(() => parsePlatformLine('{"version":"0.2.1-rc.2","floor":"0.2.2-rc.1"}', source)).toThrow(/share one major\.minor\.patch tuple/)
     expect(() => parsePlatformLine('{"version":"0.2.1-rc.2","floor":"0.2.1-rc.1","platform_version":"x"}', source)).toThrow(/unknown field/)
+  })
+
+  it('keeps platform-line.generated.ts fresh from the one JSON', () => {
+    const generator = fileURLToPath(new URL('../../scripts/gen-platform-line.mjs', import.meta.url))
+    execFileSync(process.execPath, [generator, '--check'], { stdio: 'pipe' })
   })
 })
