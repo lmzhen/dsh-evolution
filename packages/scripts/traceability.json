@@ -841,7 +841,6 @@
     ],
     "newScripts": [
       "lib-platform-line.mjs",
-      "print-platform-line.mjs",
       "gen-platform-line.mjs",
       "gen-client-seam.mjs",
       "verify-host-routes.mjs",
