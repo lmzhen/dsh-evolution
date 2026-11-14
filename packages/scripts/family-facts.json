@@ -1761,17 +1761,22 @@
               "provenAt": "2026-11-14T18:55:21.523Z",
               "provenSha": "3e618b3a7ed704630fd1bcacb2140dc5be30d3c742afb3a5e876733debf370bf"
             }
+          ],
+          "gate-49": [
+            {
+              "mutate": {
+                "file": "packages/scripts/verify-mutations.mjs",
+                "find": "if (accountWanted) process.exit(counts.cannotDecide > 0 ? 2 : 0)",
+                "replace": "if (accountWanted) process.exit(1)"
+              },
+              "expect": "red",
+              "note": "the coverage gate must be able to go red: forcing its account exit to 1 proves the gate truly consumes cannotDecide, instead of exempting the ledger itself",
+              "provenAt": "2026-11-14T19:16:31.936Z",
+              "provenSha": "1f3a88e5c289b98b957faa4d8f350b531196553fcad3e8bc666e5ddbd4f48b6e"
+            }
           ]
         },
         "mutationExempt": {
-          "gate-49": {
-            "reason": "the ledger itself: its declared state is cannot-decide while records are missing, so a mutation cannot flip it to red",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.48.0",
-            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
-            "condition": "release gate: revisit when every other check carries a stamped record",
-            "renewal": "Renewed at 0.46.0 (expiry 0.47.0). Renewed at 0.46.0 (expiry 0.47.0) with NO row reduction: this release is the W10 CI control-plane refactor; the exemption rows close with the gate-table split / probe-baseline work tracked in W9-gates §4, before 0.47."
-          },
           "gate-33": {
             "reason": "this row declares no single command (composite cell: several commands in one table row), so there is no argv a mutation could run - it cannot be mutation-proven",
             "owner": "scripts/verify-mutations",
