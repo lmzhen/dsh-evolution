@@ -27,7 +27,7 @@ export interface WriteKernelResult {
 
 export interface WriteKernelOptions {
   readonly io: EvolutionIoLike
-  readonly transact?: ((io: EvolutionIoLike, path: string, task: (current: string | null) => string | null | Promise<string | null>) => Promise<void>) | undefined
+  readonly transact?: typeof transactIo | undefined
   readonly now?: (() => number) | undefined
 }
 
@@ -64,6 +64,7 @@ export class WriteKernel {
   async run(target: { readonly path: string; readonly expected?: string | null | undefined }, task: (current: string | null) => string | null | Promise<string | null>): Promise<{ readonly warnings?: readonly string[] | undefined }> {
     let invoked = false
     let conflict = false
+    let transactionWarnings: readonly string[] | undefined
     const invoke = async (current: string | null): Promise<string | null> => {
       if (target.expected !== undefined && current !== target.expected) {
         conflict = true
@@ -73,15 +74,15 @@ export class WriteKernel {
       return await task(current)
     }
     try {
-      if (this.transact !== undefined) await this.transact(this.io, target.path, invoke)
-      else await transactIo(this.io, target.path, invoke)
+      if (this.transact !== undefined) transactionWarnings = await this.transact(this.io, target.path, invoke)
+      else transactionWarnings = await transactIo(this.io, target.path, invoke)
     } catch (error) {
       if (conflict) throw Object.assign(new Error('concurrent modification detected: ' + target.path), { noWrite: true })
       if (isCommittedWarning(error)) return { warnings: [error instanceof Error ? error.message : String(error)] }
       throw error
     }
     if (!invoked) throw new Error('internal error: the write transaction for ' + target.path + ' did not invoke the task; no write was performed')
-    return {}
+    return transactionWarnings === undefined ? {} : { warnings: transactionWarnings }
   }
 
   /**
@@ -95,6 +96,7 @@ export class WriteKernel {
     let wrote = false
     let deferred = false
     let conflict = false
+    let transactionWarnings: readonly string[] | undefined
     const task = (current: string | null): string | null => {
       if (current !== target.expected) {
         if (guard) {
@@ -108,8 +110,8 @@ export class WriteKernel {
       return target.next
     }
     try {
-      if (this.transact !== undefined) await this.transact(this.io, target.path, task)
-      else await transactIo(this.io, target.path, task)
+      if (this.transact !== undefined) transactionWarnings = await this.transact(this.io, target.path, task)
+      else transactionWarnings = await transactIo(this.io, target.path, task)
     } catch (error) {
       if (conflict) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: error instanceof Error ? error.message : String(error), target: target.path }] }
       if (isCommittedWarning(error)) return { ok: true, changed: [target.path], errors: [], warnings: [error instanceof Error ? error.message : String(error)] }
@@ -117,7 +119,7 @@ export class WriteKernel {
     }
     if (conflict || (!wrote && deferred)) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: 'concurrent modification detected: ' + target.path, target: target.path }] }
     if (!wrote) return { ok: false, changed: [], errors: [{ code: 'write-failed', message: 'transaction did not invoke the write task: ' + target.path, target: target.path }] }
-    return { ok: true, changed: [target.path], errors: [] }
+    return { ok: true, changed: [target.path], errors: [], ...(transactionWarnings === undefined ? {} : { warnings: transactionWarnings }) }
   }
 
   /**

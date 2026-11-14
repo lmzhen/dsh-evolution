@@ -4,7 +4,7 @@
  */
 
 import { basename, join } from 'node:path'
-import { nodeEvolutionIo, transactIo, type EvolutionIoLike } from './io.ts'
+import { nodeEvolutionIo, TransactionNotInvokedError, transactIo, type EvolutionIoLike } from './io.ts'
 import { evolutionRoot } from './state-store.ts'
 import { makeSerialQueue } from './serial.ts'
 import { payloadText } from './payload.ts'
@@ -349,8 +349,14 @@ export class MemoryStore {
       return step.write ?? (current ?? null)
     })
     }
-    if (this.fence !== undefined) await this.fence.run(run)
-    else await run()
+    try {
+      if (this.fence !== undefined) await this.fence.run(run)
+      else await run()
+    } catch (error) {
+      // C-01: the transact seam now reports a contract-violating backend with a
+      // typed error; memory's contract is a structured refusal, not a throw.
+      if (!(error instanceof TransactionNotInvokedError)) throw error
+    }
     // C-01: a transact backend that violates the contract (never invokes the
     // task) leaves `outcome` undefined — the old `undefined as
     // MemoryApplyResult` cast handed callers an object whose `.ok` dereference

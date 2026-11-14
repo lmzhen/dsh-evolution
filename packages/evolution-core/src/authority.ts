@@ -146,6 +146,12 @@ export class HomeAuthority {
     return (this.held.get(scope) ?? 0) > 0
   }
 
+  /** True only when THIS async call context already holds `scope` (re-entrant nesting). */
+  holdsInContext(scope: LockScope): boolean {
+    const context = CONTEXT.getStore()
+    return context?.owner === this && context.scopes.has(scope)
+  }
+
   /** True while this instance holds the home lock for any scope. */
   get holding(): boolean {
     return this.held.size > 0

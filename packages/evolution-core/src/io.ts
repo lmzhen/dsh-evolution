@@ -97,15 +97,22 @@ export async function transactIo(
   io: EvolutionIoLike,
   path: string,
   task: (current: string | null) => string | null | Promise<string | null>,
-): Promise<void> {
+): Promise<readonly string[] | undefined> {
   // V27 G1.3: a dir-fsync failure AFTER the rename (`committed: true`) means the
   // bytes ARE on disk. Every durable consumer in this family reaches its write
   // through this helper, so the tolerance lives here instead of in seven
   // packages: propagating it made memory/usage/mutations/state/activity/
   // feedback/events report "not written" for a write that happened, and a
   // two-phase caller could then roll back a visible write. The durability loss
-  // is still observable — it is logged, not swallowed.
+  // is still observable — it is logged AND returned so a two-phase caller can
+  // report it instead of silently losing the warning.
   const committedOnly = (error: unknown): boolean => isCommittedWarning(error)
+  const warnings: string[] = []
+  const warnCommitted = (error: unknown): void => {
+    const message = error instanceof Error ? error.message : String(error)
+    warnings.push(message)
+    console.warn(`evolution-io: ${path} was written but its directory fsync failed — the bytes are visible, durability is unconfirmed: ${message}`)
+  }
   let invoked = false
   const invoke = async (current: string | null): Promise<string | null> => {
     invoked = true
@@ -115,11 +122,11 @@ export async function transactIo(
     try {
       await io.transact(path, invoke)
       if (!invoked) throw new TransactionNotInvokedError(path)
-      return
+      return undefined
     } catch (error) {
       if (!committedOnly(error)) throw error
-      console.warn(`evolution-io: ${path} was written but its directory fsync failed — the bytes are visible, durability is unconfirmed: ${error instanceof Error ? error.message : String(error)}`)
-      return
+      warnCommitted(error)
+      return warnings
     }
   }
   const current = await io.readText(path)
@@ -134,9 +141,10 @@ export async function transactIo(
       await io.writeText(path, next)
     } catch (error) {
       if (!committedOnly(error)) throw error
-      console.warn(`evolution-io: ${path} was written but its directory fsync failed — the bytes are visible, durability is unconfirmed: ${error instanceof Error ? error.message : String(error)}`)
+      warnCommitted(error)
     }
   }
+  return warnings.length === 0 ? undefined : warnings
 }
 
 /** Lazy adapter over an IO provider registry, shared by every evolution consumer. */
@@ -157,9 +165,10 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
     },
     // Transact and symlink probes are forwarding-only: the fallback semantics
     // live in the consumer helper / the backend itself.
-    transact: (path, task) => {
+    transact: async (path, task) => {
       const io = provider()
-      return io.transact ? io.transact(path, task) : transactIo(io, path, task)
+      if (io.transact) await io.transact(path, task)
+      else await transactIo(io, path, task)
     },
     isSymlink: (path) => {
       const io = provider()

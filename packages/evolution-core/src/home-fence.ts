@@ -70,8 +70,13 @@ export class HomeFence {
 
 
   async run<T>(body: (lock: TreeLock) => Promise<T>): Promise<T> {
+    const invoke = async (): Promise<T> => await body(lockView(this.authority))
     try {
-      return await this.authority.runExclusive('tree', async () => await body(lockView(this.authority)))
+      // Bookkeeping called from inside a write already holds the tree scope. It must
+      // run inline rather than request the same fence again (that is an undeclared
+      // re-entry). A caller that does NOT hold it still acquires normally.
+      if (this.authority.holdsInContext('tree')) return await this.authority.runNested('tree', invoke)
+      return await this.authority.runExclusive('tree', invoke)
     } catch (error) {
       throw classify(error)
     }

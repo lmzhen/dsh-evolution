@@ -367,7 +367,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const io = evolutionIoAdapter(() => ioRegistry.provider())
     const root = evolutionHome()
     const authority = (ioCtx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
-    const commit = (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => transactIo(io, path, task)
+    const commit = async (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => {
+      await transactIo(io, path, task)
+    }
     /** The ONE cross-process writer: a home fence when the authority provides one, else the seam. */
     const write = async (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => {
       if (authority?.homeFence !== undefined) await authority.homeFence.run(async () => { await commit(path, task) })
