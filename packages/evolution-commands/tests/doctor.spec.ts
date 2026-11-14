@@ -659,7 +659,7 @@ describe('doctor (WB2, 0.3.55)', () => {
       expect(stale.presetFreshness.find(entry => entry.base === 'standard')?.status).toBe('differs')
       expect(stale.actions.some(action => action.includes(patchPath))).toBe(true)
       // The line a user reads: pinned verbatim, destination included.
-      expect(renderDoctorText(stale, 'en')).toContain(`preset:   standard → ${patchPath}  DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (/evolution preset install) to regenerate`)
+      expect(renderDoctorText(stale, 'en')).toContain(`preset:   standard → ${patchPath}  DIFFERS from a fresh generation — it is an install-time snapshot; re-run the installer (all/host) to regenerate`)
       // READ-ONLY: reporting an install-time snapshot never rewrites it.
       expect(readFileSync(patchPath, 'utf8')).toBe(edited)
     } finally {
