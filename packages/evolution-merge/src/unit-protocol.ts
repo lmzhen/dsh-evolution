@@ -288,19 +288,10 @@ export class MergeUnitTransactions implements UnitTransaction {
       await this.options.onPhase?.(phase);
     };
     try {
-      if (this.options.fence !== undefined) {
-        fenceLease = await this.options.fence.acquire();
-        lock = fenceLease.lock;
-        this.options.onLock?.("tree");
-      } else {
-        const fallback = new HomeAuthority({ home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
-        const fallbackLease: AuthorityLease | undefined = await fallback.lease("tree").catch(() => undefined);
-        if (fallbackLease === undefined) return { ok: false as const, code: "unit-fence-failed" as const, message: "tree lock unavailable" };
-        fenceLease = { lock: leaseAsTreeLock(fallbackLease), release: async () => { await fallbackLease.release() } };
-        lock = fenceLease.lock
-        this.options.onLock?.("tree");
-      }
-      if (!(await lock.assertHeld())) return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost" };
+      const acquired = await this.acquireTreeFence();
+      fenceLease = acquired.fenceLease;
+      lock = acquired.lock;
+      this.options.onLock?.("tree");
       stage = 'claim'
       claim = await this.options.claim.acquire(stored.plan.target, stored.plan.runId);
       this.options.onLock?.("claim");
@@ -433,6 +424,21 @@ export class MergeUnitTransactions implements UnitTransaction {
     } finally {
       await lease.release()
     }
+  }
+
+  /** Acquire the one tree fence (or a HomeAuthority fallback) and prove it is held. */
+  private async acquireTreeFence(): Promise<{ fenceLease: HomeFenceLease; lock: TreeLock }> {
+    let fenceLease: HomeFenceLease;
+    if (this.options.fence !== undefined) {
+      fenceLease = await this.options.fence.acquire();
+    } else {
+      const fallback = new HomeAuthority({ home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
+      const fallbackLease: AuthorityLease | undefined = await fallback.lease("tree").catch(() => undefined);
+      if (fallbackLease === undefined) throw new Error("tree lock unavailable");
+      fenceLease = { lock: leaseAsTreeLock(fallbackLease), release: async () => { await fallbackLease.release() } };
+    }
+    if (!(await fenceLease.lock.assertHeld())) throw new Error("tree fence lost");
+    return { fenceLease, lock: fenceLease.lock };
   }
 
   /** Finish the idempotent support writes from the prepared snapshot, or name the drift. */
@@ -583,19 +589,10 @@ export class MergeUnitTransactions implements UnitTransaction {
     let lock: TreeLock | undefined
     let claim: UnitClaim | undefined;
     try {
-      if (this.options.fence !== undefined) {
-        fenceLease = await this.options.fence.acquire()
-        lock = fenceLease.lock
-      } else {
-        const fallback = new HomeAuthority({ home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
-        const fallbackLease: AuthorityLease | undefined = await fallback.lease("tree").catch(() => undefined);
-        if (fallbackLease === undefined) return { ok: false as const, code: "unit-fence-failed" as const, message: "tree lock unavailable" };
-        fenceLease = { lock: leaseAsTreeLock(fallbackLease), release: async () => { await fallbackLease.release() } };
-        lock = fenceLease.lock
-      }
+      const acquired = await this.acquireTreeFence();
+      fenceLease = acquired.fenceLease;
+      lock = acquired.lock;
       this.options.onLock?.("tree");
-      if (!(await lock.assertHeld()))
-        return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost" };
       claim = await this.options.claim.acquire(snapshot.target, snapshot.runId);
       this.options.onLock?.("claim");
       const currentTarget = await this.options.backend.readSkill(snapshot.target);
