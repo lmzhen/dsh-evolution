@@ -24,14 +24,6 @@ export interface PairRecord {
   readonly committed?: boolean
 }
 
-export interface PairIndexEntry {
-  readonly pairKey: string
-  readonly runId: string
-  readonly result: PairResult
-  readonly target?: string
-  readonly reportRef?: string
-}
-
 export interface RunRecordV2 {
   readonly id: string
   readonly kind: 'merge'

@@ -1,14 +1,7 @@
 // @tier pre-tag
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { historyRecord, putPair, summarizeHistory } from '../src/domain/indexes.ts'
-
-it('pair index put replaces by pairKey', () => {
-  const first = putPair(new Map(), { pairKey: 'a', runId: 'r1', result: 'merged' })
-  const second = putPair(first, { pairKey: 'a', runId: 'r2', result: 'undone' })
-  assert.equal(second.get('a')?.runId, 'r2')
-  assert.equal(second.size, 1)
-})
+import { historyRecord, summarizeHistory } from '../src/domain/indexes.ts'
 
 it('history keeps last version and counts four kinds', () => {
   const records = [

@@ -614,7 +614,6 @@
         "evolution-merge::tests/migrate-v3.spec.ts",
         "evolution-merge::tests/model-runner.spec.ts",
         "evolution-merge::tests/new-child-authoring.spec.ts",
-        "evolution-merge::tests/pair-index.spec.ts",
         "evolution-merge::tests/pair-resume.spec.ts",
         "evolution-merge::tests/params.spec.ts",
         "evolution-merge::tests/pending-actions.spec.ts",
@@ -626,7 +625,6 @@
         "evolution-merge::tests/reconcile.spec.ts",
         "evolution-merge::tests/recovery-settle.spec.ts",
         "evolution-merge::tests/report.spec.ts",
-        "evolution-merge::tests/resolve-pair.spec.ts",
         "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/row-fact-reason.spec.ts",
         "evolution-merge::tests/row-tx-transact.spec.ts",
@@ -1254,7 +1252,6 @@
         "evolution-merge::tests/migrate-v3.spec.ts",
         "evolution-merge::tests/model-runner.spec.ts",
         "evolution-merge::tests/new-child-authoring.spec.ts",
-        "evolution-merge::tests/pair-index.spec.ts",
         "evolution-merge::tests/pair-resume.spec.ts",
         "evolution-merge::tests/params.spec.ts",
         "evolution-merge::tests/pending-actions.spec.ts",
@@ -1266,7 +1263,6 @@
         "evolution-merge::tests/reconcile.spec.ts",
         "evolution-merge::tests/recovery-settle.spec.ts",
         "evolution-merge::tests/report.spec.ts",
-        "evolution-merge::tests/resolve-pair.spec.ts",
         "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/row-fact-reason.spec.ts",
         "evolution-merge::tests/row-tx-transact.spec.ts",
@@ -1838,7 +1834,6 @@
         "evolution-merge::tests/migrate-v3.spec.ts",
         "evolution-merge::tests/model-runner.spec.ts",
         "evolution-merge::tests/new-child-authoring.spec.ts",
-        "evolution-merge::tests/pair-index.spec.ts",
         "evolution-merge::tests/pair-resume.spec.ts",
         "evolution-merge::tests/params.spec.ts",
         "evolution-merge::tests/pending-actions.spec.ts",
@@ -1850,7 +1845,6 @@
         "evolution-merge::tests/reconcile.spec.ts",
         "evolution-merge::tests/recovery-settle.spec.ts",
         "evolution-merge::tests/report.spec.ts",
-        "evolution-merge::tests/resolve-pair.spec.ts",
         "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/row-fact-reason.spec.ts",
         "evolution-merge::tests/row-tx-transact.spec.ts",
@@ -2069,7 +2063,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 412
+      "specs": 410
     },
     "ci-only": {
       "gates": 10,
@@ -2077,16 +2071,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 412
+      "specs": 410
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 484
+      "specs": 482
     }
   },
   "specs": {
-    "total": 484,
-    "marked": 484,
+    "total": 482,
+    "marked": 482,
     "unmarked": 0
   }
 }

@@ -5,7 +5,6 @@ import { readV4Readiness, type V4Readiness } from './schema4.ts'
 import { readPairLedgerV4 } from './pair-ledger.ts'
 import { readAllStages, type StageEntry } from './stage-aggregate.ts'
 import { readRunMeta, type MergeRunMeta } from './run-coordinator.ts'
-import { loadPairIndex } from './pair-index-store.ts'
 import { mergeReportPath, readMergeReport } from '../report.ts'
 import { readCommitReceipts } from '../commit-receipt.ts'
 import type { MergeReport } from '../contracts.ts'
@@ -88,14 +87,13 @@ export async function readMergeSnapshot(options: ReadSnapshotOptions): Promise<M
     rows.push({ row, stage, bodies, queue, expired: expiredKind !== null, ...(expiredKind === null ? {} : { expiredKind }) })
     bodyRefs.push(...bodies)
   }
-  const pairIndex = await loadPairIndex(options.io, options.home)
   const runs: SnapshotRun[] = []
   for (const record of options.runs) {
     const meta = await readRunMeta(options.io, options.home, record.id)
-    const pairs = [...pairIndex.values()].filter(item => item.runId === record.id).map(item => ({ pairKey: item.pairKey, runId: item.runId, result: item.result, ...(item.target === undefined ? {} : { target: item.target }) }))
     const reportPath = mergeReportPath(options.home, record.id)
     const probe = await readMergeReport(options.io, options.home, record.id)
     const report = probe.kind === 'present' ? probe.value : null
+    const pairs = (report?.pairs ?? []).map(pair => ({ pairKey: pair.pairKey, runId: record.id, result: pair.outcome, ...(pair.target === undefined ? {} : { target: pair.target.requested }) }))
     runs.push({ record, meta, pairs, report, reportRef: report === null ? null : reportPath })
   }
   const reports = runs.filter(run => run.report !== null).map(run => ({ runId: run.record.id, path: run.reportRef as string, report: run.report as MergeReport }))
@@ -112,9 +110,9 @@ export async function readMergeSnapshot(options: ReadSnapshotOptions): Promise<M
   const queueRevision = createHash('sha256').update(JSON.stringify({ schemaVersion: 4, rows: rows.map(item => [item.row.id, item.row.version, item.row.state, item.row.updatedAt]), stages: stages.map(item => [item.rowId, item.version, item.state, item.updatedAt, item.ref, item.expiresAt]) })).digest('hex')
   const notes = [...(options.notes ?? [])]
   if (historyDegraded) notes.push('history archive port unavailable; receipts only')
-  const ledgerConflicts = [...pairIndex.values()].filter(entry => (entry.result === 'merged' || entry.result === 'undone')
-    && rows.some(item => item.row.pairKey === entry.pairKey && (item.row.state === 'verify' || item.row.state === 'pending' || item.row.state === 'approved' || item.row.state === 'fuse')))
-  if (ledgerConflicts.length > 0) notes.push('ledger-conflict: pair-index says completed but the ledger still has it active (' + String(ledgerConflicts.length) + ')')
+  const activePairKeys = new Set(rows.filter(item => item.row.state === 'verify' || item.row.state === 'pending' || item.row.state === 'approved' || item.row.state === 'fuse').map(item => item.row.pairKey))
+  const ledgerConflicts = runs.flatMap(run => run.pairs).filter(entry => (entry.result === 'merged' || entry.result === 'undone') && activePairKeys.has(entry.pairKey))
+  if (ledgerConflicts.length > 0) notes.push('ledger-conflict: a run says completed but the ledger still has it active (' + String(ledgerConflicts.length) + ')')
   return { wireVersion: 1, schemaVersion: 4, readAt, queueRevision, consistency: 'eventual', ...(hostOnly === undefined ? {} : { hostOnly }), rows, stages, runs, reports, report: reports.at(-1)?.report ?? null, history, bodyRefs, doctor, approval: { mergeApproval: options.approval, ...(options.platformWrite === undefined ? {} : { platformWrite: options.platformWrite }) }, notes, degraded: notes.length > 0 }
 }
 async function readHistory(io: EvolutionIoLike, home: string): Promise<readonly HistoryItem[]> {

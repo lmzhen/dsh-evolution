@@ -6,7 +6,6 @@ import { mergeReportPath, readMergeReport, writeMergeReport } from './report.ts'
 import { pairLedger, readPairLedgerV4 } from './domain/pair-ledger.ts'
 import { readAllStages, readStageTree, writeStageIndex } from './domain/stage-aggregate.ts'
 import { dropStage } from './domain/stage-aggregate.ts'
-import { recordPair } from './domain/pair-index-store.ts'
 import { readRunMeta, writeRunMeta } from './domain/run-coordinator.ts'
 import { evidenceSha256 } from './domain/evidence-hash.ts'
 import type { MergeReport } from './contracts.ts'
@@ -94,7 +93,6 @@ export async function projectRecoveredUnit(options: {
     await dropStage(options.io, options.home, stageRowId)
   }
   await options.onPhase?.('pair-index')
-  await recordPair(options.io, options.home, { pairKey, runId: options.runId, result: 'merged', target })
   await options.onPhase?.('run-meta')
   const meta = await readRunMeta(options.io, options.home, options.runId)
   await writeRunMeta(options.io, options.home, { version: 1, runId: options.runId, ...(meta?.pid === undefined ? {} : { pid: meta.pid }), phase: 'settled', ...(options.interrupted === true ? { stopReason: 'interrupted' } : {}), reportRef: reportPath, pairCount: 1, ...(meta?.parentRunId === undefined ? {} : { parentRunId: meta.parentRunId }), ...(meta?.stagingRef === undefined ? {} : { stagingRef: meta.stagingRef }), ...(meta?.pairs === undefined ? {} : { pairs: meta.pairs }), createdAt: meta?.createdAt ?? new Date(at).toISOString(), updatedAt: new Date(at).toISOString() })

@@ -272,15 +272,6 @@
       "note": "Stale-lock removal after a failed release (W9-authority): repair() only removes a lock whose holder is gone; the release itself is the platform lock."
     },
     {
-      "id": "merge-pair-index",
-      "path": "<evolutionHome>/merge/pair-index.json",
-      "writer": "evolution-merge/src/domain/pair-index-store.ts",
-      "serializedBy": "transact",
-      "marker": "transactIo(io, pairIndexPath(home)",
-      "state": [],
-      "note": "pairKey → result/runId/target index; RMW under the same IO lock so two merge runs cannot lose each other's entries."
-    },
-    {
       "id": "unit-snapshot-and-evidence",
       "path": "<evolutionHome>/merge/unit-snapshots/** | <evolutionHome>/units/skill/snapshots/** | <evolutionHome>/merge/units/**/evidence.json",
       "writer": "evolution-core/src/unit-storage.ts",

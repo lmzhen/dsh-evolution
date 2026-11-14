@@ -29,30 +29,6 @@ export interface MergeRunMeta {
   readonly createdAt: string
   readonly updatedAt: string
 }
-export interface PairIndexEntry {
-  readonly version: 1
-  readonly runId: string
-  readonly pairKey: string
-  readonly a: string
-  readonly b: string
-  readonly target: string
-  readonly targetRevision?: string
-  readonly sourceRevisions?: Readonly<Record<string, string>>
-  readonly state: 'pending' | 'approved' | 'fused' | 'skipped'
-  readonly updatedAt: string
-}
-export interface RunCoordinatorRead {
-  readonly runId: string
-  readonly meta: MergeRunMeta | null
-  readonly pairs: readonly PairIndexEntry[]
-  readonly consistency: 'eventual'
-}
-export interface RunCoordinator {
-  begin(meta: MergeRunMeta): Promise<void>
-  recordPair(entry: PairIndexEntry): Promise<void>
-  read(runId: string): Promise<RunCoordinatorRead>
-}
-
 export function runMetaPath(home: string, runId: string): string { return join(home, 'merge', 'run-meta', encodeURIComponent(runId) + '.json') }
 export async function writeRunMeta(io: EvolutionIoLike, home: string, meta: MergeRunMeta, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<void> {
   if (meta.revision !== undefined) {
@@ -111,4 +87,3 @@ export function inFlightPairRun(metas: readonly MergeRunMeta[], pairKeyValue: st
   return metas.find(meta => meta.phase === 'running' && meta.pairKey === pairKeyValue)
 }
 
-export { recordPair } from './pair-index-store.ts'

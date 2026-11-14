@@ -9,8 +9,9 @@ import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { makeV4Home, v3Row } from './support/schema4-home.ts'
 import { readPairLedgerV4 } from '../src/domain/pair-ledger.ts'
-import { recordPair } from '../src/domain/pair-index-store.ts'
 import { readMergeSnapshot } from '../src/domain/merge-snapshot.ts'
+import { writeMergeReport } from '../src/report.ts'
+import { reportFixture } from './support/report-fixture.ts'
 import { liveRowFactsOf } from '../src/domain/live-facts.ts'
 import { reconcileMergeState } from '../src/domain/reconcile.ts'
 import { createStageTree, readStageEntry, reserveStage, writeStageIndex } from '../src/domain/stage-aggregate.ts'
@@ -37,10 +38,13 @@ it('snapshot derives a stale pending row from the live library and writes nothin
   expect((await readPairLedgerV4(v4.io, v4.home))?.rows[0]?.state).toBe('pending')
 })
 
-it('a completed pair-index entry still active in the ledger is reported as a degraded conflict', async () => {
+it('a completed run pair still active in the ledger is reported as a degraded conflict', async () => {
   const v4 = await makeV4Home([v3Row({ id: 'p1', state: 'pending', target: 'c', decision } as never)])
-  await recordPair(v4.io, v4.home, { pairKey: pairKey('a', 'b'), runId: 'r1', result: 'merged' })
-  const snapshot = await readMergeSnapshot({ io: v4.io, home: v4.home, runs: [], approval: true, now: () => 2, live: async () => liveRowFactsOf([card('a'), card('b'), card('c')]) })
+  await writeMergeReport(v4.io, v4.home, reportFixture('r1', [{
+    id: 'p1', pairKey: pairKey('a', 'b'), a: 'a', b: 'b', queue: 'fuse', outcome: 'merged', archived: [],
+  }]))
+  const run = { id: 'r1', kind: 'merge', state: 'succeeded', startedAt: 1 }
+  const snapshot = await readMergeSnapshot({ io: v4.io, home: v4.home, runs: [run] as never, approval: true, now: () => 2, live: async () => liveRowFactsOf([card('a'), card('b'), card('c')]) })
   expect(snapshot.degraded).toBe(true)
   expect(snapshot.notes.some(note => note.startsWith('ledger-conflict:'))).toBe(true)
 })

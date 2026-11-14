@@ -4,15 +4,19 @@ import type { RunRecord } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { makeV4Home } from './support/schema4-home.ts'
 import { createMergeRuntime, pairKey, type MergeRuntimeDeps } from '../src/index.ts'
-import { recordPair } from '../src/domain/pair-index-store.ts'
 import { readMergeSnapshot } from '../src/domain/merge-snapshot.ts'
+import { writeMergeReport } from '../src/report.ts'
 import { buildRunDetail } from '../src/surface/merge-view.ts'
+import { reportFixture } from './support/report-fixture.ts'
 
 const run: RunRecord = { id: 'run-1', kind: 'merge', state: 'succeeded', startedAt: 1, command: 'approve', resultRef: '/tmp/report.json' }
 
 it('CLI status consumes buildRunDetail with the current pair and per-pair outcomes', async () => {
   const v4 = await makeV4Home([])
-  await recordPair(v4.io, v4.home, { pairKey: pairKey('alpha-skill', 'beta-skill'), runId: 'run-1', result: 'merged', target: 'umbrella' })
+  await writeMergeReport(v4.io, v4.home, reportFixture('run-1', [{
+    id: 'p1', pairKey: pairKey('alpha-skill', 'beta-skill'), a: 'alpha-skill', b: 'beta-skill', queue: 'fuse', outcome: 'merged',
+    target: { requested: 'umbrella', actual: 'umbrella', created: false }, archived: [],
+  }]))
   const registry = {
     async begin() { return { id: 'run-1', signal: new AbortController().signal, startedAt: 1 } },
     async stage() {},

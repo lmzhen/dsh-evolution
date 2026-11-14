@@ -7,7 +7,6 @@ import { readCommitReceipts } from './commit-receipt.ts'
 import { undoMergeReceipt, type MergeUndoPort } from './undo-merge.ts'
 import { readUndoJournal, writeUndoJournal, type UndoPairPhase, type UndoPairState } from './domain/undo-journal.ts'
 import { readUndoReceipt, writeUndoReceipt } from './domain/undo-receipt.ts'
-import { recordPair } from './domain/pair-index-store.ts'
 import { readRunMeta, writeRunMeta } from './domain/run-coordinator.ts'
 import { readUnitEvidence } from '@deepseek-ai/dsh-evolution-core/write'
 import { evidenceSha256 as unitEvidenceDigest } from './domain/evidence-hash.ts'
@@ -120,7 +119,6 @@ async function runUndoSteps(options: UndoOperationOptions): Promise<UndoResult> 
     if (existing !== null) {
       await markPhase('pair-index')
       await options.onPhase?.('pair-index', pairKey)
-      await recordPair(options.io, options.home, { pairKey, runId: options.runId, result: 'undone', target: receipt.target })
       await markPhase('run-meta')
       await options.onPhase?.('run-meta', pairKey)
       await settleRun(options.io, options.home, options.runId, pairKey, allPairKeys, options.now())
@@ -133,7 +131,6 @@ async function runUndoSteps(options: UndoOperationOptions): Promise<UndoResult> 
     await writeUndoReceipt(options.io, options.home, { version: 1, runId: options.runId, ...(receipt.parentRunId === undefined ? {} : { parentRunId: receipt.parentRunId }), pairKey, unitId: receipt.unitId, evidenceSha256: receipt.evidenceSha256 ?? unitEvidenceDigest(checked.evidence), target: receipt.target, sources: checked.evidence.sources.map(source => source.name), restoredTargetHash: receipt.create ? null : digest(checked.evidence.target.before), restoredSourceHashes: Object.fromEntries(checked.evidence.sources.map(source => [source.name, contentHash(source.before)])), at: options.now() })
       await markPhase('pair-index')
       await options.onPhase?.('pair-index', pairKey)
-      await recordPair(options.io, options.home, { pairKey, runId: options.runId, result: 'undone', target: receipt.target })
       await markPhase('run-meta')
       await options.onPhase?.('run-meta', pairKey)
       await settleRun(options.io, options.home, options.runId, pairKey, allPairKeys, options.now())
@@ -156,7 +153,6 @@ async function runUndoSteps(options: UndoOperationOptions): Promise<UndoResult> 
     await options.onPhase?.('receipt', pairKey)
     await writeUndoReceipt(options.io, options.home, { version: 1, runId: options.runId, ...(receipt.parentRunId === undefined ? {} : { parentRunId: receipt.parentRunId }), pairKey, unitId: receipt.unitId, evidenceSha256: receipt.evidenceSha256 ?? unitEvidenceDigest(checked.evidence), target: receipt.target, sources: checked.evidence.sources.map(source => source.name), restoredTargetHash: receipt.create ? null : digest(checked.evidence.target.before), restoredSourceHashes: Object.fromEntries(checked.evidence.sources.map(source => [source.name, contentHash(source.before)])), at: options.now() })
     await options.onPhase?.('pair-index', pairKey)
-    await recordPair(options.io, options.home, { pairKey, runId: options.runId, result: 'undone', target: receipt.target })
     await options.onPhase?.('run-meta', pairKey)
     await settleRun(options.io, options.home, options.runId, pairKey, allPairKeys, options.now())
     undone.push(pairKey)

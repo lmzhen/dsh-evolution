@@ -17,7 +17,6 @@ import {
 import { loadMergeState } from './state.ts'
 import { pairLedger } from './domain/pair-ledger.ts'
 import { presentStage, dropStage, type StageEntry } from './domain/stage-aggregate.ts'
-import { recordPair } from './domain/run-coordinator.ts'
 import { v4ToLegacy } from './domain/row-v4.ts'
 import type { EvolutionIoLike, RunStage } from '@deepseek-ai/dsh-evolution-core'
 import { criteriaFrom } from './domain/engine-criteria.ts'
@@ -227,7 +226,6 @@ const finalizeRows: { id: string; unitId: string; evidenceSha256: string }[] = [
       })
       if (projected === null) { pairs.push(pairOf(row, candidate, 'failed', { failure: failureOf('decide', 'row changed before keep record') })); totals.failed += 1; continue }
       row = projected
-      await recordPair(options.io, options.home, { pairKey: row.pairKey, runId: row.runId ?? 'merge', result: 'kept' })
       pairs.push(pairOf(row, candidate, 'kept', { ...(round1.decision === undefined ? {} : { decision: round1.decision }), ...(round1.usage === undefined ? {} : { usage: round1.usage }) }))
       totals.kept += 1
       continue
@@ -363,7 +361,6 @@ const finalizeRows: { id: string; unitId: string; evidenceSha256: string }[] = [
       })
       if (dropped) {
         await dropStage(options.io, options.home, row.id, row.stagingRef)
-        await recordPair(options.io, options.home, { pairKey: row.pairKey, runId: row.runId ?? 'merge', result: 'failed', ...(row.decision?.target === undefined ? {} : { target: row.decision.target }) })
       }
       pairs.push(pairOf(row, candidate, 'failed', { decision: mergeDecision, failure: failed, ...(round2.manifestFiles === undefined ? {} : { manifestFiles: round2.manifestFiles }), ...(round2.criteria === undefined ? {} : { criteria: round2.criteria }), ...(round2.validationIssues === undefined ? {} : { validation: { issues: round2.validationIssues } }) }))
       totals.failed += 1

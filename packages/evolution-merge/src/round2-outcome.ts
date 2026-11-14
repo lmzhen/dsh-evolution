@@ -8,7 +8,6 @@ import type { MergeFailure, MergeReportPair, MergeRow } from './contracts.ts'
 import { pairLedger } from './domain/pair-ledger.ts'
 import { dropStage } from './domain/stage-aggregate.ts'
 import { casExpiredHook } from './domain/failure-route.ts'
-import { recordPair } from './domain/run-coordinator.ts'
 import type { ScanRound2Outcome } from './scan-run.ts'
 
 export interface Round2Record {
@@ -34,7 +33,6 @@ export async function recordRound2Outcome(
   }
   if (outcome.kind === 'merged') {
     const unitRef = { unitId: outcome.unitId ?? 'unknown', evidenceSha256: outcome.evidenceSha256 ?? 'unknown' }
-    const target = outcome.target?.actual ?? outcome.target?.requested ?? row.decision?.target
     const finalize = async (): Promise<void> => {
       const removed = await pairLedger(io, home, fence).transact(tx => {
         const current = tx.rows().find(item => item.id === row.id)
@@ -42,13 +40,6 @@ export async function recordRound2Outcome(
       })
       if (!removed.ok) throw new Error('row changed before commit record: ' + row.id)
       await dropStage(io, home, row.id)
-      await recordPair(io, home, {
-        pairKey: row.pairKey,
-        runId: row.runId ?? 'merge',
-        result: 'merged',
-        ...(target === undefined ? {} : { target }),
-        ...(outcome.unitId === undefined ? {} : { reportRef: outcome.unitId }),
-      })
     }
     if (deferProjection) return { merged: true, finalize, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, ...(row.decision === undefined ? {} : { decision: row.decision }), outcome: 'merged', archived: outcome.archived ?? [], ...(outcome.lengths === undefined ? {} : { lengths: outcome.lengths }), ...(outcome.unitId === undefined ? {} : { unitId: outcome.unitId }), ...(outcome.target === undefined ? {} : { target: outcome.target }), ...reportExtra } }
     {
@@ -99,7 +90,6 @@ export async function recordRound2Outcome(
     })
     if (dropped) {
       await dropStage(io, home, row.id, row.stagingRef)
-      await recordPair(io, home, { pairKey: row.pairKey, runId: row.runId ?? 'merge', result: 'failed', ...(row.decision?.target === undefined ? {} : { target: row.decision.target }) })
     }
   }
   if (failure.code === 'source-gone') {
@@ -118,12 +108,6 @@ export async function recordRound2Outcome(
   })
   if (projected === null) return { merged: false, pair: { id: row.id, pairKey: row.pairKey, a: row.a, b: row.b, queue: row.queue, outcome: 'failed', archived: [], failure: { ...failure, code: 'row-changed', message: 'row changed before failure record' }, ...reportExtra } }
   {
-    await recordPair(io, home, {
-      pairKey: row.pairKey,
-      runId: row.runId ?? 'merge',
-      result: 'failed',
-      ...(row.decision?.target === undefined ? {} : { target: row.decision.target }),
-    })
   }
   return {
     merged: false,

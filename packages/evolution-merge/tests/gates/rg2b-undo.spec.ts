@@ -8,11 +8,9 @@ import { tempRoot } from '../../../test-support/temp-home.ts'
 import { writeCommitReceipt, readCommitReceipt } from '../../src/commit-receipt.ts'
 import { runUndoOperation } from '../../src/undo-operation.ts'
 import { evidenceSha256 } from '../../src/domain/evidence-hash.ts'
-import { recordPair } from '../../src/domain/pair-index-store.ts'
 import { readRunMeta, writeRunMeta } from '../../src/domain/run-coordinator.ts'
 import { readUndoReceipt } from '../../src/domain/undo-receipt.ts'
 import type { MergeUndoPort } from '../../src/undo-merge.ts'
-import { loadPairIndex } from '../../src/domain/pair-index-store.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const version = (v: number, action: string, hash: string, beforeHash?: string): SkillVersion => ({ v, at: AT, unitId: 'u-1', action, hash, chars: 1, ...(beforeHash === undefined ? {} : { beforeHash }) })
@@ -39,7 +37,6 @@ async function setup(create = false): Promise<{ home: string; io: ReturnType<typ
   await writeUnitEvidence(io, home, ev)
   const receipt = { runId: 'run-1', unitId: 'u-1', evidenceSha256: evidenceSha256(ev), target: 'target', create, sources: ['source'], archived: ['source'], at: 1, pairKey: 'a\u0000b' }
   await writeCommitReceipt(io, home, receipt)
-  await recordPair(io, home, { pairKey: 'a\u0000b', runId: 'run-1', result: 'merged', target: 'target' })
   await writeRunMeta(io, home, { version: 1, runId: 'run-1', phase: 'settled', pairCount: 1, createdAt: AT, updatedAt: AT })
   return { home, io, state: { target: create ? 'body-1' : 'body-1', source: null, calls: [] } }
 }
@@ -52,7 +49,6 @@ it('undoes a committed pair, writes undo receipt and marks the run undone', asyn
   expect(state.source).toBe('src')
   expect(await readUndoReceipt(io, home, 'run-1', 'a\u0000b')).toMatchObject({ restoredTargetHash: contentHash('body-0') })
   expect((await readRunMeta(io, home, 'run-1'))?.phase).toBe('undone')
-  expect((await loadPairIndex(io, home)).get('a\u0000b')?.result).toBe('undone')
 })
 
 it('undoes all pairs of one run and target in reverse order', async () => {
@@ -115,14 +111,6 @@ it('resumes idempotently after a crash at the undo receipt point', async () => {
   expect((await readRunMeta(io, home, 'run-1'))?.phase).toBe('undone')
 })
 
-it('resumes settlement after a crash at pair-index write', async () => {
-  const { home, io, state } = await setup()
-  let crashed = true
-  try { await runUndoOperation({ io, home, runId: 'run-1', port: port(state), now: () => 2, onPhase: async phase => { if (phase === 'pair-index' && crashed) { crashed = false; throw new Error('kill-before-pair-index') } } }) } catch { /* expected */ }
-  const retried = await runUndoOperation({ io, home, runId: 'run-1', port: port(state), now: () => 3 })
-  expect(retried.ok, retried.ok ? '' : retried.message).toBe(true)
-  expect((await readRunMeta(io, home, 'run-1'))?.phase).toBe('undone')
-})
 
 it('completes a partially applied undo by planning the missing side only', async () => {
   // W9-commit-protocol §3.2: a partial state used to be refused with "manual retry required",
