@@ -36,39 +36,6 @@ export interface RowMenuAction {
   readonly danger?: boolean | undefined
 }
 
-/** Props for the shared action menu. */
-export interface ActionMenuProps {
-  readonly actions: readonly RowMenuAction[]
-  readonly label: string
-  readonly style?: Record<string, string | number> | undefined
-  readonly className?: string | undefined
-  readonly primitives?: MenuPrimitives | undefined
-}
-
-/**
- * Render the coordinate/action menu through the platform primitives, or a plain fallback.
- * @param props - rows, accessible label, position/style and optional primitive override.
- * @returns the menu element.
- */
-export function ActionMenu({ actions, label, style, className, primitives = PLATFORM_MENU }: ActionMenuProps): ReactNode {
-  if (primitives !== undefined) return renderPlatformMenu(primitives, actions, label, style ?? {}, className)
-  return createElement('div', {
-    'data-role': 'action-menu-fallback',
-    role: 'menu',
-    'aria-label': label,
-    ...(style === undefined ? {} : { style }),
-    ...(className === undefined ? {} : { className }),
-  }, actions.map(action => createElement('button', {
-    key: action.id,
-    type: 'button',
-    role: 'menuitem',
-    disabled: action.disabled === true,
-    'data-danger': action.danger === true ? 'true' : 'false',
-    ...(action.separatorBefore === true ? { 'data-separator-before': 'true' } : {}),
-    onClick: () => { if (action.disabled !== true) action.onSelect() },
-  }, action.label)))
-}
-
 /**
  * Render the platform menu directly. Kept exported for callers that already own the primitive row.
  * @param primitives - platform MenuSurface/MenuItemButton pair.

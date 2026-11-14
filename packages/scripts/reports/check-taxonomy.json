@@ -77,7 +77,6 @@
       ],
       "specs": [
         "evolution-client-kit::tests/format.spec.ts",
-        "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
@@ -321,7 +320,6 @@
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
-        "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
@@ -969,7 +967,6 @@
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
-        "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
@@ -1542,7 +1539,6 @@
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
-        "evolution-client-kit::tests/notice.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
         "evolution-commands::tests/atomic-write.spec.ts",
@@ -2089,11 +2085,11 @@
   "counts": {
     "fast": {
       "gates": 62,
-      "specs": 101
+      "specs": 100
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 419
+      "specs": 418
     },
     "ci-only": {
       "gates": 10,
@@ -2101,16 +2097,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 419
+      "specs": 418
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 492
+      "specs": 491
     }
   },
   "specs": {
-    "total": 492,
-    "marked": 492,
+    "total": 491,
+    "marked": 491,
     "unmarked": 0
   }
 }

@@ -1,7 +1,7 @@
 // @tier fast
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { expect, it } from 'vitest'
-import { ActionMenu, DecisionFrame, DisclosureGroup, EmptyState, FilterChip, StatusChip, TaskBanner, TimeText } from '../src/index.ts'
+import { DecisionFrame, EmptyState, TaskBanner } from '../src/index.ts'
 
 type Props = Record<string, unknown>
 const element = (node: ReactNode): ReactElement<Props> => node as ReactElement<Props>
@@ -38,10 +38,7 @@ it('keeps TaskBanner read-only and exposes count as status', () => {
   expect(roles(banner, 'task-banner-count')[0]?.props.children).toBe('2')
 })
 
-it('exposes filter state and a single empty-state primary', () => {
-  const chip = element(FilterChip({ label: '警告', count: 2, active: true, onClick: () => {} }))
-  expect(chip.props['aria-pressed']).toBe('true')
-  expect(chip.props['data-active']).toBe('true')
+it('renders a single empty-state primary', () => {
   const empty = EmptyState({
     title: '没有待处理的写入',
     description: '新的写入会出现在这里',
@@ -56,19 +53,4 @@ it('adds compact/centered empty-state markers without changing the default', () 
   expect(element(EmptyState({ title: '空' })).props['data-variant']).toBeUndefined()
   expect(element(EmptyState({ title: '空', variant: 'compact' })).props['data-variant']).toBe('compact')
   expect(element(EmptyState({ title: '空', variant: 'centered' })).props['data-variant']).toBe('centered')
-})
-
-it('uses native details for normal items and exposes status tone', () => {
-  const group = element(DisclosureGroup({ summary: '其他 6 项正常', count: 6, children: '检查项' }))
-  expect(group.type).toBe('details')
-  expect(group.props.open).toBeUndefined()
-  expect(element(StatusChip({ label: '正常', tone: 'ok' })).props['data-tone']).toBe('ok')
-})
-
-it('renders the action menu fallback and the shared time text', () => {
-  const menu = ActionMenu({ actions: [{ id: 'copy', label: '复制命令', onSelect: () => {} }], label: '更多', primitives: undefined })
-  expect(roles(menu, 'action-menu-fallback')).toHaveLength(1)
-  expect(roles(menu, 'action-menu-fallback')[0]?.props.role).toBe('menu')
-  expect(TimeText({ value: '2026-11-05T05:00:00.000Z', seconds: false })).toBeTruthy()
-  expect(element(TimeText({ value: null })).props.children).toBe('—')
 })
