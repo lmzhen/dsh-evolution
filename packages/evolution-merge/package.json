@@ -13,6 +13,9 @@
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
+  "bin": {
+    "dsh-evolution-merge-migrate": "scripts/merge-migrate.mjs"
+  },
   "exports": {
     ".": {
       "types": "./lib/types/index.d.ts",
@@ -26,6 +29,9 @@
     "lib/**/*.js",
     "lib/types/**/*.d.ts",
     "data/**/*",
+    "scripts/merge-migrate.mjs",
+    "scripts/merge-restore.mjs",
+    "scripts/merge-backup.mjs",
     "package.json"
   ],
   "license": "MIT",

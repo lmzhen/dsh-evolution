@@ -257,6 +257,25 @@ function rewriteScopedJs(stagedDir, names) {
   }
 }
 
+/**
+ * Operator scripts are shipped as `scripts/*.mjs` by packages that expose a `bin` (the merge
+ * migration entry). They import family packages by the workspace name, so the same scope
+ * rewrite lib receives must run here; otherwise the published CLI resolves
+ * `@deepseek-ai/dsh-evolution-core`, which does not exist under the publish scope.
+ * @param stagedDir - the staged package root.
+ * @param names - the family package names to rewrite.
+ */
+function rewriteScopedScripts(stagedDir, names) {
+  if (!scope) return
+  const scriptsRoot = join(stagedDir, 'scripts')
+  if (!existsSync(scriptsRoot)) return
+  for (const entry of readdirSync(scriptsRoot, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.mjs')) continue
+    const path = join(scriptsRoot, entry.name)
+    writeFileSync(path, rewriteScopedText(readFileSync(path, 'utf8'), names))
+  }
+}
+
 /** Relative paths (posix separators) of every runtime bundle under lib/,
  * skipping the tsc-only `types/` tree (never ships; it still carries the
  * workspace names and would trip the unrewritten-scope guard). */
@@ -361,6 +380,7 @@ for (const dir of sourceDirs) {
   // A materialized array stays re-iterable for each file.
   const familyNames = [...names.keys()]
   rewriteScopedJs(staged, familyNames)
+rewriteScopedScripts(staged, familyNames)
   // PLAN S5.6 (2026-09-16, audit P2-24): npm pack ALWAYS ships the package
   // root's README.md, but the rewrite face only covered manifests, YAML and
   // lib/**.{js,d.ts} — a published @lmzhen package kept advertising its
