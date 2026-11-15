@@ -38,7 +38,7 @@ it('runs a real scan through UnitTransactions and SkillLibrary', async () => {
   const deps: MergeRuntimeDeps = {
     io, home, skills, now: () => 200,
     registry: { async begin() { return { id: 'run-1', signal: new AbortController().signal, startedAt: 1 } }, async stage() {}, async settle() {} },
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel, parent: {}, allow: [], timeoutMinutes: 0, detached: false,
     cards: async () => cards,
     screeningForRun: async () => [{ a: 'alpha-skill', b: 'beta-skill' }],

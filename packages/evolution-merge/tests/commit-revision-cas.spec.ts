@@ -3,13 +3,13 @@
 // travel producer -> assembly -> store, and a changed live tree is refused with a typed
 // cause; validation findings land in skipped, manifest files[] is checked on both paths.
 import { expect, it } from 'vitest'
-import { contentHash, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
-import { revisionFingerprint, revisionSupportDigest, type CommitMergePlan, type RevisionFile } from '@deepseek-ai/dsh-evolution-core/skills'
+import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { revisionSupportDigest, type CommitMergePlan, type RevisionFile } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { makeV4Home, v3Row } from './support/schema4-home.ts'
 import {
   commitStagedRun, createStaging, pairKey, recordRound2Outcome, runAuthoring, runNewChildAuthoring, stageKeyOf,
-  writeStagedFile, type CommitPort, type ConversationChannelLike, type MergeDecision, type MergeRow, type RevisionRef, type SkillCard,
+  writeStagedFile, type CommitPort, type ConversationChannelLike, type MergeDecision, type MergeRow, type SkillCard,
 } from '../src/index.ts'
 import { withDecisionRevisions } from '../src/revision.ts'
 import { readPairLedgerV4 } from '../src/domain/pair-ledger.ts'
@@ -20,10 +20,6 @@ function commitWithLegacy(io: any, home: string, runId: string, port: any, optio
 }
 
 const BODY = (name: string): string => ['---', 'name: ' + name, 'description: A merge fixture skill.', '---', '', '# ' + name, '', 'Body of ' + name + '.', ''].join('\n')
-
-function anchor(name: string, body: string, files: readonly RevisionFile[]): RevisionRef {
-  return { kind: 'present', sha256: contentHash(revisionFingerprint(name, body, files)) }
-}
 
 const A_FILES: readonly RevisionFile[] = [{ path: 'references/a.md', content: '# a\n' }]
 const B_FILES: readonly RevisionFile[] = []
@@ -40,14 +36,14 @@ function livePort(options: { readonly mutate?: 'source-support' | 'target-suppor
   const plans: CommitMergePlan[] = []
   const base = {
     plans,
-    async readSkill(name) { return cards.find(card => card.name === name)?.body ?? null },
-    async readSupportFiles(name) {
+    async readSkill(name: string) { return cards.find(card => card.name === name)?.body ?? null },
+    async readSupportFiles(name: string) {
       const files = cards.find(card => card.name === name)?.files ?? []
       if (options.mutate === 'source-support' && name === 'alpha-skill') return files.map(file => ({ ...file, content: '# a changed\n' }))
       if (options.mutate === 'target-support' && name === 'umbrella') return [{ path: 'references/new.md', content: '# new\n' }]
       return files
     },
-    async commitMerge(plan) { plans.push(plan); return { ok: true, message: 'merged', unitId: 'u-1', archived: plan.sources, mutations: 3 } },
+    async commitMerge(plan: any) { plans.push(plan); return { ok: true, message: 'merged', unitId: 'u-1', archived: plan.sources, mutations: 3 } },
   }
   return { ...base, unit: legacyUnit(base) }
 }
@@ -217,3 +213,5 @@ it('the new-child commit failure is typed from the decision anchors', async () =
   }, { id: 'f2', pairKey: pairKey('alpha-skill', 'beta-skill'), a: 'alpha-skill', b: 'beta-skill', state: 'fuse', queue: 'fuse', decision, createdAt: 'x', updatedAt: 'x' }, decision, new AbortController().signal)
   expect(result).toMatchObject({ kind: 'failed', failure: { stage: 'commit', code: 'source-changed', retryable: false, retryFrom: 'none' } })
 })
+
+

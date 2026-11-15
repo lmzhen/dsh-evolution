@@ -34,7 +34,7 @@ it('approves a pending row through a new child and drops it after commit', { tim
   }
   const deps: MergeRuntimeDeps = {
     io, home, registry, skills, now: () => 200,
-    params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel, parent: {}, allow: [], timeoutMinutes: 0,
     unit: {
       async prepare() { return { ok: true as const, prepared: { unitId: 'u-1', planDigest: 'd' } } },

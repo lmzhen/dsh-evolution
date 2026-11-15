@@ -107,7 +107,7 @@ it('CLI reconcile runs the writer and the doctor consumes its report', async () 
   const registry = { async begin() { throw new Error('unused') }, runs() { return [] }, find() { return undefined }, cancel() { return false } } as unknown as MergeRuntimeDeps['registry']
   const runtime = createMergeRuntime({
     io: v4.io, home: v4.home, registry, skills: {} as SkillLibrary, now: () => 10 * 86_400_000,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 1, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 1, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
@@ -125,7 +125,7 @@ it('an empty library never authorizes source-gone removal', async () => {
   const registry = { async begin() { throw new Error('unused') }, runs() { return [] }, find() { return undefined }, cancel() { return false } } as unknown as MergeRuntimeDeps['registry']
   const runtime = createMergeRuntime({
     io: v4.io, home: v4.home, registry, skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],

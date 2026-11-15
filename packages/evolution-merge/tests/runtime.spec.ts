@@ -13,7 +13,7 @@ it('serves read-only verbs through the runtime', async () => {
   const deps: MergeRuntimeDeps = {
     io, home, registry: { begin: async () => { throw new Error('not used') }, runs: () => [], find: () => undefined, cancel: () => false, cancelAll: () => 0 } as unknown as MergeRuntimeDeps['registry'],
     skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0,
     cards: async () => [], screeningForRun: async () => [],
@@ -36,7 +36,7 @@ it('serves report/runs/cancel from the run registry', async () => {
   } as unknown as MergeRuntimeDeps['registry']
   const deps: MergeRuntimeDeps = {
     io, home, registry, skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
   }
@@ -57,7 +57,7 @@ it('rejects a pending row into the skipped queue', async () => {
   await seedRow(io, home, row)
   const deps: MergeRuntimeDeps = {
     io, home, registry: {} as MergeRuntimeDeps['registry'], skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
   }
@@ -74,7 +74,7 @@ it('restores a skipped row and clears a resume row', async () => {
   await seedRow(io, home, row)
   const deps: MergeRuntimeDeps = {
     io, home, registry: {} as MergeRuntimeDeps['registry'], skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
   }

@@ -35,7 +35,7 @@ it('runs a scan through the runtime registry/channel/commit path', async () => {
   }
   const deps: MergeRuntimeDeps = {
     io, home, registry, skills, now: () => 200,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel, parent: {}, allow: [], timeoutMinutes: 0, detached: false,
     unit: {
       async prepare() { return { ok: true as const, prepared: { unitId: 'u-runtime', planDigest: 'd' } } },
@@ -59,7 +59,7 @@ it('returns an accepted run id when detached is enabled', async () => {
     io, home, now: () => 1,
     registry: { async begin() { return { id: 'run-det', signal: new AbortController().signal, startedAt: 1 } }, async stage() {}, async settle() {} },
     skills: {} as SkillLibrary,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, parent: {}, allow: [], timeoutMinutes: 0, detached: true,
     channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
     cards: async () => [], screeningForRun: async () => [],

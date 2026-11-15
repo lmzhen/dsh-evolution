@@ -1,9 +1,5 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { undoMergeReceipt, type MergeUndoPort } from '../src/undo-merge.ts'
 import type { CommitReceipt } from '../src/commit-receipt.ts'
 

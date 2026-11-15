@@ -28,7 +28,7 @@ it('CLI status consumes buildRunDetail with the current pair and per-pair outcom
   } as unknown as MergeRuntimeDeps['registry']
   const runtime = createMergeRuntime({
     io: v4.io, home: v4.home, registry, skills: {} as SkillLibrary, now: () => 2,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
@@ -65,7 +65,7 @@ it('status with an unknown id answers the three-line row-not-found error', async
   const registry = { async begin() { throw new Error('unused') }, runs() { return [] }, find() { return undefined } } as unknown as MergeRuntimeDeps['registry']
   const runtime = createMergeRuntime({
     io: v4.io, home: v4.home, registry, skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
