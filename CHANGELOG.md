@@ -1,3 +1,11 @@
+## 0.49.0 (unreleased) — 迁移单入口、净删收口
+
+> **范围**：① merge 迁移改为一个 `dsh-evolution-merge-migrate` 入口（dry-run / apply / restore），宿主启动与 CLI 共用 `migrateMergeStateToV4`；② 迁移 blocked 提示按 readiness code 分四种，8 个 locale 由平台 catalog 生成；③ D5 hunk 行渲染单源；④ 删除零引用脚本/导出/helper，净减 **−5,729 行**。
+>
+> **破坏性变更**：删除无生产调用的公共导出 `installExclusionTarget`、`renderCommandTable`、`renderLongRunTable`、`instanceClaimedWriteSites`、`persistedWriteSite`、`PENDING_ARCHIVE_FILE`、`UNKNOWN_FIELD_POLICY`，以及 v1 `EvidenceEnvelope` 的 `validateEvidenceEnvelope`/`createEvidenceEnvelope`。这些导出在 0.48 已无 in-tree 调用；外部若直接引用需改用 `persistedWriteSites()`/`verify-release-evidence.mjs` 或自留副本。
+>
+> **迁移**：旧 merge 状态由 `merge-migrate --apply` 升级；失败用 `--restore <backup>`。运行前停止所有打开同一 home 的宿主。迁移前有 `pre-migrate-*` 快照，v2→v3 有 `merge-state.v2.bak.json`，v3→v4 有 `pre-1b` 备份。
+
 ## 0.48.0 (architecture reset) — 单一事实、删除死地平线、安装只留 all/host
 
 > **范围（W11 §30 Wave 0–1 已落地；Wave 2–3 见实现记录）**：① 正确性修复（0 字节 SKILL.md、unit-journal TOCTOU、ParamCard retry、skill_search 单次全树扫描、mutation 锚点重锚、skill 写 bookkeeping 不再等待自身 home fence——PR #22）；② 删除 merge 旧 coordinator/state-v3、旧 commit journal/recovery 与双 doctor recovery 行；③ 删除 client-kit 无消费者展示面、rowConfigs/surface catalog、8 个零引用脚本；④ installer 只保留 `all`/`host` 安装，oneclick/agent/layered 仅保留一个版本的卸载入口；⑤ 删除 0.2.1 投影/LLM 兼容分支；⑥ 删除 review/curator/skill/memory 的显式参数旧名读取，`PARAM_ALIASES` 仅保留为旧文档迁移与 doctor 旧键报告。
