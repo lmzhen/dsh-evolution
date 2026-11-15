@@ -17,9 +17,9 @@ it('defines merge_stage and routes writes through applyStageTool', async () => {
   const ctx: StageToolContext = { runId: 'run-1', childId: 'child-1', expectedChildId: 'child-1', phase: 'author' }
   const tool = createMergeStageTool(io, home, () => ctx)
   expect(tool.name).toBe(MERGE_STAGE_TOOL_NAME)
-  const written = JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'target' }, {})) as { ok: boolean }
+  const written = JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'target' } as never, {} as never) as string) as { ok: boolean }
   expect(written.ok).toBe(true)
-  const read = JSON.parse(await tool.execute({ op: 'read', area: 'merged', path: 'SKILL.md' }, {})) as { ok: boolean; value: string }
+  const read = JSON.parse(await tool.execute({ op: 'read', area: 'merged', path: 'SKILL.md' } as never, {} as never) as string) as { ok: boolean; value: string }
   expect(read).toMatchObject({ ok: true, value: 'target' })
 })
 
@@ -30,7 +30,7 @@ it('limits the child to merge_stage and refuses writes in the decide phase', asy
   const decide: StageToolContext = { runId: 'run-1', childId: 'child-1', expectedChildId: 'child-1', phase: 'decide' }
   const tool = createMergeStageTool(io, home, () => decide)
   expect(tool.name).toBe('merge_stage')
-  expect(JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'x' }, {}))).toMatchObject({ ok: false, code: 'phase' })
+  expect(JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'x' } as never, {} as never) as string)).toMatchObject({ ok: false, code: 'phase' })
 })
 
 it('rejects bad shapes and wrong child without writing', async () => {
@@ -39,8 +39,8 @@ it('rejects bad shapes and wrong child without writing', async () => {
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
   const ctx: StageToolContext = { runId: 'run-1', childId: 'other', expectedChildId: 'child-1', phase: 'author' }
   const tool = createMergeStageTool(io, home, () => ctx)
-  expect(JSON.parse(await tool.execute({ op: 'read', area: 'merged' }, {}))).toMatchObject({ ok: false, code: 'bad-path' })
-  expect(JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'x' }, {}))).toMatchObject({ ok: false, code: 'not-merge-child' })
+  expect(JSON.parse(await tool.execute({ op: 'read', area: 'merged' } as never, {} as never) as string)).toMatchObject({ ok: false, code: 'bad-path' })
+  expect(JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'x' } as never, {} as never) as string)).toMatchObject({ ok: false, code: 'not-merge-child' })
 })
 
 it('resolves the stage context from the tool exec child id', async () => {
@@ -51,7 +51,8 @@ it('resolves the stage context from the tool exec child id', async () => {
   registry.bind('child-1', { runId: 'run-1', childId: 'child-1', expectedChildId: 'child-1', phase: 'author' })
   const tool = createMergeStageTool(io, home, exec => registry.resolve(exec))
   const exec = { agent: { session: { id: 'child-1' } } }
-  expect(JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'x' }, exec))).toMatchObject({ ok: true })
+  expect(JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'x' } as never, exec as never) as string)).toMatchObject({ ok: true })
   registry.unbind('child-1')
-  expect(JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'y' }, exec))).toMatchObject({ ok: false, code: 'not-merge-child' })
+  expect(JSON.parse(await tool.execute({ op: 'write', path: 'SKILL.md', content: 'y' } as never, exec as never) as string)).toMatchObject({ ok: false, code: 'not-merge-child' })
 })
+
