@@ -54,10 +54,10 @@ it('no-agent wins when a parent run id exists: the invocation itself is session-
 it('resume separates no-agent from missing parent', async () => {
   const v4 = await makeV4Home([v3Row({ id: 'f1', state: 'fuse', target: 'a', decision: DECISION } as never)])
   const ports = { screening: async () => [], round1: async () => ({ kind: 'failed' as const }), round2: async () => ({ kind: 'failed' as const }) }
-  const agentless = await runResumeCommand({ io: v4.io, home: v4.home, registry, ports: ports as never, rowId: 'f1', platformWrite: false, now: () => 1, agentless: true })
+  const agentless = await runResumeCommand({ io: v4.io, home: v4.home, registry, ports: ports as never, rowId: 'f1', platformWrite: false, now: () => 1, agentless: true, approval: true })
   expect(agentless.ok).toBe(false)
   if (!agentless.ok) expect(agentless.message).toContain('code: e-305')
-  const parentOnly = await runResumeCommand({ io: v4.io, home: v4.home, registry, ports: ports as never, rowId: 'f1', platformWrite: false, now: () => 1 })
+  const parentOnly = await runResumeCommand({ io: v4.io, home: v4.home, registry, ports: ports as never, rowId: 'f1', platformWrite: false, now: () => 1, approval: true })
   expect(parentOnly.ok).toBe(false)
   if (!parentOnly.ok) {
     expect(parentOnly.message).toContain('code: merge-parent-required')
@@ -72,7 +72,7 @@ const cards: SkillCard[] = [
 function runtime(home: string, io: Awaited<ReturnType<typeof makeV4Home>>['io']): ReturnType<typeof createMergeRuntime> {
   const deps: MergeRuntimeDeps = {
     io, home, registry, skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0,
@@ -131,8 +131,10 @@ it('carries stage and run id in the code line when they exist', () => {
 
 it('passes agentless through the command runner instead of faking a parent', async () => {
   const seen: unknown[] = []
-  const command = createMergeCommand({ async execute(_command, context) { seen.push(context); return { ok: true, text: 'ok' } } }, '0.31.0')
+  const command = createMergeCommand({ async execute(_command, context) { seen.push(context); return { ok: true, text: 'ok' } } }, '0.31.0')!
   await command.handler({ rawInput: 'status' })
   await command.handler({ rawInput: 'status', agent: { session: 's1' } })
   expect(seen).toEqual([{ agentless: true }, { parent: { session: 's1' } }])
 })
+
+

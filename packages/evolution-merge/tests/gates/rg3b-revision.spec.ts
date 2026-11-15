@@ -5,7 +5,7 @@ import { criteriaFrom } from '../../src/domain/engine-criteria.ts'
 import { normalizeProviderKey } from '../../src/domain/provider-key.ts'
 import type { SkillCard } from '../../src/skill-card.ts'
 
-const card = (name: string, body: string): SkillCard => ({ name, body, managed: true })
+const card = (name: string, body: string): SkillCard => ({ name, description: name, body, managed: true })
 
 it('uses absent/present revision sentinels', () => {
   expect(targetRevisionRefOf([], 'missing')).toEqual({ kind: 'absent' })
@@ -41,8 +41,9 @@ it('maps target create/absent/present/occupied sentinel matrix to target-taken',
 })
 
 it('changes supportDigest when support content changes', () => {
-  const a = { name: 'a', body: 'a', managed: true, files: [{ path: 'references/a.md', content: 'one' }] }
-  const b = { name: 'b', body: 'b', managed: true, files: [] }
+  const a = { name: 'a', description: 'a', body: 'a', managed: true, files: [{ path: 'references/a.md', content: 'one' }] }
+  const b = { name: 'b', description: 'b', body: 'b', managed: true, files: [] }
   const changed = { ...a, files: [{ path: 'references/a.md', content: 'two' }] }
   expect(supportDigestOf([a, b], ['a', 'b'])).not.toBe(supportDigestOf([changed, b], ['a', 'b']))
 })
+
