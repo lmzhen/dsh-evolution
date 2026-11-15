@@ -22,9 +22,9 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { probeSignature } from './lib-probes.mjs'
+import { verifyGateManifest } from './verify-gate-manifest.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const TREE = resolve(HERE, '..')
@@ -74,21 +74,14 @@ if (!armed) {
   console.error('verify-check-registry: CANNOT DECIDE - no repository marker above ' + TREE + ' (the meta-gate cannot arm here; an unarmed ledger must not pass)')
   process.exit(2)
 }
-const gateRun = spawnSync(process.execPath, [join(HERE, 'verify-gate-manifest.mjs'), TREE, '--json'], { encoding: 'utf8' })
-if (gateRun.status !== 0) {
-  const detail = (gateRun.stderr === null ? '' : gateRun.stderr).trim().split('\n').slice(-6).join('\n')
-  console.error('verify-check-registry: CANNOT DECIDE - meta-gate exit=' + String(gateRun.status) + ' (its observations are this ledger\'s other half)')
-  if (detail !== '') console.error('verify-check-registry: meta-gate stderr tail:\n' + detail)
+const gateRun = verifyGateManifest([TREE, '--json'], { silent: true })
+if (gateRun.status !== 0 || gateRun.json === null) {
+  const detail = (gateRun.json?.problems ?? []).slice(-6).join('\n')
+  console.error('verify-check-registry: CANNOT DECIDE - meta-gate status=' + String(gateRun.status) + ' (its observations are this ledger\'s other half)')
+  if (detail !== '') console.error('verify-check-registry: meta-gate problems tail:\n' + detail)
   process.exit(2)
 }
-let observations = []
-try {
-  const parsed = JSON.parse(gateRun.stdout === null ? '' : gateRun.stdout)
-  observations = Array.isArray(parsed.observations) ? parsed.observations : []
-} catch {
-  console.error('verify-check-registry: CANNOT DECIDE - the meta-gate exited 0 but did not answer with JSON')
-  process.exit(2)
-}
+const observations = Array.isArray(gateRun.json.observations) ? gateRun.json.observations : []
 const liveCount = (criterion) => observations.filter((entry) => entry.criterion === criterion).length
 
 // --- the register: a gap is a debt with a measured size, an expiry and an owner --------------

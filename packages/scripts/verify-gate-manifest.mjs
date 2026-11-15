@@ -20,6 +20,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { familyGateRegisters } from './lib-doc-facts.mjs'
 import { familyVersion } from './lib-family-version.mjs'
 import { exemptionProblems } from './lib-exemptions.mjs'
@@ -28,7 +29,8 @@ import { registry } from './gates/registry.mjs'
 import { validateRegistry } from './gates/model.mjs'
 import { renderManifestGates, renderTableBlock, renderTableRows, TABLE_HEADER } from './gates/views.mjs'
 
-const argv = process.argv.slice(2)
+export function verifyGateManifest(args = process.argv.slice(2), options = {}) {
+const argv = args
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
 const registryGates = renderManifestGates(registry)
 const expectedTableRows = renderTableRows(registryGates)
@@ -80,12 +82,12 @@ let argsSources = {}
 const argsPath = join(root, 'scripts', 'args-sources.json')
 if (existsSync(argsPath)) {
   try { argsSources = JSON.parse(readFileSync(argsPath, 'utf8')).sources ?? {} }
-  catch (error) { console.error('verify-gate-manifest: ' + argsPath + ' is unreadable (' + (error instanceof Error ? error.message : String(error)) + ') - fix the declaration table'); process.exit(2) }
+  catch (error) { console.error('verify-gate-manifest: ' + argsPath + ' is unreadable (' + (error instanceof Error ? error.message : String(error)) + ') - fix the declaration table'); return { status: 2, json: null } }
 }
 const registers = familyGateRegisters(root)
 if (registers === null) {
   console.error('verify-gate-manifest: the gate-set fact (or its machine registers) is missing from scripts/family-facts.json — the exception registers have no home')
-  process.exit(2)
+  return { status: 2, json: null }
 }
 const MACHINE_LOCAL = registers.machineLocal
 const CI_NOT_EXECUTED = registers.localOnly
@@ -98,8 +100,8 @@ const WORKFLOW_STEPS = new Set((Array.isArray(registers.workflowSteps) ? registe
 const contributingPath = join(repo, 'CONTRIBUTING.md')
 const actionPath = join(repo, '.github', 'actions', 'evolution-validate', 'action.yml')
 const releasePath = join(repo, '.github', 'workflows', 'release.yml')
-if (tableArmed && !existsSync(contributingPath)) { console.error('verify-gate-manifest: no CONTRIBUTING.md at ' + contributingPath); process.exit(2) }
-if (tableArmed && !existsSync(actionPath)) { console.error('verify-gate-manifest: no composite action at ' + actionPath); process.exit(2) }
+if (tableArmed && !existsSync(contributingPath)) { console.error('verify-gate-manifest: no CONTRIBUTING.md at ' + contributingPath); return { status: 2, json: null } }
+if (tableArmed && !existsSync(actionPath)) { console.error('verify-gate-manifest: no composite action at ' + actionPath); return { status: 2, json: null } }
 
 const tableRows = expectedTableRows
 if (!tableArmed) console.error('verify-gate-manifest: table check NOT ARMED in this layout - no repository marker above ' + root + ' (the register records this row against the mirror tree)')
@@ -408,7 +410,7 @@ let drillDeclarations = {}
 const drillPath = join(root, 'scripts', 'drill-declarations.json')
 if (existsSync(drillPath)) {
   try { drillDeclarations = JSON.parse(readFileSync(drillPath, 'utf8')).drills ?? {} }
-  catch (error) { console.error('verify-gate-manifest: ' + drillPath + ' is unreadable (' + (error instanceof Error ? error.message : String(error)) + ') - fix the declaration table'); process.exit(2) }
+  catch (error) { console.error('verify-gate-manifest: ' + drillPath + ' is unreadable (' + (error instanceof Error ? error.message : String(error)) + ') - fix the declaration table'); return { status: 2, json: null } }
 }
   // (R4) falsifiability carrier: every row states how its green can be turned red (drillCmd), or
   // why it cannot be yet (noDrillReason). Neither means somebody forgot, which G6's gate-truth counts.
@@ -458,9 +460,9 @@ if (!argv.includes('--json')) console.log('argv-ci-parity: compared ' + parityCh
 // G2/M5: the registry is a LEDGER over these observations. It consumes this object instead of
 // re-deriving them (a second implementation of a discovery is how two counts start to differ).
 if (argv.includes('--json')) {
-  console.log(JSON.stringify({ schema: 1, manifestRows: manifestGates.length, familyVersion: familyVer === undefined ? null : familyVer, tableRows: tableRows.length, criteria: CRITERIA, observations, problems, notes }, null, 2))
-  if (problems.length > 0) process.exit(1)
-  process.exit(0)
+  const payload = { schema: 1, manifestRows: manifestGates.length, familyVersion: familyVer === undefined ? null : familyVer, tableRows: tableRows.length, criteria: CRITERIA, observations, problems, notes }
+  if (options.silent !== true) console.log(JSON.stringify(payload, null, 2))
+  return { status: problems.length > 0 ? 1 : 0, json: payload }
 }
 if (report) {
   console.log('verify-gate-manifest [report] ' + manifestGates.length + ' manifest row(s), family version ' + String(familyVer) + ' - ' + observations.length + ' observation(s)')
@@ -476,7 +478,13 @@ if (report) {
 if (problems.length > 0) {
   console.error('verify-gate-manifest: ' + problems.length + ' problem(s)')
   for (const problem of problems) console.error('  - ' + problem)
-  process.exit(1)
+  return { status: 1, json: null }
 }
 console.log('verify-gate-manifest: OK — ' + tableRows.length + ' declared step(s), ' + declaredScripts.size + ' in-repo script(s), upstream line ' + platformVersion
   + (notes.length > 0 ? '; ' + notes.join('; ') : ''))
+return { status: 0, json: null }
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exit(verifyGateManifest().status)
+}
