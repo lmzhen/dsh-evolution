@@ -1,8 +1,4 @@
-/**
- * Dispatch table for the handler slices that have left index.ts. Keys are the parser's
- * command names today; the remaining if-branches move here one aggregate at a time.
- * @module evolution-commands/src/host-commands/handlers
- */
+/** Extracted command handlers; the legacy chain answers whatever is not here. */
 import type { CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import type { ParsedCommand } from '../parse.ts'
@@ -19,19 +15,13 @@ import {
 
 /** What every extracted handler receives. */
 export interface CommandHandlerContext extends ApprovalCommandContext {
-  /** The raw text after `/evolution`; the four approval handlers keep the old slice shape. */
   readonly input: string
-  /** The settings provider, for the read-only params surface. */
   readonly provider?: SettingsProviderLike | undefined
-  /** The plugin context, for handlers that read a family service. */
   readonly ctx?: { get(name: string): unknown } | undefined
-  /** Doctor's run counts (the local registry snapshot). */
   readonly runs?: (() => { running: number; orphaned: number }) | undefined
-  /** The host's "this write cannot be replayed" refusal, for destructive commands. */
   readonly refusal?: ((what: string) => CommandResult | undefined) | undefined
 }
 
-/** A handler returns undefined when the command shape is not its own, so the legacy chain can answer. */
 export type CommandHandler = (context: CommandHandlerContext) => Promise<CommandResult | undefined> | CommandResult | undefined
 
 const isPendingShape = (command: ParsedCommand): boolean =>
@@ -39,7 +29,6 @@ const isPendingShape = (command: ParsedCommand): boolean =>
 const isParamsShape = (command: ParsedCommand): boolean =>
   command.positionals.length === 0 && [...command.flags.keys()].every(flag => flag === 'group' || flag === 'json')
 
-/** The extracted handlers. Grow this map as each aggregate moves; do not add a second parser. */
 export const HOST_COMMAND_HANDLERS: Readonly<Record<string, CommandHandler>> = {
   pending: context => isPendingShape(context.command) ? runPendingCommand(context) : undefined,
   approve: context => context.input.startsWith('approve ')
