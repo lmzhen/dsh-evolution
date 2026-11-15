@@ -43,7 +43,7 @@ const config = {
   extends: basePath,
   compilerOptions: {
     noEmit: true, declaration: false, declarationMap: false, composite: false, incremental: false,
-    rewriteRelativeImportExtensions: false, typeRoots: [resolve(typesRoot, '..', '@types')], paths,
+    rewriteRelativeImportExtensions: false, typeRoots: [existsSync(join(baseDir, 'node_modules', '@types')) ? join(baseDir, 'node_modules', '@types') : resolve(typesRoot, '..', '@types')], paths,
   },
   include: existsSync(join(baseDir, 'packages', 'evolution'))
     ? ['packages/evolution/evolution-*/tests/**/*.ts', 'packages/evolution/test-support/**/*.ts']
