@@ -21,10 +21,10 @@ it('authors a staged tree, passes the gate and commits', async () => {
   const io = nodeEvolutionIo()
   const result = await runAuthoring({
     io, home, runId: 'run-1', target: 'umbrella', cards, commitPort: port(), now: () => 200, summary: 'merge',
-    async author(staging) {
+    author: (async (staging: any) => {
       expect(await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella'))).toMatchObject({ ok: true })
       return 'written'
-    },
+    }) as never,
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
   if (!result.ok) return
@@ -38,11 +38,11 @@ it('P2-20: rejects a staged support file the clean JSON manifest omitted', async
   const io = nodeEvolutionIo()
   const result = await runAuthoring({
     io, home, runId: 'run-undeclared', target: 'umbrella', cards, commitPort: port(), now: () => 200, summary: 'merge',
-    async author(staging) {
+    author: (async (staging: any) => {
       await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella'))
       await writeStagedFile(io, staging.home, staging.runId, 'references/new.md', '# new\n')
       return JSON.stringify({ files: ['SKILL.md'] })
-    },
+    }) as never,
   })
   expect(result.ok).toBe(false)
   if (result.ok) return
@@ -63,7 +63,7 @@ it('P1-6: the scan path commits under the ROW run id, not the staged key', async
   }
   const result = await runAuthoring({
     io, home, runId: 'run-row', stageKey: 'run-row/pairs/abc', target: 'umbrella', cards, commitPort: port(), now: () => 200, summary: 'merge', unit: unit as never,
-    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) },
+    author: (async (staging: any) => { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) }) as never,
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
   expect(preparedRunId).toBe('run-row')
@@ -77,7 +77,7 @@ it('ignores unrelated skills when scanning the participating cards for threats',
   const commitPortWithUnit = { ...commitPort, unit: legacyUnit(commitPort) }
   const result = await runAuthoring({
     io, home, runId: 'run-participants', target: 'umbrella', cards: allCards, sources: ['alpha-skill', 'beta-skill'], commitPort: commitPortWithUnit, now: () => 200, summary: 'merge',
-    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) },
+    author: (async (staging: any) => { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) }) as never,
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
 })
@@ -87,7 +87,7 @@ it('normalizes merge-into-existing to create-umbrella when the target card is ab
   const io = nodeEvolutionIo()
   const result = await runAuthoring({
     io, home, runId: 'run-fresh', target: 'umbrella', mode: 'merge-into-existing', cards, commitPort: port(), now: () => 200, summary: 'merge',
-    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) },
+    author: (async (staging: any) => { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) }) as never,
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
   expect(await readCommitReceipt(io, home, 'run-fresh')).toMatchObject({ target: 'umbrella' })
@@ -112,7 +112,7 @@ it('refuses when the author fails or leaves a blocking tree', async () => {
 
   const blocking = await runAuthoring({
     io, home, runId: 'run-2', target: 'umbrella', cards, commitPort: port(), now: () => 200, summary: 'merge',
-    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', 'no frontmatter') },
+    author: (async (staging: any) => { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', 'no frontmatter') }) as never,
   })
   expect(blocking.ok).toBe(false)
   if (blocking.ok) return
@@ -126,7 +126,7 @@ it('uses one limits snapshot at the gate and never commits an over-limit tree', 
   const result = await runAuthoring({
     io, home, runId: 'run-limit', target: 'umbrella', cards, commitPort, now: () => 200, summary: 'merge',
     limits: { ...DEFAULT_SKILL_LIMITS, maxSkillFileBytes: 8 },
-    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) },
+    author: (async (staging: any) => { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')) }) as never,
   })
   expect(result.ok).toBe(false)
   if (!result.ok) expect(result.findings?.some(finding => finding.rule === 'limit' && finding.severity === 'block')).toBe(true)
@@ -143,7 +143,7 @@ it('allows the exact limit and rejects one byte over at both gate and commit', a
     let commits = 0
     const commitPort: CommitPort = { readSkill: port().readSkill, async commitMerge(plan) { commits += 1; return { ok: true, message: 'merged', unitId: 'u-' + runId, archived: plan.sources, mutations: 1 } } }
     const commitPortWithUnit = { ...commitPort, unit: legacyUnit(commitPort) }
-    const result = await runAuthoring({ io, home, runId, target: 'umbrella', cards, commitPort: commitPortWithUnit, now: () => 200, summary: 'merge', limits: { ...DEFAULT_SKILL_LIMITS, maxSkillFileBytes: limit }, async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', body) } })
+    const result = await runAuthoring({ io, home, runId, target: 'umbrella', cards, commitPort: commitPortWithUnit, now: () => 200, summary: 'merge', limits: { ...DEFAULT_SKILL_LIMITS, maxSkillFileBytes: limit }, async author(staging: any) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', body) } })
     expect(result.ok, runId).toBe(ok)
     expect(commits).toBe(ok ? 1 : 0)
   }
@@ -165,7 +165,7 @@ it('archives only the non-target source when merging into an existing target', a
   const io = nodeEvolutionIo()
   const result = await runAuthoring({
     io, home, runId: 'run-1', target: 'alpha-skill', cards, commitPort: port(), now: () => 200, summary: 'merge',
-    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('alpha-skill')) },
+    author: (async (staging: any) => { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('alpha-skill')) }) as never,
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
   if (result.ok) expect(result.commit.ok && result.commit.result.archived).toEqual(['beta-skill'])
@@ -192,9 +192,10 @@ it('refuses when curator blocks the target during authoring', async () => {
   const result = await runAuthoring({
     io, home, runId: 'run-1', target: 'umbrella', cards, commitPort: guarded, now: () => 200, summary: 'merge',
     isBlocked: () => blocked,
-    async author(staging) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')); blocked = true },
+    author: (async (staging: any) => { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', BODY('umbrella')); blocked = true }) as never,
   })
   expect(result.ok).toBe(false)
   if (!result.ok) expect(result.message).toContain('blocked')
   expect(commits).toBe(0)
 })
+

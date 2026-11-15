@@ -11,7 +11,7 @@ const row: MergeRow = { id: '', pairKey: 'a\u0000b', a: 'alpha-skill', b: 'beta-
 const signal = new AbortController().signal
 const mergeText = JSON.stringify({ should_merge: true, mode: 'merge-into-existing', target: 'alpha-skill', sources: ['alpha-skill', 'beta-skill'], rationale: 'same' })
 
-function channel(text: string, cacheRead?: number): ConversationChannelLike & { disposed: number; continued: number } {
+function channel(text: string, cacheRead?: number): ConversationChannelLike & { disposed: number; continued: number; first: boolean } {
   const state = { disposed: 0, continued: 0, first: true }
   return {
     ...state,
@@ -60,3 +60,4 @@ it('disposes immediately for keep and invalid decisions', async () => {
   expect((await runRound1OverChannel({ channel: bad, parent: {}, cards, allow: [], timeoutMs: 1000 }, candidate, signal)).outcome.kind).toBe('failed')
   expect(bad.disposed).toBe(1)
 })
+
