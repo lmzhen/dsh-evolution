@@ -993,27 +993,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const { facts } = buildMaintainFacts(snapshots, enrichment.usageObservedValue, undefined)
           return ok(`维护事实（零 token 预览）：\n${facts}`)
         }
-            break
-          }
-          default: break
-        }
-        if (input === 'consolidate' || input.startsWith('consolidate ')) {
-          const plan = /--plan\s+(\S+)/.exec(input)?.[1]
-          return err('`consolidate` 已退出用户面：机械追加由 curator 归档收尾，人类合成用 `/evolution merge pair <a> <b>`。' + (plan === undefined ? '' : '\n旧 --plan 审计只读保留：' + plan))
-        }
-        // 0.21.0 (G4/B4): the pin face. Same semantics as skill_manage's pin action — ONE library
-        // method (setPinned), the same repository-worded answer, and the same E-70 decision that a
-        // lifecycle-flag flip stays OUTSIDE the approval seam: staging it would let a request that
-        // expires hold the library pinned invisibly, and the flip is reversible by the same command.
-        // Like the tool, this is not a content write: no usage bump and no mutation event.
-        // F-03: the grammar was a fragile single-space match —
-        // `maintain  --timeout 600000` (multi-space) and `--timeout=600000`
-        // fell into the unknown-args rejection below. `\s+` before the flag
-        // and `[ =]` after it accept both spellings; trailing whitespace was
-        // already tolerated and stays tolerated.
-        // G7.4/C7: --timeout <ms> and --timeout=<ms> are the same flag to the parser.
-        // An UNDECLARED flag keeps the old 'unknown arguments' answer: the table declares what this
-        // subcommand accepts (C7), so a typo cannot silently become a bare flag.
         const maintainFlagsDeclared = [...(isParseFailure(command) ? [] : command.flags.keys())]
           .every(flag => flagsOf('maintain').includes('--' + flag))
         if (!isParseFailure(command) && command.name === 'maintain' && command.positionals.length === 0 && maintainFlagsDeclared) {
@@ -1242,6 +1221,27 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             `- stop:   /evolution maintain cancel ${handle.id}`,
           ].join('\n'))
         }
+            break
+          }
+          default: break
+        }
+        if (input === 'consolidate' || input.startsWith('consolidate ')) {
+          const plan = /--plan\s+(\S+)/.exec(input)?.[1]
+          return err('`consolidate` 已退出用户面：机械追加由 curator 归档收尾，人类合成用 `/evolution merge pair <a> <b>`。' + (plan === undefined ? '' : '\n旧 --plan 审计只读保留：' + plan))
+        }
+        // 0.21.0 (G4/B4): the pin face. Same semantics as skill_manage's pin action — ONE library
+        // method (setPinned), the same repository-worded answer, and the same E-70 decision that a
+        // lifecycle-flag flip stays OUTSIDE the approval seam: staging it would let a request that
+        // expires hold the library pinned invisibly, and the flip is reversible by the same command.
+        // Like the tool, this is not a content write: no usage bump and no mutation event.
+        // F-03: the grammar was a fragile single-space match —
+        // `maintain  --timeout 600000` (multi-space) and `--timeout=600000`
+        // fell into the unknown-args rejection below. `\s+` before the flag
+        // and `[ =]` after it accept both spellings; trailing whitespace was
+        // already tolerated and stays tolerated.
+        // G7.4/C7: --timeout <ms> and --timeout=<ms> are the same flag to the parser.
+        // An UNDECLARED flag keeps the old 'unknown arguments' answer: the table declares what this
+        // subcommand accepts (C7), so a typo cannot silently become a bare flag.
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
         if (/^maintain\b/.test(input)) {
           // 0.3.14 (P3-2): an input that STARTS with maintain but did not
