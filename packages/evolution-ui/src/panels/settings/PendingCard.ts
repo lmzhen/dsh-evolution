@@ -13,6 +13,7 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/settings/client/PendingCard
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react'
+import { hunkRows } from '../hunk-lines.ts'
 import type { FallbackHint } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
 import { FailureBlock, failureText } from '@lmzhen/dsh-evolution-client-kit/generated/states'
 import { DecisionFrame, EmptyState } from '@lmzhen/dsh-evolution-client-kit'
@@ -219,20 +220,15 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       ...view.answer.truncated ? [createElement('span', { className: 'evolution-param-fact', key: 'cut' }, t('approvalDiffCut'))] : [],
     ]
     const lines: ReactNode[] = []
-    // C-11: the row key is scoped to its HUNK, exactly as document.ts does it. A per-hunk index
-    // restarts at 0, so with two hunks the second old-0 collided with the first and React reused
-    // the wrong node (a line of one hunk shown in place of another). The data source returns at
-    // most one hunk today, so this is a consistency debt being paid before it can bite.
+    // hunkRows() scopes the row key to its HUNK, exactly as document.ts does it.
     const multiHunk = view.answer.hunks.length > 1 || view.answer.hunks.some(hunk => hunk.path !== view.answer.path)
     for (const [hunkIndex, hunk] of view.answer.hunks.entries()) {
       if (multiHunk) lines.push(createElement('div', { key: 'hunk-' + String(hunkIndex), className: 'evolution-param-hunk-path', 'data-role': 'hunk-path' }, hunk.path))
-      for (const [index, line] of hunk.oldText.split('\n').entries()) {
-        if (hunk.oldText === '' && line === '') continue
-        lines.push(createElement('div', { key: 'old-' + String(hunkIndex) + '-' + String(index), className: 'evolution-param-line-del' }, '- ' + line))
-      }
-      for (const [index, line] of hunk.newText.split('\n').entries()) {
-        if (hunk.newText === '' && line === '') continue
-        lines.push(createElement('div', { key: 'new-' + String(hunkIndex) + '-' + String(index), className: 'evolution-param-line-add' }, '+ ' + line))
+      for (const row of hunkRows(hunk, hunkIndex)) {
+        lines.push(createElement('div', {
+          key: row.key,
+          className: row.side === 'del' ? 'evolution-param-line-del' : 'evolution-param-line-add',
+        }, (row.side === 'del' ? '- ' : '+ ') + row.text))
       }
     }
     return createElement('div', null,

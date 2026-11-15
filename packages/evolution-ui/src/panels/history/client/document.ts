@@ -17,6 +17,7 @@
  */
 import { createElement, useState, type ReactNode } from 'react'
 import { button, note } from './atoms.ts'
+import { hunkRows } from '../../hunk-lines.ts'
 import type { VersionBodyRow, VersionDiffRow } from './api.ts'
 import type { Copy } from './chrome.ts'
 import { renderMarkdown, type MarkdownWords } from './markdown.ts'
@@ -35,17 +36,13 @@ export interface DocumentFace extends Copy {
 /** One `<pre>` rendering of a diff: added lines marked `+`, removed ones `-`. */
 function sourceBlock(diff: VersionDiffRow): ReactNode {
   const rows: ReactNode[] = []
-  // C1: the row key is scoped to its HUNK. A per-hunk index restarts at 0, so two hunks produced the
-  // same `old-0`/`new-0` keys and React reconciled the wrong rows (duplicate-key warning, and a
-  // reader could see one hunk's line replaced by another's).
+  // The row key is scoped to its HUNK by hunkRows(); a per-hunk index restarts at 0.
   for (const [hunkIndex, hunk] of diff.hunks.entries()) {
-    for (const [index, line] of hunk.oldText.split('\n').entries()) {
-      if (hunk.oldText === '' && line === '') continue
-      rows.push(createElement('div', { key: 'old-' + String(hunkIndex) + '-' + String(index), className: 'evo-doc-line-del' }, '- ' + line))
-    }
-    for (const [index, line] of hunk.newText.split('\n').entries()) {
-      if (hunk.newText === '' && line === '') continue
-      rows.push(createElement('div', { key: 'new-' + String(hunkIndex) + '-' + String(index), className: 'evo-doc-line-add' }, '+ ' + line))
+    for (const row of hunkRows(hunk, hunkIndex)) {
+      rows.push(createElement('div', {
+        key: row.key,
+        className: row.side === 'del' ? 'evo-doc-line-del' : 'evo-doc-line-add',
+      }, (row.side === 'del' ? '- ' : '+ ') + row.text))
     }
   }
   return createElement('pre', { className: 'evo-doc-source' }, rows.length === 0 ? '\u00b1' : rows)
