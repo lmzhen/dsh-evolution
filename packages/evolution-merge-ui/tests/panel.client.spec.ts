@@ -173,6 +173,7 @@ it('renders blocked without rows/actions and keeps raw text in details', async (
   expect(html).toContain('data-state="blocked"')
   expect(html).toContain('data-role="blocked"')
   expect(html).toContain('blocked.reason.migration-blocked')
+  expect(html).toContain('blocked.hint.migration-blocked')
   expect(html).toContain('title="host raw blocked"')
   expect(html).not.toContain('data-role="rows"')
   expect(html).not.toContain('data-role="row-action"')

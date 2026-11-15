@@ -183,14 +183,14 @@
       "ru": "Состояние объединения записано более новой версией; эта панель его не читает."
     },
     "blocked.reason.migration-blocked": {
-      "zh": "合并数据需要升级，面板已暂停读取。",
-      "en": "The merge data needs an upgrade, so the panel has stopped reading it.",
-      "ja": "マージデータのアップグレードが必要なため、読み取りを一時停止しています。",
-      "es": "Los datos del merge necesitan una actualización; el panel ha dejado de leerlos.",
-      "fr": "Les données de fusion doivent être migrées ; la lecture est en pause.",
-      "de": "Die Merge-Daten brauchen ein Upgrade; das Lesen ist pausiert.",
-      "pt": "Os dados de merge precisam de atualização; a leitura está pausada.",
-      "ru": "Данные объединения нужно обновить; чтение приостановлено."
+      "zh": "合并数据还是旧格式，自动升级没有完成；面板已暂停读取。",
+      "en": "The merge data is still in the old format and the automatic upgrade did not finish, so the panel has paused reading it.",
+      "ja": "マージデータが旧形式のままで、自動アップグレードが完了していません。パネルは読み取りを停止しています。",
+      "es": "Los datos de fusión siguen en el formato antiguo y la actualización automática no terminó; el panel ha pausado la lectura.",
+      "fr": "Les données de fusion sont encore dans l’ancien format et la mise à niveau automatique ne s’est pas terminée ; le panneau a suspendu la lecture.",
+      "de": "Die Zusammenführungsdaten liegen noch im alten Format vor, und die automatische Aktualisierung wurde nicht abgeschlossen; die Oberfläche liest sie nicht mehr.",
+      "pt": "Os dados de merge ainda estão no formato antigo e a atualização automática não terminou; o painel pausou a leitura.",
+      "ru": "Данные объединения всё ещё в старом формате, а автоматическое обновление не завершилось; панель приостановила чтение."
     },
     "blocked.reason.needs-repair": {
       "zh": "合并状态需要修复，面板已暂停读取。",
@@ -2221,6 +2221,46 @@
       "de": "Läuft",
       "pt": "em execução",
       "ru": "выполняется"
+    },
+    "blocked.hint.migration-blocked": {
+      "zh": "先停止宿主，再运行迁移工具；它会先备份旧数据，失败可以恢复。完成后刷新页面。",
+      "en": "Stop the host, then run the migration tool. It backs up the old data first and can restore it on failure. Refresh when done.",
+      "ja": "ホストを停止してから移行ツールを実行してください。実行前に旧データをバックアップし、失敗時は復元できます。完了後に再読み込みしてください。",
+      "es": "Detén el host y ejecuta la herramienta de migración. Antes hace una copia de seguridad y puede restaurarla si falla. Actualiza la página al terminar.",
+      "fr": "Arrêtez l’hôte, puis lancez l’outil de migration. Il sauvegarde d’abord les anciennes données et peut les restaurer en cas d’échec. Rechargez ensuite.",
+      "de": "Beenden Sie den Host und starten Sie dann das Migrationswerkzeug. Es sichert zuerst die alten Daten und kann sie bei einem Fehler wiederherstellen. Danach neu laden.",
+      "pt": "Pare o host e execute a ferramenta de migração. Ela faz backup dos dados antigos primeiro e pode restaurá-los em caso de falha. Recarregue depois.",
+      "ru": "Остановите хост и запустите инструмент миграции. Сначала он создаёт резервную копию старых данных и может восстановить её при сбое. Затем перезагрузите страницу."
+    },
+    "blocked.hint.forward-only": {
+      "zh": "合并数据来自更新版本的面板；先升级插件，再刷新页面。",
+      "en": "The merge data comes from a newer panel version. Upgrade the plugin, then refresh.",
+      "ja": "マージデータは新しいバージョンのパネルで作成されています。プラグインを更新してから再読み込みしてください。",
+      "es": "Los datos de fusión vienen de una versión más reciente del panel. Actualiza el plugin y vuelve a cargar.",
+      "fr": "Les données de fusion proviennent d’une version plus récente du panneau. Mettez le plugin à jour, puis rechargez.",
+      "de": "Die Zusammenführungsdaten stammen aus einer neueren Version der Oberfläche. Aktualisieren Sie das Plugin und laden Sie dann neu.",
+      "pt": "Os dados de merge vêm de uma versão mais recente do painel. Atualize o plugin e recarregue.",
+      "ru": "Данные объединения созданы более новой версией панели. Обновите плагин и перезагрузите страницу."
+    },
+    "blocked.hint.needs-repair": {
+      "zh": "合并数据不完整；运行迁移工具，它会先备份再修复。完成后刷新页面。",
+      "en": "The merge data is incomplete. Run the migration tool; it backs up before repairing. Refresh when done.",
+      "ja": "マージデータが不完全です。移行ツールを実行してください。修復前にバックアップします。完了後に再読み込みしてください。",
+      "es": "Los datos de fusión están incompletos. Ejecuta la herramienta de migración; hace copia antes de reparar. Actualiza al terminar.",
+      "fr": "Les données de fusion sont incomplètes. Lancez l’outil de migration ; il sauvegarde avant de réparer. Rechargez ensuite.",
+      "de": "Die Zusammenführungsdaten sind unvollständig. Starten Sie das Migrationswerkzeug; es sichert vor der Reparatur. Danach neu laden.",
+      "pt": "Os dados de merge estão incompletos. Execute a ferramenta de migração; ela faz backup antes de reparar. Recarregue depois.",
+      "ru": "Данные объединения неполные. Запустите инструмент миграции: перед восстановлением он создаёт резервную копию. Затем перезагрузите страницу."
+    },
+    "blocked.hint.unknown": {
+      "zh": "先运行诊断命令确认合并状态，再刷新页面。",
+      "en": "Run diagnostics to check the merge state, then refresh.",
+      "ja": "診断を実行してマージ状態を確認してから、再読み込みしてください。",
+      "es": "Ejecuta el diagnóstico para comprobar el estado de fusión y luego actualiza la página.",
+      "fr": "Lancez le diagnostic pour vérifier l’état de fusion, puis rechargez.",
+      "de": "Starten Sie die Diagnose, um den Zusammenführungsstatus zu prüfen, und laden Sie dann neu.",
+      "pt": "Execute o diagnóstico para verificar o estado do merge e recarregue.",
+      "ru": "Запустите диагностику, чтобы проверить состояние объединения, и перезагрузите страницу."
     }
   }
 }

@@ -23,7 +23,7 @@ export const dictionaries = {
     "blocked.doctor": "复制诊断命令",
     "blocked.hint": "修好合并数据后再刷新；面板不会自动退回旧数据。",
     "blocked.reason.forward-only": "合并状态版本过新，当前面板暂不支持。",
-    "blocked.reason.migration-blocked": "合并数据需要升级，面板已暂停读取。",
+    "blocked.reason.migration-blocked": "合并数据还是旧格式，自动升级没有完成；面板已暂停读取。",
     "blocked.reason.needs-repair": "合并状态需要修复，面板已暂停读取。",
     "blocked.reason.unknown": "合并状态未就绪，面板已暂停读取。",
     "blocked.title": "合并状态未就绪",
@@ -226,7 +226,11 @@ export const dictionaries = {
     "verify.cancelled": "已取消",
     "verify.failed": "失败",
     "verify.queued": "排队",
-    "verify.running": "进行中"
+    "verify.running": "进行中",
+    "blocked.hint.migration-blocked": "先停止宿主，再运行迁移工具；它会先备份旧数据，失败可以恢复。完成后刷新页面。",
+    "blocked.hint.forward-only": "合并数据来自更新版本的面板；先升级插件，再刷新页面。",
+    "blocked.hint.needs-repair": "合并数据不完整；运行迁移工具，它会先备份再修复。完成后刷新页面。",
+    "blocked.hint.unknown": "先运行诊断命令确认合并状态，再刷新页面。"
   },
   en: {
     "action.approve": "Copy approve command",
@@ -247,7 +251,7 @@ export const dictionaries = {
     "blocked.doctor": "Copy diagnostics command",
     "blocked.hint": "Fix the merge data, then refresh; the panel won't fall back to older data on its own.",
     "blocked.reason.forward-only": "The merge state was written by a newer version; this panel doesn't support it yet.",
-    "blocked.reason.migration-blocked": "The merge data needs an upgrade, so the panel has stopped reading it.",
+    "blocked.reason.migration-blocked": "The merge data is still in the old format and the automatic upgrade did not finish, so the panel has paused reading it.",
     "blocked.reason.needs-repair": "The merge state needs repair, so the panel has stopped reading it.",
     "blocked.reason.unknown": "The merge state isn't ready, so the panel has stopped reading it.",
     "blocked.title": "Merge state isn't ready",
@@ -450,7 +454,11 @@ export const dictionaries = {
     "verify.cancelled": "Cancelled",
     "verify.failed": "Failed",
     "verify.queued": "Queued",
-    "verify.running": "Running"
+    "verify.running": "Running",
+    "blocked.hint.migration-blocked": "Stop the host, then run the migration tool. It backs up the old data first and can restore it on failure. Refresh when done.",
+    "blocked.hint.forward-only": "The merge data comes from a newer panel version. Upgrade the plugin, then refresh.",
+    "blocked.hint.needs-repair": "The merge data is incomplete. Run the migration tool; it backs up before repairing. Refresh when done.",
+    "blocked.hint.unknown": "Run diagnostics to check the merge state, then refresh."
   },
   ja: {
     "action.approve": "承認コマンドをコピー",
@@ -471,7 +479,7 @@ export const dictionaries = {
     "blocked.doctor": "診断コマンドをコピー",
     "blocked.hint": "マージデータを修復してから更新してください。パネルが自動で古いデータに戻ることはありません。",
     "blocked.reason.forward-only": "マージ状態のバージョンが新しすぎるため、このパネルでは読み取れません。",
-    "blocked.reason.migration-blocked": "マージデータのアップグレードが必要なため、読み取りを一時停止しています。",
+    "blocked.reason.migration-blocked": "マージデータが旧形式のままで、自動アップグレードが完了していません。パネルは読み取りを停止しています。",
     "blocked.reason.needs-repair": "マージ状態の修復が必要なため、パネルの読み取りを一時停止しています。",
     "blocked.reason.unknown": "マージ状態が未準備のため、パネルの読み取りを一時停止しています。",
     "blocked.title": "マージ状態が未準備です",
@@ -674,7 +682,11 @@ export const dictionaries = {
     "verify.cancelled": "キャンセル済み",
     "verify.failed": "失敗",
     "verify.queued": "待機中",
-    "verify.running": "実行中"
+    "verify.running": "実行中",
+    "blocked.hint.migration-blocked": "ホストを停止してから移行ツールを実行してください。実行前に旧データをバックアップし、失敗時は復元できます。完了後に再読み込みしてください。",
+    "blocked.hint.forward-only": "マージデータは新しいバージョンのパネルで作成されています。プラグインを更新してから再読み込みしてください。",
+    "blocked.hint.needs-repair": "マージデータが不完全です。移行ツールを実行してください。修復前にバックアップします。完了後に再読み込みしてください。",
+    "blocked.hint.unknown": "診断を実行してマージ状態を確認してから、再読み込みしてください。"
   },
   es: {
     "action.approve": "Copiar el comando de aprobación",
@@ -695,7 +707,7 @@ export const dictionaries = {
     "blocked.doctor": "Copiar el comando de diagnóstico",
     "blocked.hint": "Arregla los datos del merge y luego actualiza; el panel no vuelve por su cuenta a datos antiguos.",
     "blocked.reason.forward-only": "El estado del merge es más nuevo de lo que admite este panel.",
-    "blocked.reason.migration-blocked": "Los datos del merge necesitan una actualización; el panel ha dejado de leerlos.",
+    "blocked.reason.migration-blocked": "Los datos de fusión siguen en el formato antiguo y la actualización automática no terminó; el panel ha pausado la lectura.",
     "blocked.reason.needs-repair": "El estado del merge necesita reparación; el panel ha dejado de leerlo.",
     "blocked.reason.unknown": "El estado del merge no está listo; el panel ha dejado de leerlo.",
     "blocked.title": "El estado del merge no está listo",
@@ -898,7 +910,11 @@ export const dictionaries = {
     "verify.cancelled": "cancelada",
     "verify.failed": "fallida",
     "verify.queued": "en cola",
-    "verify.running": "en curso"
+    "verify.running": "en curso",
+    "blocked.hint.migration-blocked": "Detén el host y ejecuta la herramienta de migración. Antes hace una copia de seguridad y puede restaurarla si falla. Actualiza la página al terminar.",
+    "blocked.hint.forward-only": "Los datos de fusión vienen de una versión más reciente del panel. Actualiza el plugin y vuelve a cargar.",
+    "blocked.hint.needs-repair": "Los datos de fusión están incompletos. Ejecuta la herramienta de migración; hace copia antes de reparar. Actualiza al terminar.",
+    "blocked.hint.unknown": "Ejecuta el diagnóstico para comprobar el estado de fusión y luego actualiza la página."
   },
   fr: {
     "action.approve": "Copier la commande d’approbation",
@@ -919,7 +935,7 @@ export const dictionaries = {
     "blocked.doctor": "Copier la commande de diagnostic",
     "blocked.hint": "Réparez les données de fusion puis actualisez ; le panneau ne revient pas tout seul aux anciennes données.",
     "blocked.reason.forward-only": "L’état de fusion a été écrit par une version plus récente ; ce panneau ne peut pas le lire.",
-    "blocked.reason.migration-blocked": "Les données de fusion doivent être migrées ; la lecture est en pause.",
+    "blocked.reason.migration-blocked": "Les données de fusion sont encore dans l’ancien format et la mise à niveau automatique ne s’est pas terminée ; le panneau a suspendu la lecture.",
     "blocked.reason.needs-repair": "L’état de fusion doit être réparé ; le panneau est en pause.",
     "blocked.reason.unknown": "L’état de fusion n’est pas prêt ; le panneau est en pause.",
     "blocked.title": "État de fusion bloqué",
@@ -1122,7 +1138,11 @@ export const dictionaries = {
     "verify.cancelled": "annulé",
     "verify.failed": "échec",
     "verify.queued": "en file",
-    "verify.running": "en cours"
+    "verify.running": "en cours",
+    "blocked.hint.migration-blocked": "Arrêtez l’hôte, puis lancez l’outil de migration. Il sauvegarde d’abord les anciennes données et peut les restaurer en cas d’échec. Rechargez ensuite.",
+    "blocked.hint.forward-only": "Les données de fusion proviennent d’une version plus récente du panneau. Mettez le plugin à jour, puis rechargez.",
+    "blocked.hint.needs-repair": "Les données de fusion sont incomplètes. Lancez l’outil de migration ; il sauvegarde avant de réparer. Rechargez ensuite.",
+    "blocked.hint.unknown": "Lancez le diagnostic pour vérifier l’état de fusion, puis rechargez."
   },
   de: {
     "action.approve": "Freigabe-Befehl kopieren",
@@ -1143,7 +1163,7 @@ export const dictionaries = {
     "blocked.doctor": "Diagnose-Befehl kopieren",
     "blocked.hint": "Merge-Daten reparieren und dann aktualisieren; das Panel fällt nicht von selbst auf ältere Daten zurück.",
     "blocked.reason.forward-only": "Der Merge-Status stammt aus einer neueren Version; dieses Panel kann ihn nicht lesen.",
-    "blocked.reason.migration-blocked": "Die Merge-Daten brauchen ein Upgrade; das Lesen ist pausiert.",
+    "blocked.reason.migration-blocked": "Die Zusammenführungsdaten liegen noch im alten Format vor, und die automatische Aktualisierung wurde nicht abgeschlossen; die Oberfläche liest sie nicht mehr.",
     "blocked.reason.needs-repair": "Der Merge-Status muss repariert werden; das Lesen ist pausiert.",
     "blocked.reason.unknown": "Der Merge-Status ist nicht bereit; das Lesen ist pausiert.",
     "blocked.title": "Merge-Status blockiert",
@@ -1346,7 +1366,11 @@ export const dictionaries = {
     "verify.cancelled": "Abgebrochen",
     "verify.failed": "Fehlgeschlagen",
     "verify.queued": "In Warteschlange",
-    "verify.running": "Läuft"
+    "verify.running": "Läuft",
+    "blocked.hint.migration-blocked": "Beenden Sie den Host und starten Sie dann das Migrationswerkzeug. Es sichert zuerst die alten Daten und kann sie bei einem Fehler wiederherstellen. Danach neu laden.",
+    "blocked.hint.forward-only": "Die Zusammenführungsdaten stammen aus einer neueren Version der Oberfläche. Aktualisieren Sie das Plugin und laden Sie dann neu.",
+    "blocked.hint.needs-repair": "Die Zusammenführungsdaten sind unvollständig. Starten Sie das Migrationswerkzeug; es sichert vor der Reparatur. Danach neu laden.",
+    "blocked.hint.unknown": "Starten Sie die Diagnose, um den Zusammenführungsstatus zu prüfen, und laden Sie dann neu."
   },
   ru: {
     "action.approve": "Скопировать команду одобрения",
@@ -1367,7 +1391,7 @@ export const dictionaries = {
     "blocked.doctor": "Скопировать команду диагностики",
     "blocked.hint": "Исправьте данные объединения и обновите; сама панель к старым данным не вернётся.",
     "blocked.reason.forward-only": "Состояние объединения записано более новой версией; эта панель его не читает.",
-    "blocked.reason.migration-blocked": "Данные объединения нужно обновить; чтение приостановлено.",
+    "blocked.reason.migration-blocked": "Данные объединения всё ещё в старом формате, а автоматическое обновление не завершилось; панель приостановила чтение.",
     "blocked.reason.needs-repair": "Состояние объединения требует исправления; чтение приостановлено.",
     "blocked.reason.unknown": "Состояние объединения не готово; чтение приостановлено.",
     "blocked.title": "Состояние объединения не готово",
@@ -1570,7 +1594,11 @@ export const dictionaries = {
     "verify.cancelled": "отменена",
     "verify.failed": "не прошла",
     "verify.queued": "в очереди",
-    "verify.running": "выполняется"
+    "verify.running": "выполняется",
+    "blocked.hint.migration-blocked": "Остановите хост и запустите инструмент миграции. Сначала он создаёт резервную копию старых данных и может восстановить её при сбое. Затем перезагрузите страницу.",
+    "blocked.hint.forward-only": "Данные объединения созданы более новой версией панели. Обновите плагин и перезагрузите страницу.",
+    "blocked.hint.needs-repair": "Данные объединения неполные. Запустите инструмент миграции: перед восстановлением он создаёт резервную копию. Затем перезагрузите страницу.",
+    "blocked.hint.unknown": "Запустите диагностику, чтобы проверить состояние объединения, и перезагрузите страницу."
   },
   pt: {
     "action.approve": "Copiar comando de aprovação",
@@ -1591,7 +1619,7 @@ export const dictionaries = {
     "blocked.doctor": "Copiar comando de diagnóstico",
     "blocked.hint": "Corrija os dados de merge e atualize; o painel não volta sozinho para dados antigos.",
     "blocked.reason.forward-only": "O estado de merge foi gravado por uma versão mais nova; este painel não consegue lê-lo.",
-    "blocked.reason.migration-blocked": "Os dados de merge precisam de atualização; a leitura está pausada.",
+    "blocked.reason.migration-blocked": "Os dados de merge ainda estão no formato antigo e a atualização automática não terminou; o painel pausou a leitura.",
     "blocked.reason.needs-repair": "O estado de merge precisa de reparo; a leitura está pausada.",
     "blocked.reason.unknown": "O estado de merge não está pronto; a leitura está pausada.",
     "blocked.title": "Estado de merge bloqueado",
@@ -1794,7 +1822,11 @@ export const dictionaries = {
     "verify.cancelled": "cancelada",
     "verify.failed": "falhou",
     "verify.queued": "na fila",
-    "verify.running": "em execução"
+    "verify.running": "em execução",
+    "blocked.hint.migration-blocked": "Pare o host e execute a ferramenta de migração. Ela faz backup dos dados antigos primeiro e pode restaurá-los em caso de falha. Recarregue depois.",
+    "blocked.hint.forward-only": "Os dados de merge vêm de uma versão mais recente do painel. Atualize o plugin e recarregue.",
+    "blocked.hint.needs-repair": "Os dados de merge estão incompletos. Execute a ferramenta de migração; ela faz backup antes de reparar. Recarregue depois.",
+    "blocked.hint.unknown": "Execute o diagnóstico para verificar o estado do merge e recarregue."
   },
 } as const
 

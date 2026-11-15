@@ -39,13 +39,20 @@ function blockedReasonKey(failure: Extract<MergeFailure, { kind: 'blocked' }>): 
   if (code.endsWith('migration-blocked')) return 'blocked.reason.migration-blocked'
   return 'blocked.reason.unknown'
 }
+function blockedHintKey(failure: Extract<MergeFailure, { kind: 'blocked' }>): string {
+  const code = failure.readiness.code ?? failure.code
+  if (code.endsWith('migration-blocked')) return 'blocked.hint.migration-blocked'
+  if (code.endsWith('forward-only')) return 'blocked.hint.forward-only'
+  if (code.endsWith('needs-repair')) return 'blocked.hint.needs-repair'
+  return 'blocked.hint.unknown'
+}
 function failureNode(t: Translate, failure: MergeFailure, fallback: readonly string[], copy: (command: string) => void): ReactNode {
   if (isBlocked(failure)) {
     const raw = failure.readiness.message
     return createElement('div', { 'data-role': 'blocked', role: 'alert', 'data-block-code': failure.code, 'data-readiness-code': failure.readiness.code ?? '' },
       createElement('h3', { 'data-role': 'blocked-title' }, t('blocked.title')),
       createElement('p', { 'data-role': 'blocked-reason', title: raw ?? t(blockedReasonKey(failure)) }, t(blockedReasonKey(failure))),
-      createElement('p', { 'data-role': 'blocked-hint' }, t('blocked.hint')),
+      createElement('p', { 'data-role': 'blocked-hint' }, t(blockedHintKey(failure))),
       raw === undefined ? null : createElement('details', { 'data-role': 'blocked-detail' }, createElement('summary', null, t('blocked.detail')), createElement('p', { 'data-role': 'blocked-raw' }, raw)),
       createElement('div', { 'data-role': 'blocked-actions' },
         createElement('button', { type: 'button', 'data-role': 'doctor', onClick: () => { copy(DOCTOR_COMMAND) } }, t('blocked.doctor')),
