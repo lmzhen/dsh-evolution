@@ -31,10 +31,8 @@ import { type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
 import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
 import { partitionVersions } from '@deepseek-ai/dsh-evolution-core/skills'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
-import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
-import { presetProfileTarget } from './preset-source.ts'
 import { flagsOf, renderHelpText, renderHint } from './registry.ts'
 import { isParseFailure, parseSubcommand } from './parse.ts'
 import { HOST_COMMAND_HANDLERS } from './host-commands/handlers.ts'
@@ -451,11 +449,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           case 'release':
           case 'params':
           case 'curator':
-          case 'mutations': {
+          case 'mutations':
+          case 'doctor': {
             if (def === undefined || isParseFailure(command)) break
             const handler = HOST_COMMAND_HANDLERS[def.id]
             if (handler === undefined) break
-            const handled = await handler({ input, command, approval, locale: hostLocale, provider: ctx.get('settings') as SettingsProviderLike | undefined, ctx })
+            const handled = await handler({ input, command, approval, locale: hostLocale, provider: ctx.get('settings') as SettingsProviderLike | undefined, ctx, runs: doctorRuns })
             if (handled !== undefined) return handled
             break
           }
@@ -1311,27 +1310,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return ok(replay.compare().report)
         }
         // G7.4/C7: the ONE parser answers the shape (flag order and `=` tolerated, F-4).
-        if (input === 'doctor' || input === 'doctor --json') {
-          // WB2 (0.3.55): read-only self-check — install form, conflicts, env,
-          // mounted services, pending count. `--json` feeds scripts.
-          // G3: the mounted identity rides in from here (the ONE profileContext probe lives in
-          // preset-source.ts) so doctor can name the profiles that are NOT this plane.
-          const mountedForDoctor = presetProfileTarget(ctx)
-          const mounted = mountedForDoctor === undefined
-            ? {}
-            : { mounted: { profile: mountedForDoctor.profile, dir: mountedForDoctor.profileDir, bundles: mountedForDoctor.bundles } }
-          const report = await diagnose(ctx, { home: evolutionRoot(), ...mounted, runs: doctorRuns() })
-          // W11 B2b: --json answers the WHOLE DoctorReport (installForm/conflicts/actions/pending +
-          // the frozen DiagnosticsView), not only the view — scripts were losing every finding.
-          if (input === 'doctor --json') return ok(JSON.stringify(report, null, 2))
-          // G6/W8 tail: the text face ends with the SAME 7+8 view the diagnostics route answers.
-          return ok(renderDoctorText(report, hostLocale))
-        }
-        // T4-03 (P2): an UNMATCHED subcommand is an error. The old fallback answered
-        // `kind: 'success'` with the full help text, so `/evolution approve` (no id),
-        // `/evolution skill` and `/evolution params --group` all read as successful commands — the
-        // same silent-success shape `/evolution maintain --bogus` already refuses. Only the bare
-        // command (and an explicit `help`) answer with the list, and they still answer success.
         if (input === '' || input === 'help') {
           return ok(hostCommandText(hostLocale, 'help.header') + '\n' + renderHelpText(hostLocale))
         }

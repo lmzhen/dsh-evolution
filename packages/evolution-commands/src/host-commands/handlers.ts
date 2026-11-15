@@ -8,6 +8,7 @@ import type { SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import type { ParsedCommand } from '../parse.ts'
 import { runParamsCommand } from './params-command.ts'
 import { runCuratorCommand, runMutationsCommand } from './curator-command.ts'
+import { runDoctorCommand, type DoctorCommandContext } from './doctor-command.ts'
 import {
   runDecisionCommand,
   runPendingCommand,
@@ -22,6 +23,8 @@ export interface CommandHandlerContext extends ApprovalCommandContext {
   readonly provider?: SettingsProviderLike | undefined
   /** The plugin context, for handlers that read a family service. */
   readonly ctx?: { get(name: string): unknown } | undefined
+  /** Doctor's run counts (the local registry snapshot). */
+  readonly runs?: (() => { running: number; orphaned: number }) | undefined
 }
 
 /** A handler returns undefined when the command shape is not its own, so the legacy chain can answer. */
@@ -53,4 +56,12 @@ export const HOST_COMMAND_HANDLERS: Readonly<Record<string, CommandHandler>> = {
   mutations: context => context.ctx === undefined
     ? undefined
     : runMutationsCommand({ input: context.input, ctx: context.ctx, locale: context.locale }),
+  doctor: context => context.ctx === undefined || context.runs === undefined
+    ? undefined
+    : runDoctorCommand({
+        input: context.input,
+        ctx: context.ctx as DoctorCommandContext['ctx'],
+        runs: context.runs,
+        locale: context.locale,
+      }),
 }
