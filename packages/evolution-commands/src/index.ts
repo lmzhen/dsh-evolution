@@ -873,6 +873,60 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
             break
           }
+          case 'maintain.handoff': {
+        const maintainHandoff = maintainSub('handoff')
+        if (maintainHandoff !== null) {
+          const registry = runs
+          if (!registry) return err('未挂载 evolution-io 注册表：无法交付报告。')
+          const synced = await syncRuns(registry)
+          const wanted = maintainHandoff.positionals[1]
+          // Review P1-1: never inject from a stale view when the home's index is unreadable.
+          if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
+          const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
+          if (!record) {
+            if (wanted !== undefined) {
+              if (!synced.ok) return err(unreadableForId(wanted, synced.note))
+              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
+            }
+            return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
+          }
+          if (wanted === undefined && record.state === 'running') {
+            return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
+          }
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法交付报告。')
+          const probed = await readRunReport(ioRegistry.provider(), record)
+          if (probed.kind === 'missing') {
+            return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
+          }
+          if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
+          // Deliver ONLY a pointer plus the report-only protocol: the report file stays
+          // the one result home, and the injected text stays small (G2/0.20.0).
+          const missingAgent = agentMissing('handoff')
+          if (missingAgent) return missingAgent
+          const message = createUserMessage({
+            content: [{
+              type: 'text',
+              text: handoffPrompt({
+                runId: record.id,
+                reportPath: reportDigestPath(record),
+                verdict: probed.report.verdict,
+                recommendationCount: probed.report.recommendationCount,
+                needsHumanCount: probed.report.needsHumanCount,
+              }),
+            }],
+            source: { kind: 'evolution-commands', form: 'notice', summary: 'maintenance report handoff' },
+          })
+          // N13b: deliverHandoff calls the waking primitive ON the receiver; a host that
+          // exposes neither primitive is a documented E-305, never a silent no-op.
+          const woke = deliverHandoff(invocationAgent as { followup?: unknown; inject?: unknown }, message)
+          if (woke === undefined) return err(hostError('e-305-the-invocation-agent-exposes', { a1: 'this maintenance handoff' }))
+          return ok(woke
+            ? `已把运行 ${record.id} 交给模型 —— 报告：${reportDigestPath(record)}。它会读取该文件并执行其中的行动项。`
+            : `已把运行 ${record.id} 交给模型并排队 —— 本宿主没有唤醒通道，因此会在你下一条消息时被读取。`)
+        }
+            break
+          }
           case 'propose': {
             const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
             if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
@@ -1189,58 +1243,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ].join('\n'))
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
-        const maintainHandoff = maintainSub('handoff')
-        if (maintainHandoff !== null) {
-          const registry = runs
-          if (!registry) return err('未挂载 evolution-io 注册表：无法交付报告。')
-          const synced = await syncRuns(registry)
-          const wanted = maintainHandoff.positionals[1]
-          // Review P1-1: never inject from a stale view when the home's index is unreadable.
-          if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
-          const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
-          if (!record) {
-            if (wanted !== undefined) {
-              if (!synced.ok) return err(unreadableForId(wanted, synced.note))
-              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
-            }
-            return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
-          }
-          if (wanted === undefined && record.state === 'running') {
-            return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
-          }
-          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法交付报告。')
-          const probed = await readRunReport(ioRegistry.provider(), record)
-          if (probed.kind === 'missing') {
-            return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
-          }
-          if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
-          // Deliver ONLY a pointer plus the report-only protocol: the report file stays
-          // the one result home, and the injected text stays small (G2/0.20.0).
-          const missingAgent = agentMissing('handoff')
-          if (missingAgent) return missingAgent
-          const message = createUserMessage({
-            content: [{
-              type: 'text',
-              text: handoffPrompt({
-                runId: record.id,
-                reportPath: reportDigestPath(record),
-                verdict: probed.report.verdict,
-                recommendationCount: probed.report.recommendationCount,
-                needsHumanCount: probed.report.needsHumanCount,
-              }),
-            }],
-            source: { kind: 'evolution-commands', form: 'notice', summary: 'maintenance report handoff' },
-          })
-          // N13b: deliverHandoff calls the waking primitive ON the receiver; a host that
-          // exposes neither primitive is a documented E-305, never a silent no-op.
-          const woke = deliverHandoff(invocationAgent as { followup?: unknown; inject?: unknown }, message)
-          if (woke === undefined) return err(hostError('e-305-the-invocation-agent-exposes', { a1: 'this maintenance handoff' }))
-          return ok(woke
-            ? `已把运行 ${record.id} 交给模型 —— 报告：${reportDigestPath(record)}。它会读取该文件并执行其中的行动项。`
-            : `已把运行 ${record.id} 交给模型并排队 —— 本宿主没有唤醒通道，因此会在你下一条消息时被读取。`)
-        }
-
         if (/^maintain\b/.test(input)) {
           // 0.3.14 (P3-2): an input that STARTS with maintain but did not
           // match the grammar (unknown flags, stray args) was silently falling
