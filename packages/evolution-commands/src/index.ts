@@ -433,6 +433,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         // G7.4/C7: the ONE parser answers the shape.
         const command = parseSubcommand(input)
+        const maintainSub = (sub: string) => {
+          if (isParseFailure(command) || command.name !== 'maintain' || command.positionals[0] !== sub) return null
+          return [...command.flags.keys()].every(flag => flagsOf('maintain').includes('--' + flag)) ? command : null
+        }
         const def = !isParseFailure(command) ? hostCommandDefForCommand(command) : undefined
         switch (def?.id) {
           case 'pending':
@@ -759,6 +763,41 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const result = await merge.run(rawInputTrimmed, { agent: invocation.agent })
           return result.ok ? ok(result.text) : err(result.text)
           }
+          case 'maintain.status': {
+        const maintainStatus = maintainSub('status')
+        if (maintainStatus !== null) {
+          const registry = runs
+          if (!registry) return err('未挂载 evolution-io 注册表：无法查看运行状态。')
+          const synced = await syncRuns(registry)
+          const wanted = maintainStatus.positionals[1]
+          if (wanted !== undefined) {
+            // A specific run this process knows is answerable even when the shared
+            // index is unreadable — only the claim "this is the whole history" needs it.
+            const record = registry.find(wanted)
+            if (!record) {
+              if (!synced.ok) {
+                return err(`运行 ${wanted} 不在本进程的历史里，且本 home 的运行索引读不出来（${synced.note ?? '原因未知'}）：但这不能证明那次运行没发生过。`)
+              }
+              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
+            }
+            return ok(synced.ok ? renderRunRecord(record) : `${renderRunRecord(record)}\n(运行索引读不出来：${synced.note ?? '原因未知'} — only this process's view is shown)`)
+          }
+          if (!synced.ok) {
+            // P2-1: "the history is unknown" and "there is no run" must not look alike.
+            return err(`本 home 的运行历史读不出来（${synced.note ?? '原因未知'}）：这「不是」没有运行。要开始干净的历史，请修好或删除 <evolutionHome>/runs.json。`)
+          }
+          const all = registry.runs()
+          if (all.length === 0) return ok('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
+          const live = all.filter(record => record.state === 'running')
+          const recent = all.filter(record => record.state !== 'running').slice(0, 5)
+          return ok([
+            live.length === 0 ? 'No maintenance run in flight.' : `In flight:\n${live.map(renderRunRecord).join('\n')}`,
+            recent.length === 0 ? '' : `Recent:\n${recent.map(renderRunRecord).join('\n')}`,
+          ].filter(part => part !== '').join('\n'))
+        }
+        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
+            break
+          }
           case 'propose': {
             const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
             if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
@@ -1073,42 +1112,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             `- result: /evolution maintain report ${handle.id}`,
             `- stop:   /evolution maintain cancel ${handle.id}`,
           ].join('\n'))
-        }
-        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
-        const maintainSub = (sub: string) => {
-          if (isParseFailure(command) || command.name !== 'maintain' || command.positionals[0] !== sub) return null
-          return [...command.flags.keys()].every(flag => flagsOf('maintain').includes('--' + flag)) ? command : null
-        }
-        const maintainStatus = maintainSub('status')
-        if (maintainStatus !== null) {
-          const registry = runs
-          if (!registry) return err('未挂载 evolution-io 注册表：无法查看运行状态。')
-          const synced = await syncRuns(registry)
-          const wanted = maintainStatus.positionals[1]
-          if (wanted !== undefined) {
-            // A specific run this process knows is answerable even when the shared
-            // index is unreadable — only the claim "this is the whole history" needs it.
-            const record = registry.find(wanted)
-            if (!record) {
-              if (!synced.ok) {
-                return err(`运行 ${wanted} 不在本进程的历史里，且本 home 的运行索引读不出来（${synced.note ?? '原因未知'}）：但这不能证明那次运行没发生过。`)
-              }
-              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
-            }
-            return ok(synced.ok ? renderRunRecord(record) : `${renderRunRecord(record)}\n(运行索引读不出来：${synced.note ?? '原因未知'} — only this process's view is shown)`)
-          }
-          if (!synced.ok) {
-            // P2-1: "the history is unknown" and "there is no run" must not look alike.
-            return err(`本 home 的运行历史读不出来（${synced.note ?? '原因未知'}）：这「不是」没有运行。要开始干净的历史，请修好或删除 <evolutionHome>/runs.json。`)
-          }
-          const all = registry.runs()
-          if (all.length === 0) return ok('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
-          const live = all.filter(record => record.state === 'running')
-          const recent = all.filter(record => record.state !== 'running').slice(0, 5)
-          return ok([
-            live.length === 0 ? 'No maintenance run in flight.' : `In flight:\n${live.map(renderRunRecord).join('\n')}`,
-            recent.length === 0 ? '' : `Recent:\n${recent.map(renderRunRecord).join('\n')}`,
-          ].filter(part => part !== '').join('\n'))
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
         const maintainReport = maintainSub('report')
