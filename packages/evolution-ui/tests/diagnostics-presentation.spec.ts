@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { diagnosticsReading } from '../src/panels/settings/DiagnosticsCard.ts'
 import type { DiagnosticRow } from '@lmzhen/dsh-evolution-client-kit/generated/contracts'
 
-const row = (key: string, status: DiagnosticRow['status']): DiagnosticRow => ({ key, label: key, status })
+const row = (key: string, status: DiagnosticRow['status']): DiagnosticRow => ({ key: key as never, label: key, status })
 
 it('keeps the highest issue first, preserves the rest, and folds normal checks', () => {
   const reading = diagnosticsReading([row('ok', 'ok'), row('warn', 'warn'), row('fail', 'fail')])

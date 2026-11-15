@@ -12,6 +12,7 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, useMemo } from 'react'
+const h = createElement as (...args: unknown[]) => ReactNode
 import type { ReactNode } from 'react'
 
 /** The three localized words the platform renderer needs; the face owns them. */
@@ -109,7 +110,7 @@ function MarkdownBlock(props: { component: MarkdownTextComponent; text: string; 
   const labels = useMemo<MarkdownLabels>(() => ({
     code: { copyLabel: copy, copiedLabel: copied }, footnotes,
   }), [copy, copied, footnotes])
-  return createElement(MarkdownText, { text, labels })
+  return h(MarkdownText, { text, labels })
 }
 
 /**
@@ -122,5 +123,6 @@ function MarkdownBlock(props: { component: MarkdownTextComponent; text: string; 
 export function renderMarkdown(text: string, words: MarkdownWords): MarkdownRender {
   const component = markdownText()
   if (component === undefined) return { ok: false }
-  return { ok: true, node: createElement(MarkdownBlock, { component, text, words }) }
+  return { ok: true, node: h(MarkdownBlock, { component, text, words }) }
 }
+

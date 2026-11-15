@@ -60,7 +60,7 @@ function state(user: Record<string, unknown>): Record<string, unknown> {
 
 describe('the per-row configuration entry', () => {
   it('T5-01/A56: a TWO-field save is ONE fenced write carrying both ops (the second field no longer vanishes)', async () => {
-    const mutate = vi.fn(async () => true)
+    const mutate = vi.fn(async (_ops: unknown[], _revision: number) => true)
     const second = fields.filter(field => field.control === 'number')[1]
     if (second === undefined) throw new Error('the memory-files row lost its second numeric field')
     const view = render(card({ view: 'page', form: { state: state({}), mutate } }))
@@ -84,7 +84,7 @@ describe('the per-row configuration entry', () => {
 
 
   it('renders the row from the page state and submits the edit through mutate', async () => {
-    const mutate = vi.fn(async () => true)
+    const mutate = vi.fn(async (_ops: unknown[], _revision: number) => true)
     const view = render(card({ view: 'page', form: { state: state({}), mutate } }))
     // The card opens collapsed, exactly as it does in our own section.
     fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
@@ -107,7 +107,7 @@ describe('the per-row configuration entry', () => {
     // G5 P1-1: the refusal is the HOST'S boolean (the settings scope answers `false` after its recovery
     // read) — the old fixture simulated it by leaving the value in place, which the value-comparison
     // verdict could see but the contract's own answer states directly.
-    const mutate = vi.fn(async () => false)
+    const mutate = vi.fn(async (_ops: unknown[], _revision: number) => false)
     const view = render(card({ view: 'page', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate } }))
     fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
     fireEvent.click(resetButton(view.container))
@@ -120,7 +120,7 @@ describe('the per-row configuration entry', () => {
   })
 
   it('audit T5-05/A60: a reset that lands leaves no error line, and the row drops its override', async () => {
-    const mutate = vi.fn(async () => true)
+    const mutate = vi.fn(async (_ops: unknown[], _revision: number) => true)
     const view = render(card({ view: 'page', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate } }))
     fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
     fireEvent.click(resetButton(view.container))
@@ -134,7 +134,7 @@ describe('the per-row configuration entry', () => {
   })
 
   it('audit T5-05/A60: the reset control reports an in-flight reset and locks the card', async () => {
-    let release: (() => void) | null = null
+    let release: any = null
     const hold = new Promise<void>((resolve) => { release = resolve })
     const mutate = vi.fn(async () => { await hold; return true })
     const view = render(card({ view: 'page', form: { state: state({ [NUMBER_FIELD.id]: 200 }), mutate } }))
@@ -165,7 +165,7 @@ describe('the per-row configuration entry', () => {
     // namespace's own field keys. Sending the canonical id made the Host refuse every save
     // ('Config field evolution-approval.pendingTtlMs is not volatile', measured on the isolated face).
     expect(numberField?.id).toBe('evolution-approval.pendingTtlMs')
-    const mutate = vi.fn(async () => true)
+    const mutate = vi.fn(async (_ops: unknown[], _revision: number) => true)
     const view = render(h(RowConfigCard, { namespace: 'evolution-approval', fields: approvalFields, t, view: 'page', form: { state: state({ pendingTtlMs: 5 }), mutate } }))
     fireEvent.click(view.container.querySelector('.evolution-param-head') as Element)
     const input = view.container.querySelector('[id="evolution-param-evolution-approval.pendingTtlMs"]') as HTMLInputElement
@@ -181,3 +181,5 @@ describe('the per-row configuration entry', () => {
     cleanup()
   })
 })
+
+

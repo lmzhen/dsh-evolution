@@ -51,7 +51,7 @@ describe('diagnostics card', () => {
   it('renders loading first, then a summary plus the runtime rows — and never the view facts', async () => {
     let resolve: ((answer: RouteAnswer<DiagnosticsView>) => void) | undefined
     const api = { view: vi.fn(() => new Promise<RouteAnswer<DiagnosticsView>>((done) => { resolve = done })) }
-    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    renderCard({ t, api: api as never, fallback: FALLBACKS.diagnostics })
     expect(screen.getByText('正在读取…')).toBeTruthy()
     await act(async () => { resolve?.(ok(view)) })
     await waitFor(() => { expect(screen.getByText('运行状态')).toBeTruthy() })
@@ -77,26 +77,26 @@ describe('diagnostics card', () => {
       runtime: [{ key: 'host-surface', label: '数据连接', status: 'ok', detail: '已就绪 12/12' }],
     }
     const api = { view: vi.fn(async () => ok(healthy)) }
-    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    renderCard({ t, api: api as never, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('运行正常')).toBeTruthy() })
   })
 
   it('says so when the view carries no runtime row', async () => {
     const api = { view: vi.fn(async () => ok({ ...view, runtime: [] })) }
-    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    renderCard({ t, api: api as never, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('没有可显示的运行状态')).toBeTruthy() })
   })
 
   it('renders a failed read as the shared failure block with the command fallback', async () => {
     const api = { view: vi.fn(async () => ({ ok: false as const, failure: { kind: 'unmounted' as const, status: 404 } })) }
-    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    renderCard({ t, api: api as never, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('这个功能没有启用。')).toBeTruthy() })
     expect(screen.getByText('可以改用命令：/evolution doctor')).toBeTruthy()
   })
 
   it('renders a rejected read as a failure instead of staying in loading', async () => {
     const api = { view: vi.fn(async () => { throw new Error('diagnostics transport rejected') }) }
-    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    renderCard({ t, api: api as never, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('读取失败，可以手动重试。')).toBeTruthy() })
     expect(screen.queryByText('正在读取…')).toBeNull()
   })
@@ -107,7 +107,7 @@ describe('diagnostics card', () => {
         .mockRejectedValueOnce(new Error('diagnostics transport rejected'))
         .mockResolvedValueOnce(ok(view)),
     }
-    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    renderCard({ t, api: api as never, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('读取失败，可以手动重试。')).toBeTruthy() })
     const retry = document.querySelector('[data-action="diag-retry"]')
     // The sentence promised a manual retry; a failure state without the control was a dead end.
@@ -123,7 +123,7 @@ describe('diagnostics card', () => {
         .mockResolvedValueOnce(ok(view))
         .mockResolvedValueOnce({ ok: false as const, failure: { kind: 'unmounted' as const, status: 404 } }),
     }
-    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    renderCard({ t, api: api as never, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(screen.getByText('运行状态')).toBeTruthy() })
     await act(async () => { fireEvent.click(screen.getByText('刷新')) })
     await waitFor(() => { expect(screen.getByText('这个功能没有启用。')).toBeTruthy() })
@@ -133,9 +133,10 @@ describe('diagnostics card', () => {
 
   it('reads once on mount and only again on an explicit refresh', async () => {
     const api = { view: vi.fn(async () => ok(view)) }
-    renderCard({ t, api, fallback: FALLBACKS.diagnostics })
+    renderCard({ t, api: api as never, fallback: FALLBACKS.diagnostics })
     await waitFor(() => { expect(api.view).toHaveBeenCalledTimes(1) })
     await act(async () => { fireEvent.click(screen.getByText('刷新')) })
     await waitFor(() => { expect(api.view).toHaveBeenCalledTimes(2) })
   })
 })
+

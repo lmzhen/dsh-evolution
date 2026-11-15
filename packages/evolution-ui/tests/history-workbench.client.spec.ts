@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
+const h = createElement as (...args: unknown[]) => never
 import { WorkbenchPage } from '../src/panels/history/client/Workbench.ts'
 import { createWorkbenchStore, resolveDefaultView } from '../src/panels/history/client/WorkbenchStore.ts'
 import type { PanelFace } from '../src/panels/history/client/Panel.ts'
@@ -11,13 +12,13 @@ import type { PendingCardFace } from '../src/panels/settings/PendingCard.ts'
 
 afterEach(cleanup)
 
-function face(loadVersions = vi.fn(async () => ({ content: [], support: [] }))): PanelFace {
+function face(loadVersions: any = vi.fn(async () => ({ content: [], support: [] }) as never)): PanelFace {
   return {
     t: (key: string) => key,
     format: (key: string) => key,
     loadSkills: async () => [],
     loadVersions,
-    loadDiff: async () => ({ v: 0, kind: 'update', added: 0, removed: 0, hunks: [] }),
+    loadDiff: async () => ({ v: 0, kind: 'update', added: 0, removed: 0, hunks: [] }) as never,
     loadBody: async () => ({ v: 0, chars: 0, display: '', truncated: false }),
     undo: async () => 'ok',
     markdownWords: { copy: 'copy', copied: 'copied', footnotes: 'footnotes' },
@@ -44,7 +45,7 @@ describe('history workbench', () => {
   })
 
   it('moves keyboard focus only across tabs that are actually visible', async () => {
-    const view = render(createElement(WorkbenchPage, {
+    const view = render(h(WorkbenchPage, {
       t: (key: string) => key,
       store: createWorkbenchStore(),
       history: face(),
@@ -61,7 +62,7 @@ describe('history workbench', () => {
   it('opens history through the owner callback, including a repeated same-skill navigation', async () => {
     const loadVersions = vi.fn(async () => ({ content: [], support: [] }))
     let owner: { openHistory?: (name: string) => void } = {}
-    const view = render(createElement(WorkbenchPage, {
+    const view = render(h(WorkbenchPage, {
       t: (key: string) => key,
       store: createWorkbenchStore(),
       history: face(loadVersions),
@@ -79,7 +80,7 @@ describe('history workbench', () => {
   })
 
   it('lands on pending when a task exists and the user has not chosen a view', async () => {
-    const view = render(createElement(WorkbenchPage, {
+    const view = render(h(WorkbenchPage, {
       t: (key: string) => key,
       store: createWorkbenchStore(),
       history: face(),
@@ -94,7 +95,7 @@ describe('history workbench', () => {
   it('does not let a late count override the user selection', async () => {
     let resolveCounts: ((counts: { pending: number; merge: number }) => void) | undefined
     const counts = new Promise<{ pending: number; merge: number }>((resolve) => { resolveCounts = resolve })
-    const view = render(createElement(WorkbenchPage, {
+    const view = render(h(WorkbenchPage, {
       t: (key: string) => key,
       store: createWorkbenchStore(),
       history: face(),
@@ -112,11 +113,11 @@ describe('history workbench', () => {
   it('restores the view after a remount from the registration-owned store', async () => {
     const store = createWorkbenchStore()
     const props = { t: (key: string) => key, store, history: face(), pending: pendingFace() }
-    const first = render(createElement(WorkbenchPage, props))
+    const first = render(h(WorkbenchPage, props))
     fireEvent.click(document.getElementById('evo-workbench-tab-pending')!)
     expect(document.getElementById('evo-workbench-tab-pending')?.getAttribute('aria-selected')).toBe('true')
     first.unmount()
-    const second = render(createElement(WorkbenchPage, props))
+    const second = render(h(WorkbenchPage, props))
     expect(document.getElementById('evo-workbench-tab-pending')?.getAttribute('aria-selected')).toBe('true')
     second.unmount()
   })

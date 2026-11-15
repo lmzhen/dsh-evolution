@@ -36,13 +36,13 @@ function open(view: ReturnType<typeof render>): void {
 }
 
 function type(view: ReturnType<typeof render>, text: string): void {
-  const input = view.container.querySelector('#' + 'evolution-param-' + FIELD.id) as HTMLInputElement
+  const input = view.container.querySelector('#' + 'evolution-param-' + FIELD!.id) as HTMLInputElement
   fireEvent.change(input, { target: { value: text } })
 }
 
 describe('the save fence is the draft baseline (W9-g6)', () => {
   it('keeps the revision the draft began at when the row advanced meanwhile', async () => {
-    const mutate = vi.fn(async () => true)
+    const mutate = vi.fn(async (_ops: unknown[], _revision: number) => true)
     const view = render(card(mutate, 7))
     open(view)
     type(view, '321')
@@ -55,7 +55,7 @@ describe('the save fence is the draft baseline (W9-g6)', () => {
   })
 
   it('re-baselines after a settled write', async () => {
-    const mutate = vi.fn(async () => true)
+    const mutate = vi.fn(async (_ops: unknown[], _revision: number) => true)
     const view = render(card(mutate, 7))
     open(view)
     type(view, '321')
@@ -72,3 +72,5 @@ describe('the save fence is the draft baseline (W9-g6)', () => {
     cleanup()
   })
 })
+
+

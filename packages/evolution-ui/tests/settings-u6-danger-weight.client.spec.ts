@@ -30,6 +30,7 @@ const windowStub = (waiting: readonly PendingRow[]) =>
 
 const api: ApprovalApi = {
   pending: windowStub([row]),
+  release: async () => ({ ok: true, data: null }),
   approve: async () => ({ ok: true, data: null }),
   reject: async () => ({ ok: true, data: null }),
   preview: async () => ({ ok: true, data: { available: false, reason: 'no preview in this fixture' } }),

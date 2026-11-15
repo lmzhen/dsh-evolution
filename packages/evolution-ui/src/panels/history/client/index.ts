@@ -3,6 +3,7 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { ReactNode } from 'react'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
 import { registerSidebarPanel, PAGE_SURFACE_CSS, ROUTES, type ConfigFormsSeat, type Translate } from '@lmzhen/dsh-evolution-client-kit'
@@ -86,8 +87,10 @@ export function apply(ctx: ClientContext): void {
     dictionaries,
     styles: { css: CSS + WORKBENCH_CSS + PAGE_SURFACE_CSS, tagId: CSS_TAG_ID },
     icon: WorkbenchIcon,
-    component: WorkbenchPage as unknown as (props: never) => unknown,
+    component: WorkbenchPage as unknown as (props: never) => ReactNode,
     body: (t): WorkbenchFace => ({ t, store: workbenchStore, history: historyFace(t), pending: pendingFace(), diagnostics: diagnosticsFace(), hasView, loadTaskCounts }),
     children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
   })
 }
+
+

@@ -74,7 +74,7 @@ describe('the pending card', () => {
   afterEach(() => { cleanup() })
 
   it('shows the reading state first, never the empty state', async () => {
-    let release: (() => void) | null = null
+    let release: any = null
     const hold = new Promise<void>((resolve) => { release = resolve })
     const pending = vi.fn(async () => {
       await hold
@@ -83,7 +83,7 @@ describe('the pending card', () => {
     mount(face({ pending }))
     expect(screen.getByText(message('approvalLoading'))).toBeDefined()
     expect(screen.queryByText(message('approvalEmpty'))).toBeNull()
-    release?.()
+    if (typeof release === 'function') release()
     await waitFor(() => { expect(screen.getByText(message('approvalEmpty'))).toBeDefined() })
   })
 
@@ -131,7 +131,7 @@ describe('the pending card', () => {
         hunks: [{ path: 'SKILL.md', oldText: 'b', newText: 'c' }],
       },
     }))
-    mount(face({ pending: windowStub([row()]), preview }))
+    mount(face({ pending: windowStub([row()]), preview: preview as never }))
     await waitFor(() => { expect(screen.getByText(message('approvalPreview'))).toBeDefined() })
     fireEvent.click(screen.getByText(message('approvalPreview')))
     await waitFor(() => { expect(screen.getByText(message('approvalDiffAdded').replace('{n}', '1'))).toBeDefined() })
@@ -144,7 +144,7 @@ describe('the pending card', () => {
 
   it('shows the host reason when a preview is unavailable', async () => {
     const preview = vi.fn(async () => ({ ok: true as const, data: { available: false as const, reason: 'the target changed after this write was staged' } }))
-    mount(face({ pending: windowStub([row()]), preview }))
+    mount(face({ pending: windowStub([row()]), preview: preview as never }))
     await waitFor(() => { expect(screen.getByText(message('approvalPreview'))).toBeDefined() })
     fireEvent.click(screen.getByText(message('approvalPreview')))
     await waitFor(() => { expect(screen.getByText(message('approvalPreviewNone') + 'the target changed after this write was staged')).toBeDefined() })
@@ -205,7 +205,7 @@ describe('the pending card', () => {
     const errors: string[] = []
     const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(' ')) })
     try {
-      mount(face({ pending: windowStub([row()]), preview }))
+      mount(face({ pending: windowStub([row()]), preview: preview as never }))
       await waitFor(() => { expect(screen.getByText(message('approvalPreview'))).toBeDefined() })
       fireEvent.click(screen.getByText(message('approvalPreview')))
       await screen.findByText('- first-old')
@@ -216,3 +216,6 @@ describe('the pending card', () => {
     expect(errors.filter(line => line.includes('unique'))).toEqual([])
   })
 })
+
+
+

@@ -75,7 +75,7 @@ afterEach(cleanup)
 
 it('P1-12: a failed read renders the shared failure sentence and the command fallback', async () => {
   render(createElement(SkillHistoryPanel, makeFace({
-    t: key => zh[key] ?? key,
+    t: key => (zh as Record<string,string>)[key] ?? key,
     loadSkills: async () => { throw new Error('boom') },
   })))
   await waitFor(() => { expect(document.body.textContent).toContain('读取失败') })
@@ -217,3 +217,4 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     expect(errors.filter(line => line.includes('unique'))).toEqual([])
   })
 })
+

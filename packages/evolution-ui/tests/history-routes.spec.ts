@@ -38,7 +38,7 @@ describe('skill-history routes: unit undo', () => {
     const curator = {
       history: async () => [],
       undo: async () => ({ ok: true, message: 'version undo' }),
-      undoUnit: async (name: string, unitId?: string) => { calls.push({ name, unitId }); return { ok: true, message: 'unit undo' } },
+      undoUnit: async (name: string, unitId?: string) => { calls.push(unitId === undefined ? { name } : { name, unitId }); return { ok: true, message: 'unit undo' } },
       skills: { list: async () => [] },
     }
     const host = await mountHostRoutes(ctx, audit => makeSkillHistoryRoutes({ getCurator: () => curator as never }, audit))

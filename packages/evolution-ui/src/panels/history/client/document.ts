@@ -16,6 +16,7 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, useState, type ReactNode } from 'react'
+const h = createElement as (...args: unknown[]) => ReactNode
 import { button, note } from './atoms.ts'
 import { hunkRows } from '../../hunk-lines.ts'
 import type { VersionBodyRow, VersionDiffRow } from './api.ts'
@@ -39,21 +40,21 @@ function sourceBlock(diff: VersionDiffRow): ReactNode {
   // The row key is scoped to its HUNK by hunkRows(); a per-hunk index restarts at 0.
   for (const [hunkIndex, hunk] of diff.hunks.entries()) {
     for (const row of hunkRows(hunk, hunkIndex)) {
-      rows.push(createElement('div', {
+      rows.push(h('div', {
         key: row.key,
         className: row.side === 'del' ? 'evo-doc-line-del' : 'evo-doc-line-add',
       }, (row.side === 'del' ? '- ' : '+ ') + row.text))
     }
   }
-  return createElement('pre', { className: 'evo-doc-source' }, rows.length === 0 ? '\u00b1' : rows)
+  return h('pre', { className: 'evo-doc-source' }, rows.length === 0 ? '\u00b1' : rows)
 }
 
 /** One rendered side of a diff: an \u201cold\u201d or \u201cnew\u201d block under a tinted edge. */
 function renderedSide(face: DocumentFace, mark: string, side: 'del' | 'add', text: string): ReactNode {
   const rendered = renderMarkdown(text, face.markdownWords)
   if (!rendered.ok) return null
-  return createElement('div', { className: 'evo-doc-block evo-doc-' + side },
-    createElement('span', { className: 'evo-doc-tag' }, mark),
+  return h('div', { className: 'evo-doc-block evo-doc-' + side },
+    h('span', { className: 'evo-doc-tag' }, mark),
     rendered.node)
 }
 
@@ -71,12 +72,12 @@ function renderedBlocks(face: DocumentFace, diff: VersionDiffRow): ReactNode[] |
     if (hunk.oldText !== '') {
       const side = renderedSide(face, '\u2212', 'del', hunk.oldText)
       if (side === null) return null
-      blocks.push(createElement('div', { key: 'del-' + String(index) }, side))
+      blocks.push(h('div', { key: 'del-' + String(index) }, side))
     }
     if (hunk.newText !== '') {
       const side = renderedSide(face, '+', 'add', hunk.newText)
       if (side === null) return null
-      blocks.push(createElement('div', { key: 'add-' + String(index) }, side))
+      blocks.push(h('div', { key: 'add-' + String(index) }, side))
     }
   }
   return blocks.length === 0 ? null : blocks
@@ -92,7 +93,7 @@ function renderedBlocks(face: DocumentFace, diff: VersionDiffRow): ReactNode[] |
 function diffView(face: DocumentFace, diff: VersionDiffRow, mode: 'source' | 'rendered'): ReactNode {
   if (mode === 'rendered') {
     const blocks = renderedBlocks(face, diff)
-    if (blocks !== null) return createElement('div', { className: 'evo-doc-render' }, blocks)
+    if (blocks !== null) return h('div', { className: 'evo-doc-render' }, blocks)
   }
   return sourceBlock(diff)
 }
@@ -111,11 +112,11 @@ export function PreviewBody(props: { face: DocumentFace; body: BodyState }): Rea
   if (body.kind === 'loading') return note({ children: face.t('preview.loading') })
   if (body.kind === 'failed') return note({ error: true, children: body.message })
   const rendered = renderMarkdown(body.body.display, face.markdownWords)
-  return createElement('div', { className: 'evo-doc-preview' },
+  return h('div', { className: 'evo-doc-preview' },
     body.body.truncated
       ? note({ children: face.format('preview.truncated', { shown: body.body.display.length, total: body.body.chars }) })
       : null,
-    rendered.ok ? rendered.node : createElement('pre', { className: 'evo-doc-source' }, body.body.display))
+    rendered.ok ? rendered.node : h('pre', { className: 'evo-doc-source' }, body.body.display))
 }
 
 /**
@@ -134,23 +135,24 @@ export function DiffBody(props: { face: DocumentFace; diff: DiffState }): ReactN
   const against = diff.diff.against === null
     ? face.t('diff.first')
     : face.format('diff.against', { n: diff.diff.against })
-  const toggle = createElement('div', { className: 'evo-doc-toggle' },
+  const toggle = h('div', { className: 'evo-doc-toggle' },
     button({ key: 'source', kind: 'switch', pressed: mode === 'source', onClick: () => { setMode('source') }, children: face.t('diff.source') }),
     button({ key: 'rendered', kind: 'switch', pressed: mode === 'rendered', onClick: () => { setMode('rendered') }, children: face.t('diff.rendered') }))
-  return createElement('div', { className: 'evo-doc-diff' },
-    createElement('div', { className: 'evo-doc-head' },
+  return h('div', { className: 'evo-doc-diff' },
+    h('div', { className: 'evo-doc-head' },
       note({
         // Four facts, four elements: the separator between them is the stylesheet's, not a character
         // a component concatenates (W15).
         children: [
-          createElement('span', { key: 'against', className: 'evo-doc-fact' }, against),
-          createElement('span', { key: 'added', className: 'evo-doc-fact' }, face.format('diff.added', { n: diff.diff.linesAdded })),
-          createElement('span', { key: 'removed', className: 'evo-doc-fact' }, face.format('diff.removed', { n: diff.diff.linesRemoved })),
+          h('span', { key: 'against', className: 'evo-doc-fact' }, against),
+          h('span', { key: 'added', className: 'evo-doc-fact' }, face.format('diff.added', { n: diff.diff.linesAdded })),
+          h('span', { key: 'removed', className: 'evo-doc-fact' }, face.format('diff.removed', { n: diff.diff.linesRemoved })),
           diff.diff.truncated
-            ? createElement('span', { key: 'truncated', className: 'evo-doc-fact' }, face.t('diff.truncated'))
+            ? h('span', { key: 'truncated', className: 'evo-doc-fact' }, face.t('diff.truncated'))
             : null,
         ],
       }),
       toggle),
     diffView(face, diff.diff, mode))
 }
+
