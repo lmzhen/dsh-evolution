@@ -20,8 +20,8 @@ it('dry-runs the 0.30.15 fixture without writing v3', async () => {
   copyFileSync(join(fixtures, 'journals', 'prepared.json'), join(home, 'merge', 'journals', 'prepared.json'))
   const out = execFileSync(process.execPath, [join(scripts, 'merge-migrate.mjs'), '--home', home, '--dry-run', '--json']).toString()
     const report = JSON.parse(out)
-  expect(report.applied).toBe(false)
-  expect(report.counts).toMatchObject({ verify: 1, pending: 1, approved: 1, fuse: 1, skipped: 1 })
-  expect(report.wouldMigrate).toBe(5)
+  expect(report.dryRun).toBe(true)
+  expect(report.state).toMatchObject({ present: true, schema: 2, rows: 5 })
+  expect(report.v3).toMatchObject({ ok: false, code: 'merge-state-migration-required' })
 })
 

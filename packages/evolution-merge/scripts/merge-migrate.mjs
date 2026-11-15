@@ -83,12 +83,14 @@ if (restore !== undefined && restore !== '') {
     process.exit(0)
   }
   acquireLock()
+  let restoreStatus = 1
   try {
     const result = spawnSync(process.execPath, [join(scriptDir, 'merge-restore.mjs'), '--home', home, '--backup', restore], { stdio: 'inherit' })
-    process.exit(result.status ?? 1)
+    restoreStatus = result.status ?? 1
   } finally {
     rmSync(lockDir, { recursive: true, force: true })
   }
+  process.exit(restoreStatus)
 }
 
 const core = await import('@deepseek-ai/dsh-evolution-core')
