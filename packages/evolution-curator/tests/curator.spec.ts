@@ -1929,7 +1929,7 @@ Body of ${name}.
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
     // Direct construction bypasses the schema `.min(1)`; the assembly clamp
     // must warn loudly.
-    new EvolutionCurator(ctx, { enabled: false, curatorIntervalHours: 0, staleAfterDays: vol(NaN) })
+    new EvolutionCurator(ctx, { enabled: false, curatorIntervalHours: 0, staleAfterDays: vol(NaN).ref })
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
     warnSpy.mockRestore()
   })

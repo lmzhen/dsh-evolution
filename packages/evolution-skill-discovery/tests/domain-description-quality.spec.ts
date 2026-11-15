@@ -5,9 +5,6 @@ import { descriptionHashOf, descriptionIsServable, evaluateDomainQuality, markSt
 function node(id: string, purpose = 'distinct purpose', triggers: string[] = ['alpha']): DomainNode {
   return { id, name: id, purpose, description: 'old', inScope: ['alpha', 'beta'], outOfScope: ['gamma'], triggers, parentIds: [], status: 'active', version: 1, createdAt: 0, updatedAt: 0, descriptionHash: 'old', descriptionVersion: 1, descriptionStatus: 'fresh', provenance: {}, quality: {} }
 }
-function edge(skillKey: SkillKey, domainId: string, role: 'primary' | 'secondary' = 'primary', status: 'active' | 'pending' = 'active'): SkillDomainEdge {
-  return { skillKey, domainId, role, confidence: 1, source: 'manual', skillHash: 'h', mapVersion: '1', status, assignedAt: 0 }
-}
 
 describe('description lifecycle', () => {
   it('regenerates only on structural events and keeps stale servable', () => {

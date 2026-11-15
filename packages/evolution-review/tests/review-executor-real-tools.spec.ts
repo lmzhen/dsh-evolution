@@ -1,7 +1,7 @@
 // @tier fast
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -63,7 +63,7 @@ describe('review executor over a real ToolsService', () => {
           const results = []
           for (const call of input.calls) {
             const result = await executeTool(ctx, parent, call.id, call.name, call.arguments, input.signal)
-            results.push({ callId: call.id, result })
+            results.push({ callId: call.id, result: result as never })
           }
           return { results }
         },
@@ -88,3 +88,4 @@ describe('review executor over a real ToolsService', () => {
     }
   })
 })
+

@@ -22,10 +22,10 @@ it('evolution-all aggregates the host entry, the mounted row packages and the sh
   // bundles/tools that carry no row (agent preset container, session-query, core resolver) too.
   const declared = new Set(Object.keys(manifest.dependencies))
   const rows = insertedRows(loadOverlayPatches('test', fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))))
-  const rowPackages = new Set()
+  const rowPackages = new Set<string>()
   for (const row of rows) {
     const name = rowName(row)
-    if (!name.startsWith('@deepseek-ai/')) continue
+    if (typeof name !== 'string' || !name.startsWith('@deepseek-ai/')) continue
     const parts = name.split('/')
     rowPackages.add(parts.length > 2 ? parts.slice(0, 2).join('/') : name)
   }

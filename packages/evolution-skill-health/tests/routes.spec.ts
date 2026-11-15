@@ -30,7 +30,7 @@ it('normalizes the host healthy verdict to the panel ok vocabulary', () => {
 })
 
 it('keeps an unreadable row unreadable even when the verdict says otherwise', () => {
-  const rows = toRouteRows([{ name: 'bad', verdict: 'ok', findings: [], dims: { readable: false } }])
+  const rows = toRouteRows([{ name: 'bad', verdict: 'ok' as never, findings: [], dims: { readable: false } }])
   expect(rows[0]?.verdict).toBe('unreadable')
 })
 

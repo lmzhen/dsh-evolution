@@ -30,9 +30,9 @@ export interface ToolCallInput {
 /** Mount the registry, prompt service, and exactly one target executor. */
 export async function mountToolHost(ctx: Context, options: ToolHostOptions = {}): Promise<void> {
   const kind = options.executor ?? 'native'
-  if (options.session !== false) await ctx.plugin(SessionStore)
+  if (options.session !== false) await ctx.plugin(SessionStore, {})
   if (options.systemPrompt !== false) await ctx.plugin(SystemPrompt, {})
-  await ctx.plugin(ToolRuntime)
+  await ctx.plugin(ToolRuntime, {})
   if (kind === 'ptc' && options.ptcRuntime !== undefined) await ctx.plugin(options.ptcRuntime as never)
   const spec: string = kind === 'ptc'
     ? '@deepseek-ai/dsh-tool-executor-ptc'

@@ -2,6 +2,7 @@ import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
+// @ts-expect-error -- the helper is plain ESM without a declaration file
 import { resolveOverlay } from '../scripts/lib-env.mjs'
 
 /**

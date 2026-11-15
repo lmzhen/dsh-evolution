@@ -1,7 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, Message, StreamChunk, ToolCallBlock } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import { runReview } from '../src/review-executor.ts'
@@ -56,7 +56,7 @@ function llm(script: StreamChunk[][]): ReviewLlmPort & { requests: unknown[] } {
 function tools(seen: { agent?: ReviewParent }): ReviewToolPort {
   return {
     async execute(input) {
-      seen.agent = input.agent
+      if (input.agent !== undefined) seen.agent = input.agent
       return { results: [{ callId: call.id, result: { content: [{ type: 'text' as const, text: 'ok' }] as ContentBlock[], isError: false } }] }
     },
   }
@@ -113,3 +113,4 @@ describe('runReview', () => {
     expect(cleared).toBe(1)
   })
 })
+

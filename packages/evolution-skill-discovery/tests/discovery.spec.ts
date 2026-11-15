@@ -45,7 +45,7 @@ describe('identity', () => {
 
   it('composes view/policy/projection/search digests deterministically', () => {
     const row = skillIndexRowOf(summary('alpha'), true)
-    const catalog = catalogRevisionOf([row], true)
+    catalogRevisionOf([row], true)
     const view = viewCatalogDigestOf('v', [row], true)
     const policy = policyDigestOf({ globalPolicyRevision: '1', effectivePolicy: { mode: 'on' } })
     expect(view).toBe(viewCatalogDigestOf('v', [row], true))
