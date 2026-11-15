@@ -93,15 +93,9 @@ if (restore !== undefined && restore !== '') {
   process.exit(restoreStatus)
 }
 
-const core = await import('@deepseek-ai/dsh-evolution-core')
-const io = core.nodeEvolutionIo()
-const { readStateReadiness } = await import('../lib/types/domain/state-bootstrap.js')
-const { migrateMergeStateToV4 } = await import('../lib/types/domain/state-migrate.js')
-const { readV4Readiness } = await import('../lib/types/domain/schema4.js')
-
 async function inspect() {
   let raw = null
-  try { raw = await io.readText(join(home, 'merge', 'merge-state.json')) } catch { /* unreadable is reported below */ }
+  try { raw = readFileSync(join(home, 'merge', 'merge-state.json'), 'utf8') } catch { /* unreadable is reported below */ }
   let schema = null
   let rows = 0
   try {
@@ -109,14 +103,13 @@ async function inspect() {
     schema = parsed?.schemaVersion ?? null
     rows = Array.isArray(parsed?.rows) ? parsed.rows.length : 0
   } catch { /* malformed is a blocker */ }
-  const v4 = await readV4Readiness(io, home)
-  const v3 = await readStateReadiness(io, home)
-  return {
-    home,
-    state: { present: raw !== null, schema, rows },
-    v4: v4.ok ? { ok: true, rows: v4.state.rows.length } : { ok: false, code: v4.code, message: v4.message },
-    v3: v3.ok ? { ok: true, rows: v3.state.rows.length } : { ok: false, code: v3.code, message: v3.message },
-  }
+  const v4 = schema === 4
+    ? { ok: true, rows }
+    : { ok: false, code: 'merge-state-migration-required', message: 'state is not v4' }
+  const v3 = schema === 3
+    ? { ok: true, rows }
+    : { ok: false, code: 'merge-state-migration-required', message: 'state is not v3 readable' }
+  return { home, state: { present: raw !== null, schema, rows }, v4, v3 }
 }
 
 if (dryRun && !apply) {
@@ -126,14 +119,20 @@ if (dryRun && !apply) {
   process.exit(0)
 }
 
+const core = await import('@deepseek-ai/dsh-evolution-core')
+const io = core.nodeEvolutionIo()
+const { migrateMergeStateToV4 } = await import('../lib/types/domain/state-migrate.js')
+const { readV4Readiness } = await import('../lib/types/domain/schema4.js')
+
 acquireLock()
 let exitCode = 0
 try {
   const before = await inspect()
-  if (before.state.schema === 4 && before.v4.ok) {
+  const beforeV4 = await readV4Readiness(io, home)
+  if (before.state.schema === 4 && beforeV4.ok) {
     const report = { ok: true, applied: false, reason: 'already-v4', before }
     if (asJson) console.log(JSON.stringify(report, null, 2))
-    else console.log('MIGRATE OK already v4 rows=' + String(before.v4.rows))
+    else console.log('MIGRATE OK already v4 rows=' + String(beforeV4.state.rows.length))
   } else {
     const backupDir = value('--backup') ?? join(home, 'merge', '.backup', 'pre-migrate-' + new Date().toISOString().replace(/[:.]/g, '-'))
     const quiesce = join(home, 'merge', '.migrate-quiesce.json')
@@ -147,10 +146,11 @@ try {
     const migration = await migrateMergeStateToV4(io, home)
     if (!migration.ok) throw new Error(migration.code + ': ' + migration.message)
     const after = await inspect()
-    if (!after.v4.ok) throw new Error(after.v4.code + ': ' + after.v4.message)
+    const afterV4 = await readV4Readiness(io, home)
+    if (!afterV4.ok) throw new Error(afterV4.code + ': ' + afterV4.message)
     const report = { ok: true, applied: true, migrated: migration.migrated, backupRef: migration.backupRef, backupDir, before, after }
     if (asJson) console.log(JSON.stringify(report, null, 2))
-    else console.log('MIGRATE OK v2/v3 -> v4 rows=' + String(after.v4.rows) + ' backup=' + backupDir + (migration.backupRef === undefined ? '' : ' pre1b=' + migration.backupRef))
+    else console.log('MIGRATE OK v2/v3 -> v4 rows=' + String(afterV4.state.rows.length) + ' backup=' + backupDir + (migration.backupRef === undefined ? '' : ' pre1b=' + migration.backupRef))
   }
 } catch (error) {
   const failure = { ok: false, code: 'migration-failed', message: error instanceof Error ? error.message : String(error) }
