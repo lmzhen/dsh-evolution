@@ -27,9 +27,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
-import { type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
 import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
-import { partitionVersions } from '@deepseek-ai/dsh-evolution-core/skills'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
@@ -452,7 +450,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           case 'mutations':
           case 'doctor':
           case 'restore':
-          case 'skill.restore': {
+          case 'skill.restore':
+          case 'skill.history':
+          case 'skill.undo': {
             if (def === undefined || isParseFailure(command)) break
             const handler = HOST_COMMAND_HANDLERS[def.id]
             if (handler === undefined) break
@@ -480,50 +480,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (input === 'consolidate' || input.startsWith('consolidate ')) {
           const plan = /--plan\s+(\S+)/.exec(input)?.[1]
           return err('`consolidate` 已退出用户面：机械追加由 curator 归档收尾，人类合成用 `/evolution merge pair <a> <b>`。' + (plan === undefined ? '' : '\n旧 --plan 审计只读保留：' + plan))
-        }
-        if (input.startsWith('skill history ')) {
-          const name = input.slice(14).trim()
-          if (!name) return err('用法：/evolution skill history <name>')
-          const curator = ctx.get('evolutionCurator') as {
-            history(name: string): Promise<SkillVersion[]>
-          } | undefined
-          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
-          const versions = await curator.history(name)
-          if (versions.length === 0) return ok(`技能 "${name}" 还没有内容版本：下一次经 skill_manage 写入后才会出现。`)
-          // Content order, not append order: two writers of one skill can interleave their index
-          // appends, and every entry written from 0.10.0 on links the version it replaced.
-          const groups = partitionVersions(versions)
-          const row = (entry: SkillVersion): string => `v${entry.v}\t${entry.at}\t${entry.action}\t${entry.chars} chars\t${entry.hash.slice(0, 12)}${entry.unitId === undefined ? '' : `\tunit:${entry.unitId}`}`
-          const lines = [`技能 "${name}" 的内容版本（由旧到新，${groups.content.length} 条，最多保留这么多）：`, ...groups.content.map(row)]
-          // Support files share this index; their bytes are history, but undo restores SKILL.md only,
-          // so they are listed apart instead of being passed off as versions of the body.
-          if (groups.support.length > 0) {
-            lines.push('支撑文件版本（仅在历史里 —— 撤销恢复的是 SKILL.md，不是这些字节）：', ...groups.support.map(row))
-          }
-          return ok(lines.join('\n'))
-        }
-        if (input.startsWith('skill undo ')) {
-          const rest = input.slice(11).trim()
-          const toMatch = /--to\s+v?(\d+)/.exec(rest)
-          const unitMatch = /--unit\s+(\S+)/.exec(rest)
-          const marker = [toMatch?.index, unitMatch?.index].filter((index): index is number => index !== undefined).sort((a, b) => a - b)[0]
-          const name = (marker === undefined ? rest : rest.slice(0, marker)).trim()
-          if (!name) return err('用法：/evolution skill undo <name> [--to v<N> | --unit <id>]')
-          if (toMatch !== null && unitMatch !== null) return err('--to 与 --unit 不能同时使用')
-          const skillUndoRefusal = unreplayableWriteRefusal('skill undo')
-          if (skillUndoRefusal) return skillUndoRefusal
-          const curator = ctx.get('evolutionCurator') as {
-            undo(name: string, v?: number): Promise<{ ok: boolean; message: string }>
-            undoUnit(name: string, unitId?: string): Promise<{ ok: boolean; message: string }>
-          } | undefined
-          const target = toMatch?.[1] === undefined ? undefined : Number(toMatch[1])
-          const unitId = unitMatch?.[1]
-          const result = curator
-            ? unitId !== undefined
-              ? await curator.undoUnit(name, unitId)
-              : target === undefined ? await curator.undo(name) : await curator.undo(name, target)
-            : { ok: false, message: hostError('e-302-curator-service-not-mounted') }
-          return result.ok ? ok(result.message) : err(result.message)
         }
         // 0.21.0 (G4/B4): the pin face. Same semantics as skill_manage's pin action — ONE library
         // method (setPinned), the same repository-worded answer, and the same E-70 decision that a

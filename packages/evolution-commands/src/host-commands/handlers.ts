@@ -10,6 +10,7 @@ import { runParamsCommand } from './params-command.ts'
 import { runCuratorCommand, runMutationsCommand } from './curator-command.ts'
 import { runDoctorCommand, type DoctorCommandContext } from './doctor-command.ts'
 import { runRestoreCommand, runSkillRestoreCommand } from './restore-commands.ts'
+import { runSkillHistoryCommand, runSkillUndoCommand } from './skill-history-commands.ts'
 import {
   runDecisionCommand,
   runPendingCommand,
@@ -73,4 +74,10 @@ export const HOST_COMMAND_HANDLERS: Readonly<Record<string, CommandHandler>> = {
   'skill.restore': context => context.ctx === undefined || context.refusal === undefined
     ? undefined
     : runSkillRestoreCommand({ input: context.input, ctx: context.ctx, locale: context.locale, refusal: context.refusal }),
+  'skill.history': context => context.ctx === undefined || context.refusal === undefined
+    ? undefined
+    : runSkillHistoryCommand({ input: context.input, ctx: context.ctx, locale: context.locale, refusal: context.refusal }),
+  'skill.undo': context => context.ctx === undefined || context.refusal === undefined
+    ? undefined
+    : runSkillUndoCommand({ input: context.input, ctx: context.ctx, locale: context.locale, refusal: context.refusal }),
 }
