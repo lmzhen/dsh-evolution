@@ -55,7 +55,7 @@ it('resumes a fuse row with its persisted decision', async () => {
   }
   await seedRow(io, home, row)
   const result = await runResumeCommand({
-    io, home, registry: registry(), ports: ports(), rowId: row.id,
+    approval: true,    io, home, registry: registry(), ports: ports(), rowId: row.id,
     platformWrite: true, now: () => 200,
   })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)

@@ -4,7 +4,7 @@ import { expect, it } from 'vitest'
 import { runApproveCommand } from '../../src/approve-command.ts'
 import { casExpiredHook } from '../../src/domain/failure-route.ts'
 import { readRunMeta, runMetaPath, writeRunMeta } from '../../src/domain/run-coordinator.ts'
-import { loadMergeState, mergeStatePath } from '../../src/state.ts'
+import { loadMergeState } from '../../src/state.ts'
 import { recordRound2Outcome } from '../../src/round2-outcome.ts'
 import { makeV4Home, v3Row } from '../support/schema4-home.ts'
 

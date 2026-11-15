@@ -12,8 +12,8 @@ function registry(): MergeRegistryPort & { calls: string[]; settled: unknown } {
     calls,
     get settled() { return settled },
     async begin(_kind, seed) { calls.push('begin:' + String(seed?.command)); return { id: 'run-1', signal: new AbortController().signal, startedAt: 100 } },
-    async stage(id, stage) { calls.push('stage:' + stage) },
-    async settle(id, outcome) { calls.push('settle:' + outcome.state); settled = outcome },
+    async stage(_id, stage) { calls.push('stage:' + stage) },
+    async settle(_id, outcome) { calls.push('settle:' + outcome.state); settled = outcome },
   }
 }
 

@@ -5,6 +5,7 @@ import { expect, it } from 'vitest'
 import { loadUsage, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { loadMergeState } from '../src/index.ts'
+// @ts-expect-error -- plain ESM fixture helper
 import { seedArchivedUsage, seedPendingMerge } from '../../scripts/acceptance/fixtures.mjs'
 
 it('G0 fixture seeds a managed pending pair that the v3 reader accepts', async () => {
@@ -32,3 +33,5 @@ it('G0 fixture writes a real archived_at and archive reason', async () => {
   expect(usage.get('g0-archived')).toMatchObject({ state: 'archived', archived_at: at })
   expect(await readFile(join(home, 'skills', '.archive', 'g0-archived', '.archive-reason'), 'utf8')).toBe('G0 archive fixture\n')
 })
+
+

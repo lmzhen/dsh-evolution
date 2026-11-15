@@ -24,8 +24,8 @@ it('parses create-umbrella and forced decisions with pending summaries', () => {
   const forced = forcedDecisionFor('a'.repeat(40), 'b'.repeat(40))
   expect(forced.target.length).toBeLessThanOrEqual(64)
   expect(forced).toMatchObject({ mode: 'create-umbrella', shouldMerge: true })
-  expect(forced.aSummary.length).toBeGreaterThan(0)
-  expect(forced.bSummary.length).toBeGreaterThan(0)
+  expect(forced.aSummary!.length).toBeGreaterThan(0)
+  expect(forced.bSummary!.length).toBeGreaterThan(0)
   expect(forced.rationale.length).toBeGreaterThan(0)
 })
 

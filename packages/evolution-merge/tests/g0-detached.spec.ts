@@ -77,7 +77,7 @@ it('resume fuse does not take the commit claim', async () => {
   const reg = registry()
   const ports: ScanPorts = { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } }
   const result = await runResumeCommand({ io, home, registry: reg.port, ports, rowId: row0.id, platformWrite: true, now: () => 1000 })
-  expect(result).toMatchObject({ ok: true })
+    approval: true,  expect(result).toMatchObject({ ok: true })
   expect(reg.calls).toContain('begin')
   await held?.release()
 })

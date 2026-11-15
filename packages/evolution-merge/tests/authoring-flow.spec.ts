@@ -122,7 +122,7 @@ it('uses one limits snapshot at the gate and never commits an over-limit tree', 
   const home = await tempRoot('dsh-merge-authoring-limits-')
   const io = nodeEvolutionIo()
   let commits = 0
-  const commitPort: CommitPort = { readSkill: port().readSkill, async commitMerge(plan) { commits += 1; return { ok: true, message: 'merged', unitId: 'u-limit', archived: plan.sources, mutations: 1 } } }
+  const commitPort: CommitPort = { readSkill: port().readSkill!, async commitMerge(plan) { commits += 1; return { ok: true, message: 'merged', unitId: 'u-limit', archived: plan.sources, mutations: 1 } } }
   const result = await runAuthoring({
     io, home, runId: 'run-limit', target: 'umbrella', cards, commitPort, now: () => 200, summary: 'merge',
     limits: { ...DEFAULT_SKILL_LIMITS, maxSkillFileBytes: 8 },
@@ -141,9 +141,9 @@ it('allows the exact limit and rejects one byte over at both gate and commit', a
     const home = await tempRoot('dsh-merge-authoring-boundary-')
     const io = nodeEvolutionIo()
     let commits = 0
-    const commitPort: CommitPort = { readSkill: port().readSkill, async commitMerge(plan) { commits += 1; return { ok: true, message: 'merged', unitId: 'u-' + runId, archived: plan.sources, mutations: 1 } } }
+    const commitPort: CommitPort = { readSkill: port().readSkill!, async commitMerge(plan) { commits += 1; return { ok: true, message: 'merged', unitId: 'u-' + runId, archived: plan.sources, mutations: 1 } } }
     const commitPortWithUnit = { ...commitPort, unit: legacyUnit(commitPort) }
-    const result = await runAuthoring({ io, home, runId, target: 'umbrella', cards, commitPort: commitPortWithUnit, now: () => 200, summary: 'merge', limits: { ...DEFAULT_SKILL_LIMITS, maxSkillFileBytes: limit }, async author(staging: any) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', body) } })
+    const result = await runAuthoring({ io, home, runId, target: 'umbrella', cards, commitPort: commitPortWithUnit, now: () => 200, summary: 'merge', limits: { ...DEFAULT_SKILL_LIMITS, maxSkillFileBytes: limit }, async author(staging: any) { await writeStagedFile(io, staging.home, staging.runId, 'SKILL.md', body); return '' } })
     expect(result.ok, runId).toBe(ok)
     expect(commits).toBe(ok ? 1 : 0)
   }
@@ -188,7 +188,7 @@ it('refuses when curator blocks the target during authoring', async () => {
   const io = nodeEvolutionIo()
   let blocked = false
   let commits = 0
-  const guarded: CommitPort = { ...port(), async commitMerge(plan) { commits += 1; return await port().commitMerge(plan) } }
+  const guarded: CommitPort = { ...port(), async commitMerge(plan) { commits += 1; return await port().commitMerge!(plan) } }
   const result = await runAuthoring({
     io, home, runId: 'run-1', target: 'umbrella', cards, commitPort: guarded, now: () => 200, summary: 'merge',
     isBlocked: () => blocked,

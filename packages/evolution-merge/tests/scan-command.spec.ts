@@ -10,8 +10,8 @@ it('wraps scan in the registry/report shell', async () => {
   const calls: string[] = []
   const registry: MergeRegistryPort = {
     async begin() { calls.push('begin'); return { id: 'run-1', signal: new AbortController().signal, startedAt: 100 } },
-    async stage(id, stage) { calls.push('stage:' + stage) },
-    async settle(id, outcome) { calls.push('settle:' + outcome.state) },
+    async stage(_id, stage) { calls.push('stage:' + stage) },
+    async settle(_id, outcome) { calls.push('settle:' + outcome.state) },
   }
   const result = await runScanCommand({
     io, home, registry, approval: false, platformWrite: true, now: () => 200,

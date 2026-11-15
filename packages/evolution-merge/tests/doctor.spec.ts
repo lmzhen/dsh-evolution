@@ -6,7 +6,7 @@ import { makeV4Home, v3Row } from './support/schema4-home.ts'
 import { mergeDoctor, mergeDoctorFact, pairKey, rowIdOf } from '../src/index.ts'
 import { readMergeSnapshot } from '../src/domain/merge-snapshot.ts'
 import { buildDoctorView, buildQueuePage } from '../src/surface/merge-view.ts'
-import { mergeStatePath } from '../src/state.ts'
+import {  } from '../src/state.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const pendingRow = (a: string, b: string, runId?: string) => {

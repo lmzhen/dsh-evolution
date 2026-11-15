@@ -1,5 +1,5 @@
 // @tier pre-tag
-import { mkdir, readdir, writeFile } from 'node:fs/promises'
+import { readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { tempRoot } from '../../../test-support/temp-home.ts'

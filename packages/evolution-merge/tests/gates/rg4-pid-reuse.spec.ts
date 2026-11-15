@@ -1,6 +1,5 @@
 // @tier pre-tag
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { writeFile } from 'node:fs/promises'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo, contentHash } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'

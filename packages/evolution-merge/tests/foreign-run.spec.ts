@@ -1,12 +1,10 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
 import { newRunRegistry, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
-import { tempRoot } from '../../test-support/temp-home.ts'
 import { makeV4Home } from './support/schema4-home.ts'
 import { readMergeSnapshot } from '../src/domain/merge-snapshot.ts'
 
 it('a run started by another plane is visible in the merge run view', async () => {
-  const home = await tempRoot('dsh-merge-foreign-run-')
   const io = nodeEvolutionIo()
   const v4 = await makeV4Home([])
   const owner = newRunRegistry({ io, home: v4.home, now: () => 10 })

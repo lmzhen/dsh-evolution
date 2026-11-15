@@ -77,7 +77,7 @@ it('P1-8: attaches the in-flight child run to the row before round2', async () =
   const attached = (await loadMergeState(io, home)).state.rows.find(item => item.id === row.id)
   expect(attached?.runId).toBe('run-live')
   const resumed = await runResumeCommand({
-    io, home, registry: liveRegistry, rowId: row.id, platformWrite: true, now: () => 200,
+    approval: true,    io, home, registry: liveRegistry, rowId: row.id, platformWrite: true, now: () => 200,
     isOwnerActive: async id => id === 'run-live',
     ports: { async screening() { return [] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'failed' } } },
   })
