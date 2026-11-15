@@ -83,8 +83,8 @@ if (restore !== undefined && restore !== '') {
 
 const core = await import('@deepseek-ai/dsh-evolution-core')
 const io = core.nodeEvolutionIo()
-const { ensureMergeStateReady, readStateReadiness } = await import('../lib/types/domain/state-bootstrap.js')
-const { normalizePairLedger } = await import('../lib/types/domain/pair-ledger.js')
+const { readStateReadiness } = await import('../lib/types/domain/state-bootstrap.js')
+const { migrateMergeStateToV4 } = await import('../lib/types/domain/state-migrate.js')
 const { readV4Readiness } = await import('../lib/types/domain/schema4.js')
 
 async function inspect() {
@@ -132,15 +132,13 @@ try {
     } finally {
       rmSync(quiesce, { force: true })
     }
-    const v3 = await ensureMergeStateReady(io, home)
-    if (!v3.ok) throw new Error(v3.code + ': ' + v3.message)
-    const normalized = await normalizePairLedger(io, home)
-    if (!normalized.ok) throw new Error(normalized.message ?? 'v3->v4 normalize failed')
+    const migration = await migrateMergeStateToV4(io, home)
+    if (!migration.ok) throw new Error(migration.code + ': ' + migration.message)
     const after = await inspect()
     if (!after.v4.ok) throw new Error(after.v4.code + ': ' + after.v4.message)
-    const report = { ok: true, applied: true, migrated: normalized.migrated, backupRef: normalized.backupRef, backupDir, before, after }
+    const report = { ok: true, applied: true, migrated: migration.migrated, backupRef: migration.backupRef, backupDir, before, after }
     if (asJson) console.log(JSON.stringify(report, null, 2))
-    else console.log('MIGRATE OK v2/v3 -> v4 rows=' + String(after.v4.rows) + ' backup=' + backupDir + (normalized.backupRef === undefined ? '' : ' pre1b=' + normalized.backupRef))
+    else console.log('MIGRATE OK v2/v3 -> v4 rows=' + String(after.v4.rows) + ' backup=' + backupDir + (migration.backupRef === undefined ? '' : ' pre1b=' + migration.backupRef))
   }
 } catch (error) {
   const failure = { ok: false, code: 'migration-failed', message: error instanceof Error ? error.message : String(error) }

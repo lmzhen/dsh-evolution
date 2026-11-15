@@ -14,7 +14,7 @@ import { type MutationLockPort } from '@deepseek-ai/dsh-evolution-core/write'
 import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState } from './state.ts'
-import { pairLedger, normalizePairLedger } from './domain/pair-ledger.ts'
+import { pairLedger } from './domain/pair-ledger.ts'
 import { legacyToV3 } from './domain/row-v3-bridge.ts'
 import { readV4Readiness } from './domain/schema4.ts'
 import { readMergeSnapshot } from './domain/merge-snapshot.ts'
@@ -35,7 +35,7 @@ import { buildDoctorView } from './surface/merge-view.ts'
 import { mergeDoctorFact, type MergeDoctorFact } from './doctor.ts'
 import { commandError, formatMergeError } from './domain/errors.ts'
 import { resolveBody } from './surface/body.ts'
-import { ensureMergeStateReady } from './domain/state-bootstrap.ts'
+import { migrateMergeStateToV4 } from './domain/state-migrate.ts'
 import { recoverCommitUnits } from './recovery-coordinator.ts'
 import { pairKey, rowIdOf } from './contracts.ts'
 import { makeMergeRoutes, type MergeRouteSource } from './merge-routes.ts'
@@ -198,18 +198,13 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     if (registry === undefined) return
     const io = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
-    const ready = (async () => {
-      const v4 = await readV4Readiness(io, home)
-      if (v4.ok) {
-        const loaded = await loadMergeState(io, home)
-        return { ok: true as const, schema: 3 as const, migrated: false, state: { schemaVersion: 3 as const, rows: loaded.state.rows.map(legacyToV3).filter((row): row is NonNullable<typeof row> => row !== null) }, quarantine: [], report: null }
-      }
-      const state = await ensureMergeStateReady(io, home, (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence)
-      if (!state.ok) return v4.code === 'merge-state-forward-only' || v4.code === 'merge-state-needs-repair' ? { ok: false as const, code: v4.code, message: v4.message } : state
-      const normalized = await normalizePairLedger(io, home)
-      return normalized.ok ? state : { ok: false as const, code: 'merge-state-needs-repair' as const, message: normalized.message ?? 'v4 normalize failed' }
-    })().catch(error => ({ ok: false as const, code: 'merge-state-migration-blocked' as const, message: error instanceof Error ? error.message : String(error) }))
     const homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
+    const ready = (async () => {
+      const migration = await migrateMergeStateToV4(io, home, homeFence)
+      if (!migration.ok) return migration
+      const loaded = await loadMergeState(io, home)
+      return { ok: true as const, schema: 3 as const, migrated: migration.migrated, state: { schemaVersion: 3 as const, rows: loaded.state.rows.map(legacyToV3).filter((row): row is NonNullable<typeof row> => row !== null) }, quarantine: [], report: null }
+    })().catch(error => ({ ok: false as const, code: 'merge-state-migration-blocked' as const, message: error instanceof Error ? error.message : String(error) }))
     const runs = newRunRegistry({ io, home, warn: (message) => { ctx.logger.warn(message) }, ...(homeFence === undefined ? {} : { fence: homeFence }) })
     ctx.effect(() => {
       const host = ctx as unknown as { on(name: string, listener: (event: { action?: string }) => void): () => void }
