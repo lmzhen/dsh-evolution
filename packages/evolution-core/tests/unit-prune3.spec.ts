@@ -12,7 +12,7 @@ const bodyWithExtra = ['---', 'name: q-skill', 'description: q-skill body', '---
 it('R-G3a-5：keep=1 时单元的条目必须整组保留（支撑 + baseline + 正文，同一 unitId）', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-unit-prune3-'))
   try {
-    const lib = new SkillLibrary(root, nodeEvolutionIo(), { versionKeep: 1 })
+    const lib = new SkillLibrary(root, nodeEvolutionIo(), { versionKeep: 1 } as never)
     await lib.create('q-skill', bodyWithExtra)
     const result = await lib.restructure('q-skill', [{ heading: 'Extra', toFile: 'references/extra.md' }], 'foreground')
     expect(result.ok, result.message).toBe(true)

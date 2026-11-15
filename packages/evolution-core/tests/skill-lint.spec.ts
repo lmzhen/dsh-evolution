@@ -14,6 +14,7 @@ const facts = (over: Partial<LintFacts> = {}): LintFacts => ({
     bodyTokens: 250,
     stampDensityPerKb: null,
     stampHits: null,
+    hardCapHits: 0,
     supportGroups: 1,
     supportFiles: 0,
     churnPatches: null,

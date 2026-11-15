@@ -142,7 +142,7 @@ it('copies shared support, deletes exclusive support, and keeps the parent refer
     expect(await readFile(join(root, 'target', 'references', 'exclusive.md'), 'utf8')).toBe('# exclusive')
     expect(await readFile(join(root, 'source', 'references', 'shared.md'), 'utf8')).toBe('# shared')
     const versions = await lib.listVersions('target')
-    const head = versions.find(version => (version as { unitHead?: { moves?: unknown[] } }).unitHead?.moves !== undefined) as { unitHead: { moves: Array<{ path: string; provenance?: string }> } }
+    const head = versions.find(version => (version as unknown as { unitHead?: { moves?: unknown[] } }).unitHead?.moves !== undefined) as unknown as { unitHead: { moves: Array<{ path: string; provenance?: string }> } }
     const sharedMove = head.unitHead.moves.find(move => move.path === 'references/shared.md')
     expect(sharedMove?.provenance).toBe(plan.plan.support.shared[0]?.provenance)
     await expect(readFile(join(root, 'source', 'references', 'exclusive.md'), 'utf8')).rejects.toThrow()
@@ -217,7 +217,7 @@ it('rolls back a copy when the target body write fails', async () => {
       if (original === undefined) throw new Error('missing transact')
       return original.call(io, path, task)
     }
-    const failing = new SkillLibrary(root, io, { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const failing = new SkillLibrary(root, io as never, { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
     const plan = planExtract({
       body: sourceBody(true),
       sourceName: 'source',
@@ -302,10 +302,11 @@ it('copies bounded external support to the target without deleting the source', 
     expect(await readFile(join(root, 'target', 'scripts', 'run.mjs'), 'utf8')).toContain('external source:')
     expect(await readFile(join(root, 'shared', 'scripts', 'run.mjs'), 'utf8')).toBe('console.log(1)' + NL)
     const versions = await lib.listVersions('target')
-    const head = versions.find(version => (version as { unitHead?: { moves?: unknown[] } }).unitHead?.moves !== undefined) as { unitHead: { moves: Array<{ path: string; provenance?: string }> } }
+    const head = versions.find(version => (version as unknown as { unitHead?: { moves?: unknown[] } }).unitHead?.moves !== undefined) as unknown as { unitHead: { moves: Array<{ path: string; provenance?: string }> } }
     const externalMove = head.unitHead.moves.find(move => move.path === 'scripts/run.mjs')
     expect(externalMove?.provenance).toBe(plan.plan.support.external[0]?.provenance)
   } finally {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
+

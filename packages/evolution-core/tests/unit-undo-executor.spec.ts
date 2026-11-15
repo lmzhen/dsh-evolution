@@ -29,7 +29,7 @@ function sinkOf(state: State): UnitUndoSink {
     },
     async updateSkill(skill, body, anchor) {
       state.calls.push('update:' + skill)
-      if (contentHash(state.skills.get(skill) ?? '') !== anchor.sha256) return { ok: false, message: 'anchor mismatch' }
+      if (contentHash(state.skills.get(skill) ?? '') !== anchor!.sha256) return { ok: false, message: 'anchor mismatch' }
       state.skills.set(skill, body)
       return { ok: true, message: 'updated' }
     },

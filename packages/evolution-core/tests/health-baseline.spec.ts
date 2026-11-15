@@ -11,8 +11,8 @@ import { RULES } from '../src/skill-lint.ts'
 import { collectCorpusSkills } from '../../scripts/lib-health-corpus.mjs'
 
 describe('G1 标定：health-baseline 读数', () => {
-  const skills = collectCorpusSkills().skills
-  const baseline = buildHealthBaseline(skills)
+  const skills = collectCorpusSkills().skills as Array<{ facts: { dims: { bodyChars: number | null } } }>
+  const baseline = buildHealthBaseline(skills as never)
 
   it('语料状态是明确的（哪一侧为空一目了然，不假装测过）', () => {
     console.log('corpora: user=' + String(baseline.corpora.user) + ' platform=' + String(baseline.corpora.platform))

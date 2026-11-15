@@ -53,7 +53,7 @@ describe('evolution restrictor (G2-S3, W4 R: child-scope)', () => {
   })
 
   it('restricts ONLY agents composed with its own restricted preset', () => {
-    const h = harness(ctx => (ctx === h.own ? 'evolution-reviewer-readonly' : 'standard'))
+    const h = harness(ctx => (ctx === (h as any).own ? 'evolution-reviewer-readonly' : 'standard'))
     apply(h.ctx as never, { allow: [' skill ', 'skill', ''], presetId: 'evolution-reviewer-readonly' })
     expect(h.listenerRegistered()).toBe(true)
     const other = h.child()
@@ -102,3 +102,4 @@ describe('evolution restrictor (G2-S3, W4 R: child-scope)', () => {
     expect(() => { h.emit(brokenChild) }).toThrow(/E-324/)
   })
 })
+
