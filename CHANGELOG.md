@@ -1,6 +1,6 @@
-## 0.49.0 (unreleased) — 迁移单入口、净删收口
+## 0.49.0 (2026-11-15) — 迁移单入口、净删收口
 
-> **范围**：① merge 迁移改为一个 `dsh-evolution-merge-migrate` 入口（dry-run / apply / restore），宿主启动与 CLI 共用 `migrateMergeStateToV4`；② 迁移 blocked 提示按 readiness code 分四种，8 个 locale 由平台 catalog 生成；③ D5 hunk 行渲染单源；④ 删除零引用脚本/导出/helper，净减 **−5,729 行**。
+> **范围**：① merge 迁移改为一个 `dsh-evolution-merge-migrate` 入口（dry-run / apply / restore），宿主启动与 CLI 共用 `migrateMergeStateToV4`；② 迁移 blocked 提示按 readiness code 分四种，8 个 locale 由平台 catalog 生成；③ D5 hunk 行渲染单源；④ 删除零引用脚本/导出/helper，净减 **−5,552 行**。
 >
 > **破坏性变更**：删除无生产调用的公共导出 `installExclusionTarget`、`renderCommandTable`、`renderLongRunTable`、`instanceClaimedWriteSites`、`persistedWriteSite`、`PENDING_ARCHIVE_FILE`、`UNKNOWN_FIELD_POLICY`，以及 v1 `EvidenceEnvelope` 的 `validateEvidenceEnvelope`/`createEvidenceEnvelope`。这些导出在 0.48 已无 in-tree 调用；外部若直接引用需改用 `persistedWriteSites()`/`verify-release-evidence.mjs` 或自留副本。
 >
@@ -3375,3 +3375,4 @@ The review also verified the rest of the rc.42-44 surface: no `session.append('e
 - Preset now includes activity and feedback.
 - Full plugin family: memory, skills, review, policy, validator, state,
   approval, threat, curator, commands, graph, replay.
+
