@@ -21,7 +21,7 @@ function harness(composedOf: (ctx: ChildCtx) => string | undefined = () => 'evol
     },
   }
   const child = (): ChildCtx => ({
-    get(name: string) { return name === 'tools' ? this.tools : undefined },
+    get(name: string) { return name === 'tools' ? (this as { tools: unknown }).tools : undefined },
     tools: {
       restrict(filter: Record<string, unknown>) {
         calls.push(filter)
@@ -34,7 +34,7 @@ function harness(composedOf: (ctx: ChildCtx) => string | undefined = () => 'evol
       cleanups.push(dispose)
       return () => {}
     },
-  })
+  }) as unknown as ChildCtx
   return {
     ctx,
     calls,

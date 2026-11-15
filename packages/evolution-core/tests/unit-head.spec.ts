@@ -22,7 +22,7 @@ it('G3b：代表片必须带 unitHead.moves（全量 manifest）与 unitHead.sou
     const moved = await lib.restructure('h-skill', [{ heading: 'Extra', toFile: 'references/extra.md' }], 'foreground')
     expect(moved.ok, moved.message).toBe(true)
     const versions = await lib.listVersions('h-skill')
-    const heads = versions.filter(v => (v as { unitHead?: { moves?: unknown[] } }).unitHead?.moves !== undefined)
+    const heads = versions.filter(v => (v as unknown as { unitHead?: { moves?: unknown[] } }).unitHead?.moves !== undefined)
     expect(heads.length).toBeGreaterThan(0)
     const head = heads[heads.length - 1] as unknown as { unitHead: { moves: unknown[]; sources?: unknown[] } }
     expect(Array.isArray(head.unitHead.moves)).toBe(true)

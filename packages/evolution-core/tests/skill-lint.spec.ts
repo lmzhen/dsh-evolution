@@ -20,6 +20,7 @@ const facts = (over: Partial<LintFacts> = {}): LintFacts => ({
     churnPatches: null,
     churnReads: null,
   },
+  hardCapMinHits: 0,
   softLineChars: 24_000,
   overSoftLine: false,
   overTwiceSoftLine: false,
@@ -77,3 +78,6 @@ describe('skill-lint（G1 V1–V4）', () => {
     expect(lintSkill(unknown).map(f => f.rule)).not.toContain('references-sprawl')
   })
 })
+
+
+

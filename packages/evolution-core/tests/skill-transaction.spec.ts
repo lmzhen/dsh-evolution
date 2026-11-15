@@ -135,7 +135,7 @@ it('V26-01: a concurrent write landing inside the commit transact aborts the mer
       // land there is one below the queue — another process, which the io
       // layer is what stands in for here.
       const currentBytes = (await io.readText(targetPath))
-      await io.writeText(targetPath, currentBytes.replace('original body.', 'CONCURRENT EDIT.'))
+      await io.writeText(targetPath, (currentBytes ?? '').replace('original body.', 'CONCURRENT EDIT.'))
     }
     const current = await ioLike.readText(path)
     const next = await task(current)

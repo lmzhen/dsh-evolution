@@ -157,7 +157,7 @@ describe('subagent channel (G3-S1/S2)', () => {
       cwd: 'D:/dsh/tmp/staging-probe',
       prompt: [{ type: 'text', text: 'decide' }],
     })
-    const childId = (opened as { childId: string }).childId
+    const childId = (opened as unknown as { childId: never }).childId
     const second = await channel.continueTurn!(childId, 'author', { timeoutMs: 1_000 })
     expect(second).toMatchObject({ kind: 'ok', childId, turn: { text: 'round-2', stopReason: 'completed' } })
     await channel.dispose!(childId)

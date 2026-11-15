@@ -35,7 +35,7 @@ function sinkOf(state: State): UnitUndoSink {
     },
     async writeSupportFile(skill, path, body, anchor) {
       state.calls.push('write:' + skill + '/' + path)
-      if (contentHash(state.supports.get(skill + '/' + path) ?? '') !== anchor.sha256) return { ok: false, message: 'anchor mismatch' }
+      if (contentHash(state.supports.get(skill + '/' + path) ?? '') !== anchor?.sha256) return { ok: false, message: 'anchor mismatch' }
       state.supports.set(skill + '/' + path, body)
       return { ok: true, message: 'written' }
     },

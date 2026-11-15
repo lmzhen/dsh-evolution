@@ -84,7 +84,7 @@ describe('resolveUnitMembers', () => {
     const { resolveUnitMembers } = await import('../src/unit-members.ts')
     const seen: string[] = []
     const io = { readText: async (path: string) => { seen.push(path); return path.includes('head-skill') ? JSON.stringify([entry({ v: 1, unitId: 'u1' })]) : null } }
-    const members = await resolveUnitMembers('ROOT', io, head, (root, name) => root + '/' + name + '/index.json', parse)
+    const members = await resolveUnitMembers('ROOT', io, head, (root, name) => root + '/' + name + '/index.json', (raw) => parse(raw ?? ''))
     expect(seen).toEqual(['ROOT/head-skill/index.json', 'ROOT/other-skill/index.json'])
     expect(members.members.map(m => m.skill)).toEqual(['head-skill'])
     expect(members.missing).toEqual([{ skill: 'other-skill', reason: 'index-absent' }])

@@ -217,7 +217,7 @@ it('rolls back a copy when the target body write fails', async () => {
       if (original === undefined) throw new Error('missing transact')
       return original.call(io, path, task)
     }
-    const failing = new SkillLibrary(root, io as never, { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const failing = new SkillLibrary(root, io as unknown as void, { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
     const plan = planExtract({
       body: sourceBody(true),
       sourceName: 'source',
@@ -309,4 +309,7 @@ it('copies bounded external support to the target without deleting the source', 
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
+
+
+
 

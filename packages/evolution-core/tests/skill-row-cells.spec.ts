@@ -149,7 +149,7 @@ describe('the words a cell may not carry (G1)', () => {
   it('U-5: a protected row names the guard (the state cell only says that it is held)', () => {
     const cells = skillRowCells(skill({ protectedBy: 'guard' })).meta
     const cell = cells.find(candidate => candidate.key === 'protectedBy')
-    expect(cell?.literal).toBe('guard')
+    expect((cell as { literal?: string } | undefined)?.literal).toBe('guard')
     expect(cell?.note).toBe('guard')
     // An unprotected row carries no such cell at all — an empty one would read as a fact of its own.
     expect(skillRowCells(skill()).meta.some(candidate => candidate.key === 'protectedBy')).toBe(false)

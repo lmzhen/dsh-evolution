@@ -22,8 +22,8 @@ it('G1/1.1: two entry points write the same bytes, and origin reaches the event'
   const io = fakeIo()
   const seen: string[] = []
   const onMutation = (event: { origin?: string }): void => { seen.push(String(event.origin)) }
-  const toolFace = new SkillLibrary('/skills', io, undefined, onMutation, undefined, undefined, authorityFrom({ origin: 'foreground' }))
-  const reviewFace = new SkillLibrary('/skills', io, undefined, onMutation, undefined, undefined, authorityFrom({ origin: 'background_review' }))
+  const toolFace = new SkillLibrary('/skills', io, undefined, onMutation as never, undefined, undefined, authorityFrom({ origin: 'foreground' }))
+  const reviewFace = new SkillLibrary('/skills', io, undefined, onMutation as never, undefined, undefined, authorityFrom({ origin: 'background_review' }))
   const toolBody = BODY('tool-body')
   const reviewBody = BODY('review-body')
   expect((await toolFace.create('tool-body', toolBody, 'foreground')).ok).toBe(true)
