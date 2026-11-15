@@ -69,5 +69,92 @@ export async function runCuratorCommand(context: CuratorCommandContext): Promise
       `summary=${state.lastSummary}`,
     ].join('\n'))
   }
+  if (input === 'curator scope') {
+    const curator = ctx.get('evolutionCurator') as { scopeView(): Promise<{ managed: string[]; watched: string[]; qualityWarned: string[]; exempted: string[]; protected: string[] }> } | undefined
+    if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
+    const view = await curator.scopeView()
+    const line = (label: string, names: string[]): string => `${label}: ${names.length}${names.length === 0 ? '' : `\n  ${names.join(', ')}`}`
+    return ok([
+      `Lifecycle scope at ${new Date().toISOString().slice(0, 10)}`,
+      line('Managed (may transition)', view.managed),
+      line('Watched (stale / quality-warned)', view.watched),
+      line('Quality-warned', view.qualityWarned),
+      line('Exempted (exclude / referenced)', view.exempted),
+      line('Protected (pinned / bundled / hub / builtin)', view.protected),
+    ].join('\n'))
+  }
+  if (input === 'curator report') {
+    const curator = ctx.get('evolutionCurator') as { latestReport(): Promise<{ runId: string; startedAt: string; archived: Array<{ name: string }>; failed: Array<{ name: string; reason: string }>; aborted?: string; unattributed?: string[] } | null> } | undefined
+    if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
+    const report: unknown = await curator.latestReport()
+    if (!report) return ok(hostCommandText(locale, 'command.curator.noReport'))
+    // V6-41 (0.3.36): the report file is out-of-band editable — a damaged
+    // shape must render "report unreadable" instead of an uncaught
+    // TypeError (the `curator status` command already has this posture).
+    if (typeof report !== 'object'
+      || typeof (report as { runId?: unknown }).runId !== 'string'
+      || typeof (report as { startedAt?: unknown }).startedAt !== 'string'
+      || !Array.isArray((report as { archived?: unknown }).archived)
+      || !Array.isArray((report as { failed?: unknown }).failed)) {
+      return err(hostCommandText(locale, 'command.curator.reportReadFailed'))
+    }
+    const reportAny = report as {
+      runId: string
+      startedAt: string
+      archived: unknown[]
+      failed: unknown[]
+      // Out-of-band editable like every other field: read defensively.
+      aborted?: unknown
+      unattributed?: unknown
+    }
+    const nameOf = (item: unknown): string =>
+      typeof item === 'object' && item !== null && typeof (item as { name?: unknown }).name === 'string'
+        ? (item as { name: string }).name
+        : '?'
+    const reasonOf = (item: unknown): string =>
+      typeof item === 'object' && item !== null && typeof (item as { reason?: unknown }).reason === 'string'
+        ? (item as { reason: string }).reason
+        : '?'
+    // P2-16 (v38): an interrupted run reports failed=(none) and used to
+    // read as a clean pass here, while the .md digest printed **Aborted**
+    // (V27 CUR-2). Carry the same run-level facts on the command surface.
+    const aborted = typeof reportAny.aborted === 'string' ? reportAny.aborted : undefined
+    const unattributed = Array.isArray(reportAny.unattributed) ? reportAny.unattributed.length : 0
+    const lines = [
+      `runId=${reportAny.runId}`,
+      `startedAt=${reportAny.startedAt}`,
+      `archived=${reportAny.archived.map(nameOf).join(', ') || '(none)'}`,
+      `failed=${reportAny.failed.map(item => `${nameOf(item)}: ${reasonOf(item)}`).join(', ') || '(none)'}`,
+      ...aborted === undefined ? [] : [`aborted=${aborted}`],
+      ...unattributed === 0 ? [] : [`unattributed=${unattributed}`],
+    ]
+    return ok(lines.join('\n'))
+  }
+  return undefined
+}
+
+/** The read-only mutations log (separate command id, same curator service). */
+export async function runMutationsCommand(context: CuratorCommandContext): Promise<CommandResult | undefined> {
+  const { input, ctx, locale } = context
+  const hostError = (id: Parameters<typeof hostErrorText>[1], args: Record<string, string | number> = {}): string => hostErrorText(locale, id, args)
+  if (input === 'mutations') {
+    const curator = ctx.get('evolutionCurator') as { skills: { listMutations(): Promise<Array<{ at: string; skillName: string; action: string; summary: string }>> } } | undefined
+    if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
+    const records: unknown = await curator.skills.listMutations()
+    // V6-41 (0.3.36): the mutations file is out-of-band editable — a
+    // damaged record must not crash the command with a TypeError (the
+    // `curator status` command already has this posture).
+    const usable = Array.isArray(records)
+      ? records.filter((row): row is { at: string; skillName: string; action: string; summary: string } =>
+        typeof row === 'object' && row !== null
+        && typeof (row as { at?: unknown }).at === 'string'
+        && typeof (row as { skillName?: unknown }).skillName === 'string'
+        && typeof (row as { action?: unknown }).action === 'string'
+        && typeof (row as { summary?: unknown }).summary === 'string')
+      : []
+    if (usable.length === 0) return ok('还没有写入记录。')
+    const recent = usable.slice(-5).reverse().map(record => `${record.at.slice(0, 19)}  ${record.skillName}  ${record.action}  ${record.summary}`)
+    return ok(`写入记录：已记录 ${usable.length} 条（最近 5 条）：\n${recent.join('\n')}`)
+  }
   return undefined
 }

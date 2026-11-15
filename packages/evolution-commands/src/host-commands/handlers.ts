@@ -7,7 +7,7 @@ import type { CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import type { ParsedCommand } from '../parse.ts'
 import { runParamsCommand } from './params-command.ts'
-import { runCuratorCommand } from './curator-command.ts'
+import { runCuratorCommand, runMutationsCommand } from './curator-command.ts'
 import {
   runDecisionCommand,
   runPendingCommand,
@@ -50,4 +50,7 @@ export const HOST_COMMAND_HANDLERS: Readonly<Record<string, CommandHandler>> = {
   curator: context => context.ctx === undefined
     ? undefined
     : runCuratorCommand({ input: context.input, ctx: context.ctx, locale: context.locale }),
+  mutations: context => context.ctx === undefined
+    ? undefined
+    : runMutationsCommand({ input: context.input, ctx: context.ctx, locale: context.locale }),
 }
