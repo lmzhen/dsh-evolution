@@ -798,6 +798,44 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
             break
           }
+          case 'maintain.report': {
+        const maintainReport = maintainSub('report')
+        if (maintainReport !== null) {
+          const registry = runs
+          if (!registry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
+          const synced = await syncRuns(registry)
+          const wanted = maintainReport.positionals[1]
+          // Review P1-1: for the id-less form an unreadable index WINS over the in-memory view —
+          // a stale record the process still holds must not answer as if the home were readable
+          // (the posture `maintain status` already takes at its list branch).
+          if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
+          const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
+          if (!record) {
+            // Three states, three sentences: a bad id, an unreadable index, and an empty
+            // home must never look alike (G2/0.20.0).
+            if (wanted !== undefined) {
+              if (!synced.ok) return err(unreadableForId(wanted, synced.note))
+              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
+            }
+            return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
+          }
+          if (wanted === undefined && record.state === 'running') {
+            return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
+          }
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
+          const probed = await readRunReport(ioRegistry.provider(), record)
+          // "no result" and "an unreadable result" must not look alike (the
+          // three-state rule the rest of the family follows).
+          if (probed.kind === 'missing') {
+            return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
+          }
+          if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
+          return ok(probed.text)
+        }
+        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
+            break
+          }
           case 'propose': {
             const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
             if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
@@ -1112,41 +1150,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             `- result: /evolution maintain report ${handle.id}`,
             `- stop:   /evolution maintain cancel ${handle.id}`,
           ].join('\n'))
-        }
-        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
-        const maintainReport = maintainSub('report')
-        if (maintainReport !== null) {
-          const registry = runs
-          if (!registry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
-          const synced = await syncRuns(registry)
-          const wanted = maintainReport.positionals[1]
-          // Review P1-1: for the id-less form an unreadable index WINS over the in-memory view —
-          // a stale record the process still holds must not answer as if the home were readable
-          // (the posture `maintain status` already takes at its list branch).
-          if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
-          const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
-          if (!record) {
-            // Three states, three sentences: a bad id, an unreadable index, and an empty
-            // home must never look alike (G2/0.20.0).
-            if (wanted !== undefined) {
-              if (!synced.ok) return err(unreadableForId(wanted, synced.note))
-              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
-            }
-            return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
-          }
-          if (wanted === undefined && record.state === 'running') {
-            return err(`最新一次运行 ${record.id} 仍在进行：它结束后才会出报告；用 /evolution maintain status ${record.id} 查看进度。`)
-          }
-          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
-          const probed = await readRunReport(ioRegistry.provider(), record)
-          // "no result" and "an unreadable result" must not look alike (the
-          // three-state rule the rest of the family follows).
-          if (probed.kind === 'missing') {
-            return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
-          }
-          if (probed.kind === 'unknown') return err(`运行 ${record.id} 有报告但读不出来（${probed.reason}）：这「不是」没有结果。`)
-          return ok(probed.text)
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
         const maintainCancel = maintainSub('cancel')
