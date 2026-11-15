@@ -26,7 +26,7 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-commands': { kind: 'evolution-commands' } & ContextFormed
   }
 }
-import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, PARAM_EXPOSURE, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
 import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
 import { partitionVersions } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -35,7 +35,6 @@ import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
 import { presetProfileTarget } from './preset-source.ts'
-import { paramGroups, paramSurfaceRows, renderParamJson, renderParamRows, type ParamSectionView } from './params.ts'
 import { flagsOf, renderHelpText, renderHint } from './registry.ts'
 import { isParseFailure, parseSubcommand } from './parse.ts'
 import { HOST_COMMAND_HANDLERS } from './host-commands/handlers.ts'
@@ -449,11 +448,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           case 'pending':
           case 'approve':
           case 'reject':
-          case 'release': {
+          case 'release':
+          case 'params': {
             if (def === undefined || isParseFailure(command)) break
             const handler = HOST_COMMAND_HANDLERS[def.id]
             if (handler === undefined) break
-            const handled = await handler({ input, command, approval, locale: hostLocale })
+            const handled = await handler({ input, command, approval, locale: hostLocale, provider: ctx.get('settings') as SettingsProviderLike | undefined })
             if (handled !== undefined) return handled
             break
           }
@@ -1432,41 +1432,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return ok(replay.compare().report)
         }
         // G7.4/C7: the ONE parser answers the shape (flag order and `=` tolerated, F-4).
-        if (!isParseFailure(command) && command.name === 'params'
-          && command.positionals.length === 0
-          && [...command.flags.keys()].every(flag => flag === 'group' || flag === 'json')) {
-          // S4.1: the READ face over the registry. Read-only and 0-token — the
-          // text renders in the command surface, exactly like `maintain --facts`.
-          const provider = ctx.get('settings') as SettingsProviderLike | undefined
-          const sections = new Map<string, ParamSectionView>()
-          if (provider?.describe !== undefined) {
-            try {
-              for (const descriptor of provider.describe({ redactSecrets: false })) {
-                // The family registry declares no secret field, and the verbatim
-                // view is what makes `user` answerable — it never leaves this process.
-                const section: ParamSectionView = {}
-                if (descriptor.user !== undefined) section.user = descriptor.user
-                const resolved = descriptor.value
-                if (typeof resolved === 'object' && resolved !== null) section.value = resolved as Record<string, unknown>
-                sections.set(descriptor.ns, section)
-              }
-            } catch (error) {
-              // Unreadable is NOT "no overrides" (the S3.x posture): refuse instead
-              // of rendering every row as if the user had set nothing.
-              return err(hostError('e-307-the-settings-service-could', { a1: error instanceof Error ? error.message : String(error) }))
-            }
-          }
-          const rows = paramSurfaceRows(sections, PARAM_EXPOSURE)
-          const groupFlag = command.flags.get('group')
-          // A flag VALUE keeps the caller's case (F-4): an unknown group now reaches E-308's list.
-          const group = typeof groupFlag === 'string' ? groupFlag : undefined
-          const selected = group === undefined ? rows : rows.filter(row => row.group === group)
-          if (group !== undefined && selected.length === 0) {
-            return err(hostError('e-308-unknown-parameter-group-group', { a1: group, a2: paramGroups(PARAM_EXPOSURE).join(', ') }))
-          }
-          if (command.flags.get('json') === true) return ok(renderParamJson(selected))
-          return ok(renderParamRows(selected, { providerMounted: provider !== undefined }))
-        }
         if (input === 'doctor' || input === 'doctor --json') {
           // WB2 (0.3.55): read-only self-check — install form, conflicts, env,
           // mounted services, pending count. `--json` feeds scripts.
