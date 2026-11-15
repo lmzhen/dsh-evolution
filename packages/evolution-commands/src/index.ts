@@ -38,10 +38,11 @@ import { presetProfileTarget } from './preset-source.ts'
 import { paramGroups, paramSurfaceRows, renderParamJson, renderParamRows, type ParamSectionView } from './params.ts'
 import { flagsOf, renderHelpText, renderHint } from './registry.ts'
 import { isParseFailure, parseSubcommand } from './parse.ts'
+import { runDecisionCommand, runPendingCommand } from './host-commands/approval-commands.ts'
 // G7-3: the atomic writer moved to the core io seam (one implementation); re-exported so this
 // module public surface -- Commands.atomicWriteFiles, which the F-211 spec drives -- is unchanged.
 import { atomicWriteFiles } from '@deepseek-ai/dsh-evolution-core'
-import { assertSkillsRootAliasRetired, elapsedSince, resolveRootConfig, newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
+import { assertSkillsRootAliasRetired, resolveRootConfig, newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 export { atomicWriteFiles }
 import { join } from 'node:path'
 
@@ -445,83 +446,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         if (!isParseFailure(command) && command.name === 'pending'
           && command.positionals.length === 0
           && [...command.flags.keys()].every(flag => flag === 'detail')) {
-          // 0.3.17 (S3.3): 'executing' rows (a previous approve crashed
-          // mid-run) stay visible — approve will refuse to re-run them.
-          // v29 CMD-05: the two lists come from independent provider
-          // snapshots (jointly non-atomic) — a record pending at snapshot 1
-          // and claimed executing before snapshot 2 appeared TWICE. Dedupe by
-          // id with the later snapshot (executing) winning; pending-first
-          // ordering preserved.
-          // S1-F2: an unmounted approval service is NOT an empty queue — it
-          // used to render as the success line below, so a degraded assembly
-          // read "service unavailable" as "nothing in flight". Match the
-          // E-301 posture of approve/reject instead.
-          if (!approval) return err(hostError('e-301-approval-service-not-mounted'))
-          const listed = [...await approval.list('pending'), ...await approval.list('executing')]
-          const pending = [...new Map(listed.map(row => [row.id, row])).values()]
-          // T4-09/A51: say which of the three human-confirmation states is in force. Reading through
-          // list() also converged the window, so anything past the TTL is already closed as rejected
-          // by the time these rows print — the note tells the operator that happened / can happen.
-          const ttlMs = typeof approval.ttlMs === 'number' && Number.isFinite(approval.ttlMs) ? approval.ttlMs : 0
-          const ttlNote = ttlMs > 0
-            ? hostCommandText(hostLocale, 'command.pending.ttl', { ttl: ttlMs })
-            : hostCommandText(hostLocale, 'command.pending.neverExpires')
-          if (pending.length === 0) return ok(hostCommandText(hostLocale, 'command.pending.empty') + ttlNote)
-          // F-328: `--detail` renders each record's staged args so an operator
-          // reviews what approve will actually replay (the summary alone is a
-          // 120-char label). The default (collapsed) view is unchanged.
-          const detailed = command.flags.get('detail') === true
-          // A staged write is a DECISION someone has to make, so the row carries when it was staged
-          // and who staged it: an abandoned record and one from a minute ago must not look alike.
-          // The words are this command surface's own. (Audit F-7: the family is NOT monolingual — the
-          // documented surfaces (help, `params`, the table in registry.ts) speak Chinese while most result
-          // lines here speak English. This row keeps the result side's English; the unification is staged
-          // in the plan, not silently assumed.)
-          const nowMs = Date.now()
-          const attribution = (p: { createdAt: string; origin?: string | undefined; sessionId?: string | undefined }): string => {
-            const age = elapsedSince(p.createdAt, nowMs)
-            const unit = age.n === 1 ? age.unit.replace(/s$/u, '') : age.unit
-            const when = age.unit === 'now' ? hostCommandText(hostLocale, 'command.pending.justNow') : hostCommandText(hostLocale, 'command.pending.ago', { n: age.n, unit })
-            const who = p.origin === undefined ? '' : hostCommandText(hostLocale, 'command.pending.from', { origin: p.origin })
-            const session = p.sessionId === undefined ? '' : hostCommandText(hostLocale, 'command.pending.session', { session: p.sessionId.slice(0, 8) })
-            return `  ·  ${when}${who}${session}`
-          }
-          const body = pending.map((p) => {
-            if (!detailed) return `${p.id}  ${p.kind}  ${p.status === 'executing' ? hostCommandText(hostLocale, 'command.pending.executing') + ' ' : ''}${p.summary}${attribution(p)}`
-            const status = p.status === 'executing' ? hostCommandText(hostLocale, 'command.pending.executing') : p.status
-            const line = `${p.id}  ${p.kind}  ${status}  ${p.summary}${attribution(p)}`
-            return p.args === undefined ? line : `${line}\n` + hostCommandText(hostLocale, 'command.pending.stagedArgs', { args: safeStagedArgs(p.args) })
-          }).join('\n')
-          const hint = pending.some(p => p.status === 'executing')
-            ? hostCommandText(hostLocale, 'command.pending.executingHint')
-            : ''
-          return ok(body + hint + ttlNote)
+          return await runPendingCommand({ command, approval, locale: hostLocale })
         }
-        if (input.startsWith('approve ')) {
-          const id = input.slice(8).trim()
-          const result = approval ? await approval.approve(id) : { ok: false, message: hostError('e-301-approval-service-not-mounted-2') }
-          return result.ok ? ok(result.message) : err(result.message)
+        if (!isParseFailure(command) && input.startsWith('approve ')) {
+          return await runDecisionCommand('approve', input.slice(8).trim(), { command, approval, locale: hostLocale })
         }
-        if (input.startsWith('reject ')) {
-          const id = input.slice(7).trim()
-          const result = approval ? await approval.reject(id) : { ok: false, message: hostError('e-301-approval-service-not-mounted-2') }
-          return result.ok ? ok(result.message) : err(result.message)
+        if (!isParseFailure(command) && input.startsWith('reject ')) {
+          return await runDecisionCommand('reject', input.slice(7).trim(), { command, approval, locale: hostLocale })
         }
-        if (input.startsWith('release ')) {
-          // S2-P2-22: the operator exit for an ORPHANED executing record (an
-          // approve that crashed mid-run) — returns it to the pending window
-          // so it can be deliberately re-approved or rejected. A record whose
-          // approve is still running in this process is refused (the in-flight
-          // check lives in the approval service). v43 FLOW2-1: the service does
-          // NOT assume it is the only live process — a claim naming a live
-          // FOREIGN pid is refused there, and a claim carrying no pid cannot be
-          // verified, so that release is a destructive operator action whose
-          // message states the replay risk.
-          const id = input.slice(8).trim()
-          if (!approval) return err(hostError('e-301-approval-service-not-mounted-2'))
-          if (!approval.release) return err(hostError('e-304-the-mounted-approval-service'))
-          const result = await approval.release(id)
-          return result.ok ? ok(result.message) : err(result.message)
+        if (!isParseFailure(command) && input.startsWith('release ')) {
+          return await runDecisionCommand('release', input.slice(8).trim(), { command, approval, locale: hostLocale })
         }
         if (input === 'curator run') {
           const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; skipped?: string; report: { runId: string; snapshotPath?: string } }> } | undefined
@@ -1659,37 +1593,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     try { await loader?.await?.() } catch { /* the loader reports its own failure; ours only needs a moment to try */ }
     runMigrationOnce()
   })()
-}
-
-/**
- * 0.3.14 (P1-1): locate the installed `dsh-evolution-agent-preset` package
- * (the delivery container for agent.cordis.yml/bases.json). Resolution order:
- * npm-name sibling (published profile layout), dev-tree sibling (source/test
- * layout), then module resolution. The package dir name differs from the npm
- * name (`evolution-agent` vs `@lmzhen/dsh-evolution-agent-preset` — the rc.44
- * dir≠name trap), so BOTH sibling shapes are probed.
- */
-/** The agent-preset base table (evolution-agent/bases.json). The installer
- * (install-layered.mjs) reads the SAME file — the literal that used to live in
- * each of them is what kept this path on `standard` while the installer knew
- * `ptc` too. Fails loud: a missing table is an incomplete install, never a
- * silent fallback to the default base. */
-function safeStagedArgs(args: unknown): string {
-  try {
-    const json = JSON.stringify(args)
-    // F-13: a top-level undefined/function/symbol makes
-    // JSON.stringify return `undefined` (it does not throw) — handled by this
-    // explicit type branch instead of relying on a `.length` TypeError to
-    // land in the catch below.
-    if (typeof json !== 'string') return '(unserializable)'
-    if (json.length > 500) return `${json.slice(0, 500)}…(truncated ${json.length - 500} chars)`
-    return json
-  } catch {
-    // args is not JSON-serializable and stringifying THREW (circular refs,
-    // BigInt, …) — render a stub so the pending surface never crashes on a
-    // malformed staged payload.
-    return '(unserializable)'
-  }
 }
 
 export * from './command-catalog.ts'
