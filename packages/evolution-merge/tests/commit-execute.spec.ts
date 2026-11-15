@@ -27,8 +27,8 @@ it('commits a staged tree and writes a receipt', async () => {
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
   const result = await commitWithLegacy(io, home, 'run-1', {
-    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
-    async commitMerge(plan) {
+    async readSkill(name: string) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async commitMerge(plan: { target: string }) {
       expect(plan.target).toBe('umbrella')
       return { ok: true, message: 'merged', unitId: 'u-1', archived: ['a', 'b'], mutations: 3 }
     },
@@ -47,14 +47,14 @@ it('commits through the UnitTransaction branch without calling commitMerge', asy
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
   const unit = {
-    async prepare(plan: { unitId?: string }) { return { ok: true as const, prepared: { unitId: 'u-unit', planDigest: 'd1' } } },
+    async prepare(_plan: { unitId?: string }) { return { ok: true as const, prepared: { unitId: 'u-unit', planDigest: 'd1' } } },
     async commit() { return { ok: true as const, evidence: { unitId: 'u-unit', runId: 'run-1', planDigest: 'd1', state: 'complete' as const, target: { before: null, after: BODY('umbrella'), supportDigest: '', created: true }, sources: [{ name: 'a', before: BODY('a'), after: null, archived: true, absorbedInto: 'umbrella' }, { name: 'b', before: BODY('b'), after: null, archived: true, absorbedInto: 'umbrella' }], mutations: 3, at: 1 } } },
     async verify() { return null },
     async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'no' } },
     async cancel() { return { ok: false, phase: 'none' as const } },
   }
   const result = await commitWithLegacy(io, home, 'run-1', {
-    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async readSkill(name: string) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { throw new Error('old path must not run') },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000, unit: unit as never })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
@@ -76,7 +76,7 @@ it('P1-6: prepares the unit under the canonical parent run id, not the stage key
     async cancel() { return { ok: false, phase: 'none' as const } },
   }
   const result = await commitWithLegacy(io, home, 'run-1/pairs/abc', {
-    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async readSkill(name: string) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { throw new Error('old path must not run') },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000, parentRunId: 'run-parent', unit: unit as never })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
@@ -99,7 +99,7 @@ it('passes the abort signal to the unit and keeps a landed commit when finalize 
     async finalize() { return { ok: false as const, code: 'unit-plan-missing' as const, message: 'finalize unavailable' } },
   }
   const result = await commitWithLegacy(io, home, 'run-1', {
-    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async readSkill(name: string) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { throw new Error('old path must not run') },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000, unit: unit as never, signal: controller.signal })
   expect(seen).toBe(controller.signal)
@@ -122,7 +122,7 @@ it('commit survives a failing journal write', async () => {
     },
   }
   const result = await commitWithLegacy(flaky, home, 'run-1', {
-    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async readSkill(name: string) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { return { ok: true, message: 'merged', unitId: 'u-1', archived: ['a', 'b'], mutations: 3 } },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000 })
   expect(result.ok, result.ok ? '' : result.message).toBe(true)
@@ -135,7 +135,7 @@ it('does not write a receipt when commit fails', async () => {
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
   const result = await commitWithLegacy(io, home, 'run-1', {
-    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async readSkill(name: string) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { return { ok: false, message: 'commit refused' } },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000 })
   expect(result.ok).toBe(false)
@@ -148,7 +148,7 @@ it('does not write a receipt when commitMerge throws', async () => {
   expect((await createStaging(io, home, input('run-1'))).ok).toBe(true)
   expect((await writeStagedFile(io, home, 'run-1', 'SKILL.md', BODY('umbrella'))).ok).toBe(true)
   await expect(commitWithLegacy(io, home, 'run-1', {
-    async readSkill(name) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
+    async readSkill(name: string) { return name === 'a' ? BODY('a') : name === 'b' ? BODY('b') : null },
     async commitMerge() { throw new Error('commit unknown') },
   }, { origin: 'foreground', summary: 'merge', now: () => 2000 })).rejects.toThrow('commit unknown')
   expect(await readCommitReceipt(io, home, 'run-1')).toBeNull()
