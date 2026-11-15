@@ -1,15 +1,15 @@
 // @tier pre-tag
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, mkdir, cp, readdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
-import { cordisRows, insertedRows, rowId, rowIds } from '../../test-support/cordis-rows.ts'
+import { insertedRows, rowIds } from '../../test-support/cordis-rows.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
+// @ts-expect-error -- plain ESM installer helper
 import { scopedName } from '../../scripts/install-layered.mjs'
 
 const run = promisify(execFile)
@@ -497,3 +497,8 @@ describe('layered installer', () => {
   }, 60_000)
 
 })
+
+void writeBasePatch
+void familyVersion
+void withStaging
+

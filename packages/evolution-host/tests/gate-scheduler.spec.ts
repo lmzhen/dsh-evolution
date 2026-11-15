@@ -4,6 +4,7 @@
 // promises, not by sleeping), and every case starts from the exported shape.
 import { EventEmitter } from 'node:events'
 import { describe, expect, it } from 'vitest'
+// @ts-expect-error -- plain ESM script without a declaration file
 import { MAX_CONCURRENCY, clampConcurrency, runTasks, createAsyncRunner } from '../../scripts/gates/runner.mjs'
 
 const recordOf = (verdict: string) => ({ verdict })

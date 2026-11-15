@@ -4,6 +4,7 @@
 // starts a process (the seam takes a stub); and no fixture asserts elapsed time - a budget kill
 // only ever arrives as an injected killedBy.
 import { describe, expect, it } from 'vitest'
+// @ts-expect-error -- plain ESM script without a declaration file
 import { ERRNO_CLASS, KINDS, LEGAL_COMBINATIONS, MODES, classifyErrno, createRunner, decideRequires, isLegalCombination } from '../../scripts/gates/runner.mjs'
 
 describe('decideRequires: the contract shape', () => {

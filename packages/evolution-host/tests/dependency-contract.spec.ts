@@ -9,7 +9,7 @@ import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { AGENT_EVOLUTION_ROW_NAMES, HOST_ROW_NAMES } from '../../test-support/row-contract.ts'
+import { AGENT_EVOLUTION_ROW_NAMES } from '../../test-support/row-contract.ts'
 import { cordisRows, insertedRows, rowIds, rowName } from '../../test-support/cordis-rows.ts'
 
 interface Subject {
@@ -58,12 +58,10 @@ function runtimeClosure(rootName: string): Set<string> {
   return seen
 }
 
-const HOST_PLANE_NOT_RUNTIME = [HOST_ROW_NAMES.memory, HOST_ROW_NAMES['memory-files'], HOST_ROW_NAMES['skill-usage'], HOST_ROW_NAMES['evolution-state'], HOST_ROW_NAMES['evolution-approval']]
-
 describe('dependency contract (one suite, four subjects)', () => {
   for (const subject of SUBJECTS) {
     it(subject.id + ': declares every row package it carries', () => {
-      const manifest = JSON.parse(readFileSync(fileURLToPath(subject.manifestUrl), 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string>; peerDependencies?: Record<string, string> }
+      const manifest = JSON.parse(readFileSync(fileURLToPath(subject.manifestUrl), 'utf8')) as { name?: string; dependencies?: Record<string, string>; devDependencies?: Record<string, string>; peerDependencies?: Record<string, string> }
       const declared = subject.closure === true ? runtimeClosure(manifest.name ?? '') : new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})])
       const patch = loadOverlayPatches('test', fileURLToPath(subject.patchUrl))
       const names = subject.rows === 'inserted' ? insertedRows(patch).map(row => rowName(row)) : cordisRows(patch).map(row => rowName(row))
@@ -110,3 +108,4 @@ describe('dependency contract (one suite, four subjects)', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 })
+

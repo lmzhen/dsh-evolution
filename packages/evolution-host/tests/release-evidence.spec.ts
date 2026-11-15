@@ -21,6 +21,7 @@ import {
   releaseEvidenceSkeleton as releaseEvidenceSkeletonRaw,
   validateReleaseEvidence as validateReleaseEvidenceRaw,
   validateSpikeEvidence as validateSpikeEvidenceRaw,
+// @ts-expect-error -- plain ESM script without a declaration file
 } from '../../scripts/lib-release-evidence.mjs'
 
 // The library is a plain .mjs script (no declarations); pin the shapes this spec drives.
@@ -233,7 +234,7 @@ describe('release-evidence assembly (W3 injection)', () => {
     expect(result.doc.spikes).toHaveLength(4)
     expect(result.doc.gates.length).toBeGreaterThan(0)
     expect(result.doc.ciFace).toEqual({ os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' })
-    expect(result.doc.traceability.covered).toBe(52)
+    expect(result.doc.traceability?.covered).toBe(52)
     expect(validateReleaseEvidence(result.doc, { release: true }).some(problem => problem.includes('synthetic manifest reading'))).toBe(true)
   })
   it('accepts a real run-gates ledger instead of the synthetic manifest rows', async () => {
@@ -282,3 +283,4 @@ describe('release-evidence assembly (W3 injection)', () => {
     } finally { await rm(dir, { recursive: true, force: true }) }
   })
 })
+

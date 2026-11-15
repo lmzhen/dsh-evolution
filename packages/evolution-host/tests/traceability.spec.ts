@@ -52,7 +52,7 @@ describe('verify-traceability: the ledger can fail', () => {
 
   it('a dropped item is a missing universe entry', async () => {
     const asset = { ...real, items: real.items.filter(item => item.id !== 'A-01') }
-    const root = await fixture(asset)
+    const root = await fixture(asset as never)
     try {
       const result = await runGate(root)
       expect(result.code).toBe(1)
@@ -63,17 +63,17 @@ describe('verify-traceability: the ledger can fail', () => {
 
   it('an unknown, duplicate or unsorted row fails', async () => {
     const unknown = { ...real, items: [...real.items, { ...real.items[0], id: 'A-23' }] }
-    const rootA = await fixture(unknown)
+    const rootA = await fixture(unknown as never)
     try { expect((await runGate(rootA)).code).toBe(1) } finally { await rm(rootA, { recursive: true, force: true }) }
     const duplicate = { ...real, items: [...real.items, real.items[0]] }
-    const rootB = await fixture(duplicate)
+    const rootB = await fixture(duplicate as never)
     try {
       const result = await runGate(rootB)
       expect(result.code).toBe(1)
       expect(result.stderr).toContain('duplicate')
     } finally { await rm(rootB, { recursive: true, force: true }) }
     const unsorted = { ...real, items: [real.items[1], real.items[0], ...real.items.slice(2)] }
-    const rootC = await fixture(unsorted)
+    const rootC = await fixture(unsorted as never)
     try {
       const result = await runGate(rootC)
       expect(result.code).toBe(1)
@@ -83,7 +83,7 @@ describe('verify-traceability: the ledger can fail', () => {
 
   it('strict mode rejects probe aliases as evidence', async () => {
     const asset = { ...real, probeAliases: { 'beh-channel-settle': 'beh-subagent-channel-outcomes' } }
-    const root = await fixture(asset)
+    const root = await fixture(asset as never)
     try {
       await copyFile(fileURLToPath(new URL('../../scripts/gate-manifest.json', import.meta.url)), join(root, 'scripts', 'gate-manifest.json'))
       const result = await runGate(root, ['--strict'])
@@ -99,7 +99,7 @@ describe('verify-traceability: the ledger can fail', () => {
     const target = asset.items.find(item => item.id === 'B-06')
     if (target === undefined) throw new Error('fixture: B-06 is missing')
     delete target.note
-    const rootB = await fixture(asset)
+    const rootB = await fixture(asset as never)
     try {
       const result = await runGate(rootB)
       expect(result.code).toBe(1)
@@ -109,7 +109,7 @@ describe('verify-traceability: the ledger can fail', () => {
 
   it('strict mode re-derives the budget instead of trusting it', async () => {
     const asset = { ...real, budget: { ...real.budget, newSubpaths: 5 } }
-    const root = await fixture(asset)
+    const root = await fixture(asset as never)
     try {
       const result = await runGate(root, [])
       expect(result.code).toBe(1)
@@ -117,3 +117,5 @@ describe('verify-traceability: the ledger can fail', () => {
     } finally { await rm(root, { recursive: true, force: true }) }
   })
 })
+
+

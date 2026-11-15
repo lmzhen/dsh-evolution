@@ -10,6 +10,7 @@ import {
   packageSourceRoot,
   prepareDistSourceRoot,
   validateTreeIdentity,
+// @ts-expect-error -- plain ESM script without a declaration file
 } from '../../scripts/install/source-tree.mjs'
 
 async function tempDir(): Promise<string> {
