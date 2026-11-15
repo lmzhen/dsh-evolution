@@ -9,10 +9,6 @@
  * `args` was shared by reference on domain, and a non-cloneable payload
  * poisoned every later read. Both providers now call these functions.
  *
- * UNKNOWN_FIELD_POLICY is `preserve`: a record written by a newer version must
- * survive a round-trip through an older provider, so unknown fields are kept
- * (json does this naturally; the domain schemas are `.loose()`).
- *
  * @module @deepseek-ai/dsh-evolution-state/storage/src/record-contract
  */
 
@@ -22,10 +18,6 @@ export type { PendingKind, PendingStatus } from '@deepseek-ai/dsh-evolution-core
 
 /** The three seam tables a record can belong to. */
 export type SeamRecordTable = typeof REVIEW_STATE_TABLE | typeof CURATOR_STATE_TABLE | typeof PENDING_TABLE
-
-/** Unknown fields survive a provider round-trip (json preserves by
- * construction; the domain schemas are `.loose()`). */
-export const UNKNOWN_FIELD_POLICY = 'preserve' as const
 
 const isNonNegInt = (value: unknown): boolean =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0

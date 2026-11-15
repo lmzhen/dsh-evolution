@@ -35,7 +35,6 @@ import { diagnose, renderDoctorText } from './doctor.ts'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
 import { presetProfileTarget } from './preset-source.ts'
-// G3: the write-path exclusion asks the ONE owner of <home>/profiles about THIS plane only.
 import { paramGroups, paramSurfaceRows, renderParamJson, renderParamRows, type ParamSectionView } from './params.ts'
 import { flagsOf, renderHelpText, renderHint } from './registry.ts'
 import { isParseFailure, parseSubcommand } from './parse.ts'

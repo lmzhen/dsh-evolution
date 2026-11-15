@@ -48,9 +48,6 @@ export function probeProblems(root, probes) {
   return problems
 }
 
-/** Test-title convention: each probe id is the spec title prefix the verification runner greps. */
-export function probeTitle(probe) { return '[' + probe.id + ']' }
-
 /** The tree that holds `node_modules` (the overlay checkout, or the mirror root). */
 export function treeRootOf(root) { return resolve(root, '..') }
 

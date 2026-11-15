@@ -7,7 +7,7 @@
  * This module owns three readers plus the family version resolution that install-layered used
  * to define locally. It never normalises anything it reads (the bytes go into pins as they are).
  */
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const SEMVER = /^\d+\.\d+\.\d+/;
@@ -17,30 +17,6 @@ export function readRootVersion(root) {
   try {
     const v = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
     return typeof v === "string" && SEMVER.test(v) ? v : null;
-  } catch { return null; }
-}
-
-/** Map package dir name -> version, for every packages/<dir>/package.json that exists. */
-export function readPackageVersions(root) {
-  const out = new Map();
-  let dirs = [];
-  try { dirs = readdirSync(join(root, "packages")); } catch { return out; }
-  for (const dir of dirs) {
-    const p = join(root, "packages", dir, "package.json");
-    if (!existsSync(p)) continue;
-    try {
-      const v = JSON.parse(readFileSync(p, "utf8")).version;
-      if (typeof v === "string") out.set(dir, v);
-    } catch { /* an unreadable package.json is reported by its own gate, not invented here */ }
-  }
-  return out;
-}
-
-/** The version the CHANGELOG headline states (the first "## " heading), or null. */
-export function readChangelogHeadVersion(root) {
-  try {
-    const line = readFileSync(join(root, "CHANGELOG.md"), "utf8").split("\n").find((l) => l.startsWith("## "));
-    return line === undefined ? null : (line.match(/^##\s+(\S+)/) || [])[1] ?? null;
   } catch { return null; }
 }
 

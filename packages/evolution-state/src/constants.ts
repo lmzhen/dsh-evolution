@@ -16,11 +16,6 @@
  * the domain table key). */
 export const CURATOR_STATE_KEY = 'primary'
 
-/** On-disk state file names (json provider, relative to its configured root). */
-/** Pre-split approval store; read-only legacy, retired after the merge. */
-export const PENDING_ARCHIVE_FILE = 'pending-state-archive.json'
-/** Rotation sidecar of {@link PENDING_ARCHIVE_FILE} (V4-01). */
-
 /** Provider names as registered on the `evolutionStateStorage` seam. */
 export const PROVIDER_DOMAIN = 'domain'
 

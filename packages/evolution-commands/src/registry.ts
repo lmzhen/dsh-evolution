@@ -49,15 +49,6 @@ export function renderHelpText(locale: HostLocale = 'zh'): string {
     .join('\n')
 }
 
-/** Markdown command table fragment for README surfaces (T-WD2 pins it).
- * `|` inside a usage (curator run|pause|…) is escaped for the table cell. */
-export function renderCommandTable(): string {
-  const lines = HOST_COMMAND_DEFS.map(entry =>
-    `| \`/evolution ${entry.usageLine.replace(/\|/g, '\\|')}\` | ${summaryOf(entry, 'zh')} |`,
-  )
-  return lines.join('\n')
-}
-
 /** Union of every entry's authored value flags. */
 export const VALUE_FLAGS: readonly string[] = (() => {
   const names: string[] = []

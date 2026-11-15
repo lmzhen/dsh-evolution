@@ -78,10 +78,6 @@ export function adapterCandidates(env = process.env) {
   return unique(list)
 }
 export function resolveAdapter(env = process.env) { return adapterCandidates(env).find((file) => existsSync(file)) ?? null }
-export function toolingDir(env = process.env) {
-  const adapter = resolveAdapter(env)
-  return adapter === null ? null : dirname(adapter)
-}
 
 const described = (label, resolved, candidates) => ({ label, resolved, candidates })
 export function describe(env = process.env) {
@@ -111,6 +107,4 @@ export function requireOverlay(env = process.env) { return requireNamed("the pla
  * time would kill the JSON envelope (0.27.1 vacuum fixture caught exactly that).
  */
 export function softOverlay(env = process.env) { return resolveOverlay(env) ?? overlayCandidates(env)[0] }
-export function softProfile(env = process.env) { return resolveProfile(env) ?? profileCandidates(env)[0] }
 export function requireProfile(env = process.env) { return requireNamed("the test-bed profile", resolveProfile(env), "EVOLUTION_PROFILE", profileCandidates(env)) }
-export function requireAdapter(env = process.env) { return requireNamed("the line resolver adapter", resolveAdapter(env), "FAMILY_LINE_ADAPTER", adapterCandidates(env)) }

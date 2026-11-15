@@ -33,7 +33,6 @@ export function profilesOf(entry) {
 const profileOf = (row) => (Array.isArray(row.profiles) ? row.profiles : [])
 export const runnableRows = (rows) => rows.filter((row) => RUNNABLE_KINDS.has(row.kind))
 export const declaredPreTag = (rows) => rows.filter((row) => profileOf(row).includes('pre-tag'))
-export const supersetPreTag = (rows) => rows.filter((row) => profileOf(row).includes('local') || profileOf(row).includes('ci'))
 export const unknownProfiles = (rows) => rows
   .map((row) => ({ id: row.id, bad: profileOf(row).filter((profile) => !['local', 'pre-tag', 'ci'].includes(profile)) }))
   .filter((entry) => entry.bad.length > 0)

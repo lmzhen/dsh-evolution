@@ -165,23 +165,3 @@ export function persistedWriteSites(): readonly PersistedWriteSite[] {
   cachedSites = table.sites
   return table.sites
 }
-
-
-/** Sites serialized by the per-home instance claim, with their instance keys.
- * @internal S2.4 (PLAN 2026-09-16): no production caller — the arch guard
- * reads the JSON asset directly; the tests are the only in-tree consumers. */
-export function instanceClaimedWriteSites(): readonly (PersistedWriteSite & { readonly instance: string })[] {
-  return persistedWriteSites().filter(
-    (site): site is PersistedWriteSite & { readonly instance: string } => site.serializedBy === 'instance-claim',
-  )
-}
-
-/** One declared site by id. An undeclared id throws — a stale caller must fail
- * loud rather than read "nothing is declared".
- * @internal S2.4 (PLAN 2026-09-16): no production caller — the arch guard
- * reads the JSON asset directly; the tests are the only in-tree consumers. */
-export function persistedWriteSite(id: string): PersistedWriteSite {
-  const site = persistedWriteSites().find(candidate => candidate.id === id)
-  if (site === undefined) throw new Error(`evolution-core: no persisted write site "${id}" in persisted-write-inventory.json`)
-  return site
-}

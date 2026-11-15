@@ -226,16 +226,6 @@ export function resolveAgentPresetBases(selection = undefined) {
   return Object.keys(AGENT_PRESET_BASES).filter(base => names.has(base)).map(base => resolveAgentPresetBase(base))
 }
 
-/** The row id one base's preset occupies in a composition. The platform ships
- * `preset-standard` for id `standard` (`packages/bundle/web-app/presets/standard.patch.yml`), so a
- * family preset id mirrors that spelling. */
-
-/** The composition identity of one base's row: the row id a profile patch is matched by, plus the
- * preset id and display copy the platform registry serves. */
-export function presetIdentity(entry) {
-  return { rowId: presetRowId(entry.id), id: entry.id, name: entry.display.name, description: entry.display.description, order: entry.display.order }
-}
-
 /** The profile's own patch layer — the file a family preset row is written to
  * (`packages/boot/app-boot/src/profile.ts`, `PROFILE_PATCH_FILENAME`). */
 export function profilePatchPath(home, profile = 'web') {

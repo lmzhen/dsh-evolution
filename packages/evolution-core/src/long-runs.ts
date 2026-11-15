@@ -120,13 +120,3 @@ export const LONG_RUNS: readonly LongRunEntry[] = [
     note: 'The write leg replays a staged plan through the registered runner; cancellation follows the plugin fiber.',
   },
 ]
-
-/**
- * Render the inventory as the README table rows (no header).
- * @returns one markdown row per entry, in inventory order.
- */
-export function renderLongRunTable(): string {
-  return LONG_RUNS.map(entry =>
-    `| \`${entry.id}\` | ${entry.kind} | ${entry.owner} | ${entry.lifetime} | ${entry.measured} | ${entry.resultHome} |`,
-  ).join('\n')
-}
