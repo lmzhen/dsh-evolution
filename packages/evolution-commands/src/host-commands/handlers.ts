@@ -7,6 +7,7 @@ import type { CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import type { ParsedCommand } from '../parse.ts'
 import { runParamsCommand } from './params-command.ts'
+import { runCuratorCommand } from './curator-command.ts'
 import {
   runDecisionCommand,
   runPendingCommand,
@@ -19,10 +20,12 @@ export interface CommandHandlerContext extends ApprovalCommandContext {
   readonly input: string
   /** The settings provider, for the read-only params surface. */
   readonly provider?: SettingsProviderLike | undefined
+  /** The plugin context, for handlers that read a family service. */
+  readonly ctx?: { get(name: string): unknown } | undefined
 }
 
 /** A handler returns undefined when the command shape is not its own, so the legacy chain can answer. */
-export type CommandHandler = (context: CommandHandlerContext) => Promise<CommandResult> | CommandResult | undefined
+export type CommandHandler = (context: CommandHandlerContext) => Promise<CommandResult | undefined> | CommandResult | undefined
 
 const isPendingShape = (command: ParsedCommand): boolean =>
   command.positionals.length === 0 && [...command.flags.keys()].every(flag => flag === 'detail')
@@ -44,4 +47,7 @@ export const HOST_COMMAND_HANDLERS: Readonly<Record<string, CommandHandler>> = {
   params: context => isParamsShape(context.command)
     ? runParamsCommand({ command: context.command, provider: context.provider, locale: context.locale })
     : undefined,
+  curator: context => context.ctx === undefined
+    ? undefined
+    : runCuratorCommand({ input: context.input, ctx: context.ctx, locale: context.locale }),
 }
