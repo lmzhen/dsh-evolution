@@ -21,8 +21,8 @@ function inputs(): DoctorInputs {
     form: { id: 'human-gated', evidence: ['profile declares evolution-all'], confidence: 'declared' },
     probes: { agentPresets: true, connection: true },
     channels: {
-      review: { kind: 'available', provider: 'spawn' },
-      maintenance: { kind: 'available', provider: 'spawn' },
+      review: { kind: 'available', provider: 'spawn', preset: { id: 'reviewer', registered: true } },
+      maintenance: { kind: 'available', provider: 'spawn', preset: { id: 'maintainer', registered: true } },
     },
     presets: { reviewer: { registered: true }, maintainer: { registered: true } },
     host: { mounted: true, deploymentAllowsRemote: false },

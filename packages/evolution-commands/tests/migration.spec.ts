@@ -128,7 +128,7 @@ describe('namespace migration command (G3)', () => {
       warn: vi.fn(),
     })
     expect(outcome.source).toBe(PLAIN(home))
-    expect(outcome.plan.entries.length).toBeGreaterThan(0)
+    expect(outcome.plan?.entries.length ?? 0).toBeGreaterThan(0)
     expect(outcome.report).toBeDefined()
   })
 

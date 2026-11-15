@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assembleDoctorInputs, buildDoctorView, degradedServiceNotes, pairingOf, unavailableDoctorView, type DoctorInputs } from '../src/doctor-view.ts'
 
-const AVAILABLE: ChannelState = { kind: 'available', provider: 'spawn' }
+const AVAILABLE: ChannelState = { kind: 'available', provider: 'spawn', preset: { id: 'reviewer', registered: true } }
 const UNAVAILABLE: ChannelState = { kind: 'unavailable', code: 'E-323', reason: 'agentPresets not mounted' }
 
 /** The golden input: every probe healthy and declared (the "all ok" baseline). */
@@ -237,7 +237,7 @@ describe('assembleDoctorInputs: the live soft probes (measured on the isolated 0
     const ctx = new Context()
     const assembled = await assembleDoctorInputs(ctx)
     expect(assembled.host.mounted).toBe(false)
-    expect(assembled.missingServices.length).toBeGreaterThan(0)
+    expect((assembled.missingServices ?? []).length).toBeGreaterThan(0)
     expect(assembled.form.confidence).toBe('inferred')
     const view = buildDoctorView(assembled)
     expect(view.runtime.find(row => row.key === 'host-surface')?.status).toBe('warn')

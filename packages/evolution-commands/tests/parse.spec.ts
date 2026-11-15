@@ -13,7 +13,7 @@ describe('parseSubcommand (C7 single parser, F-3/F-4)', () => {
   it('accepts the flag order the regex would have refused (F-4)', () => {
     const parsed = parseSubcommand('params --json --group review')
     expect(parsed).not.toHaveProperty('kind')
-    const command = parsed as { name: string; flags: Map<string, string | true> }
+    const command = parsed as unknown as { name: string; flags: Map<string, string | true> }
     expect(command.name).toBe('params')
     expect(command.flags.get('group')).toBe('review')
     expect(command.flags.get('json')).toBe(true)
@@ -21,14 +21,14 @@ describe('parseSubcommand (C7 single parser, F-3/F-4)', () => {
 
   it('accepts the --flag=value spelling its sibling already accepted (F-4)', () => {
     const parsed = parseSubcommand('params --group=review')
-    expect((parsed as { flags: Map<string, string | true> }).flags.get('group')).toBe('review')
+    expect((parsed as unknown as { flags: Map<string, string | true> }).flags.get('group')).toBe('review')
   })
 
   it('keeps a flag VALUE case intact so the domain layer can name it (F-4)', () => {
     const parsed = parseSubcommand('params --group WRITE-CAPS')
     // The group is NOT lower-cased here: the branch compares it against the registry and answers
     // E-308 with the known-group list, which is the error a typo deserves.
-    expect((parsed as { flags: Map<string, string | true> }).flags.get('group')).toBe('WRITE-CAPS')
+    expect((parsed as unknown as { flags: Map<string, string | true> }).flags.get('group')).toBe('WRITE-CAPS')
   })
 
   it('answers a SYNTAX failure when a value flag has no value (F-3)', () => {
@@ -38,7 +38,7 @@ describe('parseSubcommand (C7 single parser, F-3/F-4)', () => {
 
   it('reads --proposal as the value flag the usage declares (B2b)', () => {
     const parsed = parseSubcommand('extract alpha --proposal p1')
-    const command = parsed as { name: string; flags: Map<string, string | true>; positionals: string[] }
+    const command = parsed as unknown as { name: string; flags: Map<string, string | true>; positionals: string[] }
     expect(command.name).toBe('extract')
     expect(command.flags.get('proposal')).toBe('p1')
     expect(command.positionals).toEqual(['alpha'])
@@ -46,7 +46,7 @@ describe('parseSubcommand (C7 single parser, F-3/F-4)', () => {
 
   it('reads positionals in order and matches the name case-insensitively', () => {
     const parsed = parseSubcommand('EXTRACT a b heading --start 3')
-    const command = parsed as { name: string; flags: Map<string, string | true>; positionals: string[] }
+    const command = parsed as unknown as { name: string; flags: Map<string, string | true>; positionals: string[] }
     expect(command.name).toBe('extract')
     // Only the SUBCOMMAND name is lower-cased; positionals keep the caller's case (a skill name's
     // case can matter).
@@ -56,7 +56,7 @@ describe('parseSubcommand (C7 single parser, F-3/F-4)', () => {
 
   it('keeps a quoted run as ONE token (the restructure form)', () => {
     const parsed = parseSubcommand('restructure alpha "Two Words" refs/two.md')
-    const command = parsed as { name: string; positionals: string[] }
+    const command = parsed as unknown as { name: string; positionals: string[] }
     expect(command.name).toBe('restructure')
     expect(command.positionals).toEqual(['alpha', 'Two Words', 'refs/two.md'])
   })

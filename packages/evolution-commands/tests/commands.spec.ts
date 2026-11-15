@@ -1,81 +1,22 @@
 // @tier ci-only
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { emptyRecord, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, emptyRecord, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { markerEntryName, newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
-import { presetRowBlock, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import * as Commands from '../src/index.ts'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { tempHome, tempRoot } from '../../test-support/temp-home.ts'
 import { captureCommands } from '../../test-support/commands-stub.ts'
 import { provideChannel } from '../../test-support/fake-channel-services.ts'
-
-/** One row of the family base table (evolution-agent/bases.json) — the SAME table
- * `/evolution preset install` and install-layered.mjs read. */
-interface FamilyBase {
-  name: string
-  id: string
-  display: { name: string; description: string; order: number }
-}
-
-const FAMILY_BASES = (JSON.parse(readFileSync(new URL('../../evolution-agent/bases.json', import.meta.url), 'utf8')) as { bases: FamilyBase[] }).bases
 
 it('README marks the retired mechanical-append command and does not sell it as live', () => {
   const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8')
   expect(readme).toContain('已从用户面退役')
   expect(readme).not.toContain('把若干技能合并进一个总括技能')
 })
-
-/** One base-table row by base NAME, or a loud fixture error. */
-function familyBase(name: string): FamilyBase {
-  const row = FAMILY_BASES.find(candidate => candidate.name === name)
-  if (row === undefined) throw new Error(`fixture: bases.json carries no base named "${name}"`)
-  return row
-}
-
-/** The base composition rows as a platform bundle patch carries them
- * (`packages/bundle/web-app/presets/<base>.patch.yml`: one `insert` entry whose preset row
- * holds the composition under `config.plugins`).
- * @param rows - the base composition's rows at column 0.
- * @returns the patch text.
- */
-function basePatchText(rows: string): string {
-  const indented = rows.trimEnd().split('\n')
-    .map(line => line.trim() === '' ? '' : `          ${line}`)
-    .join('\n')
-  return `- insert:\n    - id: preset-base\n      name: '@deepseek-ai/dsh-agent-preset'\n      config:\n        id: base\n        plugins:\n${indented}\n`
-}
-
-/** Seed one base's platform patch where the resolver reads it: the profile's own
- * `node_modules` candidate (`<profileDir>/node_modules/@deepseek-ai/dsh-web-app/presets/<base>.patch.yml`).
- * @param profileDir - the profile directory the command writes into.
- * @param base - the base name (`standard` / `ptc` / `cordis`).
- * @param rows - the base composition's rows at column 0.
- */
-async function seedPlatformBase(profileDir: string, base: string, rows: string): Promise<void> {
-  const path = join(profileDir, 'node_modules', '@deepseek-ai', 'dsh-web-app', 'presets', `${base}.patch.yml`)
-  await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, basePatchText(rows), 'utf8')
-}
-
-/** The profile patch one install writes into (`PROFILE_PATCH_FILENAME`). */
-function profilePatchPath(dir: string): string {
-  return join(dir, 'cordis.patch.yml')
-}
-
-/** The launcher-owned profile facts the command writes through (`profileContext`). */
-function profileContext(name: string, dir: string): { name: string; dir: string; patchPath: string; startedBundles: string[] } {
-  return { name, dir, patchPath: profilePatchPath(dir), startedBundles: [] }
-}
-
-/** Composition rows as they read inside the profile patch: every non-blank line indented under
- * `config.plugins` (6 spaces in the row + 4 for the `- insert:` entry). */
-function inPatch(rows: string): string {
-  return rows.trim().split('\n').filter(line => line.trim() !== '').map(line => `          ${line}`).join('\n')
-}
 
 describe('evolution-commands', () => {
   it('loads without the commands service mounted', async () => {
@@ -86,7 +27,7 @@ describe('evolution-commands', () => {
 
   it('dispatches consolidate and skill restore to the curator service', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const calls: string[] = []
     ctx.provide('evolutionCurator', {
@@ -158,7 +99,7 @@ describe('evolution-commands', () => {
   // branches must ANSWER, never throw.
   it('answers E-305 instead of throwing when the invocation carries no agent', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     await ctx.plugin(Commands)
     const learn = await captured!.handler({ agent: { ctx } as never, rawInput: 'learn capture the no-agent lesson' })
@@ -183,7 +124,7 @@ describe('evolution-commands', () => {
     // so the queued prompt would sit unread until the user wrote something else
     // while the command reported success.
     const wakingAgent = { inject: (message: unknown) => injected.push(message), followup: (message: unknown) => followed.push(message) }
-    const withRequest = await captured!.handler({ agent: { ctx } as never, rawInput: 'learn distill the auth flow from <url>', agent: wakingAgent })
+    const withRequest = await captured!.handler({ rawInput: 'learn distill the auth flow from <url>', agent: wakingAgent })
     expect(withRequest.text).toContain('请现在执行')
     expect(injected).toHaveLength(0)
     expect(followed).toHaveLength(1)
@@ -195,13 +136,13 @@ describe('evolution-commands', () => {
     expect(message.content?.[0]?.text).toContain('distill the auth flow from <url>')
     expect(message.content?.[0]?.text).toContain('skill_manage')
     // Empty argument falls back to the "what we just did" guidance.
-    const empty = await captured!.handler({ agent: { ctx } as never, rawInput: 'learn', agent: wakingAgent })
+    const empty = await captured!.handler({ rawInput: 'learn', agent: wakingAgent })
     expect(empty.text).toContain('请现在执行')
     expect((followed[1] as { content: Array<{ text?: string }> }).content?.[0]?.text).toContain('the workflow we just went through')
     // A host without `followup` degrades to inject AND says so honestly —
     // claiming "Follow it now" over a non-waking queue is what the audit
     // flagged as a silent no-op.
-    const fallback = await captured!.handler({ agent: { ctx } as never, rawInput: 'learn check the retry budget', agent: { inject: (message: unknown) => injected.push(message) } })
+    const fallback = await captured!.handler({ rawInput: 'learn check the retry budget', agent: { inject: (message: unknown) => injected.push(message) } })
     expect(fallback.text).toContain('没有唤醒通道')
     expect(fallback.text).not.toContain('请现在执行')
     expect(injected).toHaveLength(1)
@@ -225,7 +166,7 @@ describe('evolution-commands', () => {
       private record(message: unknown): void { followed.push(message) }
     }
     const agent = new PlatformLikeAgent()
-    const result = await captured!.handler({ agent: { ctx }, rawInput: 'learn capture the wake-path lesson', agent })
+    const result = await captured!.handler({ rawInput: 'learn capture the wake-path lesson', agent })
     expect(result.text).toContain('请现在执行')
     expect(followed).toHaveLength(1)
     expect(agent.injected).toHaveLength(0)
@@ -236,7 +177,7 @@ describe('evolution-commands', () => {
 
   it('skills health renders degraded rows, or states that no degraded row was reported (rc.73 A1; G2)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     let first = true
     let observed = true
@@ -269,7 +210,7 @@ describe('evolution-commands', () => {
 
   it('aggregates by rule id when the curator reports findings (G2 W2)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> }
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> }
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionCurator', {
       // Two skills tripping the SAME rule: the panel must read that as one problem with count 2,
@@ -294,7 +235,7 @@ describe('evolution-commands', () => {
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
     const injected: unknown[] = []
     await ctx.plugin(Commands)
-    await captured!.handler({ agent: { ctx } as never, rawInput: 'learn node packaging', agent: { inject: (message: unknown) => injected.push(message) } })
+    await captured!.handler({ rawInput: 'learn node packaging', agent: { inject: (message: unknown) => injected.push(message) } })
     // The append is fire-and-forget; poll for the locked RMW to land — a
     // fixed sleep is load-sensitive (the full parallel suite crossed 50ms).
     const eventPath = join(home, 'evolution', 'events.json')
@@ -312,7 +253,7 @@ describe('evolution-commands', () => {
   })
 
   it('curator scope renders the lifecycle lists including quality-warned', async () => {    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionCurator', {
       scopeView: async () => ({ managed: ['hub-skill'], watched: ['stale-skill', 'warn-skill'], qualityWarned: ['warn-skill'], exempted: ['scheduled'], protected: ['pinned-skill'] }),
@@ -331,7 +272,7 @@ describe('evolution-commands', () => {
 
   it('restore dispatches the full-state snapshot restore to the curator', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const calls: string[] = []
     ctx.provide('evolutionCurator', {
@@ -359,7 +300,7 @@ describe('evolution-commands', () => {
   })
   it('dispatches curator pause/resume/status to the curator service (G2)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const calls: Array<{ paused: boolean }> = []
     let state: { lastRunAt: number; runCount: number; lastSummary: string; paused: boolean } | null = {
@@ -416,7 +357,7 @@ describe('evolution-commands', () => {
 
     const ctx = new Context()
 
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
 
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
 
@@ -585,7 +526,7 @@ describe('evolution-commands', () => {
     ctx.provide('evolutionIo', { provider: () => io })
     await ctx.plugin(Commands, { root })
     const marker = join(skillDir, markerEntryName('pinned'))
-    const library = newSkillLibrary({ config: { root }, io })
+    const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: { root }, io })
     expect(await library.isPinned('demo-skill'), 'a fresh skill is not pinned').toBe(false)
     const pinned = await captured!.handler({ agent: { ctx }, rawInput: 'skill pin demo-skill' })
     expect(pinned.kind).toBe('success')
@@ -675,6 +616,7 @@ describe('evolution-commands', () => {
           // V24-19 (v24): the no-action output must name the over signal in
           // a note — pointer_missing=over is in the facts block, so an
           // unexplained no_issues is refused by the §3 completeness gate.
+          dispose: async () => {},
           result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: ['pointer_missing: references/notes.md intentionally unlinked in this fixture; no action needed'] } }),
         }
       },
@@ -712,6 +654,7 @@ describe('evolution-commands', () => {
       async start(_kind: string, options: unknown) {
         capturedSignal = (options as { signal?: AbortSignal }).signal
         return {
+          dispose: async () => {},
           result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }),
         }
       },
@@ -754,12 +697,14 @@ describe('evolution-commands', () => {
           const plan = { text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }
           if (starts === 1) {
             return {
+              dispose: async () => {},
               result: new Promise((resolve) => {
                 resolveRun = () => { resolve(plan) }
               }),
             }
           }
-          return { result: Promise.resolve(plan) }
+          return { dispose: async () => {},
+          result: Promise.resolve(plan) }
         },
       }))
       await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
@@ -807,7 +752,8 @@ describe('evolution-commands', () => {
         list: async () => { throw new Error('unreadable library root') },
       }) as unknown as ReturnType<typeof nodeEvolutionIo>,
     })
-    provideChannel(ctx, ({ async start() { return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
+    provideChannel(ctx, ({ async start() { return { dispose: async () => {},
+          result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 60_000 })
     // 0.19.0 (S2): the command answers before the scan runs, so the failure is in
     // the RUN (readable later), not in the command's result — the shape that left
@@ -845,7 +791,8 @@ describe('evolution-commands', () => {
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
     provideChannel(ctx, ({
       async start(_kind: string, _options: unknown) {
-        return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) }
+        return { dispose: async () => {},
+          result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) }
       },
     }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
@@ -981,7 +928,8 @@ describe('evolution-commands', () => {
     provideChannel(ctx, ({
       async start(_kind: string, _options: unknown) {
         starts += 1
-        return { result: Promise.resolve({ text: 'x', structured: plan }) }
+        return { dispose: async () => {},
+          result: Promise.resolve({ text: 'x', structured: plan }) }
       },
     }))
     await ctx.plugin(Commands, { maintainCooldownMs: 60_000, root: root })
@@ -1011,7 +959,7 @@ describe('evolution-commands', () => {
     let release: (() => void) | undefined
     const plan = { text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }
     provideChannel(ctx, ({
-      async start() { return { result: new Promise((resolve) => { release = () => { resolve(plan) } }) } },
+      async start() { return { dispose: async () => {}, result: new Promise((resolve) => { release = () => { resolve(plan) } }) } },
     }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const started = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
@@ -1051,7 +999,7 @@ describe('evolution-commands', () => {
     provideChannel(ctx, ({
       async start(_kind: string, options: unknown) {
         capturedSignal = (options as { signal?: AbortSignal }).signal
-        return { result: new Promise((resolve) => { release = () => { resolve(plan) } }) }
+        return { dispose: async () => {}, result: new Promise((resolve) => { release = () => { resolve(plan) } }) }
       },
     }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
@@ -1092,7 +1040,7 @@ describe('evolution-commands', () => {
 
   it('help documents the mutations and maintain --facts subcommands (S6.6-1 E-64)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }>; input?: { hint?: string } } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }>; input?: { hint?: string } } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     await ctx.plugin(Commands)
     // Both the input-declaration hint and the bare /evolution help list the
@@ -1107,7 +1055,7 @@ describe('evolution-commands', () => {
 
   it('removed setup/config commands are unknown and absent from the hint', async () => {
     const ctx = new Context()
-    let handler: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
     await ctx.plugin(Commands, { root: await mkdtemp(join(tmpdir(), 'evo-commands-removed-')) })
     for (const line of ['migrate', 'policy set approvalConfirm auto', 'preset install']) {
@@ -1123,7 +1071,7 @@ describe('evolution-commands', () => {
 
   it('T4-03: an unknown subcommand (or a known one missing its argument) answers ERROR, not a successful help dump', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     await ctx.plugin(Commands)
     // The bare command still documents itself, and so does an explicit `help`.
@@ -1166,7 +1114,8 @@ describe('evolution-commands', () => {
       provideChannel(ctx, ({
         async start(_kind: string, _options: unknown) {
           return {
-            result: Promise.resolve({
+            dispose: async () => {},
+          result: Promise.resolve({
               text: 'x',
               structured: {
                 verdict: 'issues',
@@ -1248,7 +1197,7 @@ describe('evolution-commands', () => {
   // `.length` TypeError) must render the unserializable stub.
   it('pending --detail renders a resolving-undefined staged payload via the explicit branch (F-13/F-13)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionApproval', {
       list: async (status?: string) => status === 'pending'
@@ -1263,7 +1212,7 @@ describe('evolution-commands', () => {
 
   it('S2-P2-22: /evolution release routes to the approval service (happy path, and E-304 on an older service)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const released: string[] = []
     ctx.provide('evolutionApproval', {
@@ -1281,7 +1230,7 @@ describe('evolution-commands', () => {
     // A service without the release capability (older build) gets a distinct,
     // actionable error instead of a TypeError.
     const older = new Context()
-    let olderCaptured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    let olderCaptured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
     older.provide('commands', captureCommands((definition) => { olderCaptured = definition as typeof olderCaptured }))
     older.provide('evolutionApproval', { list: async () => [], approve: async () => ({ ok: false, message: 'x' }), reject: async () => ({ ok: false, message: 'x' }) } as never)
     await older.plugin(Commands)
@@ -1298,7 +1247,7 @@ describe('evolution-commands', () => {
     ]
     for (const { input, what } of cases) {
       const ctx = new Context()
-      let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+      let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
       ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
       // The deployment asked for foreground staging (the shipped default once
       // the row is enabled). The skill runner has no consolidate/restore
@@ -1314,7 +1263,7 @@ describe('evolution-commands', () => {
 
   it('v43 (P1-2): the same commands are not refused when the deployment does not stage foreground writes', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionApproval', { isEnabled: true, stageForeground: false, list: async () => [] })
     await ctx.plugin(Commands)
@@ -1357,7 +1306,7 @@ describe('evolution-commands', () => {
 
   it('V24-12: a double-space subcommand variant dispatches instead of returning help as success', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionApproval', {
       list: async (status?: string) => status === 'pending'
@@ -1399,7 +1348,7 @@ describe('evolution-commands', () => {
 
   it('pending --detail renders each record with its staged args, truncated and collapsed by default (F-328)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     const pendingRecord = {
       id: 'a1', kind: 'skill' as const, status: 'pending' as const, summary: 'create demo',
@@ -1442,7 +1391,7 @@ describe('evolution-commands', () => {
 
   it('V6-41: a damaged mutations/report shape renders unreadable instead of a TypeError (0.3.36)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionCurator', {
       skills: {
@@ -1466,7 +1415,7 @@ describe('evolution-commands', () => {
 
   it('P2-16 (v38): /evolution curator report surfaces an interrupted run instead of failed=(none)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     ctx.provide('evolutionCurator', {
       latestReport: async () => ({
@@ -1501,7 +1450,7 @@ describe('evolution-commands', () => {
 
   it('V6-29: maintain --timeout above the AbortSignal domain is rejected at the command gate (0.3.36)', async () => {
     const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
     await ctx.plugin(Commands)
     // 5e9 > 2^32-1: AbortSignal.timeout would throw a synchronous RangeError.
@@ -1597,7 +1546,8 @@ describe('evolution-commands', () => {
     ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
     let starts = 0
-    provideChannel(ctx, ({ async start() { starts += 1; return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
+    provideChannel(ctx, ({ async start() { starts += 1; return { dispose: async () => {},
+          result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const refused = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(refused.kind).toBe('error')
@@ -1634,7 +1584,8 @@ describe('evolution-commands', () => {
     let handler: Handler | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    provideChannel(ctx, ({ async start() { return { result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
+    provideChannel(ctx, ({ async start() { return { dispose: async () => {},
+          result: Promise.resolve({ text: 'x', structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const status = await handler!.handler({ agent: { ctx }, rawInput: 'maintain status' })
     expect(status.kind).toBe('error')
@@ -1652,7 +1603,8 @@ describe('evolution-commands', () => {
     let handler: Handler | undefined
     ctx.provide('commands', captureCommands((definition) => { handler = definition as Handler }))
     ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    provideChannel(ctx, ({ async start() { return { result: Promise.resolve({ text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
+    provideChannel(ctx, ({ async start() { return { dispose: async () => {},
+          result: Promise.resolve({ text: 'x', output: [], stopReason: 'completed' as const, structured: { verdict: 'no_issues', plan: [], notes: [] } }) } } }))
     await ctx.plugin(Commands, { root: root, maintainCooldownMs: 0 })
     const started = await handler!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(started.kind).toBe('success')
@@ -1668,7 +1620,7 @@ describe('evolution-commands', () => {
 
 it('v28 G7.2 (CMD-01): a faulting mounted service yields kind:error on every state-touching subcommand, never a throw', async () => {
   const ctx = new Context()
-  let captured: { handler(invocation: { rawInput?: string }): Promise<{ kind: string; text: string }> } | undefined
+  let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
   ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
   // Any property access on these services throws — the corrupted-state /
   // transient-IO shape (quarantine, lock budget, EIO) that the wrapper exists
@@ -1710,3 +1662,6 @@ it('v28 G7.2 (CMD-01): a faulting mounted service yields kind:error on every sta
   const help = await captured!.handler({ agent: { ctx } as never, rawInput: '' })
   expect(help.kind).toBe('success')
 })
+
+
+
