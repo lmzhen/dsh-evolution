@@ -51,7 +51,7 @@ it('exposes host-only E-323 to the doctor view and fact', async () => {
 })
 
 it('does not warn a pending row with an awaiting-approval run', async () => {
-  const v4 = await makeV4Home([pendingRow('alpha-skill', 'beta-skill', 'run-1')])
+  const v4 = await makeV4Home([pendingRow('alpha-skill', 'beta-skill', 'run-1') as never])
   expect((await mergeDoctor(v4.io, v4.home)).find(item => item.key === 'consistency')?.status).toBe('ok')
 })
 

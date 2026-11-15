@@ -215,9 +215,10 @@ it('rolls back a copy when the target body write fails', async () => {
     io.transact = async (path, task) => {
       if (path.endsWith(join('target', 'SKILL.md'))) throw new Error('injected target body failure')
       if (original === undefined) throw new Error('missing transact')
-      return original.call(io, path, task)
+      return original(path, task)
     }
-    const failing = new SkillLibrary(root, io as unknown as void, { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    // @ts-ignore -- test mutates the injected IO after construction
+    const failing = new SkillLibrary(root, io, { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
     const plan = planExtract({
       body: sourceBody(true),
       sourceName: 'source',
@@ -309,6 +310,7 @@ it('copies bounded external support to the target without deleting the source', 
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
+
 
 
 

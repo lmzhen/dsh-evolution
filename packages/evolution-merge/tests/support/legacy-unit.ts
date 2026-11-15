@@ -1,5 +1,7 @@
 import type { UnitTransaction } from '../../src/unit-protocol.ts'
-import type { CommitPort, CommitMergeResult } from '../../src/commit-execute.ts'
+import type { CommitPort } from '../../src/commit-execute.ts'
+
+type CommitMergeResult = Awaited<ReturnType<NonNullable<CommitPort['commitMerge']>>>
 
 /** Test-only adapter for fixtures that still model a CommitPort. Production has no fallback. */
 export function legacyUnit(port: CommitPort, runId = 'run-1'): UnitTransaction {
@@ -28,3 +30,4 @@ export function legacyUnit(port: CommitPort, runId = 'run-1'): UnitTransaction {
     async cancel() { return { ok: false, phase: 'none' as const } },
   }
 }
+

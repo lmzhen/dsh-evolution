@@ -14,7 +14,7 @@ async function scenario(decision: MergeRow['decision'], mutateCards?: (cards: Sk
   const home = await tempRoot('dsh-rg3b-target-')
   const io = nodeEvolutionIo()
   const key = pairKey('alpha-skill', 'beta-skill')
-  const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'alpha-skill', b: 'beta-skill', state: 'pending', queue: 'pending', decision, runId: 'parent-run', createdAt: 'x', updatedAt: 'x' }
+  const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'alpha-skill', b: 'beta-skill', state: 'pending', queue: 'pending', decision: decision as never, runId: 'parent-run', createdAt: 'x', updatedAt: 'x' }
   await seedRow(io, home, row)
   const cards = baseCards()
   let prepared = 0
@@ -53,7 +53,7 @@ it('target occupied while expected absent is target-taken and zero writes', asyn
 it('approve after support change is source-changed and zero writes', async () => {
   const cards = baseCards()
   const digest = supportDigestOf(cards, ['umbrella', 'alpha-skill', 'beta-skill'])
-  const result = await scenario({ shouldMerge: true, mode: 'merge-into-existing', target: 'umbrella', sources: ['alpha-skill'], rationale: 'r', supportDigest: digest }, list => { const target = list.find(card => card.name === 'umbrella'); if (target !== undefined) target.files = [{ path: 'references/a.md', content: 'changed' }] })
+  const result = await scenario({ shouldMerge: true, mode: 'merge-into-existing', target: 'umbrella', sources: ['alpha-skill'], rationale: 'r', supportDigest: digest }, list => { const target = list.find(card => card.name === 'umbrella'); if (target !== undefined) (target as unknown as { files: { path: string; content: string }[] }).files = [{ path: 'references/a.md', content: 'changed' }] })
   expect(result.result.ok).toBe(false)
   expect(result.result.text).toContain('source-changed')
   expect(result.prepared).toBe(0)

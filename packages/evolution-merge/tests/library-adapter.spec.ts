@@ -45,8 +45,8 @@ it('commits through SkillLibrary and archives the source', async () => {
 
 it('fails closed when archive/name capabilities are unavailable', async () => {
   const port = skillLibraryPort({} as unknown as SkillLibrary)
-  await expect(port.isArchived('src')).rejects.toThrow(/archivedNames is unavailable/)
-  await expect(port.isNameOccupied('src')).rejects.toThrow(/skillDirExists is unavailable/)
+  await expect(port.isArchived!('src')).rejects.toThrow(/archivedNames is unavailable/)
+  await expect(port.isNameOccupied!('src')).rejects.toThrow(/skillDirExists is unavailable/)
 })
 
 it('uses one home fence for the outer unit and the nested tree write', { timeout: 30000 }, async () => {

@@ -149,7 +149,7 @@ it('settles the run when body ignores abort past the drain budget', async () => 
   const result = await withMergeRun({
     io, home, registry: reg, command: 'scan', approval: { platformWrite: true, mergeApproval: false },
     now: () => 200, timeoutMinutes: 0.0001, drainMs: 5, total: 1,
-    async body() { await new Promise<void>(() => {}) },
+    async body() { await new Promise<void>(() => {}); return {} as never },
   })
   expect(result.ok).toBe(false)
   expect(reg.calls).toContain('settle:failed')

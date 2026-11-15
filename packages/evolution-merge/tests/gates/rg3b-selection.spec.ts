@@ -4,7 +4,7 @@ import { filterSelection } from '../../src/domain/selection-policy.ts'
 import { withDecisionRevisions } from '../../src/revision.ts'
 import type { SkillCard } from '../../src/skill-card.ts'
 
-const managed = (name: string): SkillCard => ({ name, body: name, managed: true, files: [{ path: 'references/' + name + '.md', content: name }] })
+const managed = (name: string): SkillCard => ({ name, description: name, body: name, managed: true, files: [{ path: 'references/' + name + '.md', content: name }] })
 
 it('filters non-managed/protected KEEP out of skipped before writing', () => {
   const selection = { candidates: [], skipped: [{ pairKey: 'a', a: 'a', b: 'b' }, { pairKey: 'x', a: 'x', b: 'y' }], reportOnly: [] }

@@ -67,7 +67,7 @@ it('mounts routes and merge_stage, without the removed /merge alias, with a mini
     const service = provided.get('evolutionMerge') as { run?: unknown; doctorFact?: unknown } | undefined
     expect(typeof service?.run).toBe('function')
     expect(typeof service?.doctorFact).toBe('function')
-    expect(await service?.doctorFact?.()).toMatchObject({ status: expect.stringMatching(/^(ok|warn|fail|unknown)$/), detail: expect.any(String) })
+    expect(await (service?.doctorFact as (() => unknown) | undefined)?.()).toMatchObject({ status: expect.stringMatching(/^(ok|warn|fail|unknown)$/), detail: expect.any(String) })
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous

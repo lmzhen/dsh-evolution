@@ -80,7 +80,7 @@ it('undoes all pairs of one run and target in reverse order', async () => {
   expect(live.get('target')).toBe('body-0')
   expect(live.get('source-1')).toBe('src-1')
   expect(live.get('source-2')).toBe('src-2')
-  expect(result.undone.sort()).toEqual(['p1', 'p2'])
+  expect([...result.undone].sort()).toEqual(['p1', 'p2'])
 })
 
 it('target create undo archives the target and records null restored hash', async () => {

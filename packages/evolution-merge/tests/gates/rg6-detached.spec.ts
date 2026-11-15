@@ -44,7 +44,7 @@ it('detached resume accepts under 1s and completes in background', { timeout: 90
   await seedRow(io, home, planned)
   const reg = registry()
   const started = Date.now()
-  const result = await runResumeCommand({ io, home, registry: reg.port, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
+  const result = await runResumeCommand({ io, home, registry: reg.port, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, approval: true, ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
   expect(Date.now() - started).toBeLessThan(1000)
   expect(result).toMatchObject({ ok: true, accepted: true, runId: 'run-1' })
   await vi.waitFor(async () => expect((await loadMergeState(io, home)).state.rows).toEqual([]), { timeout: 60_000, interval: 20 })

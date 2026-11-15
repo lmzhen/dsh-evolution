@@ -43,13 +43,13 @@ it('manual resume after restart is explicit and can complete', { timeout: 90_000
   const planned: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'a', b: 'b', state: 'fuse', queue: 'fuse', decision: DECISION, runId: 'parent-run', createdAt: AT, updatedAt: AT }
   await seedRow(io, home, planned)
   const registry = newRunRegistry({ io, home, now: () => 1000 })
-  const accepted = await runResumeCommand({ io, home, registry, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
+  const accepted = await runResumeCommand({ io, home, registry, rowId: planned.id, platformWrite: true, detached: true, now: () => 1000, approval: true, ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } } })
   expect(accepted).toMatchObject({ ok: true, accepted: true })
   const runId = accepted.runId
   const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
     if ((await loadMergeState(io, home)).state.rows.length === 0) break
-    const run = registry.find(runId)
+    const run = registry.find(runId!)
     if (run !== undefined && run.state !== 'running') break
     await new Promise(resolve => setTimeout(resolve, 10))
   }

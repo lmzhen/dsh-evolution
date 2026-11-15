@@ -70,7 +70,7 @@ it('rejects a stale queue cursor with 400', async () => {
 
 it('400s duplicate body names and returns 200 empty body for empty content', async () => {
   const { home, io } = await makeV4Home([v3Row({ id: 'r1', a: 'same', b: 'b1' }), v3Row({ id: 'r2', a: 'same', b: 'b2' })])
-  const source: MergeRouteSource = { async snapshot() { return await readMergeSnapshot({ io, home, runs: [], approval: false }) }, async bodyRef() { return null }, commands() { return [] } }
+  const source: MergeRouteSource = ({ async snapshot() { return await readMergeSnapshot({ io, home, runs: [], approval: false }) }, async bodyRef() { return null }, commands() { return [] } }) as never
   const dup = await find(source, MERGE_ROUTES.body).fetch(new Request('http://local' + MERGE_ROUTES.body + '?name=same'))
   expect(dup.status).toBe(400)
   const empty = await find(source, MERGE_ROUTES.body).fetch(new Request('http://local' + MERGE_ROUTES.body + '?id=r1&side=a'))
