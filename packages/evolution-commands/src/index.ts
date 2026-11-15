@@ -460,6 +460,28 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             if (handled !== undefined) return handled
             break
           }
+          case 'skill.pin':
+          case 'skill.unpin': {
+          const pinned = !input.startsWith('skill unpin')
+          const name = input.slice(pinned ? 10 : 12).trim()
+          if (!name) return err(`用法：/evolution skill ${pinned ? 'pin' : 'unpin'} <name>`)
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法固定或取消固定技能。')
+          // The write-side library is built exactly like restructure's: one construction recipe. The
+          // limits ride along because the name guard reads them, so a deployment that raised the
+          // name cap can still pin such a skill.
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
+            config: { root: skillsRootValue },
+            io: ioRegistry.provider(),
+            ctx,
+            limits: {
+              ...DEFAULT_SKILL_LIMITS,
+              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
+            },
+          })
+          const result = await library.setPinned(name, pinned)
+          return result.ok ? ok(result.message) : err(result.message)
+          }
           case 'propose': {
             const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
             if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
@@ -486,27 +508,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // lifecycle-flag flip stays OUTSIDE the approval seam: staging it would let a request that
         // expires hold the library pinned invisibly, and the flip is reversible by the same command.
         // Like the tool, this is not a content write: no usage bump and no mutation event.
-        if (input === 'skill pin' || input.startsWith('skill pin ') || input === 'skill unpin' || input.startsWith('skill unpin ')) {
-          const pinned = !input.startsWith('skill unpin')
-          const name = input.slice(pinned ? 10 : 12).trim()
-          if (!name) return err(`用法：/evolution skill ${pinned ? 'pin' : 'unpin'} <name>`)
-          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法固定或取消固定技能。')
-          // The write-side library is built exactly like restructure's: one construction recipe. The
-          // limits ride along because the name guard reads them, so a deployment that raised the
-          // name cap can still pin such a skill.
-          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
-            config: { root: skillsRootValue },
-            io: ioRegistry.provider(),
-            ctx,
-            limits: {
-              ...DEFAULT_SKILL_LIMITS,
-              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
-            },
-          })
-          const result = await library.setPinned(name, pinned)
-          return result.ok ? ok(result.message) : err(result.message)
-        }
         if (input === 'skills health') {
           const curator = ctx.get('evolutionCurator') as {
             healthView(): Promise<Array<{
