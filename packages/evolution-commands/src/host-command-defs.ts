@@ -35,7 +35,17 @@ export const HOST_COMMAND_DEFS: readonly HostCommandDef[] = [
   { id: 'replay', words: ['replay'], summaryKey: 'summary.replay', helpKey: 'help.replay', flags: [], positional: [], readOnly: true, needsRun: false, fallback: "replay", usageLine: "replay" },
 ]
 
-/** Resolve one single-token command name to its declaration (nested ids are matched by words later). */
+/** Resolve a parsed command to its declaration: the longest `words` prefix wins. */
+export function hostCommandDefForCommand(command: { readonly name: string; readonly positionals: readonly string[] }): HostCommandDef | undefined {
+  let found: HostCommandDef | undefined
+  for (const def of HOST_COMMAND_DEFS) {
+    const matches = def.words.every((word, index) => (index === 0 ? command.name : command.positionals[index - 1]) === word)
+    if (matches && (found === undefined || def.words.length > found.words.length)) found = def
+  }
+  return found
+}
+
+/** Resolve one single-token command name to its declaration. */
 export function hostCommandDefForName(name: string): HostCommandDef | undefined {
   return HOST_COMMAND_DEFS.find(def => def.words.length === 1 && def.words[0] === name)
 }

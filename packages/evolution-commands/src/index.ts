@@ -36,7 +36,7 @@ import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale
 import { flagsOf, renderHelpText, renderHint } from './registry.ts'
 import { isParseFailure, parseSubcommand } from './parse.ts'
 import { HOST_COMMAND_HANDLERS } from './host-commands/handlers.ts'
-import { hostCommandDefForName } from './host-command-defs.ts'
+import { hostCommandDefForCommand } from './host-command-defs.ts'
 // G7-3: the atomic writer moved to the core io seam (one implementation); re-exported so this
 // module public surface -- Commands.atomicWriteFiles, which the F-211 spec drives -- is unchanged.
 import { atomicWriteFiles } from '@deepseek-ai/dsh-evolution-core'
@@ -441,7 +441,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         // G7.4/C7: the ONE parser answers the shape.
         const command = parseSubcommand(input)
-        const def = !isParseFailure(command) ? hostCommandDefForName(command.name) : undefined
+        const def = !isParseFailure(command) ? hostCommandDefForCommand(command) : undefined
         switch (def?.id) {
           case 'pending':
           case 'approve':
@@ -457,6 +457,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const handled = await handler({ input, command, approval, locale: hostLocale, provider: ctx.get('settings') as SettingsProviderLike | undefined, ctx, runs: doctorRuns })
             if (handled !== undefined) return handled
             break
+          }
+          case 'propose': {
+            const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
+            if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
+            const result = await curator.proposeKeeps()
+            return result.ok ? ok(result.message) : err(result.message)
+          }
+          case 'skills.refresh': {
+            ctx.emit('evolution/skills-refresh')
+            return ok('已请求重读技能目录：缓存已丢弃，下次查询时重新读取。')
+          }
+          case 'replay': {
+            const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
+            if (!replay) return err(hostError('e-303-replay-service-not-mounted'))
+            return ok(replay.compare().report)
           }
           default: break
         }
@@ -561,12 +576,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const result = await library.setPinned(name, pinned)
           return result.ok ? ok(result.message) : err(result.message)
         }
-        if (input === 'propose') {
-          const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
-          if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
-          const result = await curator.proposeKeeps()
-          return result.ok ? ok(result.message) : err(result.message)
-        }
         if (input === 'skills health') {
           const curator = ctx.get('evolutionCurator') as {
             healthView(): Promise<Array<{
@@ -606,13 +615,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // REPORTED, which is not the same as every skill being readable and healthy.
           if (rows.length === 0) return ok(['Structure health: no degraded row was reported (this does NOT assert that every skill is readable).', banner].filter(Boolean).join(' '))
           return ok([banner ? `Structure health (${rows.length} degraded): ${banner}` : `Structure health (${rows.length} degraded):`, ...aggregate, ...rows.map(line)].join('\n'))
-        }
-        if (input === 'skills refresh') {
-          // 0.3.18 (E-71): out-of-band tree edits (manual/git/other process)
-          // bypass evolution/skill-mutated; this command drops the catalog's
-          // summaries cache and invalidates the published skill catalog.
-          ctx.emit('evolution/skills-refresh')
-          return ok('已请求重读技能目录：缓存已丢弃，下次查询时重新读取。')
         }
         if (input === 'learn' || input.startsWith('learn ')) {
           // V25-08 (v25): the free-text request keeps the user's original
@@ -1303,11 +1305,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // same action — the patch_count bump keeps the signals coherent.
           await (ctx.get('skillUsage') as { record?: (name: string, kind: 'patch') => Promise<void> } | undefined)?.record?.(name, 'patch')
           return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
-        }
-        if (input === 'replay') {
-          const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
-          if (!replay) return err(hostError('e-303-replay-service-not-mounted'))
-          return ok(replay.compare().report)
         }
         // G7.4/C7: the ONE parser answers the shape (flag order and `=` tolerated, F-4).
         if (input === '' || input === 'help') {
