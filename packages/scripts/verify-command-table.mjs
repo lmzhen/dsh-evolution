@@ -13,7 +13,7 @@
  *
  * Usage: node packages/scripts/verify-command-table.mjs [packages-root]
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { stripComments } from './lib-source-text.mjs'
@@ -24,7 +24,11 @@ const pkg = resolve(root, 'evolution-commands/src')
 const { HOST_COMMAND_DEFS, entryName, summaryOf } = await import(pathToFileURL(join(pkg, 'registry.ts')).href)
 const { parseSubcommand, isParseFailure } = await import(pathToFileURL(join(pkg, 'parse.ts')).href)
 const sourcePath = join(pkg, 'index.ts')
-const source = stripComments(readFileSync(sourcePath, 'utf8'))
+const handlerDir = join(pkg, 'host-commands')
+const handlerSources = readdirSync(handlerDir)
+  .filter(name => name.endsWith('.ts'))
+  .map(name => stripComments(readFileSync(join(handlerDir, name), 'utf8')))
+const source = [stripComments(readFileSync(sourcePath, 'utf8')), ...handlerSources].join('\n')
 const problems = []
 
 // A: the C7 shape.

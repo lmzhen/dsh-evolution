@@ -38,7 +38,7 @@ import { presetProfileTarget } from './preset-source.ts'
 import { paramGroups, paramSurfaceRows, renderParamJson, renderParamRows, type ParamSectionView } from './params.ts'
 import { flagsOf, renderHelpText, renderHint } from './registry.ts'
 import { isParseFailure, parseSubcommand } from './parse.ts'
-import { runDecisionCommand, runPendingCommand } from './host-commands/approval-commands.ts'
+import { HOST_COMMAND_HANDLERS } from './host-commands/handlers.ts'
 // G7-3: the atomic writer moved to the core io seam (one implementation); re-exported so this
 // module public surface -- Commands.atomicWriteFiles, which the F-211 spec drives -- is unchanged.
 import { atomicWriteFiles } from '@deepseek-ai/dsh-evolution-core'
@@ -443,19 +443,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         // G7.4/C7: the ONE parser answers the shape.
         const command = parseSubcommand(input)
-        if (!isParseFailure(command) && command.name === 'pending'
-          && command.positionals.length === 0
-          && [...command.flags.keys()].every(flag => flag === 'detail')) {
-          return await runPendingCommand({ command, approval, locale: hostLocale })
-        }
-        if (!isParseFailure(command) && input.startsWith('approve ')) {
-          return await runDecisionCommand('approve', input.slice(8).trim(), { command, approval, locale: hostLocale })
-        }
-        if (!isParseFailure(command) && input.startsWith('reject ')) {
-          return await runDecisionCommand('reject', input.slice(7).trim(), { command, approval, locale: hostLocale })
-        }
-        if (!isParseFailure(command) && input.startsWith('release ')) {
-          return await runDecisionCommand('release', input.slice(8).trim(), { command, approval, locale: hostLocale })
+        if (!isParseFailure(command)) {
+          const handler = HOST_COMMAND_HANDLERS[command.name]
+          if (handler !== undefined) {
+            const handled = await handler({ input, command, approval, locale: hostLocale })
+            if (handled !== undefined) return handled
+          }
         }
         if (input === 'curator run') {
           const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; skipped?: string; report: { runId: string; snapshotPath?: string } }> } | undefined
