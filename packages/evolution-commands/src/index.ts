@@ -522,33 +522,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (rows.length === 0) return ok(['Structure health: no degraded row was reported (this does NOT assert that every skill is readable).', banner].filter(Boolean).join(' '))
           return ok([banner ? `Structure health (${rows.length} degraded): ${banner}` : `Structure health (${rows.length} degraded):`, ...aggregate, ...rows.map(line)].join('\n'))
           }
-          case 'propose': {
-            const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
-            if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
-            const result = await curator.proposeKeeps()
-            return result.ok ? ok(result.message) : err(result.message)
-          }
-          case 'skills.refresh': {
-            ctx.emit('evolution/skills-refresh')
-            return ok('已请求重读技能目录：缓存已丢弃，下次查询时重新读取。')
-          }
-          case 'replay': {
-            const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
-            if (!replay) return err(hostError('e-303-replay-service-not-mounted'))
-            return ok(replay.compare().report)
-          }
-          default: break
-        }
-        if (input === 'consolidate' || input.startsWith('consolidate ')) {
-          const plan = /--plan\s+(\S+)/.exec(input)?.[1]
-          return err('`consolidate` 已退出用户面：机械追加由 curator 归档收尾，人类合成用 `/evolution merge pair <a> <b>`。' + (plan === undefined ? '' : '\n旧 --plan 审计只读保留：' + plan))
-        }
-        // 0.21.0 (G4/B4): the pin face. Same semantics as skill_manage's pin action — ONE library
-        // method (setPinned), the same repository-worded answer, and the same E-70 decision that a
-        // lifecycle-flag flip stays OUTSIDE the approval seam: staging it would let a request that
-        // expires hold the library pinned invisibly, and the flip is reversible by the same command.
-        // Like the tool, this is not a content write: no usage bump and no mutation event.
-        if (input === 'learn' || input.startsWith('learn ')) {
+          case 'learn': {
           // V25-08 (v25): the free-text request keeps the user's original
           // spacing (only trim) — the whitespace collapse is dispatch-only.
           const request = rawInputTrimmed === 'learn' ? '' : rawInputTrimmed.slice(6).trim()
@@ -603,7 +577,33 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           return woke
             ? ok('已向本会话发送学习请求，请现在执行。')
             : ok('学习请求已排入本会话队列：本宿主没有唤醒通道，会在你下一条消息时读取。')
+          }
+          case 'propose': {
+            const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
+            if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
+            const result = await curator.proposeKeeps()
+            return result.ok ? ok(result.message) : err(result.message)
+          }
+          case 'skills.refresh': {
+            ctx.emit('evolution/skills-refresh')
+            return ok('已请求重读技能目录：缓存已丢弃，下次查询时重新读取。')
+          }
+          case 'replay': {
+            const replay = ctx.get('evolutionReplay') as { compare(): { report: string } } | undefined
+            if (!replay) return err(hostError('e-303-replay-service-not-mounted'))
+            return ok(replay.compare().report)
+          }
+          default: break
         }
+        if (input === 'consolidate' || input.startsWith('consolidate ')) {
+          const plan = /--plan\s+(\S+)/.exec(input)?.[1]
+          return err('`consolidate` 已退出用户面：机械追加由 curator 归档收尾，人类合成用 `/evolution merge pair <a> <b>`。' + (plan === undefined ? '' : '\n旧 --plan 审计只读保留：' + plan))
+        }
+        // 0.21.0 (G4/B4): the pin face. Same semantics as skill_manage's pin action — ONE library
+        // method (setPinned), the same repository-worded answer, and the same E-70 decision that a
+        // lifecycle-flag flip stays OUTSIDE the approval seam: staging it would let a request that
+        // expires hold the library pinned invisibly, and the flip is reversible by the same command.
+        // Like the tool, this is not a content write: no usage bump and no mutation event.
         if (!isParseFailure(command) && command.name === 'maintain' && command.flags.get('facts') === true && command.positionals.length === 0) {
           // 0-token deterministic preview (011 §12-1 v12): facts block only,
           // no subagent call, no cooldown (the cooldown guards LLM calls).
