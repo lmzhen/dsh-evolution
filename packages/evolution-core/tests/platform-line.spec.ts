@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { PLATFORM_LINE } from '../src/platform-line.generated.ts'
+// @ts-expect-error -- plain ESM helper without a declaration file
 import { parsePlatformLine as parseLine, windowRows as rowsOf, OUTPUT_KEYS as OUTPUT_KEYS_RAW } from '../../scripts/lib-platform-line.mjs'
 
 /** The script modules are plain .mjs (no declarations); pin the two shapes this spec exercises. */

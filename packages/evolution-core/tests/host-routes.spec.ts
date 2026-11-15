@@ -6,7 +6,7 @@ function harness(options: { readonly noConnection?: boolean; readonly remote?: b
   const injected: Array<{ names: readonly string[]; run: (scope: unknown) => void }> = []
   const registered: Array<Record<string, unknown>> = []
   const disposed: number[] = []
-  const effectRuns: Array<() => () => void> = []
+  const effectRuns: Array<() => void> = []
   const connection = {
     allowsRemoteAuthorities: options.remote === true,
     fetch: {
@@ -22,7 +22,7 @@ function harness(options: { readonly noConnection?: boolean; readonly remote?: b
   }
   const scope = {
     connection: options.noConnection === true ? undefined : connection,
-    effect(run: () => () => void) { effectRuns.push(run()) },
+    effect(run: () => (() => void) | void) { const result = run(); effectRuns.push(typeof result === 'function' ? result : () => {}); return () => {} },
   }
   return { owner, scope, injected, registered, disposed, effectRuns }
 }
@@ -62,3 +62,4 @@ describe('host route registration (G4-S1)', () => {
     expect(hostSurface({ get: () => undefined } as never)).toEqual({ available: false, code: 'E-325', reason: 'connection-missing' })
   })
 })
+

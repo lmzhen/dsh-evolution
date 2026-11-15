@@ -98,7 +98,7 @@ it('nodeEvolutionIo.transact deletes the file when task returns null', async () 
   await io.writeText(target, 'keep')
   const transact = io.transact!
   await transact(target, async () => null)
-  expect(await io.readText(target)).toBeNull()
+  expect(await io.readText!(target)).toBeNull()
 })
 
 it('a task failure propagates immediately — it is never lock contention (E-8, 0.3.17)', async () => {
@@ -412,7 +412,7 @@ it('G2 S4: concurrent RMW on ONE path inside this process never loses an update'
   await io.writeText(target, '0')
   // The surviving concurrency guarantee: one promise chain per path, so twelve readers all see
   // the previous write. (Cross-process mutual exclusion is the platform provider's job now.)
-  await Promise.all(Array.from({ length: 12 }, () => io.transact(target, async current => String(Number(current ?? '0') + 1))))
+  await Promise.all(Array.from({ length: 12 }, () => io.transact!(target, async current => String(Number(current ?? '0') + 1))))
   expect(await io.readText(target)).toBe('12')
 })
 
@@ -422,7 +422,7 @@ it('G2 S4: a `*.lock` file is inert data — writes ignore it and it is never sw
   const target = join(root, 'state.json')
   await writeFile(`${target}.lock`, `${process.pid}:deadbeef`, 'utf8')
   await io.writeText(target, 'fresh')
-  await io.transact(target, async () => 'next')
+  await io.transact!(target, async () => 'next')
   expect(await io.readText(target)).toBe('next')
   // It is the user's bytes, not a protocol artifact: writes neither obey nor delete it.
   expect(await io.readText(`${target}.lock`)).toBe(`${process.pid}:deadbeef`)

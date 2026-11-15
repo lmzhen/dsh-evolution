@@ -136,12 +136,14 @@ describe('evolution session projections (G4)', () => {
 
 describe('evolution projection history', () => {
   it('captures a full catalog and remembers projection digests', () => {
-    const empty = evolutionProjectionHistoryProjection.init()
+    const empty = evolutionProjectionHistoryProjection.init(undefined as never, undefined as never)
     const catalog = { content: [{ type: 'text', text: '<system-reminder>\n<available_skills>\n- alpha: a\n</available_skills>\n</system-reminder>' }], source: { kind: 'skill-catalog', form: 'catalog', entries: [{ name: 'alpha', description: 'a' }] } }
-    const first = evolutionProjectionHistoryProjection.apply(empty, { type: 'user/message', data: catalog } as never)
+    const first = (evolutionProjectionHistoryProjection.apply as (...args: unknown[]) => any)(empty, { type: 'user/message', data: catalog } as never)
     expect(first.catalogs).toHaveLength(1)
     expect(first.catalogs[0]!.entries).toEqual([{ name: 'alpha', description: 'a' }])
     const withDigest = evolutionProjectionHistoryProjection.apply(first, { type: 'user/message', data: { content: [], source: { kind: 'evolution-skill-projection', digest: 'd1' } } } as never)
     expect(withDigest.digests).toEqual(['d1'])
   })
 })
+
+

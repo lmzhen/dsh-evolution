@@ -1,12 +1,8 @@
 // @tier ci-only
 import { describe, expect, it, vi } from 'vitest'
-import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { promisify } from 'node:util'
 import {
   basePresetPlugins,
   composePresetComposition,
@@ -20,7 +16,6 @@ import {
   resolveBasePresetPatch,
 } from '@deepseek-ai/dsh-evolution-core/composition'
 
-const run = promisify(execFile)
 
 describe('composePresetComposition (0.3.15)', () => {
   it('composes standard rows then the delta with one trailing newline', () => {
@@ -313,8 +308,6 @@ describe('preset patch fixtures (source installer preset generation retired in 0
     "            name: '@deepseek-ai/dsh-tool-skill'",
     '',
   ].join('\n')
-  const otherRow = '- id: keep-me\n  name: "@deepseek-ai/dsh-other"\n'
-  const patched = mergePresetRow(otherRow, composePresetEntry(basePatch, delta, identity), identity.rowId)
 
   it('replaces the platform empty-list seed instead of extending it', () => {
     // The platform seeds a fresh profile patch with `[]` (`packages/boot/app-boot/src/profile.ts`,
@@ -441,3 +434,4 @@ describe('resolveBasePresetPatch (G6: the platform base patch)', () => {
     }
   })
 })
+

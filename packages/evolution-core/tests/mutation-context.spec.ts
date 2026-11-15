@@ -1,6 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { MutationUnit, type EvolutionIoLike, type MutationSnapshotPort } from '../src/mutation-unit.ts'
+import { MutationUnit, type MutationSnapshotPort } from '../src/mutation-unit.ts'
+import type { EvolutionIoLike } from '../src/io.ts'
 
 class MemoryIo implements EvolutionIoLike {
   readonly files = new Map<string, string>()
