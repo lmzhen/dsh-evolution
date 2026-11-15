@@ -593,17 +593,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             if (!replay) return err(hostError('e-303-replay-service-not-mounted'))
             return ok(replay.compare().report)
           }
-          default: break
-        }
-        if (input === 'consolidate' || input.startsWith('consolidate ')) {
-          const plan = /--plan\s+(\S+)/.exec(input)?.[1]
-          return err('`consolidate` 已退出用户面：机械追加由 curator 归档收尾，人类合成用 `/evolution merge pair <a> <b>`。' + (plan === undefined ? '' : '\n旧 --plan 审计只读保留：' + plan))
-        }
-        // 0.21.0 (G4/B4): the pin face. Same semantics as skill_manage's pin action — ONE library
-        // method (setPinned), the same repository-worded answer, and the same E-70 decision that a
-        // lifecycle-flag flip stays OUTSIDE the approval seam: staging it would let a request that
-        // expires hold the library pinned invisibly, and the flip is reversible by the same command.
-        // Like the tool, this is not a content write: no usage bump and no mutation event.
+          case 'maintain': {
         if (!isParseFailure(command) && command.name === 'maintain' && command.flags.get('facts') === true && command.positionals.length === 0) {
           // 0-token deterministic preview (011 §12-1 v12): facts block only,
           // no subagent call, no cooldown (the cooldown guards LLM calls).
@@ -654,6 +644,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const { facts } = buildMaintainFacts(snapshots, enrichment.usageObservedValue, undefined)
           return ok(`维护事实（零 token 预览）：\n${facts}`)
         }
+            break
+          }
+          default: break
+        }
+        if (input === 'consolidate' || input.startsWith('consolidate ')) {
+          const plan = /--plan\s+(\S+)/.exec(input)?.[1]
+          return err('`consolidate` 已退出用户面：机械追加由 curator 归档收尾，人类合成用 `/evolution merge pair <a> <b>`。' + (plan === undefined ? '' : '\n旧 --plan 审计只读保留：' + plan))
+        }
+        // 0.21.0 (G4/B4): the pin face. Same semantics as skill_manage's pin action — ONE library
+        // method (setPinned), the same repository-worded answer, and the same E-70 decision that a
+        // lifecycle-flag flip stays OUTSIDE the approval seam: staging it would let a request that
+        // expires hold the library pinned invisibly, and the flip is reversible by the same command.
+        // Like the tool, this is not a content write: no usage bump and no mutation event.
         // F-03: the grammar was a fragile single-space match —
         // `maintain  --timeout 600000` (multi-space) and `--timeout=600000`
         // fell into the unknown-args rejection below. `\s+` before the flag
