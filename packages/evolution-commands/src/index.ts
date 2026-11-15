@@ -836,6 +836,43 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
             break
           }
+          case 'maintain.cancel': {
+        const maintainCancel = maintainSub('cancel')
+        if (maintainCancel !== null) {
+          const registry = runs
+          if (!registry) return err('未挂载 evolution-io 注册表：无法取消运行。')
+          const synced = await syncRuns(registry)
+          const wanted = maintainCancel.positionals[1]
+          // Review P1-1: the id-less form answers sentence F when the index could not be read,
+          // instead of acting on a stale in-memory view (same posture as `report`/`handoff`).
+          if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
+          const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
+          if (!record) {
+            if (wanted !== undefined) {
+              if (!synced.ok) return err(unreadableForId(wanted, synced.note))
+              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
+            }
+            return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
+          }
+          // Omitting the id only ever cancels the ONE run this process is running: the
+          // registry's owned-only cancel below refuses anything else, and the refusal is
+          // worded for the id-less case with a pointer to the explicit form (G2/0.20.0).
+          const idlessHint = wanted === undefined ? ' 要取消某次运行请带上 id：/evolution maintain status 会列出它们。' : ''
+          // ONE cancel call (review P1-1): a run another process owns cannot be stopped
+          // from here, and a terminal one has nothing to cancel — the two answers differ.
+          if (!registry.cancel(record.id)) {
+            if (record.state === 'running') {
+              // Review P2-4: an explicit id cannot cancel a foreign run either, so the id-less
+              // hint pointed at a dead end here; the terminal branch below keeps it.
+              return err(`运行 ${record.id} 正在共享本 home 的另一个进程里运行：只能在那里取消。`)
+            }
+            return err(`运行 ${record.id} 已经是 ${record.state}：没有可取消的东西。${idlessHint}`)
+          }
+          return ok(`维护运行 ${record.id} 已取消：扫描会在下一个检查点停止。用 /evolution maintain status ${record.id} 查看终态。`)
+        }
+        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
+            break
+          }
           case 'propose': {
             const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
             if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
@@ -1150,40 +1187,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             `- result: /evolution maintain report ${handle.id}`,
             `- stop:   /evolution maintain cancel ${handle.id}`,
           ].join('\n'))
-        }
-        // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
-        const maintainCancel = maintainSub('cancel')
-        if (maintainCancel !== null) {
-          const registry = runs
-          if (!registry) return err('未挂载 evolution-io 注册表：无法取消运行。')
-          const synced = await syncRuns(registry)
-          const wanted = maintainCancel.positionals[1]
-          // Review P1-1: the id-less form answers sentence F when the index could not be read,
-          // instead of acting on a stale in-memory view (same posture as `report`/`handoff`).
-          if (wanted === undefined && !synced.ok) return err(unreadableIndex(synced.note))
-          const record = wanted === undefined ? newestRun(registry) : registry.find(wanted)
-          if (!record) {
-            if (wanted !== undefined) {
-              if (!synced.ok) return err(unreadableForId(wanted, synced.note))
-              return err(`本 home 里没有 ${wanted} 这次运行：用 /evolution maintain status 查看最近的几次。`)
-            }
-            return err('本 home 还没有维护运行记录：用 /evolution maintain 启动一次。')
-          }
-          // Omitting the id only ever cancels the ONE run this process is running: the
-          // registry's owned-only cancel below refuses anything else, and the refusal is
-          // worded for the id-less case with a pointer to the explicit form (G2/0.20.0).
-          const idlessHint = wanted === undefined ? ' 要取消某次运行请带上 id：/evolution maintain status 会列出它们。' : ''
-          // ONE cancel call (review P1-1): a run another process owns cannot be stopped
-          // from here, and a terminal one has nothing to cancel — the two answers differ.
-          if (!registry.cancel(record.id)) {
-            if (record.state === 'running') {
-              // Review P2-4: an explicit id cannot cancel a foreign run either, so the id-less
-              // hint pointed at a dead end here; the terminal branch below keeps it.
-              return err(`运行 ${record.id} 正在共享本 home 的另一个进程里运行：只能在那里取消。`)
-            }
-            return err(`运行 ${record.id} 已经是 ${record.state}：没有可取消的东西。${idlessHint}`)
-          }
-          return ok(`维护运行 ${record.id} 已取消：扫描会在下一个检查点停止。用 /evolution maintain status ${record.id} 查看终态。`)
         }
         // G7.4/C7: the sub-form comes from the ONE parser; the table declares the flags.
         const maintainHandoff = maintainSub('handoff')
