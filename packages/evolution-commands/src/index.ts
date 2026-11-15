@@ -578,6 +578,93 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ? ok('已向本会话发送学习请求，请现在执行。')
             : ok('学习请求已排入本会话队列：本宿主没有唤醒通道，会在你下一条消息时读取。')
           }
+          case 'extract': {
+                    if (isParseFailure(command) || command.name !== 'extract') {
+            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--owner-covers] 或 --proposal <id>')
+          }
+          const source = command.positionals[0] ?? ''
+          const proposalFlag = command.flags.get('proposal')
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法执行 extract。')
+          let target = command.positionals[1] ?? ''
+          let heading = command.positionals[2] ?? ''
+          let start: string | undefined
+          let end: string | undefined
+          let extractItems: Array<{ heading: string; start?: string; end?: string; to_skill: string }> = []
+          let proposalOutcome: 'extract' | 'mixed' | undefined
+          if (typeof proposalFlag === 'string') {
+            if (source === '') return err('用法：/evolution extract <source> --proposal <id>')
+            const proposal = await readProposalReport(ioRegistry.provider(), proposalFlag)
+            if (proposal === null) return err('找不到 extract proposal：' + proposalFlag)
+            if (proposal.outcome === 'keep') return err('该 proposal 的结论是 keep，没有可应用提取。')
+            if (proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) return err('该 proposal 未覆盖 owner（owner-gap），不能应用。')
+            target = proposal.owner.name
+            heading = proposal.parts[0]?.heading ?? ''
+            proposalOutcome = proposal.outcome === 'extract' || proposal.outcome === 'mixed' ? proposal.outcome : undefined
+            extractItems = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: target }))
+          } else {
+            if (source === '' || target === '' || heading === '') {
+              return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
+            }
+            const startFlag = command.flags.get('start')
+            const endFlag = command.flags.get('end')
+            start = typeof startFlag === 'string' ? startFlag : undefined
+            end = typeof endFlag === 'string' ? endFlag : undefined
+            extractItems = [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }]
+          }
+          const ownerCovers = command.flags.has('owner-covers')
+          const outcomeFlag = command.flags.get('outcome')
+          if (outcomeFlag !== undefined && outcomeFlag !== 'extract' && outcomeFlag !== 'mixed') {
+            return err('--outcome 只能是 extract 或 mixed。')
+          }
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
+            config: { root: skillsRootValue },
+            io: ioRegistry.provider(),
+            ctx,
+            threatExemptLabels: config.threatExemptLabels,
+            limits: {
+              ...DEFAULT_SKILL_LIMITS,
+              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
+            },
+          })
+          const built = await buildExtractPlanFromLibrary(library, {
+            source,
+            items: extractItems,
+            ...(outcomeFlag === undefined ? (proposalOutcome === undefined ? {} : { outcome: proposalOutcome }) : { outcome: outcomeFlag }),
+            ...(ownerCovers ? { ownerCovers: true } : {}),
+          })
+          if (!built.ok) return err(built.message)
+          const plan = built.plan
+          const warnings = built.warnings === undefined || built.warnings.length === 0 ? '' : '\n' + built.warnings.join('\n')
+          if (!command.flags.has('apply')) {
+            const proposal = proposalFromPlan(plan, { runId: 'cli-' + Date.now().toString(36) })
+            const proposalPath = await writeProposalReport(ioRegistry.provider(), proposal).catch(() => { /* best-effort proposal report */ })
+            return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=' + ownerDecisionText(plan.owner) + warnings + '\nproposal_id: ' + proposal.id + (proposalPath === undefined ? '' : '（已写入 reports）'))
+          }
+          if (approval) {
+            const session = invocationAgent?.session
+            const sessionPolicy = effectiveSessionPolicy(ctx, session)
+            const stagesForeground = approval.isEnabled !== false
+              && sessionPolicy !== 'never'
+              && approval.stageForeground !== false
+            if (stagesForeground && session === undefined) return err(hostError('e-306-this-deployment-stages-foreground-2'))
+            if (stagesForeground && !approval.hasRunner('skill')) {
+              return err('无法暂存提取：没有注册技能回放运行器：请挂载 tool-skill-manage 行，或禁用 evolution-approval。')
+            }
+            const decision = await approval.request({
+              kind: 'skill',
+              summary: '/evolution extract ' + source + ' -> ' + target + ' ' + heading,
+              args: { operation: { action: 'extract', name: source, extract: extractItems }, origin: 'foreground', libraryOrigin: 'foreground' },
+              origin: 'foreground',
+              ...session !== undefined ? { sessionId: session.id, session } : {},
+              ...sessionPolicy !== undefined ? { sessionPolicy } : {},
+            })
+            if (decision.action === 'staged') return ok(decision.message)
+          }
+          const result = await library.extract(plan, 'foreground')
+          if (!result.ok) return err(result.message)
+          return ok(result.message + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + warnings)
+          }
           case 'propose': {
             const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
             if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
@@ -1059,93 +1146,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // Review P2-5: the hint still demanded an id from `report`/`cancel` and never named
           // `handoff`, so it described a grammar two releases behind the one it guards.
           return err('未知的 maintain 参数：应为 `maintain`、`maintain --timeout <ms>` / `maintain --timeout=<ms>`、`maintain status [<id>]`、`maintain report [<id>]`、`maintain handoff [<id>]` 或 `maintain cancel [<id>]`。实际收到：' + input)
-        }
-        if (input.startsWith('extract ')) {
-                    if (isParseFailure(command) || command.name !== 'extract') {
-            return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>] [--owner-covers] 或 --proposal <id>')
-          }
-          const source = command.positionals[0] ?? ''
-          const proposalFlag = command.flags.get('proposal')
-          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法执行 extract。')
-          let target = command.positionals[1] ?? ''
-          let heading = command.positionals[2] ?? ''
-          let start: string | undefined
-          let end: string | undefined
-          let extractItems: Array<{ heading: string; start?: string; end?: string; to_skill: string }> = []
-          let proposalOutcome: 'extract' | 'mixed' | undefined
-          if (typeof proposalFlag === 'string') {
-            if (source === '') return err('用法：/evolution extract <source> --proposal <id>')
-            const proposal = await readProposalReport(ioRegistry.provider(), proposalFlag)
-            if (proposal === null) return err('找不到 extract proposal：' + proposalFlag)
-            if (proposal.outcome === 'keep') return err('该 proposal 的结论是 keep，没有可应用提取。')
-            if (proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) return err('该 proposal 未覆盖 owner（owner-gap），不能应用。')
-            target = proposal.owner.name
-            heading = proposal.parts[0]?.heading ?? ''
-            proposalOutcome = proposal.outcome === 'extract' || proposal.outcome === 'mixed' ? proposal.outcome : undefined
-            extractItems = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: target }))
-          } else {
-            if (source === '' || target === '' || heading === '') {
-              return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
-            }
-            const startFlag = command.flags.get('start')
-            const endFlag = command.flags.get('end')
-            start = typeof startFlag === 'string' ? startFlag : undefined
-            end = typeof endFlag === 'string' ? endFlag : undefined
-            extractItems = [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_skill: target }]
-          }
-          const ownerCovers = command.flags.has('owner-covers')
-          const outcomeFlag = command.flags.get('outcome')
-          if (outcomeFlag !== undefined && outcomeFlag !== 'extract' && outcomeFlag !== 'mixed') {
-            return err('--outcome 只能是 extract 或 mixed。')
-          }
-          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
-            config: { root: skillsRootValue },
-            io: ioRegistry.provider(),
-            ctx,
-            threatExemptLabels: config.threatExemptLabels,
-            limits: {
-              ...DEFAULT_SKILL_LIMITS,
-              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
-            },
-          })
-          const built = await buildExtractPlanFromLibrary(library, {
-            source,
-            items: extractItems,
-            ...(outcomeFlag === undefined ? (proposalOutcome === undefined ? {} : { outcome: proposalOutcome }) : { outcome: outcomeFlag }),
-            ...(ownerCovers ? { ownerCovers: true } : {}),
-          })
-          if (!built.ok) return err(built.message)
-          const plan = built.plan
-          const warnings = built.warnings === undefined || built.warnings.length === 0 ? '' : '\n' + built.warnings.join('\n')
-          if (!command.flags.has('apply')) {
-            const proposal = proposalFromPlan(plan, { runId: 'cli-' + Date.now().toString(36) })
-            const proposalPath = await writeProposalReport(ioRegistry.provider(), proposal).catch(() => { /* best-effort proposal report */ })
-            return ok('提取计划（未写入；默认 plan，--apply 才写）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + target + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + '；owner=' + ownerDecisionText(plan.owner) + warnings + '\nproposal_id: ' + proposal.id + (proposalPath === undefined ? '' : '（已写入 reports）'))
-          }
-          if (approval) {
-            const session = invocationAgent?.session
-            const sessionPolicy = effectiveSessionPolicy(ctx, session)
-            const stagesForeground = approval.isEnabled !== false
-              && sessionPolicy !== 'never'
-              && approval.stageForeground !== false
-            if (stagesForeground && session === undefined) return err(hostError('e-306-this-deployment-stages-foreground-2'))
-            if (stagesForeground && !approval.hasRunner('skill')) {
-              return err('无法暂存提取：没有注册技能回放运行器：请挂载 tool-skill-manage 行，或禁用 evolution-approval。')
-            }
-            const decision = await approval.request({
-              kind: 'skill',
-              summary: '/evolution extract ' + source + ' -> ' + target + ' ' + heading,
-              args: { operation: { action: 'extract', name: source, extract: extractItems }, origin: 'foreground', libraryOrigin: 'foreground' },
-              origin: 'foreground',
-              ...session !== undefined ? { sessionId: session.id, session } : {},
-              ...sessionPolicy !== undefined ? { sessionPolicy } : {},
-            })
-            if (decision.action === 'staged') return ok(decision.message)
-          }
-          const result = await library.extract(plan, 'foreground')
-          if (!result.ok) return err(result.message)
-          return ok(result.message + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + warnings)
         }
         if (input.startsWith('restructure ')) {
         // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
