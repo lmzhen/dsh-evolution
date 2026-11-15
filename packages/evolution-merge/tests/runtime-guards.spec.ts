@@ -32,7 +32,7 @@ function runtime(home: string, io: Awaited<ReturnType<typeof makeV4Home>>['io'],
   const deps: MergeRuntimeDeps = {
     io, home, registry: reg, skills: {} as SkillLibrary, now: () => 1,
     ...(isBlocked === undefined ? {} : { isBlocked }),
-    params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: [], timeoutMinutes: 0,
@@ -46,7 +46,7 @@ it('fails scan and pair at run level when the host data plane is unavailable', a
   const reg = registry()
   const deps = {
     io: v4.io, home: v4.home, registry: reg, skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async () => ({ kind: 'unavailable' as const, code: 'E-323', reason: 'no channel' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'E-323', reason: 'no channel' }), dispose: async () => {} },
     hostCapabilities: { hostOnly: async () => ({ code: 'E-323' as const, detail: 'agentPresets not mounted' }) },
@@ -83,12 +83,12 @@ it('passes merge_stage as the only child allow-list entry', async () => {
   }
   const deps: MergeRuntimeDeps = {
     io: v4.io, home: v4.home, registry: registry(), skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel, parent: {}, allow: ['merge_stage'], timeoutMinutes: 0, detached: false,
     cards: async () => cards, screeningForRun: async () => [],
   }
   const service = createMergeRuntime(deps)
-  const result = await service.execute({ verb: 'pair', a: 'a', b: 'b' })
+  await service.execute({ verb: 'pair', a: 'a', b: 'b' })
   expect(opened[0]).toMatchObject({ allow: ['merge_stage'] })
 })
 
@@ -97,7 +97,7 @@ it('pair --force writes the forced decision without round 1', async () => {
   const opened: unknown[] = []
   const deps: MergeRuntimeDeps = {
     io: v4.io, home: v4.home, registry: registry(), skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async (args: unknown) => { opened.push(args); return { kind: 'unavailable' as const, code: 'x', reason: 'x' } }, continueTurn: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: ['merge_stage'], timeoutMinutes: 0, detached: false,
@@ -113,7 +113,7 @@ it('pair --force with approval yields a pending row with readable summaries', as
   const v4 = await makeV4Home([])
   const deps: MergeRuntimeDeps = {
     io: v4.io, home: v4.home, registry: registry(), skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: ['merge_stage'], timeoutMinutes: 0, detached: false,
@@ -142,7 +142,7 @@ it('candidates --retry reruns round 1 for a verify row', async () => {
   }
   const deps: MergeRuntimeDeps = {
     io: home.io, home: home.home, registry: registry(), skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false, channel, parent: {}, allow: ['merge_stage'], timeoutMinutes: 0, detached: false,
     cards: async () => cards, screeningForRun: async () => [],
   }
@@ -162,7 +162,7 @@ it('resume --retry enters the approved-row authoring path without a new approval
   const opened: unknown[] = []
   const deps: MergeRuntimeDeps = {
     io: home.io, home: home.home, registry: registry(), skills: {} as SkillLibrary, now: () => 1,
-    params: { mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    params: { mergeModelsRoot: '', mergeApproval: true, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
     platformWrite: false,
     channel: { open: async (args: unknown) => { opened.push(args); return { kind: 'unavailable' as const, code: 'x', reason: 'x' } }, continueTurn: async () => ({ kind: 'unavailable' as const, code: 'x', reason: 'x' }), dispose: async () => {} },
     parent: {}, allow: ['merge_stage'], timeoutMinutes: 0, detached: false,
@@ -221,7 +221,7 @@ it('pair refuses a curator-blocked name before opening a run', async () => {
 })
 
 it('pair drops a skipped row for the same pair before scanning', async () => {
-  const v4 = await makeV4Home([v3Row({ id: 'skip-1', state: 'skipped', reason: 'rejected', skipSource: 'human' })])
+  const v4 = await makeV4Home([v3Row({ id: 'skip-1', state: 'skipped', reason: 'rejected', skipSource: 'human' } as never)])
   const service = runtime(v4.home, v4.io)
   await service.execute({ verb: 'pair', a: 'a', b: 'b' } as never)
   expect((await loadMergeState(v4.io, v4.home)).state.rows.some(row => row.id === 'skip-1')).toBe(false)
@@ -306,3 +306,4 @@ it('row failures keep three lines and carry the row run id', async () => {
     expect(result.text).toContain('run=run-s')
   }
 })
+
