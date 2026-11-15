@@ -51,7 +51,7 @@ describe('evolution-threat', () => {
       signal: new AbortController().signal,
     })
     expect(result.isError).toBe(true)
-    expect(result.content.some((block: { type: string; text?: string }) => block.type === 'text' && block.text.includes('prompt_injection_ignore'))).toBe(true)
+    expect(result.content.some((block: { type: string; text?: string }) => block.type === 'text' && block.text?.includes('prompt_injection_ignore'))).toBe(true)
   })
 
   it('scans BOTH facts and content of an operations entry — facts cannot shadow content (E-28a, 0.3.17)', () => {
@@ -117,7 +117,7 @@ describe('evolution-threat', () => {
       signal: new AbortController().signal,
     })
     expect(blocked.isError).toBe(true)
-    expect(blocked.content.some(block => block.type === 'text' && block.text.includes('read_secrets'))).toBe(true)
+    expect(blocked.content.some((block: { type: string; text?: string }) => block.type === 'text' && block.text?.includes('read_secrets'))).toBe(true)
   })
 
 
@@ -170,3 +170,4 @@ describe('evolution-threat', () => {
     expect(infResult.maxScanChars).toBe(Infinity)
   })
 })
+

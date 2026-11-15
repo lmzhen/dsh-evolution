@@ -69,7 +69,7 @@ describe('projectCatalog', () => {
   })
 
   it('fails open when a catalog name is ambiguous across providers', () => {
-    const managed = summary('alpha')
+    summary('alpha')
     const external = summary('alpha', 'other')
     const base = input([{ name: 'alpha', description: 'a' }])
     const result = projectCatalog({
@@ -97,3 +97,4 @@ describe('projectCatalog', () => {
     expect(a.digest).not.toBe(c.digest)
   })
 })
+

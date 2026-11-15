@@ -1929,7 +1929,7 @@ Body of ${name}.
     const warnSpy = vi.spyOn(ctx.logger, 'warn')
     // Direct construction bypasses the schema `.min(1)`; the assembly clamp
     // must warn loudly.
-    new EvolutionCurator(ctx, { enabled: false, curatorIntervalHours: 0, staleAfterDays: vol(NaN).ref })
+    new EvolutionCurator(ctx, { enabled: false, curatorIntervalHours: vol(0), staleAfterDays: vol(NaN) as never })
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to the default'))
     warnSpy.mockRestore()
   })
@@ -2392,3 +2392,5 @@ it('P2-4 (v38): a rejecting list/mtime probe cannot crash the report reader', { 
   expect(listWarn.mock.calls.some(call => String(call[0]).includes('could not list the reports directory'))).toBe(true)
   listWarn.mockRestore()
 })
+
+

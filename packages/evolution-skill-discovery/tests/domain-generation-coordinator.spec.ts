@@ -40,7 +40,7 @@ function fixture(): { store: DomainMapStore; calls: () => number } {
     },
     rollback: async () => snapshot,
   } as DomainMapStore
-  const port = { generate: async () => { calls += 1; return proposal } }
+  { generate: async () => { calls += 1; return proposal } }
   return { store: Object.assign(store, { calls: () => calls }), calls: () => calls }
 }
 
@@ -69,3 +69,4 @@ it('derives generation facts from live rows, not config', () => {
   const facts = bootstrapFactsFromRows([skillIndexRowOf(summary, true)])
   expect(facts).toEqual([{ name: 'alpha', description: 'alpha desc', whenToUse: 'use alpha', skillKey: expect.any(String), threeFieldHash: expect.any(String) }])
 })
+

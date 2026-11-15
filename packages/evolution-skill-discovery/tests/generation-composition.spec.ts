@@ -13,9 +13,10 @@ it('fails loud when mode:on has no llm service', () => {
 })
 
 it('builds a global-map request from live rows', () => {
-  const request = buildGenerationRequest({ mapScope: 'global', sourceDigest: 'src', mapVersion: '0', rows: [skillIndexRowOf(summary, true)], prompt: 'p', promptVersion: 'v2' })
+  const request = buildGenerationRequest({ mapScope: 'global', sourceDigest: 'src', mapVersion: '0', rows: [skillIndexRowOf(summary, true)], prompt: 'p', promptVersion: 'v2' } as never)
   expect(request.mapScope).toBe('global')
   expect(request.sourceDigest).toBe('src')
   expect(request.expectedMapVersion).toBe('0')
   expect(request.facts[0]).toMatchObject({ name: 'alpha', whenToUse: 'use alpha' })
 })
+

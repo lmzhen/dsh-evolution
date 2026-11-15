@@ -48,7 +48,7 @@ export function legacyChannel(legacy: LegacySubagents) {
   let started = 0
   return {
     get state() { return AVAILABLE },
-    async prepare() { return AVAILABLE },
+    async prepare(_spec: unknown) { return AVAILABLE },
     async run(spec: {
       readonly parent: unknown
       readonly label: string
@@ -62,7 +62,7 @@ export function legacyChannel(legacy: LegacySubagents) {
       readonly signal?: AbortSignal
     }) {
       started += 1
-      const childId = 'legacy-child-' + started
+      const childId = ('legacy-child-' + started) as never
       const request = {
         label: spec.label,
         prompt: [{ type: 'text', text: spec.promptText }],
@@ -96,7 +96,7 @@ export function legacyChannel(legacy: LegacySubagents) {
           return {
             kind: 'no-structured' as const,
             childId,
-            stopReason: record.stopReason ?? 'completed',
+            stopReason: (record.stopReason ?? 'completed') as never,
             ...(record.diagnostic === undefined ? {} : { diagnostic: record.diagnostic }),
           }
         }
@@ -126,7 +126,7 @@ export function provideChannel(ctx: Context, legacy: LegacySubagents): { registe
     startActivation: async (spec: { label?: string; request: Record<string, unknown>; signal?: AbortSignal }) => {
       started += 1
       const run = await legacy.start('spawn', { ...spec.request, label: spec.label, signal: spec.signal })
-      const childId = 'legacy-child-' + started
+      const childId = ('legacy-child-' + started) as never
       if (run.localAgent !== undefined && run.localAgent !== null) children.set(childId, run.localAgent)
       const normalized = run.result.then(value => normalize(value))
       const aborted = new Promise<never>((_resolve, reject) => {
@@ -151,3 +151,6 @@ export function provideChannel(ctx: Context, legacy: LegacySubagents): { registe
   }
   return { registered }
 }
+
+
+

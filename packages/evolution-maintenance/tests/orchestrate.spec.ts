@@ -103,7 +103,7 @@ describe('runMaintain', () => {
     seenRequests.length = 0
     const withIo: MaintainRuntime = {
       ...runtime(validResult),
-      io: { list: async () => ['a.json', 'b.json'] },
+      io: { list: async () => ['a.json', 'b.json'], readText: async () => null, exists: async () => false },
     }
     const outcome = await runMaintain(withIo)
     expect(outcome.ok).toBe(true)
@@ -114,7 +114,7 @@ describe('runMaintain', () => {
 
   it('G3/3.4: the run also hands the three reachability readings to the subagent', async () => {
     seenRequests.length = 0
-    const withIo: MaintainRuntime = { ...runtime(validResult), io: { list: async () => [] } }
+    const withIo: MaintainRuntime = { ...runtime(validResult), io: { list: async () => [], readText: async () => null, exists: async () => false } }
     const outcome = await runMaintain(withIo)
     expect(outcome.ok).toBe(true)
     expect(seenRequests.join(' ')).toContain('store/history.blobs')
@@ -744,3 +744,4 @@ describe('renderMaintainTemplate', () => {
     expect(rendered).toContain('MECHANICAL_FACTS v=1 sig=sig123')
   })
 })
+

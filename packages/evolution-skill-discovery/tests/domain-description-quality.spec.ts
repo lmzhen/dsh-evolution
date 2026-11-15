@@ -1,6 +1,6 @@
 // @tier ci-only
 import { describe, expect, it } from 'vitest'
-import { descriptionHashOf, descriptionIsServable, evaluateDomainQuality, markStaleDescriptions, nextMapVersion, refreshAgedDescriptions, refreshStaleDescriptions, renderDomainDescription, shouldRegenerateDescription, type DomainMapStore, type DomainNode, type SkillDomainEdge, type SkillKey } from '../src/index.ts'
+import { descriptionHashOf, descriptionIsServable, evaluateDomainQuality, markStaleDescriptions, nextMapVersion, refreshAgedDescriptions, refreshStaleDescriptions, renderDomainDescription, shouldRegenerateDescription, type DomainMapStore, type DomainNode, type SkillDomainEdge } from '../src/index.ts'
 
 function node(id: string, purpose = 'distinct purpose', triggers: string[] = ['alpha']): DomainNode {
   return { id, name: id, purpose, description: 'old', inScope: ['alpha', 'beta'], outOfScope: ['gamma'], triggers, parentIds: [], status: 'active', version: 1, createdAt: 0, updatedAt: 0, descriptionHash: 'old', descriptionVersion: 1, descriptionStatus: 'fresh', provenance: {}, quality: {} }
@@ -64,3 +64,4 @@ describe('quality gate', () => {
     expect(evaluateDomainQuality(node('d', 'another purpose', ['alpha', 'beta']), [peer]).issues).toContain('overlaps-peer')
   })
 })
+

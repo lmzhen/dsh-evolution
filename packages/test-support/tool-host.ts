@@ -30,16 +30,16 @@ export interface ToolCallInput {
 /** Mount the registry, prompt service, and exactly one target executor. */
 export async function mountToolHost(ctx: Context, options: ToolHostOptions = {}): Promise<void> {
   const kind = options.executor ?? 'native'
-  if (options.session !== false) await ctx.plugin(SessionStore, {})
-  if (options.systemPrompt !== false) await ctx.plugin(SystemPrompt, {})
+  if (options.session !== false) await ctx.plugin(SessionStore)
+  if (options.systemPrompt !== false) await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime, {})
-  if (kind === 'ptc' && options.ptcRuntime !== undefined) await ctx.plugin(options.ptcRuntime as never)
+  if (kind === 'ptc' && options.ptcRuntime !== undefined) await ctx.plugin(options.ptcRuntime as never, null as never)
   const spec: string = kind === 'ptc'
     ? '@deepseek-ai/dsh-tool-executor-ptc'
     : '@deepseek-ai/dsh-tool-executor-native'
   const mod = await import(/* @vite-ignore */ spec) as { apply?: (context: Context) => void }
   if (typeof mod.apply !== 'function') throw new Error('tool-host: ' + spec + ' has no apply()')
-  await ctx.plugin(mod as never)
+  await ctx.plugin(mod as never, null as never)
 }
 
 /** Call one tool through the batch seam; return the inner result. */
@@ -82,3 +82,6 @@ export async function emitAgentInbox(ctx: Context, agent: unknown, name: string,
   if (typeof mod.emitAgentEvent !== 'function') throw new Error('tool-host: @deepseek-ai/dsh-agent has no emitAgentEvent')
   mod.emitAgentEvent(ctx, agent, name, payload)
 }
+
+
+

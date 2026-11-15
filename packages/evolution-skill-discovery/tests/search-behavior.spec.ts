@@ -1,5 +1,5 @@
 // @tier ci-only
-import { describe, expect, it } from 'vitest'
+import { expect, it } from 'vitest'
 import { readFile } from 'node:fs/promises'
 import { SkillSearchIndex, skillIndexRowOf, type SkillIndexRow } from '../src/index.ts'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
@@ -21,3 +21,4 @@ it('replays the EVAL-010 mixed-language fixture without hard-coding a judge sent
   expect(none.results).toHaveLength(0)
   expect(none.fallback).not.toBe(true)
 })
+

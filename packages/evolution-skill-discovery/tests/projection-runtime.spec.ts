@@ -17,7 +17,7 @@ import {
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 
 function summary(name: string, provider = 'dsh-evolution'): SkillSummary {
-  return { name, description: name + ' description', whenToUse: undefined, invocation: { modelInvocable: true, userInvocable: true }, source: 'user-dsh', provider }
+  return { name, description: name + ' description', invocation: { modelInvocable: true, userInvocable: true }, source: 'user-dsh', provider }
 }
 function node(id: string): DomainNode {
   return { id, name: id, purpose: 'purpose ' + id, description: 'old', inScope: ['in'], outOfScope: ['out'], triggers: ['t'], parentIds: [], status: 'active', version: 1, createdAt: 0, updatedAt: 0, descriptionHash: 'h', descriptionVersion: 1, descriptionStatus: 'fresh', provenance: {}, quality: {} }
@@ -68,7 +68,7 @@ function catalogText(out: PreStepDecision): string {
 describe('ProjectionRuntime', () => {
   it('applies per-view projection and restores after map becomes corrupt', async () => {
     let broken = false
-    const map = { read: async () => { if (broken) throw new Error('map broken'); return snapshot } } as DomainMapStore
+    const map = { read: async () => { if (broken) throw new Error('map broken'); return snapshot } } as unknown as DomainMapStore
     const journal = new ProjectionJournal(memoryIo(), 'journal.json')
     const rt = runtime(map, journal)
     const applied = await rt.project(agent(), decision())
@@ -87,7 +87,7 @@ describe('ProjectionRuntime', () => {
 
   it('stops hiding when search becomes unavailable', async () => {
     let searchReady = true
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const rt = new ProjectionRuntime({
       skillIndexSource: source, map, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal: new ProjectionJournal(memoryIo(), 'journal.json'), workingDirectory: { ensure: async () => '/w' },
       featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on', searchAvailable: () => searchReady,
@@ -101,7 +101,7 @@ describe('ProjectionRuntime', () => {
 
   it('restores with a replacement catalog when no catalog is present', async () => {
     let broken = false
-    const map = { read: async () => { if (broken) throw new Error('map broken'); return snapshot } } as DomainMapStore
+    const map = { read: async () => { if (broken) throw new Error('map broken'); return snapshot } } as unknown as DomainMapStore
     const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'))
     await rt.project(agent(), decision())
     broken = true
@@ -113,7 +113,7 @@ describe('ProjectionRuntime', () => {
 
   it('appends a replacement catalog when the map changes without a catalog message', async () => {
     let current: DomainMapSnapshot = snapshot
-    const map = { read: async () => current } as DomainMapStore
+    const map = { read: async () => current } as unknown as DomainMapStore
     const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'))
     await rt.project(agent(), decision())
     current = { ...snapshot, mapVersion: '2', edges: [] }
@@ -124,7 +124,7 @@ describe('ProjectionRuntime', () => {
   })
 
   it('reprojects a full catalog after compaction instead of returning the unprojected decision', async () => {
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'))
     await rt.project(agent(), decision())
     const reemitted = await rt.project(agent(), decision())
@@ -138,9 +138,9 @@ describe('ProjectionRuntime', () => {
     const session = { readEvents: () => message === undefined ? [] : [{ type: 'user/message', data: message }] }
     const first = { id: 'restart', session } as unknown as Agent
     const journal = new ProjectionJournal(memoryIo(), 'journal.json')
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const applied = await runtime(map, journal).project(first, decision())
-    const restarted = new ProjectionRuntime({ skillIndexSource: source, map: { read: async () => { throw new Error('broken') } } as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal, workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
+    const restarted = new ProjectionRuntime({ skillIndexSource: source, map: { read: async () => { throw new Error('broken') } } as unknown as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal, workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
     const restored = await restarted.project(first, applied)
     expect(catalogText(restored)).toContain('- alpha:')
   })
@@ -149,21 +149,21 @@ describe('ProjectionRuntime', () => {
     const base = decision()
     const message = base.kind === 'enter' ? base.messages[0]! : undefined
     const cold = { id: 'cold', session: { readEvents: () => message === undefined ? [] : [{ type: 'user/message', data: message }] } } as unknown as Agent
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'))
     const projected = await rt.project(cold, { kind: 'enter', messages: [] })
     expect(catalogText(projected)).toContain('replacement catalog')
   })
 
   it('passes now so production can mark aged descriptions stale', async () => {
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const rt = new ProjectionRuntime({ skillIndexSource: source, map, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal: new ProjectionJournal(memoryIo(), 'journal.json'), workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on', descriptionStaleAfterHours: 1 })
     const applied = await rt.project(agent(), decision())
     expect(catalogText(applied)).toContain('descriptionStatus=stale')
   })
 
   it('does not append the same projection digest twice', async () => {
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const rt = new ProjectionRuntime({ skillIndexSource: source, map, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal: new ProjectionJournal(memoryIo(), 'journal.json'), workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
     const applied = await rt.project(agent(), decision())
     const second = await rt.project(agent(), applied)
@@ -171,14 +171,14 @@ describe('ProjectionRuntime', () => {
   })
 
   it('does not project a frozen session', async () => {
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'), true)
     const original = decision()
     expect(await rt.project(agent(), original)).toBe(original)
   })
 
   it('applies one projection context when a full catalog is re-sent (compaction)', async () => {
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'))
     const first = await rt.project(agent(), decision())
     const second = await rt.project(agent(), decision())
@@ -201,29 +201,29 @@ describe('ProjectionRuntime', () => {
     const events = [t1, t2].flatMap(item => item.kind === 'enter' ? item.messages.map(message => ({ type: 'user/message', data: message })) : [])
     const sessionAgent = { id: 'newest-base', session: { id: 's', readEvents: () => events } } as unknown as Agent
     const journal = new ProjectionJournal(memoryIo(), 'journal.json')
-    const map = { read: async () => allSnapshot } as DomainMapStore
+    const map = { read: async () => allSnapshot } as unknown as DomainMapStore
     const rt = new ProjectionRuntime({ skillIndexSource: allSource, map, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal, workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
     const applied = await rt.project(sessionAgent, t2)
     expect(catalogText(applied)).not.toContain('- `alpha`:')
-    const restarted = new ProjectionRuntime({ skillIndexSource: allSource, map: { read: async () => { throw new Error('broken') } } as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal, workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
+    const restarted = new ProjectionRuntime({ skillIndexSource: allSource, map: { read: async () => { throw new Error('broken') } } as unknown as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal, workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
     const restored = await restarted.project(sessionAgent, applied)
     expect(catalogText(restored)).toContain('- gamma:')
     expect(catalogText(restored)).toContain('- alpha:')
   })
 
   it('restores a projected-only cold session from its full source entries instead of blocking', async () => {
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const journal = new ProjectionJournal(memoryIo(), 'journal.json')
     const cold = { id: 'cold-projected', session: { id: 's' } } as unknown as Agent
     const applied = await runtime(map, journal).project(cold, decision())
-    const restarted = new ProjectionRuntime({ skillIndexSource: source, map: { read: async () => { throw new Error('broken') } } as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal: new ProjectionJournal(memoryIo(), 'empty.json'), workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
+    const restarted = new ProjectionRuntime({ skillIndexSource: source, map: { read: async () => { throw new Error('broken') } } as unknown as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal: new ProjectionJournal(memoryIo(), 'empty.json'), workingDirectory: { ensure: async () => '/w' }, featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on' })
     const restored = await restarted.project(cold, applied)
     expect(restarted.report().action).toBe('restored')
     expect(catalogText(restored)).toContain('- `alpha`:')
   })
 
   it('does not re-append a replacement catalog on a restarted runtime with the same session digest', async () => {
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const journal = new ProjectionJournal(memoryIo(), 'journal.json')
     const sessionAgent = { id: 'restart-replay', session: { id: 's', readEvents: () => [] } } as unknown as Agent
     const first = await runtime(map, journal).project(sessionAgent, decision())
@@ -240,7 +240,7 @@ describe('ProjectionRuntime', () => {
 
   it('adds domain cards even when no skill is hidden', async () => {
     const cardsOnly = { ...snapshot, edges: [] } as DomainMapSnapshot
-    const map = { read: async () => cardsOnly } as DomainMapStore
+    const map = { read: async () => cardsOnly } as unknown as DomainMapStore
     const rt = runtime(map, new ProjectionJournal(memoryIo(), 'journal.json'))
     const applied = await rt.project(agent(), decision())
     const contexts = applied.kind === 'enter' ? applied.messages.filter(message => message.source.kind === 'evolution-skill-projection') : []
@@ -251,7 +251,7 @@ describe('ProjectionRuntime', () => {
 
 
   it('resolves policy per working directory for two windows', async () => {
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const disabled = new DomainPolicyStore({ global: { mode: 'on' }, workspace: { disableDomains: ['d1'] } })
     const enabled = new DomainPolicyStore({ global: { mode: 'on' } })
     const rt = new ProjectionRuntime({
@@ -271,7 +271,7 @@ describe('ProjectionRuntime', () => {
 
   it('P2-10: a real Session without history fails open with a warning instead of silently blocking', async () => {
     const warnings: string[] = []
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const rt = new ProjectionRuntime({
       skillIndexSource: source, map, policy: new DomainPolicyStore({ global: { mode: 'on' } }),
       journal: new ProjectionJournal(memoryIo(), 'journal.json'),
@@ -288,7 +288,7 @@ describe('ProjectionRuntime', () => {
   })
 
   it('restores and dedupes through the real projection-history port without readEvents', async () => {
-    const map = { read: async () => snapshot } as DomainMapStore
+    const map = { read: async () => snapshot } as unknown as DomainMapStore
     const journal = new ProjectionJournal(memoryIo(), 'journal.json')
     const frame = { text, entries: [{ name: 'alpha', description: 'alpha description' }, { name: 'beta', description: 'beta description' }], update: false }
     const agentWithoutLog = { id: 'projection-history', session: { id: 's' } } as unknown as Agent
@@ -302,7 +302,7 @@ describe('ProjectionRuntime', () => {
     const digest = context === undefined ? undefined : (context.source as { digest?: string }).digest
     expect(digest).toBeDefined()
     const restarted = new ProjectionRuntime({
-      skillIndexSource: source, map: { read: async () => { throw new Error('broken') } } as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal,
+      skillIndexSource: source, map: { read: async () => { throw new Error('broken') } } as unknown as DomainMapStore, policy: new DomainPolicyStore({ global: { mode: 'on' } }), journal,
       workingDirectory: { ensure: async () => '/w' }, history: () => ({ catalogs: [frame], digests: digest === undefined ? [] : [digest] }),
       featureEpoch: 'e', codecVersion: 'c1', adapterVersion: 'a', projectionSchemaVersion: 'p', mode: 'on',
     })
@@ -312,3 +312,5 @@ describe('ProjectionRuntime', () => {
   })
 
 })
+
+

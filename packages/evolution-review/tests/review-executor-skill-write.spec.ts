@@ -84,7 +84,7 @@ describe('real skill_manage write', () => {
           const results = []
           for (const toolCall of input.calls) {
             const result = await executeTool(ctx, toolAgent, toolCall.id, toolCall.name, toolCall.arguments, input.signal)
-            results.push({ callId: toolCall.id, result })
+            results.push({ callId: toolCall.id, result: result as never })
           }
           return { results }
         },
@@ -116,3 +116,4 @@ describe('real skill_manage write', () => {
     }
   })
 })
+
