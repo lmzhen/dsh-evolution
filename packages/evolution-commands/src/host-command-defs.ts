@@ -34,3 +34,8 @@ export const HOST_COMMAND_DEFS: readonly HostCommandDef[] = [
   { id: 'extract', words: ['extract'], summaryKey: 'summary.extract', helpKey: 'help.extract', flags: [{ name: 'start', kind: 'value' }, { name: 'end', kind: 'value' }, { name: 'outcome', kind: 'value' }, { name: 'proposal', kind: 'value' }, { name: 'owner-covers', kind: 'boolean' }, { name: 'apply', kind: 'boolean' }], positional: [], readOnly: false, needsRun: false, fallback: "extract <source> <target> \"<heading>\" [--start <line>] [--end <line>] [--outcome extract|mixed] [--proposal <id>] [--owner-covers] [--apply]", usageLine: "extract <source> <target> \"<heading>\" [--start <line>] [--end <line>] [--outcome extract|mixed] [--proposal <id>] [--owner-covers] [--apply]" },
   { id: 'replay', words: ['replay'], summaryKey: 'summary.replay', helpKey: 'help.replay', flags: [], positional: [], readOnly: true, needsRun: false, fallback: "replay", usageLine: "replay" },
 ]
+
+/** Resolve one single-token command name to its declaration (nested ids are matched by words later). */
+export function hostCommandDefForName(name: string): HostCommandDef | undefined {
+  return HOST_COMMAND_DEFS.find(def => def.words.length === 1 && def.words[0] === name)
+}

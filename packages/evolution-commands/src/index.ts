@@ -39,6 +39,7 @@ import { paramGroups, paramSurfaceRows, renderParamJson, renderParamRows, type P
 import { flagsOf, renderHelpText, renderHint } from './registry.ts'
 import { isParseFailure, parseSubcommand } from './parse.ts'
 import { HOST_COMMAND_HANDLERS } from './host-commands/handlers.ts'
+import { hostCommandDefForName } from './host-command-defs.ts'
 // G7-3: the atomic writer moved to the core io seam (one implementation); re-exported so this
 // module public surface -- Commands.atomicWriteFiles, which the F-211 spec drives -- is unchanged.
 import { atomicWriteFiles } from '@deepseek-ai/dsh-evolution-core'
@@ -443,12 +444,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const approval = (ctx.get('evolutionApproval') as ApprovalLike | undefined)
         // G7.4/C7: the ONE parser answers the shape.
         const command = parseSubcommand(input)
-        if (!isParseFailure(command)) {
-          const handler = HOST_COMMAND_HANDLERS[command.name]
-          if (handler !== undefined) {
+        const def = !isParseFailure(command) ? hostCommandDefForName(command.name) : undefined
+        switch (def?.id) {
+          case 'pending':
+          case 'approve':
+          case 'reject':
+          case 'release': {
+            if (def === undefined || isParseFailure(command)) break
+            const handler = HOST_COMMAND_HANDLERS[def.id]
+            if (handler === undefined) break
             const handled = await handler({ input, command, approval, locale: hostLocale })
             if (handled !== undefined) return handled
+            break
           }
+          default: break
         }
         if (input === 'curator run') {
           const curator = ctx.get('evolutionCurator') as { run(options?: { ignoreGates?: boolean }): Promise<{ stale: string[]; archived: string[]; errors: string[]; skipped?: string; report: { runId: string; snapshotPath?: string } }> } | undefined
