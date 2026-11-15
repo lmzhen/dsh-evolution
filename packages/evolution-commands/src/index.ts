@@ -450,11 +450,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           case 'params':
           case 'curator':
           case 'mutations':
-          case 'doctor': {
+          case 'doctor':
+          case 'restore':
+          case 'skill.restore': {
             if (def === undefined || isParseFailure(command)) break
             const handler = HOST_COMMAND_HANDLERS[def.id]
             if (handler === undefined) break
-            const handled = await handler({ input, command, approval, locale: hostLocale, provider: ctx.get('settings') as SettingsProviderLike | undefined, ctx, runs: doctorRuns })
+            const handled = await handler({ input, command, approval, locale: hostLocale, provider: ctx.get('settings') as SettingsProviderLike | undefined, ctx, runs: doctorRuns, refusal: unreplayableWriteRefusal })
             if (handled !== undefined) return handled
             break
           }
@@ -475,36 +477,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           default: break
         }
-        if (input === 'restore' || input.startsWith('restore ')) {
-          // P0-2 (v11): the bare `restore` (registry/README documented usage)
-          // fell into the help branch — the handler only matched the
-          // argument-carrying shape. Both forms now reach restoreSnapshot.
-          // P2-11 (v19): reject an unexpected tail. The v11 shape accepted any
-          // argument and silently ran a WHOLE-TREE rollback, so an operator who
-          // typed `/evolution restore <name>` (missing the `skill ` prefix)
-          // triggered the destructive path by accident.
-          const tail = input.slice('restore'.length).trim()
-          if (tail !== '') {
-            return err(`\`restore\` 不接受参数（收到 "${tail}"）。\`restore\` 做整树回滚，\`skill restore <name>\` 恢复单个技能。`)
-          }
-          const restoreRefusal = unreplayableWriteRefusal('restore')
-          if (restoreRefusal) return restoreRefusal
-          const curator = ctx.get('evolutionCurator') as { restoreSnapshot(): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.restoreSnapshot() : { ok: false, message: hostError('e-302-curator-service-not-mounted') }
-          return result.ok ? ok(result.message) : err(result.message)
-        }
         if (input === 'consolidate' || input.startsWith('consolidate ')) {
           const plan = /--plan\s+(\S+)/.exec(input)?.[1]
           return err('`consolidate` 已退出用户面：机械追加由 curator 归档收尾，人类合成用 `/evolution merge pair <a> <b>`。' + (plan === undefined ? '' : '\n旧 --plan 审计只读保留：' + plan))
-        }
-        if (input.startsWith('skill restore ')) {
-          const name = input.slice(14).trim()
-          if (!name) return err('用法：/evolution skill restore <name>')
-          const skillRestoreRefusal = unreplayableWriteRefusal('skill restore')
-          if (skillRestoreRefusal) return skillRestoreRefusal
-          const curator = ctx.get('evolutionCurator') as { restore(name: string): Promise<{ ok: boolean; message: string }> } | undefined
-          const result = curator ? await curator.restore(name) : { ok: false, message: hostError('e-302-curator-service-not-mounted') }
-          return result.ok ? ok(result.message) : err(result.message)
         }
         if (input.startsWith('skill history ')) {
           const name = input.slice(14).trim()

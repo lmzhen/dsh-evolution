@@ -9,6 +9,7 @@ import type { ParsedCommand } from '../parse.ts'
 import { runParamsCommand } from './params-command.ts'
 import { runCuratorCommand, runMutationsCommand } from './curator-command.ts'
 import { runDoctorCommand, type DoctorCommandContext } from './doctor-command.ts'
+import { runRestoreCommand, runSkillRestoreCommand } from './restore-commands.ts'
 import {
   runDecisionCommand,
   runPendingCommand,
@@ -25,6 +26,8 @@ export interface CommandHandlerContext extends ApprovalCommandContext {
   readonly ctx?: { get(name: string): unknown } | undefined
   /** Doctor's run counts (the local registry snapshot). */
   readonly runs?: (() => { running: number; orphaned: number }) | undefined
+  /** The host's "this write cannot be replayed" refusal, for destructive commands. */
+  readonly refusal?: ((what: string) => CommandResult | undefined) | undefined
 }
 
 /** A handler returns undefined when the command shape is not its own, so the legacy chain can answer. */
@@ -64,4 +67,10 @@ export const HOST_COMMAND_HANDLERS: Readonly<Record<string, CommandHandler>> = {
         runs: context.runs,
         locale: context.locale,
       }),
+  restore: context => context.ctx === undefined || context.refusal === undefined
+    ? undefined
+    : runRestoreCommand({ input: context.input, ctx: context.ctx, locale: context.locale, refusal: context.refusal }),
+  'skill.restore': context => context.ctx === undefined || context.refusal === undefined
+    ? undefined
+    : runSkillRestoreCommand({ input: context.input, ctx: context.ctx, locale: context.locale, refusal: context.refusal }),
 }
