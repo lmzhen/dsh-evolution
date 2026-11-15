@@ -665,6 +665,100 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (!result.ok) return err(result.message)
           return ok(result.message + '\n提取判定：outcome=' + plan.outcome + '；target=' + target + warnings)
           }
+          case 'restructure': {
+        // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
+                    if (isParseFailure(command) || command.name !== 'restructure') {
+            return err('用法：/evolution restructure <name> "<heading>" <to_file>')
+          }
+          const name = command.positionals[0] ?? ''
+          const heading = command.positionals[1] ?? ''
+          const toFile = command.positionals[2] ?? ''
+          if (name === '' || heading === '' || toFile === '') {
+            return err('用法：/evolution restructure <name> "<heading>" <to_file>')
+          }
+          const planFlag = command.flags.get('plan')
+          const planRunId = typeof planFlag === 'string' ? planFlag : undefined
+          if (!toFile.startsWith('references/')) return err('to_file 必须位于 references/ 之下（日志或明细的落地位置）。')
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法重构。')
+          // v20 (D-2 / P2-8): the write joins the approval seam like every
+          // other user-facing skill write — an approval-enabled deployment
+          // must not have a command path that lands the same kind of write
+          // directly (the family contract learning-graph's P2-6 states for
+          // /graph). When the service is absent, disabled, or staging will
+          // not happen, `request` returns 'allow' and the direct write below
+          // runs unchanged. The pre-check refuses only the combination that
+          // would stage a record nobody could ever replay (P1-9 trap).
+          if (approval) {
+            // V24-10 (v24): the session now rides the request, exactly like
+            // the two same-family staging surfaces (tool-skill-manage and
+            // learning-graph). The previous `effectiveSessionPolicy(ctx,
+            // undefined)` was a constant-undefined dead call — the helper's
+            // own contract returns undefined when the session is missing — so
+            // a session/deployment `'never'` policy never reached this write
+            // face and the staged record carried no sessionId attribution.
+            const session = invocationAgent?.session
+            const sessionPolicy = effectiveSessionPolicy(ctx, session)
+            const stagesForeground = approval.isEnabled !== false
+              && sessionPolicy !== 'never'
+              && approval.stageForeground !== false
+            // PLAN S5.5 (2026-09-16, audit P2-23): in a staging deployment a
+            // session-less invocation (the E-305 shape) slipped past `willStage`
+            // — which gated only the hasRunner pre-check — into the
+            // unconditional `approval.request` below WITHOUT a session: the
+            // record landed with no session attribution, the exact V24-10
+            // violation, while consolidate/restore refuse through the E-306
+            // helper. Same structured refusal here; with a session present the
+            // behavior is unchanged.
+            if (stagesForeground && session === undefined) {
+              return err(hostError('e-306-this-deployment-stages-foreground-2'))
+            }
+            const willStage = stagesForeground
+            if (willStage && !approval.hasRunner('skill')) {
+              return err('无法暂存重构：没有注册技能回放运行器：请挂载 tool-skill-manage 行（evolution-agent 预设或 evolution-all），或禁用 evolution-approval。')
+            }
+            const decision = await approval.request({
+              kind: 'skill',
+              summary: `/evolution restructure ${name}${planRunId ? ` (plan ${planRunId})` : ''}`,
+              args: { operation: { action: 'restructure', name, restructure: [{ heading, to_file: toFile }] }, origin: 'foreground', libraryOrigin: 'foreground' },
+              origin: 'foreground',
+              // A session-less caller only reaches this request when staging
+              // is OFF (the refusal above covers the staging deployment), so
+              // a staged record still never lands without attribution.
+              ...session !== undefined ? { sessionId: session.id, session } : {},
+              ...sessionPolicy !== undefined ? { sessionPolicy } : {},
+            })
+            if (decision.action === 'staged') {
+              return ok(`${decision.message}${planRunId ? `\n[audit] plan=${planRunId}` : ''}`)
+            }
+          }
+          // V8-08 (0.3.47): the command's restructure write joins the single
+          // write-sink discipline — the skill-catalog cache invalidation
+          // event fires like every other mutating construction point.
+          // P2-18 (V10-03): the write-side library receives the configured
+          // threat-scan exemption labels — the core-side constructor option
+          // field is named `threatExemptLabels` (P2-18 core batch; the field
+          // name is the linkage contract, keep in sync). Empty/omitted keeps
+          // the strict scan unchanged.
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
+            config: { root: skillsRootValue },
+            io: ioRegistry.provider(),
+            ctx,
+            threatExemptLabels: config.threatExemptLabels,
+            // 0.5.0 (§16.7): the write-behind stages are deployment policy, so the
+            // command's restructure honours exactly what skill_manage honours.
+            limits: {
+              ...DEFAULT_SKILL_LIMITS,
+              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
+            },
+          })
+          const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
+          if (!result.ok) return err(result.message)
+          // Same mutating observation surface as skill_manage performs for the
+          // same action — the patch_count bump keeps the signals coherent.
+          await (ctx.get('skillUsage') as { record?: (name: string, kind: 'patch') => Promise<void> } | undefined)?.record?.(name, 'patch')
+          return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
+          }
           case 'propose': {
             const curator = ctx.get('evolutionCurator') as { proposeKeeps(): Promise<{ ok: boolean; count: number; message: string }> } | undefined
             if (!curator) return err(hostError('e-302-curator-service-not-mounted'))
@@ -1146,100 +1240,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // Review P2-5: the hint still demanded an id from `report`/`cancel` and never named
           // `handoff`, so it described a grammar two releases behind the one it guards.
           return err('未知的 maintain 参数：应为 `maintain`、`maintain --timeout <ms>` / `maintain --timeout=<ms>`、`maintain status [<id>]`、`maintain report [<id>]`、`maintain handoff [<id>]` 或 `maintain cancel [<id>]`。实际收到：' + input)
-        }
-        if (input.startsWith('restructure ')) {
-        // G7.4/C7: the ONE parser owns the shape (quote-aware tokens, `--plan` as a flag).
-                    if (isParseFailure(command) || command.name !== 'restructure') {
-            return err('用法：/evolution restructure <name> "<heading>" <to_file>')
-          }
-          const name = command.positionals[0] ?? ''
-          const heading = command.positionals[1] ?? ''
-          const toFile = command.positionals[2] ?? ''
-          if (name === '' || heading === '' || toFile === '') {
-            return err('用法：/evolution restructure <name> "<heading>" <to_file>')
-          }
-          const planFlag = command.flags.get('plan')
-          const planRunId = typeof planFlag === 'string' ? planFlag : undefined
-          if (!toFile.startsWith('references/')) return err('to_file 必须位于 references/ 之下（日志或明细的落地位置）。')
-          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
-          if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法重构。')
-          // v20 (D-2 / P2-8): the write joins the approval seam like every
-          // other user-facing skill write — an approval-enabled deployment
-          // must not have a command path that lands the same kind of write
-          // directly (the family contract learning-graph's P2-6 states for
-          // /graph). When the service is absent, disabled, or staging will
-          // not happen, `request` returns 'allow' and the direct write below
-          // runs unchanged. The pre-check refuses only the combination that
-          // would stage a record nobody could ever replay (P1-9 trap).
-          if (approval) {
-            // V24-10 (v24): the session now rides the request, exactly like
-            // the two same-family staging surfaces (tool-skill-manage and
-            // learning-graph). The previous `effectiveSessionPolicy(ctx,
-            // undefined)` was a constant-undefined dead call — the helper's
-            // own contract returns undefined when the session is missing — so
-            // a session/deployment `'never'` policy never reached this write
-            // face and the staged record carried no sessionId attribution.
-            const session = invocationAgent?.session
-            const sessionPolicy = effectiveSessionPolicy(ctx, session)
-            const stagesForeground = approval.isEnabled !== false
-              && sessionPolicy !== 'never'
-              && approval.stageForeground !== false
-            // PLAN S5.5 (2026-09-16, audit P2-23): in a staging deployment a
-            // session-less invocation (the E-305 shape) slipped past `willStage`
-            // — which gated only the hasRunner pre-check — into the
-            // unconditional `approval.request` below WITHOUT a session: the
-            // record landed with no session attribution, the exact V24-10
-            // violation, while consolidate/restore refuse through the E-306
-            // helper. Same structured refusal here; with a session present the
-            // behavior is unchanged.
-            if (stagesForeground && session === undefined) {
-              return err(hostError('e-306-this-deployment-stages-foreground-2'))
-            }
-            const willStage = stagesForeground
-            if (willStage && !approval.hasRunner('skill')) {
-              return err('无法暂存重构：没有注册技能回放运行器：请挂载 tool-skill-manage 行（evolution-agent 预设或 evolution-all），或禁用 evolution-approval。')
-            }
-            const decision = await approval.request({
-              kind: 'skill',
-              summary: `/evolution restructure ${name}${planRunId ? ` (plan ${planRunId})` : ''}`,
-              args: { operation: { action: 'restructure', name, restructure: [{ heading, to_file: toFile }] }, origin: 'foreground', libraryOrigin: 'foreground' },
-              origin: 'foreground',
-              // A session-less caller only reaches this request when staging
-              // is OFF (the refusal above covers the staging deployment), so
-              // a staged record still never lands without attribution.
-              ...session !== undefined ? { sessionId: session.id, session } : {},
-              ...sessionPolicy !== undefined ? { sessionPolicy } : {},
-            })
-            if (decision.action === 'staged') {
-              return ok(`${decision.message}${planRunId ? `\n[audit] plan=${planRunId}` : ''}`)
-            }
-          }
-          // V8-08 (0.3.47): the command's restructure write joins the single
-          // write-sink discipline — the skill-catalog cache invalidation
-          // event fires like every other mutating construction point.
-          // P2-18 (V10-03): the write-side library receives the configured
-          // threat-scan exemption labels — the core-side constructor option
-          // field is named `threatExemptLabels` (P2-18 core batch; the field
-          // name is the linkage contract, keep in sync). Empty/omitted keeps
-          // the strict scan unchanged.
-          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
-            config: { root: skillsRootValue },
-            io: ioRegistry.provider(),
-            ctx,
-            threatExemptLabels: config.threatExemptLabels,
-            // 0.5.0 (§16.7): the write-behind stages are deployment policy, so the
-            // command's restructure honours exactly what skill_manage honours.
-            limits: {
-              ...DEFAULT_SKILL_LIMITS,
-              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
-            },
-          })
-          const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
-          if (!result.ok) return err(result.message)
-          // Same mutating observation surface as skill_manage performs for the
-          // same action — the patch_count bump keeps the signals coherent.
-          await (ctx.get('skillUsage') as { record?: (name: string, kind: 'patch') => Promise<void> } | undefined)?.record?.(name, 'patch')
-          return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
         }
         // G7.4/C7: the ONE parser answers the shape (flag order and `=` tolerated, F-4).
         if (input === '' || input === 'help') {
