@@ -17,7 +17,7 @@ it('copies row actions and honors the confirm gate on the production panel', asy
   const row: MergeRowView = {
     id: 'mr_copy', pairKey: 'mr_copy', a: 'alpha', b: 'beta', state: 'pending', queue: 'pending', stage: null, label: 'alpha + beta',
     updatedAt: '2026-01-01T00:00:00.000Z', bodies: [],
-    actions: [{ id: 'approve', command, confirm: false, enabled: true }], createdAt: 1,
+    actions: [{ id: 'approve', command, confirm: false, enabled: true }], createdAt: '2026-01-01T00:00:00.000Z',
   }
   const copySource: MergeSource = { ...source(), rows: async (queue): Promise<MergeOutcome<QueuePage>> => ({ ok: true, payload: { queue, expiredOnly: false, items: [row], counts: view().counts } }) }
   const store = new MergeStore(copySource, { view: view(), rows: [row] })
@@ -38,7 +38,7 @@ it('copies a confirm action immediately without native confirm', async () => {
   const row: MergeRowView = {
     id: 'mr_confirm', pairKey: 'mr_confirm', a: 'alpha', b: 'beta', state: 'pending', queue: 'pending', stage: null, label: 'alpha + beta',
     updatedAt: '2026-01-01T00:00:00.000Z', bodies: [],
-    actions: [{ id: 'restore', command, confirm: true, enabled: true }], createdAt: 1,
+    actions: [{ id: 'restore', command, confirm: true, enabled: true }], createdAt: '2026-01-01T00:00:00.000Z',
   }
   const confirmSource: MergeSource = { ...source(), rows: async (queue): Promise<MergeOutcome<QueuePage>> => ({ ok: true, payload: { queue, expiredOnly: false, items: [row], counts: view().counts } }) }
   const store = new MergeStore(confirmSource, { view: view(), rows: [row] })
@@ -108,3 +108,5 @@ it('disables platformWrite when capability is false and never derives it from me
   expect(el.querySelector('input[data-field="enabled"]')).toBeNull()
   expect(el.querySelector('input[data-field="mergeApproval"]')).toBeNull()
 })
+
+

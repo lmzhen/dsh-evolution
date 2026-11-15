@@ -211,3 +211,5 @@ export const en: Record<string, string> = {
   'state.fuse': 'Ready to merge',
   'state.skipped': 'Skipped',
 }
+
+

@@ -29,3 +29,5 @@ it('zh and en have the same complete key set', () => {
   expect(zh['action.discard']).toBe('复制丢弃命令')
   expect(zh['history.sourceRunId']).toBe('来源运行')
 })
+
+

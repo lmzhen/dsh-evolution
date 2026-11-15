@@ -158,3 +158,5 @@ export async function history(): Promise<MergeOutcome<{ items: MergeHistoryItem[
   const answer = await requestWire<WireHistory>(HOST_ROUTES.history)
   return answer.ok ? { ok: true, payload: { items: answer.payload.items.map(item => ({ name: item.name, kind: item.kind, reason: item.reason, lastVersion: item.lastVersion, archivedAt: new Date(item.archivedAt).toISOString(), ...(item.sourceRunId === undefined ? {} : { sourceRunId: item.sourceRunId }) })) } } : answer
 }
+
+

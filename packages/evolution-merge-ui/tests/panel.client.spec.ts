@@ -21,7 +21,7 @@ const row = (): MergeRowView => ({
   updatedAt: '2026-01-01T00:00:00.000Z', target: 'alpha', targetActual: 'alpha-v2', summary: { a: 'alpha summary', b: null, rationale: 'because' },
   stageView: { state: 'lost', expiresAt: 1_800_000_000_000 }, bodies: [{ name: 'alpha', side: 'live' }, { name: 'beta', side: 'archive' }],
   actions: [{ id: 'approve', command: '/evolution merge approve mr_pending', confirm: false, enabled: true }, { id: 'reject', command: '/evolution merge reject mr_pending', confirm: true, enabled: true, disabledReason: 'unavailable' }, { id: 'copy', command: '/evolution merge copy mr_pending', confirm: false, enabled: true }, { id: 'discard', command: '/evolution merge discard mr_pending', confirm: true, enabled: true }],
-  createdAt: 1, updatedAt: 2,
+  createdAt: '2026-01-01T00:00:00.000Z',
 })
 const source = (overrides: Partial<MergeSource> = {}): MergeSource => ({
   view: async () => ({ ok: true, payload: view() } as MergeOutcome<MergeViewPayload>),
@@ -78,7 +78,7 @@ it('renders four tabs, settings, run strip, pending id/three sentences and stage
 
 it('renders succeeded with no progress as progress unknown, never 0/N', () => {
   const base = view()
-  const noProgress = { ...base, lastRun: { ...base.lastRun!, progress: undefined } } as MergeViewPayload
+  const noProgress = { ...base, lastRun: { ...base.lastRun!, progress: undefined } } as unknown as MergeViewPayload
   const html = render(new MergeStore(source(), { view: noProgress, rows: [] }))
   expect(html).toContain('data-role="run-progress"')
   expect(html).toContain('run.progressUnknown')
@@ -86,7 +86,7 @@ it('renders succeeded with no progress as progress unknown, never 0/N', () => {
 })
 
 it('renders four tabs, the expired toggle, and pending summary only on pending rows', () => {
-  const fuse = { ...row(), id: 'mr_fuse', state: 'fuse' as const, queue: 'fuse' as const, summary: undefined, stageView: undefined }
+  const fuse = { ...row(), id: 'mr_fuse', state: 'fuse' as const, queue: 'fuse' as const, summary: undefined, stageView: undefined } as unknown as MergeRowView
   const html = render(new MergeStore(source(), { view: view(), rows: [row(), fuse] }))
   expect((html.match(/data-role="tab"/g) ?? []).length).toBe(4)
   expect(html).toContain('data-role="expired-toggle"')
@@ -94,7 +94,7 @@ it('renders four tabs, the expired toggle, and pending summary only on pending r
 })
 
 it('renders verify rows with verify facts and no pending summary', () => {
-  const verify = { ...row(), id: 'mr_verify', state: 'verify' as const, queue: 'verify' as const, verifySubState: 'candidates' as const, summary: undefined, stageView: undefined }
+  const verify = { ...row(), id: 'mr_verify', state: 'verify' as const, queue: 'verify' as const, verifySubState: 'candidates' as const, summary: undefined, stageView: undefined } as unknown as MergeRowView
   const html = render(new MergeStore(source(), { view: view(), rows: [verify], queue: 'verify' }))
   expect(html).toContain('data-row-state="verify"')
   expect(html).toContain('verify.candidates')
@@ -104,14 +104,14 @@ it('renders verify rows with verify facts and no pending summary', () => {
 it('renders rejected and kept reasons as localized copy, never raw codes', () => {
   for (const [reason, text] of [['rejected', '人工拒绝合并'], ['kept', '无需合并']] as const) {
     const skipped = { ...row(), id: 'mr_' + reason, state: 'skipped' as const, queue: 'skipped' as const, reason, reasonCode: reason }
-    const html = renderToStaticMarkup(createElement(MergePanel, { store: new MergeStore(source(), { view: view(), rows: [skipped], queue: 'skipped' }), t: key => zh[key] ?? key }))
+    const html = renderToStaticMarkup(createElement(MergePanel, { store: new MergeStore(source(), { view: view(), rows: [skipped], queue: 'skipped' }), t: key => (zh as Record<string, string>)[key] ?? key }))
     expect(html).toContain(text)
     expect(html).not.toContain('>' + reason + '<')
   }
 })
 
 it('renders English labels without raw locale keys', () => {
-  const html = renderToStaticMarkup(createElement(MergePanel, { store: new MergeStore(source(), { view: view(), rows: [row()] }), t: key => en[key] ?? key }))
+  const html = renderToStaticMarkup(createElement(MergePanel, { store: new MergeStore(source(), { view: view(), rows: [row()] }), t: key => (en as Record<string, string>)[key] ?? key }))
   expect(html).toContain(en['title']!)
   expect(html).toContain(en['tab.pending']! + ' 2')
   expect(html).not.toContain('settings.title')
@@ -201,7 +201,7 @@ it('keeps body and history errors inside the overlay', async () => {
   expect(html).toContain('data-role="rows"')
   const historyStore = new MergeStore(source({ history: async () => ({ ok: true, payload: { items: [{ name: 'a', kind: 'merged', reason: 'host reason', reasonCode: 'target-taken', lastVersion: 2, archivedAt: '2026-01-01T00:00:00.000Z' }] } } as MergeOutcome<{ items: MergeHistoryItem[] }>) }), { view: view(), rows: [] })
   await historyStore.openHistory()
-  const historyHtml = renderToStaticMarkup(createElement(MergePanel, { store: historyStore, t: (key: string) => zh[key] ?? key }))
+  const historyHtml = renderToStaticMarkup(createElement(MergePanel, { store: historyStore, t: (key: string) => (zh as Record<string, string>)[key] ?? key }))
   expect(historyHtml).toContain('data-role="history-item"')
   expect(historyHtml).toContain('data-role="history-item-name"')
   expect(historyHtml).toContain('data-role="history-item-version"')
@@ -212,3 +212,8 @@ it('keeps body and history errors inside the overlay', async () => {
 it('scopes family tokens to the portal modal root', () => {
   expect(CSS).toContain(':where(.evolution-merge-panel,.evo-merge-modal)')
 })
+
+
+
+
+

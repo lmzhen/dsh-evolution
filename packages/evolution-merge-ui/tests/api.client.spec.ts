@@ -32,7 +32,7 @@ describe('merge-ui client api', () => {
           id: 'mr_a', state: 'pending', queue: 'pending', a: 'alpha', b: 'beta',
           target: { requested: 'alpha', actual: 'alpha-v2' }, summary: { a: 'A', b: 'B', rationale: 'R' },
           stage: 'lost', reasonCode: 'target-taken', actions: [{ id: 'approve', command: '/evolution merge approve mr_a', confirm: false, enabled: true }],
-          bodies: [{ name: 'alpha', side: 'live' }, { name: 'beta', side: 'archive' }], createdAt: 1, updatedAt: 2,
+          bodies: [{ name: 'alpha', side: 'live' }, { name: 'beta', side: 'archive' }], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:01.000Z',
         }] }))
     vi.stubGlobal('fetch', fetchMock)
     const page = await rows('pending')
@@ -53,7 +53,7 @@ describe('merge-ui client api', () => {
   })
 
   it('combines a stage with the staging expiry carried by the same row', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => answer({ wireVersion: 1, readAt: 1, queue: 'fuse', expiredOnly: false, counts: facts.counts.active, rows: [{ id: 'mr_fuse', state: 'approved', queue: 'fuse', a: 'a', b: 'b', stage: 'present', staging: { state: 'kept', expiresAt: 42 }, target: { requested: 'a' }, actions: [], createdAt: 1, updatedAt: 2 }] })))
+    vi.stubGlobal('fetch', vi.fn(async () => answer({ wireVersion: 1, readAt: 1, queue: 'fuse', expiredOnly: false, counts: facts.counts.active, rows: [{ id: 'mr_fuse', state: 'approved', queue: 'fuse', a: 'a', b: 'b', stage: 'present', staging: { state: 'kept', expiresAt: 42 }, target: { requested: 'a' }, actions: [], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:01.000Z' }] })))
     expect(await rows('fuse')).toMatchObject({ ok: true, payload: { items: [{ stageView: { state: 'present', expiresAt: 42 } }] } })
   })
 
@@ -87,3 +87,5 @@ describe('merge-ui client api', () => {
     expect(await view()).toMatchObject({ ok: false, failure: { kind: 'problem', code: 'server', status: 503 } })
   })
 })
+
+

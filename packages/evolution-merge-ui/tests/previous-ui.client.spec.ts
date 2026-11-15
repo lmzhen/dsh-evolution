@@ -20,7 +20,7 @@ it('previous UI api reads the new server four GET envelopes', async () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => answer(url.includes('/body')
     ? { wireVersion: 1, readAt: 1, name: 'alpha', side: 'live', text: '# alpha', markdown: true, truncated: false, totalBytes: 7 }
     : url.includes('/rows')
-      ? { wireVersion: 1, readAt: 1, queue: 'pending', expiredOnly: false, counts: { active: { verify: 0, pending: 1, fuse: 0, skipped: 0 }, expired: 0 }, rows: [{ id: 'mr_a', state: 'pending', queue: 'pending', a: 'alpha', b: 'beta', target: { requested: 'alpha' }, actions: [{ id: 'approve', command: '/evolution merge approve mr_a', confirm: false, enabled: true }], createdAt: 1, updatedAt: 2 }], notes: [] }
+      ? { wireVersion: 1, readAt: 1, queue: 'pending', expiredOnly: false, counts: { active: { verify: 0, pending: 1, fuse: 0, skipped: 0 }, expired: 0 }, rows: [{ id: 'mr_a', state: 'pending', queue: 'pending', a: 'alpha', b: 'beta', target: { requested: 'alpha' }, actions: [{ id: 'approve', command: '/evolution merge approve mr_a', confirm: false, enabled: true }], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:01.000Z' }], notes: [] }
       : url.includes('/history')
         ? { wireVersion: 1, readAt: 1, items: [{ name: 'alpha', kind: 'merged', reason: 'merged', lastVersion: 2, archivedAt: 1 }] }
         : { wireVersion: 1, readAt: 1, counts: { active: { verify: 0, pending: 1, fuse: 0, skipped: 0 }, expired: 0 }, active: null, last: null, approval: { mergeApproval: true }, fallback: [], startCommands: { scan: 's', pair: 'p' }, notes: [], degraded: false })))
@@ -71,3 +71,5 @@ it('previous UI Panel still copies a row action command', async () => {
   expect(writes).toEqual(['/evolution merge approve mr_a'])
   root.unmount()
 })
+
+

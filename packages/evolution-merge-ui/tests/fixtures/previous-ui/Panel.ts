@@ -241,3 +241,5 @@ export function MergePanel(face: MergeFace): ReactNode {
     blocked === undefined ? createElement('button', { type: 'button', 'data-role': 'refresh', onClick: () => { loadView(); loadRows(tab, undefined, tab === 'pending' && expiredOnly) } }, t('refresh')) : null,
   )
 }
+
+

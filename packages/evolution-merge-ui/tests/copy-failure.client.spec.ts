@@ -18,7 +18,7 @@ const row = (): MergeRowView => ({
   id: 'mr_copy', pairKey: 'mr_copy', a: 'alpha', b: 'beta', state: 'pending', queue: 'pending', stage: null,
   label: 'alpha + beta', target: 'alpha',
   actions: [{ id: 'approve', command: '/evolution merge approve mr_copy', confirm: false, enabled: true }],
-  createdAt: 1, updatedAt: 2,
+  createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:01.000Z',
 })
 
 it('copy failure keeps the command selectable and retries the same command', async () => {
@@ -46,3 +46,5 @@ it('copy failure keeps the command selectable and retries the same command', asy
   root.unmount()
   host.remove()
 })
+
+

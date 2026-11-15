@@ -8,3 +8,5 @@ it('merges equal summaries once, keeps different ones separate, and reports miss
   expect(summarizePair('left', null)).toEqual({ kind: 'different', a: 'left', b: null })
   expect(summarizePair(' ', null)).toEqual({ kind: 'missing' })
 })
+
+

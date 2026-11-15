@@ -33,3 +33,5 @@ it('does not dispose the shared merge store when the panel unmounts', async () =
   expect(dispose).not.toHaveBeenCalled()
   expect(() => store.start()).not.toThrow()
 })
+
+

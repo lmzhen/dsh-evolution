@@ -12,7 +12,7 @@ import { rowOrderKey } from '../src/client/sorting.ts'
 
 const t = (key: string): string => key
 const view = (): MergeViewPayload => ({ counts: { verify: 0, pending: 3, fuse: 0, skipped: 0 }, expired: 0, tabs: [{ queue: 'verify', count: 0 }, { queue: 'pending', count: 3 }, { queue: 'fuse', count: 0 }, { queue: 'skipped', count: 0 }], commands: [], startCommands: { scan: 's', pair: 'p' }, notes: [], degraded: false, approval: { mergeApproval: false } })
-const row = (id: string): MergeRowView => ({ id, pairKey: id, a: 'a-' + id, b: 'b-' + id, state: 'pending', queue: 'pending', stage: null, label: 'label-' + id, updatedAt: '2026-01-01T00:00:00.000Z', actions: [], createdAt: 1 })
+const row = (id: string): MergeRowView => ({ id, pairKey: id, a: 'a-' + id, b: 'b-' + id, state: 'pending', queue: 'pending', stage: null, label: 'label-' + id, updatedAt: '2026-01-01T00:00:00.000Z', actions: [], createdAt: '2026-01-01T00:00:00.000Z' })
 const rows = [row('r1'), row('r2'), row('r3')]
 const source = (): MergeSource => ({
   view: async () => ({ ok: true, payload: view() } as MergeOutcome<MergeViewPayload>),
@@ -65,3 +65,5 @@ it('drops a row before its target and survives a tab switch', async () => {
   expect(order()).toEqual(['r2', 'r1', 'r3'])
   expect(JSON.parse(localStorage.getItem(rowOrderKey('ws-A', 'pending'))!)).toEqual(['r2', 'r1', 'r3'])
 })
+
+

@@ -34,3 +34,5 @@ it('refreshes facts and the current tab on focus and visibilitychange', async ()
   await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
   expect(viewCalls).toBeGreaterThan(afterFocus)
 })
+
+

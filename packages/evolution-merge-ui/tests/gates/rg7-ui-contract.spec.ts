@@ -27,3 +27,5 @@ it('RG7 UI consumes wireVersion, ActionRef, and imports no write model', () => {
   const deps = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).dependencies ?? {}
   expect(Object.keys(deps).some(name => name.includes('dsh-evolution-merge') || name.includes('dsh-evolution-core'))).toBe(false)
 })
+
+

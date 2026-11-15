@@ -60,7 +60,7 @@ describe('MergeStore', () => {
   it('a failed background view read keeps the readable view and rows', async () => {
     const read = vi.fn()
       .mockResolvedValueOnce({ ok: true, payload: view() } as MergeOutcome<MergeViewPayload>)
-      .mockResolvedValueOnce({ ok: false, failure: problem('view-lost') } as MergeOutcome<MergeViewPayload>)
+      .mockResolvedValueOnce({ ok: false, failure: problem('view-lost' as never) } as MergeOutcome<MergeViewPayload>)
     const store = new MergeStore(source({ view: read }), { view: view(), rows: [row('r1')] })
     await store.loadView()
     expect(store.read().viewState).toBe('ready')
@@ -115,3 +115,5 @@ describe('MergeStore', () => {
     expect(store.read().current.status).toBe('empty')
   })
 })
+
+

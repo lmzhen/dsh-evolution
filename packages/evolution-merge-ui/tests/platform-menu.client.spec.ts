@@ -27,3 +27,5 @@ it('renders the coordinate menu through MenuSurface and MenuItemButton', () => {
   expect(html).toContain('Top')
   expect(html).toContain('data-separator="true"')
 })
+
+
