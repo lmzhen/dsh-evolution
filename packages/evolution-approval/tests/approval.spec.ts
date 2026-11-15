@@ -7,6 +7,8 @@ import { effectiveSessionPolicy } from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { mountStateStack } from '../../test-support/state-stack.ts'
 
+const AUDIT = { channel: 'command', principal: 'owner', deploymentAllowsRemote: false } as const
+
 // v43 FLOW2-1: release's orphan criterion needs a claim whose holder is a LIVE
 // pid that is NOT this process — the only honest fixture for "another process
 // may be running this approve" (our own pid is the releasable leftover branch).
@@ -107,7 +109,7 @@ describe('evolution-approval', () => {
     // Simulate the crash: the record is claimed (→ executing) and the process
     // dies before the resolve. The runner never ran in this simulation.
     await ctx.evolutionState.claimPending(staged.id, 'crash-claim')
-    const retry = await ctx.evolutionApproval.approve(staged.id)
+    const retry = await ctx.evolutionApproval.approve(staged.id, AUDIT)
     expect(retry.ok).toBe(false)
     expect(retry.message).toContain('正在执行')
     // V5-18 (0.3.31): the message attributes the execution to a CONCURRENT
@@ -117,7 +119,7 @@ describe('evolution-approval', () => {
     expect(retry.message).toContain('不要拒绝')
     expect(executions).toBe(0) // ALWAYS zero duplication
     // Operator cleanup: reject resolves the executing record without a runner.
-    const cleanup = await ctx.evolutionApproval.reject(staged.id)
+    const cleanup = await ctx.evolutionApproval.reject(staged.id, AUDIT)
     expect(cleanup.ok).toBe(true)
     expect(await ctx.evolutionApproval.list('pending').then(rows => rows.length)).toBe(0)
   })
@@ -142,7 +144,7 @@ describe('evolution-approval', () => {
 
     const pending = await ctx.evolutionApproval.list('pending')
     expect(pending).toHaveLength(1)
-    const approve = await ctx.evolutionApproval.approve(pending[0]!.id)
+    const approve = await ctx.evolutionApproval.approve(pending[0]!.id, AUDIT)
     expect(approve.ok).toBe(true)
     expect(applied).toBe(1)
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(0)
@@ -155,10 +157,10 @@ describe('evolution-approval', () => {
     const ctx = await mountStateStack(home, { evolution: true, approval: true })
     ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: false, message: 'replay failed' }))
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'fail', args: {}, origin: 'background_review' })
-    const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
+    const failed = await ctx.evolutionApproval.approve(decision.pendingId!, AUDIT)
     expect(failed.ok).toBe(false)
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
-    const rejected = await ctx.evolutionApproval.reject(decision.pendingId!)
+    const rejected = await ctx.evolutionApproval.reject(decision.pendingId!, AUDIT)
     expect(rejected.ok).toBe(true)
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
   })
@@ -171,7 +173,7 @@ describe('evolution-approval', () => {
     // record must get the "reject instead of re-approving" guidance too.
     ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: false, message: 'Path traversal is not allowed.' }))
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'traverse', args: {}, origin: 'background_review' })
-    const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
+    const failed = await ctx.evolutionApproval.approve(decision.pendingId!, AUDIT)
     expect(failed.ok).toBe(false)
     expect(failed.message).toContain('Path traversal is not allowed.')
     expect(failed.message).toContain('请驳回该记录')
@@ -184,7 +186,7 @@ describe('evolution-approval', () => {
     const ctx = await mountStateStack(home, { evolution: true, approval: true })
     ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: false, message: 'entry "x" not found' }))
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'stale', args: {}, origin: 'background_review' })
-    const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
+    const failed = await ctx.evolutionApproval.approve(decision.pendingId!, AUDIT)
     expect(failed.ok).toBe(false)
     expect(failed.message).toContain('请驳回该记录')
   })
@@ -194,7 +196,7 @@ describe('evolution-approval', () => {
     const ctx = await mountStateStack(home, { evolution: true, approval: true })
     ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: false, message: 'replay failed' }))
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'fail', args: {}, origin: 'background_review' })
-    const failed = await ctx.evolutionApproval.approve(decision.pendingId!)
+    const failed = await ctx.evolutionApproval.approve(decision.pendingId!, AUDIT)
     expect(failed.ok).toBe(false)
     expect(failed.message).toBe('replay failed')
   })
@@ -231,7 +233,7 @@ describe('evolution-approval', () => {
     ctx.evolutionApproval.registerRunner('memory', () => hung)
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'live', args: {}, origin: 'background_review' })
     const id = decision.pendingId!
-    const running = ctx.evolutionApproval.approve(id)
+    const running = ctx.evolutionApproval.approve(id, AUDIT)
     // Poll instead of assuming 25 ms is enough on a loaded CI worker; the claim is
     // the state this test needs, not a wall-clock delay.
     for (let attempt = 0; attempt < 200; attempt += 1) {
@@ -335,8 +337,8 @@ describe('evolution-approval', () => {
       kind: 'memory', summary: 'atomic approval', args: { action: 'add', facts: 'x' }, origin: 'background_review',
     })
     const [a, b] = await Promise.all([
-      ctx.evolutionApproval.approve(decision.pendingId!),
-      ctx.evolutionApproval.approve(decision.pendingId!),
+      ctx.evolutionApproval.approve(decision.pendingId!, AUDIT),
+      ctx.evolutionApproval.approve(decision.pendingId!, AUDIT),
     ])
     // v21 (T-6) correction of the first tightening attempt: CONCURRENT
     // approve calls are coalesced by the in-flight dedupe (`approve:${id}`),
@@ -370,7 +372,7 @@ describe('evolution-approval', () => {
     })
     const id = decision.pendingId!
     // Start the approve runner (claims → 'executing', then blocks on the gate).
-    const approve = ctx.evolutionApproval.approve(id)
+    const approve = ctx.evolutionApproval.approve(id, AUDIT)
     // Wait until the record is actually 'executing' so reject hits the
     // executing-rescue path (the claim is held by the in-flight approve).
     for (let i = 0; i < 500; i++) {
@@ -378,7 +380,7 @@ describe('evolution-approval', () => {
       await new Promise(resolve => setTimeout(resolve, 2))
     }
     // The operator rejects while the runner is still in flight.
-    const rejected = await ctx.evolutionApproval.reject(id)
+    const rejected = await ctx.evolutionApproval.reject(id, AUDIT)
     expect(rejected.ok).toBe(true)
     // The message is honest about the race window, not "crashed approve cleaned up".
     expect(rejected.message).toContain('未持有占用声明')
@@ -458,17 +460,17 @@ describe('evolution-approval', () => {
     // live "another writer" — the old message mis-attributed it. Both approve
     // and reject must name the real cause.
     const missing = '00000000-0000-4000-8000-000000000000'
-    const approve = await ctx.evolutionApproval.approve(missing)
+    const approve = await ctx.evolutionApproval.approve(missing, AUDIT)
     expect(approve.ok).toBe(false)
     expect(approve.message).toContain('不在待批准窗口里')
-    const reject = await ctx.evolutionApproval.reject(missing)
+    const reject = await ctx.evolutionApproval.reject(missing, AUDIT)
     expect(reject.ok).toBe(false)
     expect(reject.message).toContain('不在待批准窗口里')
     // The executing branch stays intact (the crashed-approve cleanup path).
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'x', args: {}, origin: 'background_review' })
     const id = decision.pendingId!
     await ctx.evolutionState.claimPending(id, 'crash-claim')
-    const executing = await ctx.evolutionApproval.approve(id)
+    const executing = await ctx.evolutionApproval.approve(id, AUDIT)
     expect(executing.ok).toBe(false)
     expect(executing.message).toContain('正在执行')
   })
@@ -479,17 +481,17 @@ describe('evolution-approval', () => {
     ctx.evolutionApproval.registerRunner('memory', async () => { throw new Error('runner backend exploded') })
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'boom', args: {}, origin: 'background_review' })
     const id = decision.pendingId!
-    const failed = await ctx.evolutionApproval.approve(id)
+    const failed = await ctx.evolutionApproval.approve(id, AUDIT)
     expect(failed.ok).toBe(false)
     // The throw shape (not the runner {ok:false} shape): record stays pending
     // AND the claim is released — a retry or reject can still act on it.
     expect(failed.message).toContain('仍处于待批准状态')
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
     expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
-    const retry = await ctx.evolutionApproval.approve(id)
+    const retry = await ctx.evolutionApproval.approve(id, AUDIT)
     expect(retry.ok).toBe(false)
     expect(retry.message).not.toContain('already resolved')
-    const rejected = await ctx.evolutionApproval.reject(id)
+    const rejected = await ctx.evolutionApproval.reject(id, AUDIT)
     expect(rejected.ok).toBe(true)
   })
 
@@ -499,12 +501,12 @@ describe('evolution-approval', () => {
     // No registerRunner at all (host-only composition case).
     const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'orphan', args: {}, origin: 'background_review' })
     const id = decision.pendingId!
-    const approve = await ctx.evolutionApproval.approve(id)
+    const approve = await ctx.evolutionApproval.approve(id, AUDIT)
     expect(approve.ok).toBe(false)
     expect(approve.message).toContain('注册回放运行器')
     expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
     expect(await ctx.evolutionApproval.list('executing')).toHaveLength(0)
-    const rejected = await ctx.evolutionApproval.reject(id)
+    const rejected = await ctx.evolutionApproval.reject(id, AUDIT)
     expect(rejected.ok).toBe(true)
     expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(1)
   })
@@ -518,7 +520,7 @@ describe('evolution-approval', () => {
     // without executing anything.
     const decision = await ctx.evolutionApproval.request({ kind: 'capability', summary: 'capability demo', args: { name: 'demo' }, origin: 'foreground' })
     expect(decision.action).toBe('staged')
-    const approved = await ctx.evolutionApproval.approve(decision.pendingId!)
+    const approved = await ctx.evolutionApproval.approve(decision.pendingId!, AUDIT)
     expect(approved.ok).toBe(true)
     expect(approved.message).toContain('未执行任何代码')
     expect(await ctx.evolutionApproval.list('approved')).toHaveLength(1)
@@ -582,7 +584,7 @@ it('v28 G1.3 (APPR-01): a failed resolve after a successful runner reports the l
   const original = state.tryResolvePending
   state.tryResolvePending = async () => { throw new Error('corrupt pending-state.json (quarantined)') }
   try {
-    const result = await ctx.evolutionApproval.approve(pendingId)
+    const result = await ctx.evolutionApproval.approve(pendingId, AUDIT)
     expect(result.ok).toBe(false)
     expect(result.message).toContain('已经落地')
     expect(result.message).toContain('corrupt pending-state.json')
@@ -590,7 +592,8 @@ it('v28 G1.3 (APPR-01): a failed resolve after a successful runner reports the l
     state.tryResolvePending = original
   }
   // The claim stays 'executing' — approve refuses to re-run it (no double write).
-  const again = await ctx.evolutionApproval.approve(pendingId)
+  const again = await ctx.evolutionApproval.approve(pendingId, AUDIT)
   expect(again.ok).toBe(false)
   expect(again.message).toMatch(/executing|already/i)
 })
+

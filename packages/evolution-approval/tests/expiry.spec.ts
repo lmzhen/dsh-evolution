@@ -13,6 +13,8 @@ import { mountStateStack } from '../../test-support/state-stack.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import EvolutionApproval from '../src/index.ts'
 
+const AUDIT = { channel: 'command', principal: 'owner', deploymentAllowsRemote: false } as const
+
 /** One mounted approval service over the family state stack, with a runner spy. */
 async function mountApproval(pendingTtlMs: number) {
   const root = await tempRoot('dsh-approval-ttl-')
@@ -73,7 +75,7 @@ describe('staged-window expiry (T4-09/A51)', () => {
   it('P2-22: approving an expired record directly refuses and never runs it', async () => {
     const { ctx, ran } = await mountApproval(1000)
     const id = await stage(ctx, new Date(Date.now() - 60_000).toISOString())
-    const outcome = await ctx.evolutionApproval.approve(id)
+    const outcome = await ctx.evolutionApproval.approve(id, AUDIT)
     expect(outcome.ok).toBe(false)
     expect(ran).toEqual([])
     expect((await ctx.evolutionState.listPending('rejected')).some(item => item.id === id)).toBe(true)
@@ -99,7 +101,7 @@ describe('staged-window expiry (T4-09/A51)', () => {
     }
     ctx.provide('evolutionMutationAuthority', fake)
     const id = await stage(ctx)
-    const outcome = await ctx.evolutionApproval.approve(id)
+    const outcome = await ctx.evolutionApproval.approve(id, AUDIT)
     expect(outcome.ok).toBe(true)
     expect(released).toEqual(['l2'])
   })
@@ -146,3 +148,4 @@ describe('staged-window expiry (T4-09/A51)', () => {
     expect(rows.map(row => row.id)).toContain(id)
   })
 })
+
