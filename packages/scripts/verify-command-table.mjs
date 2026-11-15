@@ -70,15 +70,16 @@ for (const entry of HOST_COMMAND_DEFS) {
 // E-08: the DISPATCH speaks one token, so C compares the key FIRST token; the injectivity assertion
 // below is what covers the sub-level.
 const tableNames = new Set(HOST_COMMAND_DEFS.map((entry) => entryName(entry).split(' ')[0]))
+const tableIds = new Set(HOST_COMMAND_DEFS.map((entry) => entry.id))
 const dispatched = new Set()
 for (const match of source.matchAll(/([A-Za-z]+Parsed)\.name [!=]== '([a-z]+)'/g)) dispatched.add(match[2])
 for (const match of source.matchAll(/subcommandOf\(input, '([a-z]+)'/g)) dispatched.add(match[1])
+for (const match of source.matchAll(/case '([a-z][a-z.-]*)':/g)) dispatched.add(match[1])
 for (const name of dispatched) {
-  if (!tableNames.has(name)) problems.push('the dispatch answers "' + name + '" but the table has no entry for it (C7)')
+  if (!tableIds.has(name)) problems.push('the dispatch answers "' + name + '" but the table has no entry for it (C7)')
 }
-for (const name of tableNames) {
-  const answered = new RegExp("'" + name + "'").test(source) || new RegExp('\\b' + name + '\\b').test(source)
-  if (!answered) problems.push('the table declares "' + name + '" but the command source never answers it')
+for (const name of tableIds) {
+  if (!dispatched.has(name)) problems.push('the table declares "' + name + '" but no switch case answers it (C7 reverse)')
 }
 // D (P2/D3): the parser's value-flag list and the table's authored `flags` kinds are two
 // declarations of ONE fact — which flags take a value. Parse the table, not the prose: the

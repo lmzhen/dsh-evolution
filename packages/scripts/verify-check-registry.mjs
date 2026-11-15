@@ -74,7 +74,14 @@ if (!armed) {
   console.error('verify-check-registry: CANNOT DECIDE - no repository marker above ' + TREE + ' (the meta-gate cannot arm here; an unarmed ledger must not pass)')
   process.exit(2)
 }
-const gateRun = verifyGateManifest([TREE, '--json'], { silent: true })
+let gateRun
+
+try {
+  gateRun = verifyGateManifest([TREE, '--json'], { silent: true })
+} catch (error) {
+  console.error('verify-check-registry: CANNOT DECIDE - the meta-gate crashed (' + (error instanceof Error ? error.message : String(error)) + ')')
+  process.exit(2)
+}
 if (gateRun.status !== 0 || gateRun.json === null) {
   const detail = (gateRun.json?.problems ?? []).slice(-6).join('\n')
   console.error('verify-check-registry: CANNOT DECIDE - meta-gate status=' + String(gateRun.status) + ' (its observations are this ledger\'s other half)')

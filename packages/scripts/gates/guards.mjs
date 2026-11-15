@@ -13,6 +13,7 @@ export const guards = [
     title: "`node packages/evolution/scripts/verify-family-types.mjs`",
     argv: ["node","packages/evolution/scripts/verify-family-types.mjs"],
     lanes: ["local"],
+    registration: {"reason":"this row is executable only on the build overlay; the flat mirror has no packages/evolution tree, so a no-overlay local run cannot resolve it","owner":"scripts/toolchain","expiry":"0.50.0","plan":"run local gates from the flat mirror with --overlay (the supported release line), or give the row a mirror-local per-package tsc fallback","renewal":"Registered at 0.49.0 (expiry 0.50.0): the overlay tsc row passes on the release line; the registration only covers the no-overlay invocation."},
   }),
 
   gate("gate-02", {

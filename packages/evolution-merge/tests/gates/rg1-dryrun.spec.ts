@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, readFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
@@ -18,10 +18,10 @@ it('dry-runs the 0.30.15 fixture without writing v3', async () => {
   copyFileSync(join(fixtures, 'runs', 'succeeded.json'), join(home, 'runs.json'))
   copyFileSync(join(fixtures, 'receipts', 'complete.json'), join(home, 'merge', 'receipts', 'complete.json'))
   copyFileSync(join(fixtures, 'journals', 'prepared.json'), join(home, 'merge', 'journals', 'prepared.json'))
-  const out = join(home, 'migration-dry-run.json')
-  execFileSync(process.execPath, [join(scripts, 'merge-migrate-dry-run.mjs'), '--home', home, '--out', out])
-  const report = JSON.parse(readFileSync(out, 'utf8'))
+  const out = execFileSync(process.execPath, [join(scripts, 'merge-migrate.mjs'), '--home', home, '--dry-run', '--json']).toString()
+    const report = JSON.parse(out)
   expect(report.applied).toBe(false)
   expect(report.counts).toMatchObject({ verify: 1, pending: 1, approved: 1, fuse: 1, skipped: 1 })
   expect(report.wouldMigrate).toBe(5)
 })
+

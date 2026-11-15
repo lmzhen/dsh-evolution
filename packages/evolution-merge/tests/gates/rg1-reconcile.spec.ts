@@ -19,7 +19,7 @@ it('reconciles identical dry-run reports and rejects a changed row', async () =>
   const target = join(home, 'target.json')
   const out = join(home, 'reconcile.json')
   execFileSync(process.execPath, [join(scripts, 'merge-source-snapshot.mjs'), '--home', home, '--out', source])
-  execFileSync(process.execPath, [join(scripts, 'merge-migrate-dry-run.mjs'), '--home', home, '--out', target])
+  writeFileSync(target, execFileSync(process.execPath, [join(scripts, 'merge-migrate.mjs'), '--home', home, '--dry-run', '--json']))
   execFileSync(process.execPath, [join(scripts, 'merge-reconcile.mjs'), '--source', source, '--target', target, '--out', out])
   expect(JSON.parse(readFileSync(out, 'utf8')).diffs).toEqual([])
   const changed = JSON.parse(readFileSync(target, 'utf8'))
@@ -27,3 +27,4 @@ it('reconciles identical dry-run reports and rejects a changed row', async () =>
   writeFileSync(target, JSON.stringify(changed))
   expect(() => execFileSync(process.execPath, [join(scripts, 'merge-reconcile.mjs'), '--source', source, '--target', target, '--out', out])).toThrow()
 })
+

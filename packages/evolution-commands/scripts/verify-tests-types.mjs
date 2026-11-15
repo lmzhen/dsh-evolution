@@ -43,9 +43,11 @@ const config = {
   extends: basePath,
   compilerOptions: {
     noEmit: true, declaration: false, declarationMap: false, composite: false, incremental: false,
-    rewriteRelativeImportExtensions: false, paths,
+    rewriteRelativeImportExtensions: false, typeRoots: [resolve(typesRoot, '..', '@types')], paths,
   },
-  include: ['packages/evolution/evolution-*/tests/**/*.ts', 'packages/evolution/test-support/**/*.ts'],
+  include: existsSync(join(baseDir, 'packages', 'evolution'))
+    ? ['packages/evolution/evolution-*/tests/**/*.ts', 'packages/evolution/test-support/**/*.ts']
+    : ['packages/evolution-*/tests/**/*.ts', 'packages/test-support/**/*.ts'],
 }
 writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n')
 const tsc = findUp(baseDir, 'node_modules/typescript/bin/tsc')
@@ -64,3 +66,4 @@ function findUp(start, rel) {
     if (dirname(dir) === dir) return undefined
   }
 }
+

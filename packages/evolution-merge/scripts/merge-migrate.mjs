@@ -30,9 +30,14 @@ if (homeArg === undefined || homeArg === '') {
   process.exit(2)
 }
 const home = resolve(homeArg)
-const dryRun = argv.includes('--dry-run') || (!argv.includes('--apply') && !argv.includes('--restore'))
 const apply = argv.includes('--apply')
-const restore = value('--restore')
+const restoreAt = argv.indexOf('--restore')
+const restore = restoreAt >= 0 ? argv[restoreAt + 1] : undefined
+if (restoreAt >= 0 && (restore === undefined || restore === '' || restore.startsWith('--'))) {
+  console.error('usage: merge-migrate --home <dir> [--dry-run] [--apply] [--restore <backup-dir>] [--json]')
+  process.exit(2)
+}
+const dryRun = argv.includes('--dry-run') || (!apply && restoreAt < 0)
 const asJson = argv.includes('--json')
 const lockDir = join(home, 'merge', '.migrate-lock')
 const LOCK_TTL_MS = 60 * 60 * 1000
@@ -77,8 +82,13 @@ if (restore !== undefined && restore !== '') {
     else console.log('DRY RUN: would restore ' + restore + ' into ' + home + ' (stop the host first)')
     process.exit(0)
   }
-  const result = spawnSync(process.execPath, [join(scriptDir, 'merge-restore.mjs'), '--home', home, '--backup', restore], { stdio: 'inherit' })
-  process.exit(result.status ?? 1)
+  acquireLock()
+  try {
+    const result = spawnSync(process.execPath, [join(scriptDir, 'merge-restore.mjs'), '--home', home, '--backup', restore], { stdio: 'inherit' })
+    process.exit(result.status ?? 1)
+  } finally {
+    rmSync(lockDir, { recursive: true, force: true })
+  }
 }
 
 const core = await import('@deepseek-ai/dsh-evolution-core')
