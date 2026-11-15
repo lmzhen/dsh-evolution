@@ -37,7 +37,7 @@ it('previous-ui fixture accepts new server view/rows/body/history and copies a r
   expect(rows.rows[0]?.actions.some(action => action.command.startsWith('/evolution merge approve '))).toBe(true)
   expect(body).toMatchObject({ wireVersion: 1, text: '# a\n', markdown: true })
   expect(history.items[0]?.reasonCode).toBe('merged')
-  expect(history.items[0]?.generation).toBe(1)
+  expect(history.items[0]?.generation as never).toBe(1)
   const copied = rows.rows[0]!.actions.find(action => action.command.includes(' approve '))!.command.replace('/evolution merge ', '')
   expect(parseMergeCommand(copied.split(' '))).toMatchObject({ ok: true })
 })

@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { makeV4Home } from '../support/schema4-home.ts'
 import { readMergeSnapshot } from '../../src/domain/merge-snapshot.ts'
 

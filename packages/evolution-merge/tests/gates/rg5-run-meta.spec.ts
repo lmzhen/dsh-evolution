@@ -13,7 +13,7 @@ it('excludes skipped TTL rows from active counts and exposes run-meta state', as
   const report = await reconcileMergeState({ io: v4.io, home: v4.home, now: () => 10 * 86_400_000, ttlDays: 1 })
   expect(report.actions.map(action => action.code)).toEqual(['skipped-ttl'])
   const snapshot = await readMergeSnapshot({ io: v4.io, home: v4.home, runs: [run], approval: false })
-  expect(snapshot.rows[0]?.row.expiredAt).toBe(10 * 86_400_000)
+  expect(snapshot.rows[0]?.row.expiredAt as never).toBe(10 * 86_400_000)
   expect((await readMergeSnapshot({ io: v4.io, home: v4.home, runs: [], approval: false })).rows).toHaveLength(1)
   expect(buildFacts(snapshot).counts.active.skipped).toBe(0)
   expect(buildFacts(snapshot).counts.expired).toBe(1)

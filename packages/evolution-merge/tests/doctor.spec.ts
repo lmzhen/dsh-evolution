@@ -20,7 +20,7 @@ it('reports empty, populated and unreadable state without writing', async () => 
   const empty = await mergeDoctor(io, home)
   expect(empty.map(item => item.key)).toEqual(['state', 'merge-state-v3', 'quarantine', 'tree-lock', 'backup', 'migration', 'staging-index', 'target-claim', 'runs', 'install', 'reconcile', 'consistency', 'models', 'staging', 'staging-path'])
   expect(empty[0]).toMatchObject({ status: 'ok' })
-  const v4 = await makeV4Home([pendingRow('alpha-skill', 'beta-skill')])
+  const v4 = await makeV4Home([pendingRow('alpha-skill', 'beta-skill') as never])
   const rows = await mergeDoctor(v4.io, v4.home)
   expect(rows[0]?.detail).toContain('pending 1')
 })

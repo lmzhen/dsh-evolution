@@ -76,8 +76,8 @@ it('resume fuse does not take the commit claim', async () => {
   const held = await acquireTargetClaim(io, home, 'a', 1000)
   const reg = registry()
   const ports: ScanPorts = { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } }
-  const result = await runResumeCommand({ io, home, registry: reg.port, ports, rowId: row0.id, platformWrite: true, now: () => 1000 })
-    approval: true,  expect(result).toMatchObject({ ok: true })
+  const result = await runResumeCommand({ io, home, registry: reg.port, ports, rowId: row0.id, platformWrite: true, now: () => 1000, approval: true })
+  expect(result).toMatchObject({ ok: true })
   expect(reg.calls).toContain('begin')
   await held?.release()
 })
@@ -89,7 +89,7 @@ it('detached resume returns before round2 and completes in background', { timeou
   await seedRow(io, home, row0)
   const reg = registry()
   const result = await runResumeCommand({
-    io, home, registry: reg.port, rowId: row0.id, platformWrite: true, detached: true, now: () => 1000,
+    io, home, registry: reg.port, rowId: row0.id, platformWrite: true, detached: true, now: () => 1000, approval: true,
     ports: { async screening() { return [{ a: 'a', b: 'b' }] }, async round1() { return { kind: 'keep' } }, async round2() { return { kind: 'merged', unitId: 'u-1', archived: ['b'] } } },
   })
   expect(result).toMatchObject({ ok: true, accepted: true, runId: 'run-1' })
@@ -148,3 +148,4 @@ it('non-detached invalid row returns before registry.begin', async () => {
   expect(result.ok).toBe(false)
   expect(reg.calls).toEqual([])
 })
+

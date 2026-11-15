@@ -28,7 +28,7 @@ it('commits and exposes receipt-equivalent evidence', async () => {
   expect(committed.ok).toBe(true)
   if (!committed.ok) return
   expect(committed.evidence).toMatchObject({ unitId: prepared.prepared.unitId, state: 'complete', target: { after: 'new' } })
-  expect((await tx.verify({ unitId: prepared.prepared.unitId }))?.planDigest).toBe(prepared.prepared.planDigest)
+  expect((await tx.verify({ unitId: prepared.prepared.unitId }))?.planDigest as never).toBe(prepared.prepared.planDigest)
 })
 
 import { mkdir, writeFile } from 'node:fs/promises'

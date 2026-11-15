@@ -52,7 +52,7 @@ it('accepts schema4 with manifest and writes rows through transactMergeState', a
 it('does not repair a marker index on the v4 path', async () => {
   const { home, io, backupId } = await makeV4Home([])
   await writeFile(mergeStatePath(home), JSON.stringify({ schemaVersion: 4, pre1b: { backupRef: backupId, at: 'x' }, migration: { migratedFromV2: true, sourceSha256: 's', targetSha256: 't', staging: [{ rowId: 'r1', pairKey: 'a', ref: 'run/pairs/r1', expiresAt: 1, createdAt: 1 }], at: 'x' }, rows: [] }))
-  const before = await readFile(mergeStatePath(home), 'utf8')
+  await readFile(mergeStatePath(home), 'utf8')
   await transactMergeState(io, home, tx => tx.rows().length)
   const after = JSON.parse(await readFile(mergeStatePath(home), 'utf8')) as { schemaVersion: number; rows: unknown[] }
   expect(after).toMatchObject({ schemaVersion: 4, rows: [] })
@@ -108,3 +108,4 @@ it('normalizes v3 to v4 with backup and keeps the read adapter', async () => {
   expect(loaded.state.rows).toHaveLength(1)
   expect(loaded.state.rows[0]?.id).toBe('r1')
 })
+
