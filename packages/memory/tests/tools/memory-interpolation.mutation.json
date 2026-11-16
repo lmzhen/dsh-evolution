@@ -3,7 +3,7 @@
   "edits": [
     {
       "file": "packages/memory/src/tools/index.ts",
-      "find": "text: () => snapshotText,\n      interpolate: false,",
+      "find": "text: () => snapshotText,\n        interpolate: false,",
       "replace": "text: () => snapshotText,\n      interpolate: true,"
     }
   ],
