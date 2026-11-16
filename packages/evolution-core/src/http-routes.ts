@@ -133,7 +133,7 @@ export function registerHostRoutes(
 ): void {
   const injecting = owner as unknown as Partial<InjectingContext>
   if (typeof injecting.inject !== 'function') throw new Error('host routes require a context that owns inject()')
-  injecting.inject(['evolutionPlatform', 'connection'], (scope: Context) => {
+  injecting.inject(['connection'], (scope: Context) => {
     const connection = connectionFor(scope)
     const audit: DecisionAudit = {
       channel: 'connection.fetch',
@@ -194,4 +194,5 @@ export function methodNotAllowed(allowed: readonly HttpMethod[]): Response {
     headers: { 'content-type': 'application/json; charset=utf-8', allow: allowed.join(', ') },
   })
 }
+
 

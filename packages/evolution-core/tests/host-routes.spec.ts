@@ -46,7 +46,7 @@ describe('host route registration (G4-S1)', () => {
     let seenAudit: DecisionAudit | undefined
     registerHostRoutes(h.owner as never, (audit) => { seenAudit = audit; return routes })
     expect(h.injected).toHaveLength(1)
-    expect(h.injected[0]?.names).toEqual(['evolutionPlatform', 'connection'])
+    expect(h.injected[0]?.names).toEqual(['connection'])
     h.injected[0]?.run(h.scope)
     expect(seenAudit).toEqual({ channel: 'connection.fetch', principal: 'owner', deploymentAllowsRemote: true })
     expect(h.registered.map(route => route.path)).toEqual([HOST_ROUTES.approval.pending, HOST_ROUTES.skillHealth.rows])
@@ -70,4 +70,5 @@ describe('host route registration (G4-S1)', () => {
     expect(hostSurface({ get: () => undefined } as never)).toEqual({ available: false, code: 'E-325', reason: 'connection-missing' })
   })
 })
+
 
