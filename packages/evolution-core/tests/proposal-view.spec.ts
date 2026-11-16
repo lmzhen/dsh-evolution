@@ -1,6 +1,6 @@
 // @tier fast
 import { expect, it } from 'vitest'
-import { planExtract, proposalFromPlan } from '@deepseek-ai/dsh-evolution-core'
+import { planExtract, proposalFromPlan } from '@deepseek-ai/dsh-evolution-core/extract'
 
 const NL = String.fromCharCode(10)
 const body = ['# Demo', '', '## Details', '', 'reusable detail', '', '## Usage', '', 'Use it.'].join(NL)
@@ -30,3 +30,4 @@ it('projects a plan into a proposal without changing owner or outcome', () => {
   expect(proposal.status).toBe('proposed')
   expect(proposal.parts[0]?.heading).toBe('Details')
 })
+

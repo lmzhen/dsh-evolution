@@ -3,7 +3,8 @@ import { expect, it } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { contentHash, DEFAULT_SKILL_LIMITS, nodeEvolutionIo, planExtract, readExternalSupport, type OwnerDecision } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, DEFAULT_SKILL_LIMITS, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { planExtract, readExternalSupport, type OwnerDecision } from '@deepseek-ai/dsh-evolution-core/extract'
 import { loadVersions, SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { planUnitUndoAcross } from '@deepseek-ai/dsh-evolution-core/write'
 
@@ -310,6 +311,7 @@ it('copies bounded external support to the target without deleting the source', 
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
+
 
 
 

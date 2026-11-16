@@ -7,5 +7,6 @@ export * from './extract-request.ts'
 export * from './extract-prompt.ts'
 export { ownerCandidatesFromSummaries } from './owner-resolver.ts'
 export { proposalFromPlan } from './proposal-view.ts'
-export { readProposalReport, writeProposalReport } from './proposal-report.ts'
+export { readProposalReport, readProposalReports, writeProposalReport } from './proposal-report.ts'
+
 

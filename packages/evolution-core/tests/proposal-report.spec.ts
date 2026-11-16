@@ -3,7 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { nodeEvolutionIo, readProposalReport, readProposalReports, writeProposalReport, type ProposalView } from '@deepseek-ai/dsh-evolution-core'
+import { nodeEvolutionIo, type ProposalView } from '@deepseek-ai/dsh-evolution-core'
+import { readProposalReport, readProposalReports, writeProposalReport } from '@deepseek-ai/dsh-evolution-core/extract'
 
 const PROPOSAL: ProposalView = {
   version: 1,
@@ -42,3 +43,4 @@ it('writes and reads the newest proposal reports', async () => {
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
+
