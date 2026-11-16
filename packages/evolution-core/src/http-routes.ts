@@ -104,7 +104,15 @@ export type HostSurface =
 /** Resolve through the port; only a context with NO platform service falls back to its direct service (legacy tests/fakes). */
 function connectionFor(ctx: Context): ConnectionPort | undefined {
   const platform = ctx.get('evolutionPlatform') as EvolutionPlatform | undefined
-  return platform?.ports?.connection ?? connectionPort(ctx)
+  const port = platform?.ports?.connection ?? connectionPort(ctx)
+  if (port !== undefined) return port
+  // Cordis' inject callback hands the service on the scope for fake contexts that do not implement get().
+  const raw = (ctx as unknown as { connection?: { allowsRemoteAuthorities?: boolean; fetch?: { register?: (route: unknown) => unknown } } }).connection
+  if (raw?.fetch?.register === undefined) return undefined
+  return {
+    allowsRemoteAuthorities: raw.allowsRemoteAuthorities === true,
+    register: route => raw.fetch!.register!(route) as () => Promise<void>,
+  }
 }
 
 export function hostSurface(ctx: Context): HostSurface {
@@ -194,6 +202,7 @@ export function methodNotAllowed(allowed: readonly HttpMethod[]): Response {
     headers: { 'content-type': 'application/json; charset=utf-8', allow: allowed.join(', ') },
   })
 }
+
 
 
 

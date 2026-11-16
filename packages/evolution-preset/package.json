@@ -42,12 +42,12 @@
     "@deepseek-ai/dsh-evolution-activity": "workspace:^",
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
-    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.0"
+    "@deepseek-ai/dsh-tool-session-query": "^0.2.2-rc.3"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-storage": "^0.2.2-rc.0",
-    "@deepseek-ai/dsh-storage-json": "^0.2.2-rc.0",
-    "@deepseek-ai/dsh-storage-domain": "^0.2.2-rc.0"
+    "@deepseek-ai/dsh-storage": "^0.2.2-rc.3",
+    "@deepseek-ai/dsh-storage-json": "^0.2.2-rc.3",
+    "@deepseek-ai/dsh-storage-domain": "^0.2.2-rc.3"
   },
   "exports": {
     ".": {
@@ -60,3 +60,4 @@
   },
   "types": "lib/types/index.d.ts"
 }
+
