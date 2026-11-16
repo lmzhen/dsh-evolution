@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-16T20:53:09.879Z",
+  "generatedAt": "2026-11-16T21:53:51.181Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -17,8 +17,8 @@
     },
     {
       "probe": "beh-hmr-double-apply",
-      "signature": "6ff7beee6740a0bd61ba86dee0f2241d99255f1e100afffca27046bf43c27ca8",
-      "provenAt": "2026-11-15T15:28:43.975Z",
+      "signature": "8ebc699767760900d4af88aa7f080e448b2be686467eadab0980e6999c9ab843",
+      "provenAt": "2026-11-16T21:53:51.167Z",
       "tree": "overlay"
     },
     {
@@ -137,14 +137,14 @@
     },
     {
       "probe": "decl-platform-ranges",
-      "signature": "81c6f9703663d178a80d97ccaa55012a934350ca3582fe186a9be285d3751c00",
-      "provenAt": "2026-11-15T15:28:44.409Z",
+      "signature": "eba3cbfc1fe5b8e687afdaf9130f8d386222c81ac08c59bd04b0f2f8cee71ab3",
+      "provenAt": "2026-11-16T21:33:40.746Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-platform-view",
-      "signature": "2f2e5707627daceb6f8e98c84388ba0dc0e7144107be31d82f62b528fb71f5f2",
-      "provenAt": "2026-11-15T15:28:44.155Z",
+      "signature": "09bdbb952223096e833cef29266a79adb3f297126cbc090d3947b6e87bbf7d61",
+      "provenAt": "2026-11-16T21:30:21.488Z",
       "tree": "overlay"
     }
   ]

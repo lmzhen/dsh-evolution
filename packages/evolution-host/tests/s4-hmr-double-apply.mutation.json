@@ -2,11 +2,11 @@
   "probe": "beh-hmr-double-apply",
   "edits": [
     {
-      "file": "packages/evolution-core/src/http-routes.ts",
-      "find": "      return () => {\n        for (const dispose of disposers) {",
-      "replace": "      return () => {\n        for (const dispose of disposers.slice(0, 0)) {"
+      "file": "packages/evolution-core/lib/http-routes.js",
+      "find": "return () => {\n\t\t\t\tfor (const dispose of disposers) try {",
+      "replace": "return () => {\n\t\t\t\tfor (const dispose of disposers.slice(0, 0)) try {"
     }
   ],
   "expect": "red",
-  "note": "dispose must release every registered route; skipping the disposer leaves the first cycle mounted"
+  "note": "dispose must release every registered route; skipping the disposer leaves the first cycle mounted (packaged lib face)"
 }
