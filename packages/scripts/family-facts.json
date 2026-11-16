@@ -512,7 +512,7 @@
         "adapter": {
           "script": "lib-line.mjs",
           "sha256": "1931db3d233c642d15bb2994408e917a70819800fa876cbe03446566bf12dbcb",
-          "expectedLine": "0.2.2-rc.1",
+          "expectedLine": "0.2.2-rc.3",
           "extendsExternal": {
             "path": "D:/dsh/_tools/lib-line.mjs",
             "sha256": "1931db3d233c642d15bb2994408e917a70819800fa876cbe03446566bf12dbcb"
@@ -2062,3 +2062,4 @@
     "templateRoot": "scripts/checklists/templates"
   }
 }
+

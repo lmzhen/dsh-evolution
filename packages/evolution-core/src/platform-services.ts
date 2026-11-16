@@ -23,6 +23,7 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'agents', feature: 'review and curator subagent wake-ups', side: 'host' },
   { service: 'approval', feature: 'the platform approval policy the approval row shadows', side: 'host' },
   { service: 'commands', feature: 'the /skill-domain confirmation command surface', side: 'host' },
+  { service: 'connection', feature: 'the platform exact-route carrier for family host routes', side: 'host' },
   { service: 'configEditor', feature: 'the params view inherited-vs-override column', side: 'host' },
   { service: 'configForms', feature: 'the platform config-form seat the settings page renders through', side: 'client' },
   { service: 'evolutionApproval', feature: 'pending writes: list, approve and reject from the command surface', side: 'host' },
@@ -48,8 +49,10 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'skillUsage', feature: 'usage counters feeding the curator and the review planner', side: 'host' },
   { service: 'skills', feature: 'the platform skill catalog the skill tool writes through', side: 'host' },
   { service: 'storageDomain', feature: 'the storage-domain state provider', side: 'host' },
+  { service: 'subagents', feature: 'the review/curator subagent execution kernel', side: 'host' },
   { service: 'systemPrompt', feature: 'the protected-skills prompt variable', side: 'host' },
   { service: 'tools', feature: 'tool registration and the guard seam', side: 'host' },
+  { service: 'userQuestions', feature: 'the owner confirmation prompt behind skill writes', side: 'host' },
   { service: 'workingDirectory', feature: 'the cwd used for skill snapshots and per-view policy files', side: 'host' },
 ])
 
@@ -63,3 +66,4 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
 export function absentHostServices(has: (name: string) => boolean): PlatformServiceProbe[] {
   return PLATFORM_SERVICE_PROBES.filter(entry => entry.side === 'host' && !has(entry.service))
 }
+

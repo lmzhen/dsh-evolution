@@ -45,6 +45,7 @@ export class EvolutionProjections extends Service {
     // Normal compositions mount the registry before this service: attach now so
     // the first reader observes registered units, exactly like the previous
     // awaited init. Only a missing registry takes the lifecycle path.
+    // platform-declaration anchor: sessionProjections is declared in core PLATFORM_SERVICE_PROBES.
     if (this.ctx.get('sessionProjections') !== undefined) {
       await this.attach(this.ctx)
       return
@@ -131,3 +132,4 @@ export class EvolutionProjections extends Service {
     this.ctx.logger.warn('evolution-core-runtime: %s; projection reads degrade to undefined', reason)
   }
 }
+
