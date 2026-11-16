@@ -10,7 +10,9 @@ It does not modify or train the model, and it does not provide a hosted model se
 
 ## Platform line
 
-The family targets DeepSeek Harness `0.2.2-rc.1` only. Published packages declare the `^0.2.2-rc.0` peer range and the `>=0.2.2-rc.0 <0.2.3-0` engine range. The single host edge is the `evolutionPlatform` service; features reach it through the family's platform ports, never by importing host internals. The family's own write authority is `evolutionMutationAuthority`: one lease/fence service above the IO seam, shared by merge, review, curator and the knowledge stores.
+**Validated platform line: DSH `0.2.2-rc.3`.**
+
+The family targets DeepSeek Harness `0.2.2-rc.3` only (DCR-2). Published packages declare the `^0.2.2-rc.3` peer range and the `>=0.2.2-rc.3 <0.2.3-0` engine range. 0.50.0 deliberately drops the rc.1/rc.2 compatibility layer: install 0.49.x if your host is still on an older platform line. The single host edge is the `evolutionPlatform` service; features reach it through the family's platform ports, never by importing host internals. The family's own write authority is `evolutionMutationAuthority`: one lease/fence service above the IO seam, shared by merge, review, curator and the knowledge stores.
 
 ## What is a skill?
 
@@ -87,9 +89,9 @@ See [docs/commands.md](docs/commands.md) for the command reference and [docs/con
 
 | Item | Current requirement |
 |---|---|
-| Validated platform line | **`0.2.2-rc.1`** |
-| Published dependency window | `^0.2.2-rc.0` |
-| Family version | `0.49.0` |
+| Validated platform line | **`0.2.2-rc.3`** |
+| Published dependency window | `^0.2.2-rc.3` |
+| Family version | `0.49.0`（0.50.0 发布后改） |
 | Node | `^22.19.0` or `>=24.0.0` |
 
 Published packages do not cross older prerelease platform lines. See [INSTALL.md](INSTALL.md) for installation and upgrade order.

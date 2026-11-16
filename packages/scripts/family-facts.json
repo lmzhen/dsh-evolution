@@ -339,10 +339,10 @@
       },
       "must": [
         {
-          "text": "**Validated platform line: DSH `0.2.2-rc.1`.**"
+          "text": "**Validated platform line: DSH `0.2.2-rc.3`.**"
         },
         {
-          "text": "`^0.2.2-rc.0`"
+          "text": "`^0.2.2-rc.3`"
         }
       ],
       "forbid": [

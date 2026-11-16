@@ -18,8 +18,9 @@
  */
 
 import { type MutationAuthority } from '@deepseek-ai/dsh-evolution-core'
+import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import { Context, Service } from '@deepseek-ai/cordis'
-import type { Fiber, Volatile } from '@deepseek-ai/cordis'
+import type { Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 // v43 FLOW2-1: the orphan criterion needs ONE liveness rule. G2 S4 retired the io write-lock
 // protocol this grammar was borrowed from, so the claim-id grammar and its pid probe live HERE —
@@ -283,8 +284,8 @@ export class EvolutionApproval extends Service {
     // pages editing one row makes a write on the wrong one look ignored. Probed, not assumed: a
     // host without the capability still loads.
     this.ctx.inject(['settings'], (injected) => {
-      const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
-      if (typeof settings?.configure !== 'function') return
+      const settings = settingsPort(injected)
+      if (settings?.configure === undefined) return
       // The owner argument is what the platform looks the presentation up by; omitting it registers
       // the suppression on the settings service's own fiber and the auto form returns after a
       // re-mount (v46 S1.12b; platform precedent: settings.configure({ auto: false }, plugin.fiber)).

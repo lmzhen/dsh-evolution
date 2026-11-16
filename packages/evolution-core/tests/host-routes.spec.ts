@@ -16,12 +16,20 @@ function harness(options: { readonly noConnection?: boolean; readonly remote?: b
       },
     },
   }
+  const port = options.noConnection === true
+    ? undefined
+    : {
+        allowsRemoteAuthorities: options.remote === true,
+        register: (route: unknown) => connection.fetch.register(route as Record<string, unknown>),
+      }
+  const platform = { ports: { connection: port } }
+  const get = (name: string) => name === 'evolutionPlatform' ? platform : undefined
   const owner = {
-    get: () => (options.noConnection === true ? undefined : connection),
+    get,
     inject(names: readonly string[], run: (scope: unknown) => void) { injected.push({ names, run }) },
   }
   const scope = {
-    connection: options.noConnection === true ? undefined : connection,
+    get,
     effect(run: () => (() => void) | void) { const result = run(); effectRuns.push(typeof result === 'function' ? result : () => {}); return () => {} },
   }
   return { owner, scope, injected, registered, disposed, effectRuns }
@@ -38,7 +46,7 @@ describe('host route registration (G4-S1)', () => {
     let seenAudit: DecisionAudit | undefined
     registerHostRoutes(h.owner as never, (audit) => { seenAudit = audit; return routes })
     expect(h.injected).toHaveLength(1)
-    expect(h.injected[0]?.names).toEqual(['connection'])
+    expect(h.injected[0]?.names).toEqual(['evolutionPlatform', 'connection'])
     h.injected[0]?.run(h.scope)
     expect(seenAudit).toEqual({ channel: 'connection.fetch', principal: 'owner', deploymentAllowsRemote: true })
     expect(h.registered.map(route => route.path)).toEqual([HOST_ROUTES.approval.pending, HOST_ROUTES.skillHealth.rows])

@@ -1,7 +1,7 @@
 /** Browser half: one read-only merge view inside the shared evolution workbench. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createElement, type ReactNode } from 'react'
-import { panelWorkspaceId, registerWorkbenchView, type ConfigFormsSeat } from '@lmzhen/dsh-evolution-client-kit'
+import { panelWorkspaceId, registerSurface, type ConfigFormsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
 import { NS, dictionaries } from './messages.ts'
@@ -27,7 +27,8 @@ export function apply(ctx: ClientContext): void {
   const source: MergeSource = { view: api.view, rows: api.rows, body: api.body, history: api.history }
   const store = new MergeStore(source)
   ctx.effect(() => () => { store.dispose() }, 'evolution-merge-ui: store')
-  registerWorkbenchView<MergeFace>(ctx, {
+  registerSurface<MergeFace>(ctx, {
+    surface: 'workbench',
     id: PANEL_ID,
     order: PANEL_ORDER,
     namespace: NS,

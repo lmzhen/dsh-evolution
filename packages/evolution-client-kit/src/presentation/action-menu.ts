@@ -3,8 +3,8 @@
  * without the primitive row. No page owns a second menu implementation.
  */
 import { createElement, type ReactNode } from 'react'
+import { platformUiModule } from '../platform-ui.ts'
 
-declare function require(id: string): unknown
 
 /** The platform's menu surface: a styled container that accepts div props. */
 export type MenuSurfaceComponent = (props: Record<string, unknown> & { children?: ReactNode }) => ReactNode
@@ -24,7 +24,6 @@ export interface MenuPrimitives {
   MenuItemButton: MenuItemButtonComponent
 }
 
-const PLATFORM_UI_MODULE = '@deepseek-ai/dsh-client-ui-primitives'
 
 /** One row of the coordinate/action menu, independent of the renderer. */
 export interface RowMenuAction {
@@ -76,7 +75,8 @@ export function menuPrimitivesFrom(row: Record<string, unknown>): MenuPrimitives
 export const PLATFORM_MENU: MenuPrimitives | undefined = (() => {
   try {
     // oxlint-disable-next-line typescript/no-require-imports -- the client module table is reachable only through the loader's require
-    return menuPrimitivesFrom(require(PLATFORM_UI_MODULE) as Record<string, unknown>)
+    const row = platformUiModule()
+  return row === undefined ? undefined : menuPrimitivesFrom(row)
   } catch {
     return undefined
   }

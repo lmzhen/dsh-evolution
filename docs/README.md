@@ -36,4 +36,4 @@ merge 使用独立的 `mergeApproval`。它为 `true` 时，合并记录在独�
 
 - 用户文档只保留操作所需的行为、默认值和限制；安装形态与平台版本以根 README 和 INSTALL 的当前内容为准。
 - 功能的具体默认参数在 [设置](configuration.md)，模型条件和数据外发边界在 [API key 与模型](api-keys.md)。
-- 维护者文档：[架构](developer/architecture.md)、[开发](developer/development.md)、[单元与撤销](developer/units-and-undo.md)。
+- 维护者文档：[架构](developer/architecture.md)、[开发](developer/development.md)、[单元与撤销](developer/units-and-undo.md)、[架构优化执行入口](developer/architecture-optimization/README.md)。

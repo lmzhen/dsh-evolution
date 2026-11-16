@@ -59,6 +59,18 @@
       "types": "./lib/types/contract.d.ts",
       "default": "./lib/contract.js"
     },
+    "./result": {
+      "types": "./lib/types/result.d.ts",
+      "default": "./lib/result.js"
+    },
+    "./errors": {
+      "types": "./lib/types/errors.d.ts",
+      "default": "./lib/errors.js"
+    },
+    "./extract": {
+      "types": "./lib/types/extract.d.ts",
+      "default": "./lib/extract.js"
+    },
     "./io-registry": {
       "types": "./lib/types/io-registry.d.ts",
       "default": "./lib/io-registry.js"

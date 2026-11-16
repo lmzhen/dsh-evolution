@@ -8,6 +8,7 @@ import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
+import { commandsPort, settingsPort, toolsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type HomeFence } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type MutationLockPort } from '@deepseek-ai/dsh-evolution-core/write'
@@ -102,8 +103,8 @@ export interface MergePresentationContext {
 /** Suppress the platform auto form; the registry renders the merge card instead. */
 export function configureMergePresentation(ctx: MergePresentationContext): void {
   ctx.inject(['settings'], (scope) => {
-    const settings = scope.settings
-    if (typeof settings?.configure !== 'function') return
+    const settings = settingsPort(scope as unknown as Context)
+    if (settings?.configure === undefined) return
     const disposer = settings.configure({ auto: false }, ctx.fiber)
     if (typeof disposer === 'function') scope.effect(() => disposer as () => void, 'evolution-merge: settings presentation')
   })
@@ -341,7 +342,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       const view = buildDoctorView(await current.snapshot())
       return mergeDoctorFact(view, await readReconcileReport(io, home))
     }
-    const commands = scope.get('commands') as { register(definition: unknown): () => void } | undefined
+    const commands = commandsPort(scope)
     if (commands === undefined) return
     const runtime = createMergeRuntime({
       io, home, registry: runs, skills, now: () => Date.now(), getParams, getPlatformWrite,
@@ -386,10 +387,10 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const command = createMergeCommand(runtime)
     if (command !== null) scope.effect(() => commands.register(command), 'evolution-merge: command')
     ctx.inject(['tools'], (toolScope) => {
-      const tools = toolScope.get('tools') as { register(definition: unknown): () => void } | undefined
+      const tools = toolsPort(toolScope as unknown as Context)
       if (tools === undefined) return
       const tool = createMergeStageTool(io, home, exec => stage.resolve(exec), exec => stage.snapshot(exec))
-      toolScope.effect(() => tools.register(tool), 'evolution-merge: merge_stage')
+      toolScope.effect(() => tools.register(tool as never), 'evolution-merge: merge_stage')
     })
     scope.effect(() => () => { runs.cancelAll() }, 'evolution-merge: runs')
   })

@@ -85,13 +85,14 @@ describe('evolution-curator boundaries', () => {
     // post-0.1.5 read of exactly the log the loop appends).
     const recent = ctx.sessions.create(SessionId('curator-recent-session'))
     recent.append('turn/start', { turn: 1 })
-    ctx.provide('agents', {
+    const agents = {
       list: () => {
         listCalls += 1
         if (listCalls === 1) return []
-        return [{ session: recent }]
+        return [{ id: 'curator-recent-session', session: recent }]
       },
-    })
+    }
+    ctx.provide('agents', agents)
     // v32 TEST-02 (CUR-04): a live skill with NO usage sidecar must get its
     // baseline PERSISTED even when the run is skipped — otherwise a busy host
     // re-seeds a fresh created_at on every blocked run and the skill can never

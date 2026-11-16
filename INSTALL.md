@@ -4,7 +4,7 @@
 
 ## 先决条件
 
-- DeepSeek Harness 官方 **0.2.2-rc.1** 或同一兼容线。
+- DeepSeek Harness 官方 **0.2.2-rc.3**（npm `next` 线；`latest` 尚未提升）。0.50.0 不再支持 rc.1/rc.2；旧平台请继续用 0.49.x。
 - Node.js `^22.19.0` 或 `>=24.0.0`。
 - 可用的 `pnpm`：`dsh plugin` 会把 add/remove 转发给 pnpm。
 - 一个能正常启动的 `dsh` profile。桌面 GUI 使用 `desktop`，Web/headless 通常使用 `web`。

@@ -13,6 +13,7 @@
 
 import { isRecord } from './guards.ts'
 import type { Context } from '@deepseek-ai/cordis'
+import type { EvolutionPlatform } from './runtime/platform.ts'
 
 /** Largest request body a family route accepts; a bigger one reads as "no body" (400 from the handler). */
 export const MAX_REQUEST_BODY_BYTES = 64 * 1024
@@ -100,19 +101,9 @@ export type HostSurface =
   | { readonly available: false; readonly code: 'E-325'; readonly reason: 'connection-missing' | 'service-absent' }
 
 export function hostSurface(ctx: Context): HostSurface {
-  const connection = (ctx as unknown as { get(name: string): unknown }).get('connection')
-  if (connection === undefined) return { available: false, code: 'E-325', reason: 'connection-missing' }
-  const allows = (connection as { readonly allowsRemoteAuthorities?: boolean }).allowsRemoteAuthorities === true
-  return { available: true, allowsRemoteAuthorities: allows }
-}
-
-interface ConnectionFetchLike {
-  register(route: ConnectionFetchRouteLike): () => Promise<void>
-}
-
-interface ConnectionServiceLike {
-  readonly allowsRemoteAuthorities?: boolean
-  readonly fetch?: ConnectionFetchLike
+  const port = (ctx.get('evolutionPlatform') as EvolutionPlatform | undefined)?.ports?.connection
+  if (port === undefined) return { available: false, code: 'E-325', reason: 'connection-missing' }
+  return { available: true, allowsRemoteAuthorities: port.allowsRemoteAuthorities }
 }
 
 interface InjectingContext {
@@ -135,8 +126,8 @@ export function registerHostRoutes(
 ): void {
   const injecting = owner as unknown as Partial<InjectingContext>
   if (typeof injecting.inject !== 'function') throw new Error('host routes require a context that owns inject()')
-  injecting.inject(['connection'], (scope: Context) => {
-    const connection = (scope as unknown as { connection?: ConnectionServiceLike }).connection
+  injecting.inject(['evolutionPlatform', 'connection'], (scope: Context) => {
+    const connection = (scope.get('evolutionPlatform') as EvolutionPlatform | undefined)?.ports?.connection
     const audit: DecisionAudit = {
       channel: 'connection.fetch',
       principal: 'owner',
@@ -154,14 +145,22 @@ export function registerHostRoutes(
     // installable platform (rc.1) always carries connection.fetch. A missing register is an
     // assembly error, not a reason to fall back to a loopback webserver bridge — that bridge was
     // the second admission path the audit found (G4 had already deleted the fence it duplicated).
-    if (connection?.fetch === undefined || typeof connection.fetch.register !== 'function') {
+    if (connection === undefined) {
       throw new Error('connection.fetch.register() is required to register family host routes (platform >= 0.2.2-rc.1); no fallback admission path exists')
     }
-    const register = connection.fetch.register.bind(connection.fetch)
+    const register = connection.register.bind(connection)
     effect.call(scope, () => {
       const disposers: Array<() => Promise<void>> = []
       try {
-        for (const route of routes) disposers.push(register(route))
+        for (const route of routes) {
+          const outcome = connection.tryRegister?.(route)
+          if (outcome === undefined) {
+            disposers.push(register(route))
+            continue
+          }
+          if (!outcome.ok) throw new Error(outcome.error.message)
+          disposers.push(outcome.value)
+        }
       } catch (error) {
         for (const dispose of disposers) { try { void dispose() } catch { /* best-effort rollback */ } }
         throw error

@@ -52,6 +52,9 @@ export interface ExtractAnchors {
   targetMdSha256: string
 }
 
+/** The stable plan shape a preview/approval serializes and an apply re-executes. */
+export type SkillPlan = ExtractPlanDraft
+
 export interface ExtractPlanDraft {
   source: string
   target: { name: string; exists: boolean }

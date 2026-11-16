@@ -18,32 +18,28 @@
  * @module @deepseek-ai/dsh-tool-skill-manage
  */
 
+import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import { skillWriteGateContext, protectedSkillNamesOf, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import { defineTool, registerEvolutionTool, type PromptSection } from '@deepseek-ai/dsh-evolution-core/platform'
+import { defineTool, registerEvolutionTool, skillsPort, type SystemPromptPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Agent } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, computeDedupGroups, nearDuplicateSummaries, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
-import { DEFAULT_HEALTH_THRESHOLDS, newSkillLibrary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
+import { DEFAULT_HEALTH_THRESHOLDS, newSkillLibrary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fuzzyPatch } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
-import { buildExtractPlanFromLibrary, ownerDecisionText, EXTRACT_PROMPT_V1, createSubagentChannel, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, readProposalReport, writeProposalReport, type ExtractPlanLibrary, type ExtractPartRequest } from '@deepseek-ai/dsh-evolution-core'
+import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, ownerDecisionText, EXTRACT_PROMPT_V1, ownerCandidatesFromSummaries, projectExtractBodies, proposalFromPlan, readProposalReport, writeProposalReport, type ExtractPlanLibrary, type ExtractPartRequest, type SkillPlan } from '@deepseek-ai/dsh-evolution-core/extract'
 import type { CitationPolicy, EvolutionIoLike, LiveValue, SupportFileCharPolicy } from '@deepseek-ai/dsh-evolution-core'
 import type { WriteAnchor } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { SkillSummary } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '@deepseek-ai/dsh-evolution-skill-discovery/usage'
 import { DEFAULT_WRITE_CONFIRM_MODE, DEFAULT_WRITE_CONFIRM_TIMEOUT_SECONDS, runWriteGates, type WriteConfirmMode, type WriteConfirmRequest } from '@deepseek-ai/dsh-evolution-core'
-/**
- * F-2 (audit v46 / G7.2): the read-only action set used to be spelled out FOUR times in this file
- * (usage accounting at the patch_count bump, the cross-source directory exemption, the approval gap
- * and the replay exemption). The four USES stay where they are — their neighbouring logic differs —
- * but the CRITERION is this one predicate, so adding an action cannot update three of four.
- */
-const READ_ONLY_ACTIONS: readonly string[] = ['list', 'review', 'pin', 'unpin']
-const isReadOnlyAction = (action: unknown): boolean =>
-  typeof action === 'string' && READ_ONLY_ACTIONS.includes(action)
+import { commitSkillAction, isReadOnlySkillAction, skillActionOf } from './skill-actions.ts'
+/** F-2: the read-only criterion is the action table's mutates flag. */
+const isReadOnlyAction = isReadOnlySkillAction
 
 export const name = 'tool-skill-manage'
 export const inject = ['tools', 'skillUsage', 'evolutionIo']
@@ -432,18 +428,24 @@ function combinedSignal(call: AbortSignal | undefined, deadline: AbortSignal | u
   return { signal: AbortSignal.any([call, deadline]) }
 }
 
-/** The platform services the confirm gate reads; both are OPTIONAL seams. */
+/** The ports the confirm gate reads; both are OPTIONAL seams on evolutionPlatform. */
+interface ConfirmPorts {
+  readonly agents?: AgentsLike
+  readonly userQuestions?: UserQuestionsLike
+}
+
+interface ConfirmPlatform {
+  readonly ports?: ConfirmPorts
+}
+
 interface ConfirmProbeContext {
-  get(name: 'agents'): AgentsLike | undefined
-  get(name: 'userQuestions'): UserQuestionsLike | undefined
+  get(name: 'evolutionPlatform'): ConfirmPlatform | undefined
 }
 
 /** The platform's agent registry, as far as this tool reads it. */
 interface AgentsLike {
   /** @returns the live agent whose shared agent/session id this is, if any. */
   get(id: string): unknown
-  /** @returns the live top-level agents. */
-  roots(): readonly unknown[]
 }
 
 /** The platform's question service, as far as this tool reads it. */
@@ -471,23 +473,24 @@ function reasonOfError(error: unknown): string {
 }
 
 /**
- * The registry's live ROOT agent for this call's session, or `undefined`.
+ * The registry's live root agent for this call's session, or `undefined`.
  *
  * The registry keys agents by their shared agent/session id (platform `agent`), and the
- * platform's `ask()` accepts only an agent that is BOTH its exact live instance and a root —
- * that check is `user-questions`'s own private `assertLiveRoot`. An id that resolves to an agent owned by another
- * agent is not a root: the caller then proceeds unconfirmed rather than blocking a human question on
- * an agent no human is watching.
+ * platform's `ask()` accepts only an agent that is BOTH its exact live instance and not a
+ * subagent — that check is `user-questions`'s `assertLiveRoot`: it compares
+ * `agents.get(id)` identity and rejects `session.header.origin === 'subagent'`. Delegated
+ * agents have no independent human, so the caller proceeds unconfirmed instead of blocking a
+ * question on an agent no human is watching.
  * @param probe - the context, read through the optional-service probe.
  * @param exec - this call's execution context.
  * @returns the live root agent, when this session has one.
  */
 function liveRootAgentOf(probe: ConfirmProbeContext, exec: SkillToolExec): unknown {
-  const agents = probe.get('agents')
+  const agents = probe.get('evolutionPlatform')?.ports?.agents
   const sessionId = exec.agent?.session?.id
   if (agents === undefined || typeof sessionId !== 'string') return undefined
-  const candidate = agents.get(sessionId)
-  return candidate !== undefined && agents.roots().includes(candidate) ? candidate : undefined
+  const candidate = agents.get(sessionId) as { session?: { header?: { origin?: string } } } | undefined
+  return candidate !== undefined && candidate.session?.header?.origin !== 'subagent' ? candidate : undefined
 }
 
 /** The one thing the operator's answer decides: was the confirm label selected? */
@@ -506,8 +509,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // family renders its own card from the registry). Probed, not assumed: a host
   // without the capability still loads.
   ctx.inject(['settings'], (injected) => {
-    const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
-    if (typeof settings?.configure !== 'function') return
+    const settings = settingsPort(injected)
+    if (settings?.configure === undefined) return
     // v46 S1.12b (finding 6-1): the owner argument is what the platform looks the presentation up by.
     // Omitting it registers the suppression on the settings service's own fiber, so a row that
     // re-mounts keeps a dead key and the auto form can return (platform precedent:
@@ -525,11 +528,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // dependency strength (M-7).
   // P2-13 (v16): the REAL upstream type (family-completes the v15 batch —
   // tool-memory was migrated, this call site was missed).
-  const systemPrompt = ctx.get('systemPrompt') as {
-    section(section: PromptSection): () => void
-    /** B4: the platform's variable seam — the provider runs SYNCHRONOUSLY at every assembly. */
-    variable(name: string, provider: (context: unknown) => string | undefined): () => void
-  } | undefined
+  const systemPrompt = (ctx.get('evolutionPlatform') as {
+    ports?: { systemPrompt?: SystemPromptPort }
+  } | undefined)?.ports?.systemPrompt
   if (systemPrompt) {
     // B4 (design §4.3): the protected-skill list is deployment state that changes without a reload,
     // so it rides a prompt VARIABLE instead of baked section text. ONE effect registers the variable
@@ -604,7 +605,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // "no prompt could be shown", not "the human walked away".
   const isDismissed = (error: unknown): boolean => questionErrorCode(error) === 'ASK_ABORTED'
   const confirmSkillWrite = async (request: WriteConfirmRequest, exec: SkillToolExec): Promise<boolean> => {
-    const questions = probe.get('userQuestions')
+    const questions = probe.get('evolutionPlatform')?.ports?.userQuestions
     if (questions === undefined) return confirmUnavailable('no user-questions service is mounted')
     const ask = (agent: unknown) => questions.ask({
       questions: [{
@@ -810,7 +811,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // told apart by convention. The union makes the third state representable
   // and the illegal one unrepresentable.
   const catalogWinner = async (name: string): Promise<Probe<{ winner: SkillSummary | undefined; view: readonly SkillSummary[] }>> => {
-    const catalog = ctx.get('skills')
+    const catalog = skillsPort(ctx)
     if (catalog === undefined) return probeUnknown('the skills service is not mounted')
     // V41 scope alignment: the family's own catalog provider is a PRESET row, so
     // a scope-less list() reads the global layer alone (the platform documents
@@ -844,6 +845,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     applyLimits()
     const action = args.action
     const name = args.name ?? ''
+    const actionMeta = skillActionOf(action)
+    if (actionMeta?.needsName === true && name === '') {
+      return { ok: false, message: `动作「${action}」需要 name。`, skills: [] }
+    }
     if (action === 'extract' && origin === 'background_review') {
       return { ok: false, message: '背景审查不能执行 extract：review 只提议；提取必须由显式前台工具/命令执行。', skills: [] }
     }
@@ -909,46 +914,35 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     let result
     let proposal: string | undefined
-    if (action === 'create') {
-      // Batch C (2026-09-27, design §3C-2): the create-time near-duplicate hint
-      // rides the SAME "Authoring check" channel the description bar uses — one
-      // extra line, no new result field (design §2: the message channel is the
-      // family's feedback surface, and a structured field would have no
-      // consumer). Computed BEFORE the create, because afterwards the candidate
-      // is in the listing it was compared against.
-      feedbackLines.push(...await duplicateHintLines(name, candidateDescription, crossSourceView))
-      result = await library.create(name, args.content ?? '', origin, { managed: origin !== 'foreground' })
-    }
-    else if (action === 'edit' || action === 'update') result = await library.update(name, args.content ?? '', origin, stagedAnchor)
-    else if (action === 'patch') result = await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
-    else if (action === 'delete') result = await library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {})
-    else if (action === 'write_file') result = await library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor)
-    else if (action === 'remove_file') result = await library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor)
-    else if (action === 'restructure') {
-      // V8-09 (0.3.47): `args.restructure` is an ARRAY — a non-array payload
-      // (garbage that slipped past the schema) used to throw a bare `.map`
-      // TypeError; the family posture is a structured refusal instead.
-      // v20 (D-1): the move fields get the same treatment — a non-string
-      // `heading`/`to_file` used to flow past `?? ''` (only nullish defaults)
-      // into the library's string ops.
-      // V24-20a (v24): ELEMENT-level guard — `restructure: [null]` used to
-      // throw reading `.heading` of null inside the map (the staged-args
-      // replay channel bypasses the tool schema, so the container guard alone
-      // did not close the family's "schema is not a guarantee" posture).
-      const moves = Array.isArray(args.restructure) ? args.restructure : []
-      if (moves.some((move) => {
-        const raw: unknown = move
-        return raw === null || typeof raw !== 'object'
-      })) {
-        result = { ok: false, message: 'restructure 的每一项都必须是带 heading 与 to_file 的对象。' }
-      } else {
-        result = await library.restructure(name, moves.map(move => ({
+    const simpleActions: Record<string, () => Promise<SkillActionResult>> = {
+      create: async () => {
+        feedbackLines.push(...await duplicateHintLines(name, candidateDescription, crossSourceView))
+        return library.create(name, args.content ?? '', origin, { managed: origin !== 'foreground' })
+      },
+      edit: () => library.update(name, args.content ?? '', origin, stagedAnchor),
+      update: () => library.update(name, args.content ?? '', origin, stagedAnchor),
+      patch: () => library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin),
+      delete: () => library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {}),
+      write_file: () => library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor),
+      remove_file: () => library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor),
+      pin: () => library.setPinned(name, true, origin),
+      unpin: () => library.setPinned(name, false, origin),
+      restructure: async () => {
+        const moves = Array.isArray(args.restructure) ? args.restructure : []
+        if (moves.some((move) => {
+          const raw: unknown = move
+          return raw === null || typeof raw !== 'object'
+        })) {
+          return { ok: false, message: 'restructure 的每一项都必须是带 heading 与 to_file 的对象。' }
+        }
+        return library.restructure(name, moves.map(move => ({
           heading: typeof move.heading === 'string' ? move.heading : '',
           toFile: typeof move.to_file === 'string' ? move.to_file : '',
         })), origin)
-      }
-    }
-    else if (action === 'extract') {
+      },
+      extract: async () => {
+        let result: SkillActionResult | undefined
+
       let source = typeof args.name === 'string' ? args.name : ''
       let items: ExtractPartRequest[] = Array.isArray(args.extract) ? args.extract as ExtractPartRequest[] : []
       let outcome = args.outcome
@@ -958,15 +952,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const io = registry?.provider()
         if (io === undefined) { result = { ok: false, message: 'proposal_id 需要 evolutionIo 提供者。' }; }
         else {
-          const proposal = await readProposalReport(io, args.proposal_id)
-          if (proposal === null) result = { ok: false, message: '找不到 extract proposal：' + args.proposal_id }
-          else if (proposal.outcome === 'keep') result = { ok: false, message: '该 proposal 的结论是 keep，没有可应用提取。' }
-          else if (proposal.outcome === 'owner-gap' || proposal.owner.mode !== 'covered' || proposal.owner.name === undefined) result = { ok: false, message: '该 proposal 未覆盖 owner（owner-gap），不能应用。' }
+          const report = await readProposalReport(io, args.proposal_id)
+          if (report === null) result = { ok: false, message: '找不到 extract proposal：' + args.proposal_id }
+          else if (report.outcome === 'keep') result = { ok: false, message: '该 proposal 的结论是 keep，没有可应用提取。' }
+          else if (report.outcome === 'owner-gap' || report.owner.mode !== 'covered' || report.owner.name === undefined) result = { ok: false, message: '该 proposal 未覆盖 owner（owner-gap），不能应用。' }
           else {
-            source = proposal.source
-            outcome = proposal.outcome === 'extract' || proposal.outcome === 'mixed' ? proposal.outcome : undefined
+            source = report.source
+            outcome = report.outcome === 'extract' || report.outcome === 'mixed' ? report.outcome : undefined
             ownerCovers = undefined
-            items = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: proposal.owner.name! }))
+            items = report.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: report.owner.name! }))
           }
         }
       }
@@ -981,13 +975,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       if (!built.ok) {
         result = { ok: false, message: built.message }
       } else {
-        proposal = JSON.stringify(proposalFromPlan(built.plan, { runId: 'tool-' + Date.now().toString(36) }))
-        const ownerText = ownerDecisionText(built.plan.owner)
-        const decisionLine = `提取判定：outcome=${built.plan.outcome}；target=${built.plan.target.name}；owner=${ownerText}`
+        const plan: SkillPlan = built.plan
+        proposal = JSON.stringify(proposalFromPlan(plan, { runId: 'tool-' + Date.now().toString(36) }))
+        const ownerText = ownerDecisionText(plan.owner)
+        const decisionLine = `提取判定：outcome=${plan.outcome}；target=${plan.target.name}；owner=${ownerText}`
         const candidateLines = built.candidates.slice(0, 8).map(candidate => '- ' + candidate.name + '：' + candidate.description + (candidate.whenToUse === undefined ? '' : '；whenToUse: ' + candidate.whenToUse) + (candidate.headings.length === 0 ? '' : '；headings: ' + candidate.headings.join(' / ')))
         result = args.dry_run === true
-          ? { ok: true, message: '提取计划（未写入）：' + built.plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + built.plan.target.name + '\n' + decisionLine + (candidateLines.length === 0 ? '' : '\n候选 owner：\n' + candidateLines.join('\n')) }
-          : await library.extract(built.plan, origin)
+          ? { ok: true, message: '提取计划（未写入）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + plan.target.name + '\n' + decisionLine + (candidateLines.length === 0 ? '' : '\n候选 owner：\n' + candidateLines.join('\n')) }
+          : await library.extract(plan, origin)
         if (result.ok && built.warnings !== undefined && built.warnings.length > 0) {
           result = { ...result, message: result.message + '\n' + built.warnings.join('\n') }
         }
@@ -995,14 +990,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           try {
             const registry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
             const io = registry?.provider()
-            if (io !== undefined) await writeProposalReport(io, proposalFromPlan(built.plan, { runId: 'tool-' + Date.now().toString(36) }))
+            if (io !== undefined) await writeProposalReport(io, proposalFromPlan(plan, { runId: 'tool-' + Date.now().toString(36) }))
           } catch { /* best-effort proposal report */ }
         }
         if (result.ok) result = { ...result, message: result.message + '\n' + decisionLine }
       }
+
+        return result ?? { ok: false, message: 'extract did not produce a result' }
+      },
     }
-    else if (action === 'pin') result = await library.setPinned(name, true, origin)
-    else if (action === 'unpin') result = await library.setPinned(name, false, origin)
+    if (action !== undefined && Object.prototype.hasOwnProperty.call(simpleActions, action)) result = await commitSkillAction(simpleActions[action]!)
+
     else result = { ok: false, message: `未知动作「${action}」。` }
 
     // v35 C9: the library refused because the anchor did not hold — report it in
@@ -1474,4 +1472,3 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     approvalCtx.effect(() => dispose, 'tool-skill-manage.approval-runner')
   })
 }
-

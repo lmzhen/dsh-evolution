@@ -6,7 +6,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
-import { registerSidebarPanel, PAGE_SURFACE_CSS, ROUTES, type ConfigFormsSeat, type Translate } from '@lmzhen/dsh-evolution-client-kit'
+import { registerSurface, PAGE_SURFACE_CSS, ROUTES, type ConfigFormsSeat, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import type { DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
 import { createDiagnosticsApi } from '../../settings/diagnostics-state.ts'
@@ -80,7 +80,8 @@ export function apply(ctx: ClientContext): void {
     return { pending: pendingCount, merge: mergeCount }
   }
   const workbenchStore = createWorkbenchStore()
-  registerSidebarPanel<WorkbenchFace>(ctx, {
+  registerSurface<WorkbenchFace>(ctx, {
+    surface: 'sidebar',
     id: WORKBENCH_ID,
     order: PANEL_ORDER,
     namespace: NS,
@@ -92,5 +93,3 @@ export function apply(ctx: ClientContext): void {
     children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
   })
 }
-
-

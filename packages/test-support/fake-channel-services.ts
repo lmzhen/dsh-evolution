@@ -123,9 +123,11 @@ export function provideChannel(ctx: Context, legacy: LegacySubagents): { registe
     getProvider: (name: string) => name === 'spawn'
       ? { name: 'spawn', capabilities: { agentPreset: true, agentOptions: true, outputSchema: true, depthLimit: true }, inheritsParentContext: false }
       : undefined,
-    startActivation: async (spec: { label?: string; request: Record<string, unknown>; signal?: AbortSignal }) => {
+    startActivation: async (spec: { label?: string; request?: Record<string, unknown>; signal?: AbortSignal }) => {
       started += 1
-      const run = await legacy.start('spawn', { ...spec.request, label: spec.label, signal: spec.signal })
+      // rc.3 channel speaks the flat spec; older fixtures nested it in `request`.
+      const request = spec.request ?? spec as unknown as Record<string, unknown>
+      const run = await legacy.start('spawn', { ...request, label: spec.label, signal: spec.signal })
       const childId = ('legacy-child-' + started) as never
       if (run.localAgent !== undefined && run.localAgent !== null) children.set(childId, run.localAgent)
       const normalized = run.result.then(value => normalize(value))
@@ -137,6 +139,26 @@ export function provideChannel(ctx: Context, legacy: LegacySubagents): { registe
       return { childId, result: Promise.race([normalized, aborted]), dispose: run.dispose }
     },
   })
+  // The real channel reads EvolutionPlatform ports. Tests that mount the family
+  // plugins provide the raw services above; mirror them through the same port
+  // table the runtime service would expose.
+  if ((ctx as unknown as { get(name: string): unknown }).get('evolutionPlatform') === undefined) {
+    const raw = (ctx as unknown as { get(name: string): unknown }).get('subagents') as {
+      getProvider(name: string): unknown
+      startActivation(spec: unknown): Promise<unknown>
+      sendMessage?(sender: unknown, targetId: string, content: unknown, options?: { signal?: AbortSignal }): Promise<unknown>
+    }
+    ctx.provide('evolutionPlatform', {
+      ports: {
+        subagents: {
+          getProvider: (name: string) => raw.getProvider(name),
+          start: (spec: unknown) => raw.startActivation(spec),
+          ...(raw.sendMessage === undefined ? {} : { sendMessage: raw.sendMessage.bind(raw) }),
+        },
+        presets: { composedPreset: () => 'standard' },
+      },
+    })
+  }
   if ((ctx as unknown as { get(name: string): unknown }).get('agentPresets') === undefined) {
     ctx.provide('agentPresets', {
       readDocument: async () => PARENT_PRESET_DOC,

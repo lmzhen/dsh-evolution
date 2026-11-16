@@ -1,9 +1,11 @@
 /** Shared browser seams and panel lifecycle for the evolution family. */
 export type { ClientSeam, ConfigFormLike, ConfigFormSnapshotLike, ConfigFormsSeat, ConfigPathOpLike, ConfigWriteKind, ConfigWriteOutcome, LocaleSeat, PanelBodyOptions, PanelRowOptions, SettingsFace, SlotsSeat } from './seam.ts'
 export { registerSidebarPanel, requireClientSeats, type SidebarPanelSpec, type Translate } from './panel.ts'
+export { registerSurface, type SurfaceSpec } from './register-surface.ts'
 export { registerWorkbenchView } from './workbench-view.ts'
 export type { WorkbenchViewSpec } from './workbench-view.ts'
 export { panelWorkspaceId } from './workspace.ts'
+export { PLATFORM_UI_MODULE, platformUiModule } from './platform-ui.ts'
 export { formatLocalClock, formatLocalDateTime, isSameLocalDay, type LocalDateTimeOptions } from './format.ts'
 export { DecisionFrame, type DecisionFrameProps } from './presentation/decision-frame.ts'
 export { TaskBanner, type TaskBannerProps } from './presentation/task-banner.ts'

@@ -15,6 +15,8 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveBasePresetPatch } from '@deepseek-ai/dsh-evolution-core/composition'
+import { profileContextPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Context } from '@deepseek-ai/cordis'
 
 /** The launcher-owned profile facts a preset write needs. */
 export interface PresetProfileTarget {
@@ -32,14 +34,6 @@ export interface PresetProfileTarget {
  * `PROFILE_PATCH_FILENAME`). */
 export const PROFILE_PATCH_FILENAME = 'cordis.patch.yml'
 
-/** The runtime surface `profileContext` carries; only the fields this module reads. */
-interface ProfileContextLike {
-  readonly name: string
-  readonly dir: string
-  readonly patchPath: string
-  readonly startedBundles: readonly string[]
-}
-
 /**
  * The profile patch this process writes into, or undefined outside a profile.
  *
@@ -51,7 +45,7 @@ interface ProfileContextLike {
  */
 export function presetProfileTarget(ctx: { get(name: string): unknown }): PresetProfileTarget | undefined {
 // platform-declaration anchor: the platform’s `profileContext` service (optional; undefined ⇒ no preset source)
-  const profile = ctx.get('profileContext') as ProfileContextLike | undefined
+  const profile = profileContextPort(ctx as Context)
   if (profile === undefined || typeof profile.dir !== 'string' || profile.dir === '') return undefined
   return {
     profile: profile.name,

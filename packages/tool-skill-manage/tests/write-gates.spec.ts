@@ -288,6 +288,20 @@ describe('write gates: the execution point still refuses a stored plan', () => {
   })
 })
 
+function mountUserQuestions(
+  ctx: Context,
+  service: { ask: (request: { questions: Array<{ id: string; header?: string; question: string; options?: Array<{ label: string }> }>; agent?: unknown }) => Promise<unknown> },
+): void {
+  ctx.provide('userQuestions', service)
+  const agents = (ctx as unknown as { agents?: { get(id: string): unknown } }).agents
+  ctx.provide('evolutionPlatform', {
+    ports: {
+      userQuestions: service,
+      ...(agents === undefined ? {} : { agents: { get: (id: string) => agents.get(id) } }),
+    },
+  })
+}
+
 describe('write gates: the foreground confirmation (E-317)', () => {
   interface AskedQuestion {
     id: string
@@ -309,7 +323,7 @@ describe('write gates: the foreground confirmation (E-317)', () => {
   ): { asked: AskedQuestion[]; routing: unknown[] } {
     const asked: AskedQuestion[] = []
     const routing: unknown[] = []
-    ctx.provide('userQuestions', {
+    mountUserQuestions(ctx, {
       ask: async (request: { questions: AskedQuestion[]; agent?: unknown }) => {
         if (accept !== undefined && !accept(request.agent)) {
           throw Object.assign(new Error('human interaction requires the exact live calling agent when an agent is supplied'), { code: 'CALLER_NOT_LIVE' })
@@ -482,7 +496,7 @@ describe('write gates: the confirmation MODE (0.12.0)', () => {
   function mountSilentQuestions(ctx: Context): { signals: Array<AbortSignal | undefined>; asked: string[] } {
     const signals: Array<AbortSignal | undefined> = []
     const asked: string[] = []
-    ctx.provide('userQuestions', {
+    mountUserQuestions(ctx, {
       ask: async (request: { questions: Array<{ question: string }>; signal?: AbortSignal }) => {
         asked.push(request.questions[0]?.question ?? '')
         signals.push(request.signal)
@@ -528,7 +542,7 @@ describe('write gates: the confirmation MODE (0.12.0)', () => {
   it('timeout still writes when the operator answers in time, and the question carries a signal', async () => {
     const { ctx, root } = await setup({ skillWriteConfirm: 'timeout', skillWriteConfirmTimeoutSeconds: 30 })
     const signals: Array<AbortSignal | undefined> = []
-    ctx.provide('userQuestions', {
+    mountUserQuestions(ctx, {
       ask: async (request: { questions: Array<{ id: string }>; signal?: AbortSignal }) => {
         signals.push(request.signal)
         return { answers: [{ id: request.questions[0]?.id ?? '', selected: ['创建'] }] }
@@ -545,7 +559,7 @@ describe('write gates: the confirmation MODE (0.12.0)', () => {
     // The platform answers an aborted question with ASK_ABORTED, which the seam reads as a dismissal
     // — so this case is the one where the deadline and the refusal race each other in the microtask
     // queue. It must still be reported as a TIMEOUT, not as a human declining.
-    ctx.provide('userQuestions', {
+    mountUserQuestions(ctx, {
       ask: async (request: { questions: Array<{ id: string }>; signal?: AbortSignal }) => await new Promise((_resolve, reject) => {
         request.signal?.addEventListener('abort', () => {
           reject(Object.assign(new Error('ask_user_question was aborted before the user answered'), { code: 'ASK_ABORTED' }))
@@ -560,7 +574,7 @@ describe('write gates: the confirmation MODE (0.12.0)', () => {
 
   it('leaves no live timer behind once the prompt is answered', async () => {
     const { ctx } = await setup({ skillWriteConfirm: 'timeout', skillWriteConfirmTimeoutSeconds: 30 })
-    ctx.provide('userQuestions', {
+    mountUserQuestions(ctx, {
       ask: async (request: { questions: Array<{ id: string }> }) => ({ answers: [{ id: request.questions[0]?.id ?? '', selected: ['创建'] }] }),
     })
     // A referenced timer would keep a one-shot CLI process alive for the whole window after the write
@@ -573,7 +587,7 @@ describe('write gates: the confirmation MODE (0.12.0)', () => {
   })
   it('a declined prompt in ask mode is still E-317, not the timeout sentence', async () => {
     const { ctx } = await setup({ skillWriteConfirm: 'ask' })
-    ctx.provide('userQuestions', {
+    mountUserQuestions(ctx, {
       ask: async (request: { questions: Array<{ id: string }> }) => ({ answers: [{ id: request.questions[0]?.id ?? '', selected: ['Cancel'] }] }),
     })
     const refused = await callTool(ctx, { action: 'create', name: 'mode-ask-no', content: skillBody('mode-ask-no') }, sessionOf(undefined))
@@ -594,7 +608,7 @@ describe('write gates: review-fix sentinels (2026-09-26 independent review)', ()
   /** A question service whose answer depends on the question, so a delete answers "Delete". */
   function mountQuestions(ctx: Context, decide: (question: AskedQuestion) => string[]): { asked: AskedQuestion[] } {
     const asked: AskedQuestion[] = []
-    ctx.provide('userQuestions', {
+    mountUserQuestions(ctx, {
       ask: async (request: { questions: AskedQuestion[] }) => {
         const question = request.questions[0] as AskedQuestion
         asked.push(question)
@@ -629,7 +643,7 @@ describe('write gates: review-fix sentinels (2026-09-26 independent review)', ()
 
   it('refuses a DISMISSED prompt instead of writing unconfirmed (ASK_ABORTED)', async () => {
     const { ctx, root } = await setup()
-    ctx.provide('userQuestions', {
+    mountUserQuestions(ctx, {
       ask: async () => {
         throw Object.assign(new Error('ask_user_question was aborted before the user answered'), { code: 'ASK_ABORTED' })
       },
