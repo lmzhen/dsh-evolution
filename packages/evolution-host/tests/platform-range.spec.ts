@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url'
 
 const run = promisify(execFile)
 const guard = fileURLToPath(new URL('../../scripts/verify-platform-ranges.mjs', import.meta.url))
-const PEERS = '^0.2.2-rc.0'
-const ENGINES = '>=0.2.2-rc.0 <0.2.3-0'
+const PEERS = '^0.2.2-rc.3'
+const ENGINES = '>=0.2.2-rc.3 <0.2.3-0'
 
 async function stagedDir(packages: Array<Record<string, unknown>>) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-platform-range-'))
@@ -118,3 +118,4 @@ describe('verify-platform-ranges (G1-S6 range guard)', () => {
     await cleanup(root)
   })
 })
+

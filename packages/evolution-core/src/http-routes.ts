@@ -104,7 +104,7 @@ export type HostSurface =
 /** Resolve through the port; only a context with NO platform service falls back to its direct service (legacy tests/fakes). */
 function connectionFor(ctx: Context): ConnectionPort | undefined {
   const platform = ctx.get('evolutionPlatform') as EvolutionPlatform | undefined
-  return platform?.ports?.connection ?? (platform === undefined ? connectionPort(ctx) : undefined)
+  return platform?.ports?.connection ?? connectionPort(ctx)
 }
 
 export function hostSurface(ctx: Context): HostSurface {
@@ -194,5 +194,6 @@ export function methodNotAllowed(allowed: readonly HttpMethod[]): Response {
     headers: { 'content-type': 'application/json; charset=utf-8', allow: allowed.join(', ') },
   })
 }
+
 
 

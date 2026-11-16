@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import EvolutionCurator from '../src/index.ts'
-import { planExtract } from '@deepseek-ai/dsh-evolution-core'
+import { planExtract } from '@deepseek-ai/dsh-evolution-core/extract'
 import { newestUnitId } from '../src/unit-undo-plan.ts'
 
 const stamp = String.fromCharCode(10)
@@ -163,3 +163,4 @@ it('R-G3a-2b：extract 的 source/target/support 由一次 undoUnit 全字节还
     expect(existsSync(join(home, 'skills', 'ex-target', 'references', 'shared.md'))).toBe(false)
   } finally { await rm(home, { recursive: true, force: true }) }
 })
+

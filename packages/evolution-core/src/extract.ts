@@ -5,8 +5,10 @@
 export * from './extract-plan.ts'
 export * from './extract-request.ts'
 export * from './extract-prompt.ts'
+export { readExternalSupport } from './external-support.ts'
 export { ownerCandidatesFromSummaries } from './owner-resolver.ts'
 export { proposalFromPlan } from './proposal-view.ts'
 export { readProposalReport, readProposalReports, writeProposalReport } from './proposal-report.ts'
+
 
 
