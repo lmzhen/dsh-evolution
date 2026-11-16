@@ -14,6 +14,7 @@
 import { isRecord } from './guards.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { EvolutionPlatform } from './runtime/platform.ts'
+import { connectionPort, type ConnectionPort } from './platform/connection.ts'
 
 /** Largest request body a family route accepts; a bigger one reads as "no body" (400 from the handler). */
 export const MAX_REQUEST_BODY_BYTES = 64 * 1024
@@ -100,8 +101,14 @@ export type HostSurface =
   | { readonly available: true; readonly allowsRemoteAuthorities: boolean }
   | { readonly available: false; readonly code: 'E-325'; readonly reason: 'connection-missing' | 'service-absent' }
 
+/** Resolve through the port; only a context with NO platform service falls back to its direct service (legacy tests/fakes). */
+function connectionFor(ctx: Context): ConnectionPort | undefined {
+  const platform = ctx.get('evolutionPlatform') as EvolutionPlatform | undefined
+  return platform?.ports?.connection ?? (platform === undefined ? connectionPort(ctx) : undefined)
+}
+
 export function hostSurface(ctx: Context): HostSurface {
-  const port = (ctx.get('evolutionPlatform') as EvolutionPlatform | undefined)?.ports?.connection
+  const port = connectionFor(ctx)
   if (port === undefined) return { available: false, code: 'E-325', reason: 'connection-missing' }
   return { available: true, allowsRemoteAuthorities: port.allowsRemoteAuthorities }
 }
@@ -127,7 +134,7 @@ export function registerHostRoutes(
   const injecting = owner as unknown as Partial<InjectingContext>
   if (typeof injecting.inject !== 'function') throw new Error('host routes require a context that owns inject()')
   injecting.inject(['evolutionPlatform', 'connection'], (scope: Context) => {
-    const connection = (scope.get('evolutionPlatform') as EvolutionPlatform | undefined)?.ports?.connection
+    const connection = connectionFor(scope)
     const audit: DecisionAudit = {
       channel: 'connection.fetch',
       principal: 'owner',
@@ -187,3 +194,4 @@ export function methodNotAllowed(allowed: readonly HttpMethod[]): Response {
     headers: { 'content-type': 'application/json; charset=utf-8', allow: allowed.join(', ') },
   })
 }
+
