@@ -37,7 +37,10 @@ for (const tarball of tarballs) {
 // @deepseek-ai/dsh-storage-domain@0.2.2-rc.1 imports @deepseek-ai/dsh-storage but does not
 // declare it, so install it explicitly for the artifact-first import gate.
 specs.add('@deepseek-ai/dsh-storage@' + platformVersion)
+// @deepseek-ai/dsh-llm@0.2.2-rc.3 imports @deepseek-ai/dsh-error but does not declare it; install it explicitly.
+specs.add('@deepseek-ai/dsh-error@' + platformVersion)
 const root = await mkdtemp(join(tmpdir(), 'dsh-packed-platform-'))
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 execFileSync(npm, ['install', '--prefix', root, '--no-package-lock', '--no-save', '--legacy-peer-deps', ...specs], { stdio: 'inherit', shell: process.platform === 'win32' })
 process.stdout.write(join(root, 'node_modules') + '\n')
+
