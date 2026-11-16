@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-14T16:35:39.198Z",
-  "tree": "8b6a9fa5",
+  "measuredAt": "2026-11-16T20:11:09.732Z",
+  "tree": "d55d916c",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -180,6 +180,16 @@
       "expectLine": "unknown",
       "status": "pending",
       "reasonRef": "packages/evolution-core/tests/opt-in.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/platform-lifecycle.spec.ts",
+      "id": "@deepseek-ai/dsh-session-projection",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-core/tests/platform-lifecycle.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
       "owner": "evolution-core"
     },
@@ -1015,16 +1025,6 @@
     },
     {
       "spec": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts",
-      "id": "@deepseek-ai/dsh-agent",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-skill-discovery"
-    },
-    {
-      "spec": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts",
       "id": "@deepseek-ai/dsh-llm",
       "kind": "platform",
       "expectLine": "unknown",
@@ -1036,6 +1036,16 @@
     {
       "spec": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts",
       "id": "@deepseek-ai/dsh-session",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-skill-discovery"
+    },
+    {
+      "spec": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts",
+      "id": "@deepseek-ai/dsh-agent",
       "kind": "platform",
       "expectLine": "unknown",
       "status": "pending",

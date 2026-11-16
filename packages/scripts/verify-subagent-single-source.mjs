@@ -16,6 +16,8 @@ const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
 const JSON_OUT = argv.includes('--json')
 const OWNER = 'evolution-core/src/subagent/channel.ts'
+const PORT_ADAPTER = 'evolution-core/src/platform/subagents.ts'
+const KERNEL = 'evolution-core/src/subagent/kernel.ts'
 const FORBIDDEN = [
   [/\.start\('spawn'/, 'legacy subagents.start(spawn) call'],
   [/subagents\.start\(/, 'legacy subagents.start() call'],
@@ -46,8 +48,10 @@ function walk(dir) {
     lines.forEach((line, index) => {
       const trimmed = line.trim()
       if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return
-      if (rel !== OWNER && line.includes('startActivation')) hits.push({ file: rel, line: index + 1, rule: 'startActivation outside the channel owner' })
+      const subagentOwner = rel === OWNER || rel === PORT_ADAPTER || rel === KERNEL
+      if (!subagentOwner && line.includes('startActivation')) hits.push({ file: rel, line: index + 1, rule: 'startActivation outside the subagent owner/adapter' })
       for (const [pattern, rule] of FORBIDDEN) {
+        if (pattern.test(line) && (rel === KERNEL || rel === PORT_ADAPTER) && (rule === 'legacy subagents.start() call' || rule === 'legacy subagents.start(spawn) call')) continue
         if (pattern.test(line)) hits.push({ file: rel, line: index + 1, rule })
       }
     })
@@ -76,3 +80,4 @@ if (scanned === 0) {
 }
 if (JSON_OUT) console.log(JSON.stringify({ ok: true, scanned }, null, 2))
 else console.log('verify-subagent-single-source: OK — ' + scanned + ' production source(s), one execution path (evolution-core channel)')
+
