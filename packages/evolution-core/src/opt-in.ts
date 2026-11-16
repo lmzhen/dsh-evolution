@@ -39,6 +39,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { EvolutionPlatform } from './runtime/platform.ts'
+import { toolsPort } from './platform/tools.ts'
 import { scopeOf } from './platform/index.ts'
 import type { OpaqueScopeKey } from './scope.ts'
 
@@ -105,7 +106,7 @@ export function scopedProbeReport(): ScopedProbeReport {
  */
 export function sessionSeesFamilyTools(ctx: Context, sessionId: string): boolean {
   const platform = ctx.get('evolutionPlatform') as EvolutionPlatform | undefined
-  const tools = platform?.ports.tools
+  const tools = platform?.ports.tools ?? toolsPort(ctx)
   if (tools === undefined) return false
   const agent = platform?.ports.agents?.get(sessionId)
   const scope = agent?.ctx === undefined ? undefined : scopeOf(agent.ctx as Context)
@@ -155,3 +156,4 @@ export function sessionAudited(ctx: Context, sessionId: string, sessionScoped: b
   noteScopedProbeMiss(ctx)
   return false
 }
+
