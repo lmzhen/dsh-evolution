@@ -134,8 +134,8 @@ export const guards = [
   gate("gate-18", {
     kind: "script",
     tree: "mirror",
-    title: "`node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/_upstream/dsh-upstream-0.2.2-rc.1 --accept-recorded`",
-    argv: ["node","packages/scripts/verify-platform-contract.mjs","packages","--upstream","D:/dsh/_upstream/dsh-upstream-0.2.2-rc.1","--accept-recorded"],
+    title: "`node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/_upstream/dsh-upstream-0.2.2-rc.3 --accept-recorded`",
+    argv: ["node","packages/scripts/verify-platform-contract.mjs","packages","--upstream","D:/dsh/_upstream/dsh-upstream-0.2.2-rc.3","--accept-recorded"],
     // CI runs the action's overlay form: the platform citations are overlay-relative, so the guard
     // must see the overlay tree (strict mode, no --accept-recorded).
     ci: { cwd: "upstream", argv: ["node","packages/evolution/scripts/verify-platform-contract.mjs","packages/evolution","--upstream","."] },

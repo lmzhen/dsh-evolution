@@ -110,6 +110,7 @@
         "evolution-core::tests/numeric.spec.ts",
         "evolution-core::tests/owner-resolver.spec.ts",
         "evolution-core::tests/params.spec.ts",
+        "evolution-core::tests/platform-lifecycle.spec.ts",
         "evolution-core::tests/platform-line.spec.ts",
         "evolution-core::tests/platform-llm-route.spec.ts",
         "evolution-core::tests/policy-stage-limits.spec.ts",
@@ -121,6 +122,7 @@
         "evolution-core::tests/reference-rewrite.spec.ts",
         "evolution-core::tests/restricted-preset.spec.ts",
         "evolution-core::tests/restrictor.spec.ts",
+        "evolution-core::tests/result.spec.ts",
         "evolution-core::tests/review-channel.spec.ts",
         "evolution-core::tests/review-context.spec.ts",
         "evolution-core::tests/session-fold.spec.ts",
@@ -176,7 +178,8 @@
         "evolution-ui::tests/settings-slot-fill.client.spec.ts",
         "evolution-ui::tests/settings-states.generated.spec.ts",
         "evolution-ui::tests/settings-styles.client.spec.ts",
-        "evolution-ui::tests/settings-u8-glossary.spec.ts"
+        "evolution-ui::tests/settings-u8-glossary.spec.ts",
+        "tool-skill-manage::tests/action-table.spec.ts"
       ],
       "gatesLocal": [
         "gate-01",
@@ -394,6 +397,7 @@
         "evolution-core::tests/param-registry.spec.ts",
         "evolution-core::tests/params-docs.spec.ts",
         "evolution-core::tests/params.spec.ts",
+        "evolution-core::tests/platform-lifecycle.spec.ts",
         "evolution-core::tests/platform-line.spec.ts",
         "evolution-core::tests/platform-llm-route.spec.ts",
         "evolution-core::tests/plugin-record-not-dispatch.spec.ts",
@@ -414,6 +418,7 @@
         "evolution-core::tests/restore-and-transact-guards.spec.ts",
         "evolution-core::tests/restricted-preset.spec.ts",
         "evolution-core::tests/restrictor.spec.ts",
+        "evolution-core::tests/result.spec.ts",
         "evolution-core::tests/review-channel.spec.ts",
         "evolution-core::tests/review-context.spec.ts",
         "evolution-core::tests/run-outcome-single-source.spec.ts",
@@ -719,7 +724,8 @@
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
         "memory::tests/memory.spec.ts",
-        "memory::tests/tools/memory-interpolation-contract.spec.ts"
+        "memory::tests/tools/memory-interpolation-contract.spec.ts",
+        "tool-skill-manage::tests/action-table.spec.ts"
       ],
       "gatesLocal": [
         "gate-01",
@@ -1029,6 +1035,7 @@
         "evolution-core::tests/param-registry.spec.ts",
         "evolution-core::tests/params-docs.spec.ts",
         "evolution-core::tests/params.spec.ts",
+        "evolution-core::tests/platform-lifecycle.spec.ts",
         "evolution-core::tests/platform-line.spec.ts",
         "evolution-core::tests/platform-llm-route.spec.ts",
         "evolution-core::tests/plugin-record-not-dispatch.spec.ts",
@@ -1049,6 +1056,7 @@
         "evolution-core::tests/restore-and-transact-guards.spec.ts",
         "evolution-core::tests/restricted-preset.spec.ts",
         "evolution-core::tests/restrictor.spec.ts",
+        "evolution-core::tests/result.spec.ts",
         "evolution-core::tests/review-channel.spec.ts",
         "evolution-core::tests/review-context.spec.ts",
         "evolution-core::tests/run-outcome-single-source.spec.ts",
@@ -1354,7 +1362,8 @@
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
         "memory::tests/memory.spec.ts",
-        "memory::tests/tools/memory-interpolation-contract.spec.ts"
+        "memory::tests/tools/memory-interpolation-contract.spec.ts",
+        "tool-skill-manage::tests/action-table.spec.ts"
       ],
       "gatesLocal": [
         "gate-01",
@@ -1596,6 +1605,7 @@
         "evolution-core::tests/param-registry.spec.ts",
         "evolution-core::tests/params-docs.spec.ts",
         "evolution-core::tests/params.spec.ts",
+        "evolution-core::tests/platform-lifecycle.spec.ts",
         "evolution-core::tests/platform-line.spec.ts",
         "evolution-core::tests/platform-llm-route.spec.ts",
         "evolution-core::tests/plugin-record-not-dispatch.spec.ts",
@@ -1617,6 +1627,7 @@
         "evolution-core::tests/restore-and-transact-guards.spec.ts",
         "evolution-core::tests/restricted-preset.spec.ts",
         "evolution-core::tests/restrictor.spec.ts",
+        "evolution-core::tests/result.spec.ts",
         "evolution-core::tests/review-channel.spec.ts",
         "evolution-core::tests/review-context.spec.ts",
         "evolution-core::tests/run-outcome-single-source.spec.ts",
@@ -1974,6 +1985,7 @@
         "memory::tests/tools/memory-interpolation-contract.spec.ts",
         "memory::tests/tools/memory-interpolation.spec.ts",
         "memory::tests/tools/tool-memory.spec.ts",
+        "tool-skill-manage::tests/action-table.spec.ts",
         "tool-skill-manage::tests/approval-preview.spec.ts",
         "tool-skill-manage::tests/create-tree-reads.spec.ts",
         "tool-skill-manage::tests/extract-agent.spec.ts",
@@ -2051,11 +2063,11 @@
   "counts": {
     "fast": {
       "gates": 62,
-      "specs": 101
+      "specs": 104
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 407
+      "specs": 410
     },
     "ci-only": {
       "gates": 10,
@@ -2063,16 +2075,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 407
+      "specs": 410
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 479
+      "specs": 482
     }
   },
   "specs": {
-    "total": 479,
-    "marked": 479,
+    "total": 482,
+    "marked": 482,
     "unmarked": 0
   }
 }

@@ -127,3 +127,4 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 - [ ] User-facing docs are updated; stale paragraphs are deleted, not archived in place.
 - [ ] No secrets, local home paths, or one-off reports are committed.
 
+
