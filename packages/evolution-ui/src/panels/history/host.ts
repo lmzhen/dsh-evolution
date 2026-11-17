@@ -82,5 +82,41 @@ export function apply(ctx: Context): void {
       }
       return rows
     },
+    getCounts: async () => {
+      const curator = ctx.get('evolutionCurator') as {
+        skills?: { list?: () => Promise<ReadonlyArray<{ name: string }>> }
+        history?: (name: string) => Promise<ReadonlyArray<{ action?: unknown; unitId?: unknown }>>
+      } | undefined
+      if (curator?.skills?.list === undefined || curator.history === undefined) return null
+      const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+      if (ioRegistry === undefined) return null
+      const io = ioRegistry.provider()
+      const registry = newRunRegistry({ io, home: evolutionHome() })
+      const loaded = await registry.load()
+      if (!loaded.ok) return null
+      const counts = { offload: 0, condense: 0, extract: 0 }
+      for (const run of registry.runs('governance')) {
+        if (run.state !== 'succeeded' || run.resultRef === undefined) continue
+        try {
+          const raw = await io.readText(run.resultRef)
+          const report = raw === null ? undefined : JSON.parse(raw) as { mode?: unknown }
+          if (report?.mode === 'offload') counts.offload += 1
+          else if (report?.mode === 'condense') counts.condense += 1
+        } catch { /* a missing report is not a successful count */ }
+      }
+      // extract is counted per committed cross-skill unit, not per path row.
+      const units = new Set<string>()
+      try {
+        for (const skill of await curator.skills.list()) {
+          const history = await curator.history(skill.name)
+          for (const entry of history) {
+            if (entry.action !== 'extract' || typeof entry.unitId !== 'string' || entry.unitId === '') continue
+            units.add(entry.unitId)
+          }
+        }
+      } catch { return null }
+      counts.extract = units.size
+      return counts
+    },
   }, audit))
 }

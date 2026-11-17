@@ -78,6 +78,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   const [diffs, setDiffs] = useState<ReadonlyMap<number, DiffState>>(new Map())
   const [bodies, setBodies] = useState<ReadonlyMap<number, BodyState>>(new Map())
   const [governance, setGovernance] = useState<readonly GovernanceRow[]>([])
+  const [counts, setCounts] = useState<HealthPayload['counts']>(null)
   const [healthByName, setHealthByName] = useState<ReadonlyMap<string, HealthPayload['rows'][number]>>(new Map())
   // Every rows read takes a ticket, and only the newest one may write state. Without it a slow reply
   // for skill A lands while B is open: B would show A's rows, and B's restore buttons would post A's
@@ -253,6 +254,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
       ? loadHealth().then((payload) => {
         if (!live) return
         setGovernance(payload.governance)
+        setCounts(payload.counts)
         setHealthByName(new Map(payload.rows.map(row => [row.name, row])))
       })
       : loadGovernance!().then((rows) => { if (live) setGovernance(rows) })
@@ -324,7 +326,14 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
                 state: row.state,
               }),
               ' · ',
-              localTime(new Date(row.startedAt).toISOString()))))),
+              localTime(new Date(row.startedAt).toISOString())))),
+          counts === null || counts.offload + counts.condense + counts.extract === 0
+            ? null
+            : createElement('p', { className: 'evo-hist-hint' }, face.format('governance.counts', {
+              offload: counts.offload,
+              condense: counts.condense,
+              extract: counts.extract,
+            }))),
       failure === undefined ? null : createElement('div', { className: 'evo-hist-failure' }, failureBlock(face.t, failure)),
       // The explanation is for the screen that has nothing else on it (W12): a reader who can see
       // versions does not need to be told what a version is.

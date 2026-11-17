@@ -622,6 +622,16 @@
       "pt": "{mode} {target} — {state}",
       "ru": "{mode} {target} — {state}"
     },
+    "governance.counts": {
+      "zh": "成功：offload {offload} · condense {condense} · extract {extract}",
+      "en": "Succeeded: offload {offload} · condense {condense} · extract {extract}",
+      "ja": "成功：offload {offload} · condense {condense} · extract {extract}",
+      "es": "Correctas: offload {offload} · condense {condense} · extract {extract}",
+      "fr": "Réussies : offload {offload} · condense {condense} · extract {extract}",
+      "de": "Erfolgreich: offload {offload} · condense {condense} · extract {extract}",
+      "pt": "Bem-sucedidas: offload {offload} · condense {condense} · extract {extract}",
+      "ru": "Успешно: offload {offload} · condense {condense} · extract {extract}"
+    },
     "health.verdict.warn": {
       "zh": "需关注",
       "en": "Needs attention",

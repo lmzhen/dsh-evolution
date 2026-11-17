@@ -147,6 +147,7 @@ export interface HealthRow {
 export interface HealthPayload {
   readonly rows: readonly HealthRow[]
   readonly governance: readonly GovernanceRow[]
+  readonly counts: { readonly offload: number; readonly condense: number; readonly extract: number } | null
 }
 
 export interface VersionsPayload {
@@ -193,7 +194,7 @@ export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHis
     skills: async () => await request(HOST_ROUTES.skills) as readonly SkillRow[],
     versions: async (name: string) => await request(HOST_ROUTES.versions + '?name=' + encodeURIComponent(name)) as VersionsPayload,
     health: async () => {
-      const data = await request(HOST_ROUTES.health) as { rows?: unknown; governance?: unknown }
+      const data = await request(HOST_ROUTES.health) as { rows?: unknown; governance?: unknown; counts?: unknown }
       const rows = Array.isArray(data.rows)
         ? (data.rows as Array<Record<string, unknown>>).map(row => {
           const dims = row.dims !== null && typeof row.dims === 'object' ? row.dims as Record<string, unknown> : {}
@@ -218,7 +219,17 @@ export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHis
             resultRef: typeof row.resultRef === 'string' ? row.resultRef : null,
           }))
         : []
-      return { rows, governance }
+      const counts = data.counts !== null && typeof data.counts === 'object'
+        ? (() => {
+          const raw = data.counts as Record<string, unknown>
+          return {
+            offload: typeof raw.offload === 'number' ? raw.offload : 0,
+            condense: typeof raw.condense === 'number' ? raw.condense : 0,
+            extract: typeof raw.extract === 'number' ? raw.extract : 0,
+          }
+        })()
+        : null
+      return { rows, governance, counts }
     },
     diff: async (name: string, v: number) => await request(HOST_ROUTES.diff + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionDiffRow,
     body: async (name: string, v: number) => await request(HOST_ROUTES.body + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionBodyRow,
