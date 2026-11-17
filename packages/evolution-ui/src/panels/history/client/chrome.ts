@@ -254,6 +254,9 @@ export function panelHead(copy: Copy, onRefresh: () => void, title?: string, nam
       createElement('summary', null, copy.t('copy.tidy')),
       createElement(CopyCommandButton, { key: 'offload', copy, command: `/evolution offload ${name}`, label: copy.t('copy.offload') }),
       createElement(CopyCommandButton, { key: 'condense', copy, command: `/evolution condense ${name}`, label: copy.t('copy.condense') })))
+    actions.push(createElement('details', { key: 'extract', className: 'evo-hist-more' },
+      createElement('summary', null, copy.t('copy.extract')),
+      createElement(CopyCommandButton, { key: 'discover', copy, command: `/evolution extract ${name}`, label: copy.t('copy.extract.discover') })))
   }
   return createElement('div', { className: 'evo-hist-head' },
     createElement('h2', { className: 'evo-hist-title' }, title ?? copy.t('title')),
