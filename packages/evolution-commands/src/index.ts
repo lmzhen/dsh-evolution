@@ -779,6 +779,27 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             .replace('%SKILL%', target)
             .replace('%MODE%', mode)
             .replace('%DRY%', dryRun ? 'yes (no writes)' : 'no')
+          const io = (ctx.get('evolutionIo') as { provider?(name?: string): { writeText(path: string, content: string): Promise<void> } } | undefined)?.provider?.()
+          const reportPath = join(evolutionHome(), 'reports', `tidy-${run.id}.json`)
+          const writeReport = async (state: 'succeeded' | 'failed' | 'cancelled', text: string, failure?: string): Promise<void> => {
+            if (io === undefined) return
+            try {
+              await io.writeText(reportPath, JSON.stringify({
+                version: 1,
+                runId: run.id,
+                target,
+                mode,
+                dryRun,
+                state,
+                startedAt: run.startedAt,
+                finishedAt: new Date().toISOString(),
+                text,
+                ...(failure === undefined ? {} : { failure }),
+              }, null, 2) + '\n')
+            } catch (error) {
+              ctx.logger.warn(`dsh-evolution-commands: tidy ${target} report write failed: ${error instanceof Error ? error.message : String(error)}`)
+            }
+          }
           const open = channel.open.bind(channel)
           void (async () => {
             try {
@@ -793,17 +814,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               })
               if (opened.kind === 'ok') {
                 await channel.dispose?.(opened.childId).catch(() => { /* best-effort activation cleanup */ })
+                await writeReport('succeeded', opened.turn.text)
                 await runs.stage(run.id, 'settle', { done: 1, total: 1 })
-                await runs.settle(run.id, { state: 'succeeded' })
+                await runs.settle(run.id, { state: 'succeeded', ...(io === undefined ? {} : { resultRef: reportPath }) })
                 return
               }
-              await runs.settle(run.id, opened.kind === 'aborted'
-                ? { state: 'cancelled' }
-                : { state: 'failed', failure: opened.reason })
+              const state = opened.kind === 'aborted' ? 'cancelled' : 'failed'
+              const failure = opened.kind === 'aborted' ? 'cancelled' : opened.reason
+              await writeReport(state, '', failure)
+              await runs.settle(run.id, { state, ...(io === undefined ? {} : { resultRef: reportPath }), ...(failure === undefined ? {} : { failure }) })
             } catch (error) {
               const failure = error instanceof Error ? error.message : String(error)
               ctx.logger.warn(`dsh-evolution-commands: tidy ${target} failed: ${failure}`)
-              await runs.settle(run.id, { state: 'failed', failure })
+              await writeReport('failed', '', failure)
+              await runs.settle(run.id, { state: 'failed', ...(io === undefined ? {} : { resultRef: reportPath }), failure })
             }
           })()
           return ok(`已启动治理：${target}（mode=${mode}${dryRun ? '，dry-run' : ''}；run=${run.id}）。完成后在技能历史查看摘要；用 /evolution maintain status ${run.id} 查状态。`)
