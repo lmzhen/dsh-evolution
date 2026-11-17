@@ -60,7 +60,7 @@ curator 负责技能库的生命周期整理。默认在宿主启动约 10 秒�
 
 ## 技能整理：restructure / condense
 
-offload 不需要独立执行器。技能正文达到硬上限时写入会被拒绝，并提示拆小 SKILL.md、把支撑内容放进 `references/` 或 `templates/`；达到软上限时健康检查显示 `warn` / `needs-restructure`。真正执行“移到 references”的是 `/evolution restructure <name> "<heading>" <to_file>`：一个 unit、CAS、可 undo，也支持 start/end 子块。
+offload 不需要独立执行器。技能正文达到硬上限时写入会被拒绝，并提示拆小 SKILL.md、把支撑内容放进 `references/` 或 `templates/`；达到软上限时健康检查显示 `warn` / `needs-restructure`。真正执行“移到 references”的是 `/evolution restructure <name> "<heading>" <to_file>`：一个 unit、CAS、可 undo，也支持 start/end 连续行子块（参数是完整行文本，不是行号）。
 
 `/evolution condense <skill>` 是逐章节压缩，使用一个独立的 governance 子智能体：
 

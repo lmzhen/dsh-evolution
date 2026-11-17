@@ -66,9 +66,9 @@
 | `/evolution learn [request]` | 向当前会话发一条学习请求 |
 | `/evolution review [memory|skill|combined]` | 立即向当前会话注入一次复盘，不等空闲 |
 | `/evolution replay` | 从活动记录比较不同会话和重启之间的计划结果 |
-| `/evolution restructure <name> "<heading>" <to_file> [--start <line>] [--end <line>] [--plan <runId>]` | 把技能正文的一节（或 start/end 子块）移到 references 文件；就是 offload 的执行器 |
+| `/evolution restructure <name> "<heading>" <to_file> [--start "<exact line>"] [--end "<exact line>"] [--plan <runId>]` | 把技能正文的一节（或 start/end 连续行子块）移到 references 文件；start/end 是完整行文本，不是行号 |
 | `/evolution condense <name> [--dry-run]` | 逐章节压缩技能正文（后台治理子智能体，多次小改） |
-| `/evolution extract <source> [<target> "<heading>"] [--start <line>] [--end <line>] [--outcome extract|mixed] [--apply]` | 预览或执行跨技能提取；source-only 时只返回 owner proposal |
+| `/evolution extract <source> [<target> "<heading>"] [--start "<exact line>"] [--end "<exact line>"] [--outcome extract|mixed] [--apply]` | 预览或执行跨技能提取；source-only 时只返回 owner proposal |
 
 `replay` 依赖活动记录。默认 `reviewMode=aux` 且 aux 不向父会话追加工具事件，因此没有相应数据时不能据此推断回放已经完成过实际评估。
 
