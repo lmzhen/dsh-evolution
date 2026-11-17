@@ -4,7 +4,7 @@
 >
 > **破坏性变更（DCR-2）**：0.50.0 **只支持 DSH 0.2.2-rc.3+**。`peerDependencies` 为 `^0.2.2-rc.3`，`engines.dsh` 为 `>=0.2.2-rc.3 <0.2.3-0`；0.2.2-rc.1/rc.2 宿主会被平台兼容门拒绝，请停留在 0.49.x。包集合不变（20 个包），不新增 npm 包名。
 >
-> **验证**：CI run `43975839492` 全绿（Node 22/24 validate、pack、Windows desktop install）；rc.3 定向测试 96/96；mutation coverage 23/23；20 包 tarball audit 通过；rc.3 npm web host 真机打开「技能自动进化」面板（自进化/技能历史/待批/合并/诊断），console 无 error。
+> **验证**：CI run `44008520889` 全绿（Node 22/24 validate、pack、Windows desktop install）；rc.3 定向测试 96/96；mutation coverage 23/23；20 包 tarball audit 通过；rc.3 npm web host 真机打开「技能自动进化」面板（自进化/技能历史/待批/合并/诊断），console 无 error。
 >
 > **迁移**：rc.1/rc.2 用户不要升级；rc.3 用户可直接用 0.50.0。旧 rc.1 兼容桥已删除，无自动迁移路径。
 

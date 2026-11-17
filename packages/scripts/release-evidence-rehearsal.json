@@ -1,5 +1,5 @@
 {
-  "note": "0.50.0 release rehearsal: S1-S3 measured on the 20 packed 0.50.0 tarballs installed into D:/dsh/_rc3-release050 (platform 0.2.2-rc.3, npm web host 3105); S4 re-run in the build overlay (evolution-host s4-hmr-double-apply, 2/2).",
+  "note": "0.50.0 release rehearsal: S1-S3 measured on the 20 packed 0.50.0 tarballs installed into D:/dsh/_rc3-release050b (platform 0.2.2-rc.3, npm web host 3106; empty history corpus); S4 in the build overlay (s4-hmr-double-apply, 2/2).",
   "familyVersion": "0.50.0",
   "spikes": [
     {
@@ -8,18 +8,18 @@
       "face": "web",
       "hostVersion": "0.2.2-rc.3",
       "familyVersion": "0.50.0",
-      "startedAt": "2026-11-17T02:45:00.000Z",
-      "artifactSha256": "a224ebde0443c02553c85e7c12da70521de80ce5bfca5c1ae7a2212d3db9df15",
+      "startedAt": "2026-11-17T03:36:00.000Z",
+      "artifactSha256": "0ef864e89bb36952d855658f1f58f015ed5ab0c4e02b1a8e40b2232900974942",
       "inputsSha256": "1f69b7ee29ced3a02526bf460fe75204abf401f9b85a49bf766d29aa828efaea",
-      "commit": "e024f1dfd443f061e419107a5954404289c69413",
+      "commit": "09b47449ac5bc44d09026495d0c2922ac2bc5fc8",
       "readings": {
         "skillHistoryRows": 0,
         "skillHistoryBytes": 21,
         "threeReadsStable": true,
         "readMs": [
-          10,
+          6,
           2,
-          1
+          3
         ],
         "ownerStatus": 200
       }
@@ -30,18 +30,18 @@
       "face": "web",
       "hostVersion": "0.2.2-rc.3",
       "familyVersion": "0.50.0",
-      "startedAt": "2026-11-17T02:45:00.000Z",
-      "artifactSha256": "a224ebde0443c02553c85e7c12da70521de80ce5bfca5c1ae7a2212d3db9df15",
+      "startedAt": "2026-11-17T03:36:00.000Z",
+      "artifactSha256": "0ef864e89bb36952d855658f1f58f015ed5ab0c4e02b1a8e40b2232900974942",
       "inputsSha256": "1f69b7ee29ced3a02526bf460fe75204abf401f9b85a49bf766d29aa828efaea",
-      "commit": "e024f1dfd443f061e419107a5954404289c69413",
+      "commit": "09b47449ac5bc44d09026495d0c2922ac2bc5fc8",
       "readings": {
         "ownerDiagnostics": 200,
         "anonymous": 401,
         "anonymousBody": "unauthorized",
         "diagnosticsReadMs": [
-          14,
-          2,
-          1
+          13,
+          1,
+          10
         ],
         "carrier": "connection.fetch"
       }
@@ -52,10 +52,10 @@
       "face": "web",
       "hostVersion": "0.2.2-rc.3",
       "familyVersion": "0.50.0",
-      "startedAt": "2026-11-17T02:45:00.000Z",
-      "artifactSha256": "a224ebde0443c02553c85e7c12da70521de80ce5bfca5c1ae7a2212d3db9df15",
+      "startedAt": "2026-11-17T03:36:00.000Z",
+      "artifactSha256": "0ef864e89bb36952d855658f1f58f015ed5ab0c4e02b1a8e40b2232900974942",
       "inputsSha256": "1f69b7ee29ced3a02526bf460fe75204abf401f9b85a49bf766d29aa828efaea",
-      "commit": "e024f1dfd443f061e419107a5954404289c69413",
+      "commit": "09b47449ac5bc44d09026495d0c2922ac2bc5fc8",
       "readings": {
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
@@ -70,10 +70,10 @@
       "face": "web",
       "hostVersion": "0.2.2-rc.3",
       "familyVersion": "0.50.0",
-      "startedAt": "2026-11-17T02:45:00.000Z",
-      "artifactSha256": "a224ebde0443c02553c85e7c12da70521de80ce5bfca5c1ae7a2212d3db9df15",
+      "startedAt": "2026-11-17T03:36:00.000Z",
+      "artifactSha256": "0ef864e89bb36952d855658f1f58f015ed5ab0c4e02b1a8e40b2232900974942",
       "inputsSha256": "1f69b7ee29ced3a02526bf460fe75204abf401f9b85a49bf766d29aa828efaea",
-      "commit": "e024f1dfd443f061e419107a5954404289c69413",
+      "commit": "09b47449ac5bc44d09026495d0c2922ac2bc5fc8",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
@@ -90,7 +90,7 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on 8b1de0c1 (OK 52/52)"
+    "source": "verify-traceability --strict on 09b47449 (OK 52/52)"
   },
   "faces": {
     "web": {
@@ -99,5 +99,5 @@
       "runtime": 8
     }
   },
-  "generatedAt": "2026-11-17T02:45:00.000Z"
+  "generatedAt": "2026-11-17T03:36:00.000Z"
 }
