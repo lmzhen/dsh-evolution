@@ -144,7 +144,7 @@ export function createSubagentKernel(ctx: Context): SubagentChannel {
         if (spec.afterResult !== undefined) {
           try {
             const child = platform.ports.agents?.get(run.id)
-            if (child !== undefined) evidence = spec.afterResult(child as never)
+            if (child !== undefined) evidence = spec.afterResult(child)
           } catch {
             evidence = undefined
           }
@@ -256,6 +256,7 @@ export function createSubagentKernel(ctx: Context): SubagentChannel {
   }
   return channel
 }
+
 
 
 

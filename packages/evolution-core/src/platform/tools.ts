@@ -37,8 +37,8 @@ export function toolsPort(ctx: Context): ToolsPort | undefined {
     register: (definition) => tools.register(definition),
     guard: (guard) => tools.guard(guard),
     restrict: (filter) => tools.restrict(filter),
-    get: (name, scope) => tools.get(name, scope as never),
-    ...(typeof tools.execute === 'function' ? { execute: <T = unknown>(input: unknown) => tools.execute!(input as never) as Promise<T> } : {}),
+    get: (name, scope) => tools.get(name, scope as Parameters<ToolRuntime['get']>[1]),
+    ...(typeof tools.execute === 'function' ? { execute: <T = unknown>(input: unknown) => tools.execute!(input as Parameters<NonNullable<ToolRuntime['execute']>>[0]) as Promise<T> } : {}),
   }
 }
 
@@ -49,3 +49,4 @@ export function registerEvolutionTool(
 ): () => void {
   return toolsPort(ctx)?.register(definition) ?? (() => {})
 }
+

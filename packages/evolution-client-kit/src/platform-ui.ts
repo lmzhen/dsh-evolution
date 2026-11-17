@@ -7,12 +7,17 @@
  */
 export const PLATFORM_UI_MODULE = '@deepseek-ai/dsh-client-ui-primitives'
 
-declare function require(id: string): unknown
+type ClientRequire = (id: string) => unknown
+
+/** The loader injects its synchronous require onto the page before factory bodies run. */
+function clientRequire(): ClientRequire | undefined {
+  return (globalThis as { __dshClientRequire?: ClientRequire }).__dshClientRequire
+}
 
 /** The module row, or undefined in a deployment that does not compose it. */
 export function platformUiModule(): Record<string, unknown> | undefined {
   try {
-    const row = require(PLATFORM_UI_MODULE)
+    const row = clientRequire()?.(PLATFORM_UI_MODULE)
     return typeof row === 'object' && row !== null ? row as Record<string, unknown> : undefined
   } catch {
     return undefined
