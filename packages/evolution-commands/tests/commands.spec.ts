@@ -594,6 +594,45 @@ describe('evolution-commands', () => {
     throw new Error(`maintenance run ${id} never settled`)
   }
 
+  it('offload --dry-run never grants the child a write tool', async () => {
+    const dir = await tempHome('evo-commands-offload-dry-')
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    const io = nodeEvolutionIo()
+    ctx.provide('evolutionIo', { provider: () => io })
+    let startOptions: Record<string, unknown> | undefined
+    const channel = provideChannel(ctx, ({
+      async start(_kind: string, options: unknown) {
+        startOptions = options as Record<string, unknown>
+        return {
+          dispose: async () => {},
+          result: Promise.resolve({ text: 'dry run: no writes', structured: { verdict: 'no_issues', plan: [], notes: [] } }),
+        }
+      },
+    }))
+    await ctx.plugin(Commands, { root: root })
+    const result = await captured!.handler({
+      agent: { ctx, session: { id: 'parent-session', header: { origin: 'foreground' } } },
+      rawInput: 'offload demo-skill --dry-run',
+    })
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('已启动治理')
+    await vi.waitFor(() => { expect(startOptions).toBeDefined() })
+    // The restriction is enforced through the composed preset, not the request;
+    // inspect the registered definition's restrictor config.
+    const allows = (channel.registered as Array<{ plugins?: Array<{ config?: { allow?: readonly string[] } }> }>)
+      .flatMap(definition => definition.plugins ?? [])
+      .map(plugin => plugin.config?.allow)
+      .filter((allow): allow is readonly string[] => Array.isArray(allow))
+    const normalized = allows.map(allow => [...allow].sort())
+    expect(normalized).toContainEqual(['glob', 'grep', 'read', 'skill'])
+    expect(normalized.every(allow => !allow.includes('skill_manage'))).toBe(true)
+  })
+
   it('maintain enriches support files and reports pointer_missing truthfully (v11 P1-1)', async () => {
     // tempHome, not tempRoot: the run registry and the report live under the
     // evolution home now, and a test must not write into the real one.
