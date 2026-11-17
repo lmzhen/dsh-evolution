@@ -866,17 +866,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
       change = { text: normalized.text, source: 'model' }
     }
-    // Model-origin structural writes must explain themselves; foreground/human
-    // writes keep the host fallback so the CLI and UI are never blocked.
-    const structural = action === 'restructure' || action === 'extract' || action === 'delete'
-    if (structural && origin !== 'foreground' && change === undefined) {
-      return { ok: false, message: `动作「${action}」的后台写入必须提供 summary（一句变更原因）。`, skills: [] }
-    }
     if (actionMeta?.needsName === true && name === '') {
       return { ok: false, message: `动作「${action}」需要 name。`, skills: [] }
     }
     if (action === 'extract' && origin === 'background_review') {
       return { ok: false, message: '背景审查不能执行 extract：review 只提议；提取必须由显式前台工具/命令执行。', skills: [] }
+    }
+    // Model-origin structural writes must explain themselves; foreground/human
+    // writes keep the host fallback so the CLI and UI are never blocked.
+    const structural = action === 'restructure' || action === 'extract' || action === 'delete'
+    if (structural && origin !== 'foreground' && change === undefined) {
+      return { ok: false, message: `动作「${action}」的后台写入必须提供 summary（一句变更原因）。`, skills: [] }
     }
     if (action === 'review') {
       // v31 TSM-05: the tree scan fails loud on a transient read error
