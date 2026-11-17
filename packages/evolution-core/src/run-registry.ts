@@ -454,8 +454,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       const startedAt = now()
       const controller = new AbortController()
       controllers.set(id, controller)
-      // The pid is what lets ANOTHER process tell this live run from an orphan.
-      owned.set(id, {
+      const record: RunRecord = {
         id,
         kind,
         state: 'running',
@@ -464,11 +463,32 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
         ...(seed?.command !== undefined ? { command: seed.command } : {}),
         ...(seed?.parentRunId !== undefined ? { parentRunId: seed.parentRunId } : {}),
         ...(seed?.total !== undefined ? { progress: { done: 0, total: seed.total } } : {}),
-      })
-      // Write-through (0.19.1, review P2): answering "started" promises a run another
-      // plane can read, so the row reaches the index before this resolves. `persist()`
-      // warns instead of throwing, so an unwritable home cannot withhold the handle.
-      await persist()
+      }
+      if (seed?.exclusive === true) {
+        // Cross-process single-flight: the shared index is read INSIDE the
+        // transaction that writes the new row. A live owner of the same kind
+        // (including another plane) refuses; a dead owner is an orphan and
+        // does not block. Ask-then-begin alone could not see the other plane.
+        try {
+          await writeIndex((current) => {
+            const onDisk = parseIndex(current)
+            const busy = [...onDisk.records, ...owned.values()].some(row =>
+              row.kind === kind && row.state === 'running' && !ownerIsGone(row))
+            if (busy) throw new Error(`run-kind-active:${kind}`)
+            return serializeIndex([...onDisk.records, record], onDisk.foreign)
+          })
+        } catch (error) {
+          controllers.delete(id)
+          throw error
+        }
+        owned.set(id, record)
+      } else {
+        // Write-through (0.19.1, review P2): answering "started" promises a run another
+        // plane can read, so the row reaches the index before this resolves. `persist()`
+        // warns instead of throwing, so an unwritable home cannot withhold the handle.
+        owned.set(id, record)
+        await persist()
+      }
       return {
         id,
         kind,
