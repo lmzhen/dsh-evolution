@@ -123,7 +123,7 @@ export interface RunRegistry {
    * lifetime starts when the caller answers "started", so a plane that reads that answer
    * must find the run. The cost is one local index write on the ack path (milliseconds).
    */
-  begin(kind: RunKind, seed?: { command?: RunCommand; total?: number; parentRunId?: string }): Promise<RunHandle>
+  begin(kind: RunKind, seed?: { command?: RunCommand; total?: number; parentRunId?: string; exclusive?: boolean }): Promise<RunHandle>
   /** Record a run's terminal state (first writer wins). */
   settle(id: string, outcome: RunOutcome): Promise<void>
   /**
@@ -443,6 +443,13 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
     },
 
     async begin(kind, seed) {
+      // Ask-then-begin has a window; a kind that must be single-flight is
+      // checked again at the mutation point, before this process owns a row.
+      if (seed?.exclusive === true) {
+        for (const record of owned.values()) {
+          if (record.kind === kind && record.state === 'running') throw new Error(`run-kind-active:${kind}`)
+        }
+      }
       const id = randomUUID()
       const startedAt = now()
       const controller = new AbortController()

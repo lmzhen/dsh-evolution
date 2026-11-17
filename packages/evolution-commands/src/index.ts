@@ -802,7 +802,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (prepared.kind !== 'available') return err(`治理子智能体不可用：${prepared.reason}`)
           const active = await runs.findActive('governance')
           if (active !== undefined) return err(`已有治理运行在跑：${active.id}。先等它完成，或用 /evolution maintain status ${active.id} 查看。`)
-          const run = await runs.begin('governance')
+          let run: Awaited<ReturnType<typeof runs.begin>>
+          try {
+            run = await runs.begin('governance', { exclusive: true })
+          } catch {
+            return err('已有治理运行在跑。先等它完成，或用 /evolution maintain status 查看。')
+          }
           await runs.stage(run.id, 'author', { done: 0, total: 1 })
           const prompt = GOVERNANCE_PROMPT_TEMPLATE
             .replace('%SKILL%', target)
