@@ -33,6 +33,11 @@ import { classifySessionEvent, paramRowId, readDispatchSignal, sessionAudited, s
 
 import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
+/** Model requests per auxiliary review run. Offload normally needs 3; 4 leaves one retry. */
+const DEFAULT_REVIEW_MAX_ROUNDS = 4
+/** Keep a mistyped deployment value from turning one review into a long-running loop. */
+const MAX_REVIEW_MAX_ROUNDS = 12
+
 // The read-before-write RULE moved to evolution-core (ONE rule for both enforcement points: the
 // tool path and this plan path — design dsh-evolution-write-gate-design.md §4.2); the READER is
 // core's reader (the `evolutionReads` projection for a real Session, the structural accessor for a
@@ -105,6 +110,8 @@ export interface Config {
    * the policy snapshot like the memory cadence. */
   reviewSkillInterval?: Volatile<number | undefined>
   reviewTimeoutMs?: number
+  /** Model requests per aux review run (E2 internal). Default 4; offload normally needs 3. */
+  reviewMaxRounds?: number
   /** E3/P1-8 (v11) — TRUE semantics: this flag gates ONLY the completion
    * channel. The cadence latch stays active regardless of the value (a
    * completion-gated deployment still fires at the policy cadence), so
@@ -158,6 +165,7 @@ export const Config = z.object({
   reviewMemoryInterval: z.number().min(1).volatile(),
   reviewSkillInterval: z.number().min(1).volatile(),
   reviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_REVIEW_TIMEOUT_MS),
+  reviewMaxRounds: z.number().min(1).max(MAX_REVIEW_MAX_ROUNDS).default(DEFAULT_REVIEW_MAX_ROUNDS),
   // V7-15 (0.3.44): the trigger is closed to the three known values — a typo
   // cannot silently select a fourth behavior. Note: schemastery is tolerant
   // (it STRIPS an unmatching value and keeps the default), so the runtime
@@ -237,6 +245,7 @@ const cadenceSummary = (kind: ReviewKind): string => `auto-review:${kind}`
  * {@link resolveReviewRowSettings}, which clamps its own numerics. */
 type ClampedReviewConfig = Config & {
   reviewTimeoutMs: number
+  reviewMaxRounds: number
 }
 
 /**
@@ -258,6 +267,7 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
     // (the schema may be bypassed by a programmatic assembly; clampedNumber
     // also catches NaN/±Infinity, which z.number() lets through).
     reviewTimeoutMs: field('reviewTimeoutMs', rawConfig.reviewTimeoutMs, DEFAULT_REVIEW_TIMEOUT_MS, 1, MAX_TIMER_DELAY_MS),
+    reviewMaxRounds: field('reviewMaxRounds', rawConfig.reviewMaxRounds, DEFAULT_REVIEW_MAX_ROUNDS, 1, MAX_REVIEW_MAX_ROUNDS),
   })
 }
 
@@ -1011,6 +1021,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       let status: 'completed' | 'failed' | 'timeout' | 'aborted' = 'failed'
       let actions: readonly { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'staged' | 'error' }[] = []
       let usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined
+      let requests = 0
+      let toolCalls = 0
       let error: string | undefined
       try {
         const prompt = reviewPrompt(kind, 'aux')
@@ -1020,12 +1032,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent }) },
           instruction: prompt,
           toolAllow,
+          maxRounds: config.reviewMaxRounds,
           signal: controller.signal,
           markReview: () => {},
           clearReview: () => {},
         }))
         finalText = result.finalText
         actions = result.actions
+        requests = result.requests
+        toolCalls = result.toolCalls
         if (result.usage !== undefined) {
           usage = {
             inputTokens: result.usage.inputTokens ?? 0,
@@ -1057,6 +1072,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             trigger: { reason, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars },
             finalText,
             actions,
+            requests,
+            toolCalls,
             ...(usage === undefined ? {} : { usage }),
             startedAt,
             finishedAt,

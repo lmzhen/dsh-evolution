@@ -58,6 +58,9 @@ export interface EvolutionReviewCompletedEvent {
   readonly trigger: { readonly reason: string; readonly toolCalls: number; readonly userChars: number; readonly assistantChars: number }
   readonly finalText: string
   readonly actions: readonly EvolutionReviewAction[]
+  /** Model requests actually spent, and tool calls issued inside them. */
+  readonly requests?: number | undefined
+  readonly toolCalls?: number | undefined
   readonly usage?: { readonly inputTokens: number; readonly outputTokens: number; readonly cacheReadTokens: number; readonly cacheWriteTokens: number } | undefined
   readonly startedAt: number
   readonly finishedAt: number
