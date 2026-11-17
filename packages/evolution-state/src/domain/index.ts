@@ -41,6 +41,21 @@ export const name = 'evolution-state-domain'
 export const inject = ['evolutionStateStorage', 'storageDomain']
 
 /**
+ * The domain package can be loaded twice (host + plugin copy, or a test tree
+ * that imports source and lib side by side), so `instanceof DomainError` is not
+ * a reliable seam. The stable contract is the name+code pair.
+ * @param error - the thrown value.
+ * @param code - the stable DomainError code to match.
+ * @returns whether this is a DomainError with that code.
+ */
+function isDomainErrorCode(error: unknown, code: string): boolean {
+  if (error instanceof DomainError) return error.code === code
+  if (typeof error !== 'object' || error === null) return false
+  const candidate = error as { name?: unknown; code?: unknown }
+  return candidate.name === 'DomainError' && candidate.code === code
+}
+
+/**
  * Review-state record schema of the storage-domain table.
  * @internal Referenced only by this package's own tests and EVOLUTION_DOMAIN
  * below — not public API surface (audit v10 S-03); the record contract lives
@@ -290,7 +305,7 @@ export function apply(ctx: Context): void {
         await table.update(CURATOR_STATE_KEY, current => guarded(current) ?? current)
         return
       } catch (error) {
-        if (!(error instanceof DomainError && error.code === 'missing-key')) throw error
+        if (!isDomainErrorCode(error, 'missing-key')) throw error
       }
       // P2-4: fresh-install missing-key recovery now retries the
       // SAME atomic update ONCE before seeding. The old shape (update reject →
@@ -309,7 +324,7 @@ export function apply(ctx: Context): void {
         await table.update(CURATOR_STATE_KEY, current => guarded(current) ?? current)
         return
       } catch (error) {
-        if (!(error instanceof DomainError && error.code === 'missing-key')) throw error
+        if (!isDomainErrorCode(error, 'missing-key')) throw error
       }
       // Fresh install, still no record: seed by applying the task to null and
       // putting the result (delete when null) — same seam gate as above.
@@ -437,7 +452,7 @@ export function apply(ctx: Context): void {
         // Missing key is the benign "no such pending record" outcome; a
         // closed domain or backend failure must surface so approval reports
         // the real cause instead of "already being resolved" (v3-round self-check).
-        if (error instanceof DomainError && error.code === 'missing-key') return null
+        if (isDomainErrorCode(error, 'missing-key')) return null
         throw error
       }
     },
@@ -457,7 +472,7 @@ export function apply(ctx: Context): void {
         // 0.3.22 (F-332): release is a no-op on a record that never existed,
         // matching the json provider (and the claimPending/tryResolvePending
         // benign-vs-malign split); a closed/backend error still surfaces.
-        if (error instanceof DomainError && error.code === 'missing-key') return
+        if (isDomainErrorCode(error, 'missing-key')) return
         throw error
       }
     },
@@ -529,7 +544,7 @@ export function apply(ctx: Context): void {
         return { record: structuredClone(resolved.record), applied: true }
       } catch (error: unknown) {
         // v3-round self-check: only missing-key is benign; closed/backend errors propagate.
-        if (error instanceof DomainError && error.code === 'missing-key') return { record: null, applied: false }
+        if (isDomainErrorCode(error, 'missing-key')) return { record: null, applied: false }
         throw error
       }
     },
