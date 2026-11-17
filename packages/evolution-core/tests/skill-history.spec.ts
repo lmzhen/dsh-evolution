@@ -103,6 +103,9 @@ describe('skill-history: the library records what it writes', () => {
       const versions = await loadVersions(root, io, 'hist-skill')
       expect(versions.map(v => v.action)).toEqual(['create', 'update', 'patch'])
       expect(versions.map(v => v.v)).toEqual([1, 2, 3])
+      expect(versions[0]?.summary).toContain('created SKILL.md')
+      expect(versions[1]?.summary).toContain('updated SKILL.md')
+      expect(versions[1]?.summarySource).toBe('host')
       // The content of each version is readable, in order — the whole point of the seam.
       expect(await loadVersionContent(root, io, 'hist-skill', 1)).toContain('One.')
       expect(await loadVersionContent(root, io, 'hist-skill', 2)).toContain('Two.')
