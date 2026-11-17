@@ -776,20 +776,27 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             .replace('%SKILL%', target)
             .replace('%MODE%', mode)
             .replace('%DRY%', dryRun ? 'yes (no writes)' : 'no')
-          const opened = await channel.open({
-            parent: agent as never,
-            label: `tidy:${target}`,
-            promptText: prompt,
-            kind: 'governance',
-            allow: ['skill', 'read', 'glob', 'grep', 'skill_manage'],
-            timeoutMs: 15 * 60 * 1000,
-          })
-          if (opened.kind === 'ok') {
-            await channel.dispose?.(opened.childId).catch(() => { /* best-effort activation cleanup */ })
-            return ok(opened.turn.text)
-          }
-          if (opened.kind === 'unavailable') return err(`治理子智能体不可用：${opened.reason}`)
-          return err('治理运行已取消。')
+          const open = channel.open.bind(channel)
+          void (async () => {
+            try {
+              const opened = await open({
+                parent: agent as never,
+                label: `tidy:${target}`,
+                promptText: prompt,
+                kind: 'governance',
+                allow: ['skill', 'read', 'glob', 'grep', 'skill_manage'],
+                timeoutMs: 15 * 60 * 1000,
+              })
+              if (opened.kind === 'ok') {
+                await channel.dispose?.(opened.childId).catch(() => { /* best-effort activation cleanup */ })
+                return
+              }
+              ctx.logger.warn(`dsh-evolution-commands: tidy ${target} ended as ${opened.kind}${opened.kind === 'unavailable' ? ` (${opened.reason})` : ''}`)
+            } catch (error) {
+              ctx.logger.warn(`dsh-evolution-commands: tidy ${target} failed: ${error instanceof Error ? error.message : String(error)}`)
+            }
+          })()
+          return ok(`已启动治理：${target}（mode=${mode}${dryRun ? '，dry-run' : ''}）。完成后在技能历史查看摘要；失败会记录在宿主日志。`)
           }
           case 'merge': {
           const merge = ctx.get('evolutionMerge') as undefined | { run(input: string, invocation?: { agent?: unknown }): Promise<{ ok: boolean; text: string }> }
