@@ -10,7 +10,7 @@ import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 // by `vendor/hmr/src/index.ts`. The probes are capability checks — absence degrades a feature and
 // `/evolution doctor` reports it.
 import type { Context, Volatile } from '@deepseek-ai/cordis'
-import { createSubagentChannel, authorityFrom, mutationLockFrom, GOVERNANCE_PROMPT_TEMPLATE } from '@deepseek-ai/dsh-evolution-core'
+import { createSubagentChannel, authorityFrom, mutationLockFrom, GOVERNANCE_PROMPT_TEMPLATE, withReviewContext } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
 import { makeDiagnosticsRoutes } from './diagnostics-route.ts'
@@ -766,12 +766,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const headingFlag = command.flags.get('heading')
           const heading = typeof headingFlag === 'string' && headingFlag.trim() !== '' ? headingFlag.trim() : undefined
           const dryRun = command.flags.has('dry-run')
-          // P1-3: an approval-enabled deployment would stage every child write and
-          // report the run as succeeded with no unit. Refuse honestly instead of
-          // producing a fake success; dry-run has no writes and stays available.
-          if (!dryRun) {
-            const staged = unreplayableWriteRefusal('治理运行')
-            if (staged !== undefined) return staged
+          // P1-3: the child writes as a background origin. Any enabled approval
+          // queue stages those writes regardless of `stageForeground`, so a run
+          // would report success with no historical unit. Refuse honestly;
+          // dry-run has no writes and stays available.
+          if (!dryRun && approval !== undefined && approval.isEnabled !== false) {
+            return err('当前部署开启了写入审批：治理子智能体是 background origin，写入会被暂存，无法保证历史 unit。请先关闭审批，或用 --dry-run 预览。')
           }
           const agent = invocationAgent
           if (agent === undefined) return err(hostError('e-305-this-invocation-carries-no', { a1: 'governance subagent' }))
@@ -845,7 +845,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const open = channel.open.bind(channel)
           void (async () => {
             try {
-              const opened = await open({
+              const opened = await withReviewContext({ reviewId: run.id, runId: run.id, reads: new Set<string>() }, async () => await open({
                 parent: agent as never,
                 label: `governance:${target}`,
                 promptText: prompt,
@@ -853,7 +853,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 allow,
                 timeoutMs: 15 * 60 * 1000,
                 signal: run.signal,
-              })
+              }))
               if (opened.kind === 'ok') {
                 await channel.dispose?.(opened.childId).catch(() => { /* best-effort activation cleanup */ })
                 await writeReport('succeeded', opened.turn.text)

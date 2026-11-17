@@ -195,15 +195,29 @@ export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHis
     health: async () => {
       const data = await request(HOST_ROUTES.health) as { rows?: unknown; governance?: unknown }
       const rows = Array.isArray(data.rows)
-        ? (data.rows as Array<Record<string, unknown>>).map(row => ({
-          name: typeof row.name === 'string' ? row.name : '',
-          verdict: typeof row.verdict === 'string' ? row.verdict : 'unknown',
-          bodyChars: typeof row.bodyChars === 'number' ? row.bodyChars : null,
-          supportFiles: typeof row.supportFiles === 'number' ? row.supportFiles : null,
-          findings: Array.isArray(row.findings) ? row.findings.length : 0,
-        })).filter(row => row.name !== '')
+        ? (data.rows as Array<Record<string, unknown>>).map(row => {
+          const dims = row.dims !== null && typeof row.dims === 'object' ? row.dims as Record<string, unknown> : {}
+          return {
+            name: typeof row.name === 'string' ? row.name : '',
+            verdict: typeof row.verdict === 'string' ? row.verdict : 'unknown',
+            bodyChars: typeof dims.bodyChars === 'number' ? dims.bodyChars : null,
+            supportFiles: typeof dims.supportFiles === 'number' ? dims.supportFiles : null,
+            findings: Array.isArray(row.findings) ? row.findings.length : 0,
+          }
+        }).filter(row => row.name !== '')
         : []
-      const governance = Array.isArray(data.governance) ? data.governance as readonly GovernanceRow[] : []
+      const governance = Array.isArray(data.governance)
+        ? (data.governance as Array<Record<string, unknown>>)
+          .filter(row => typeof row.runId === 'string' && typeof row.startedAt === 'number')
+          .map(row => ({
+            runId: row.runId as string,
+            state: typeof row.state === 'string' ? row.state : 'unknown',
+            startedAt: row.startedAt as number,
+            target: typeof row.target === 'string' ? row.target : null,
+            mode: typeof row.mode === 'string' ? row.mode : null,
+            resultRef: typeof row.resultRef === 'string' ? row.resultRef : null,
+          }))
+        : []
       return { rows, governance }
     },
     diff: async (name: string, v: number) => await request(HOST_ROUTES.diff + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionDiffRow,

@@ -109,6 +109,7 @@ export const CSS = [
   '.evo-hist-more>button{margin-left:var(--evo-space-2)}',
   // A chip is a STATE: it takes the neutral layer, not the interaction colour it used to borrow (W9).
   '.evo-hist-chip{flex:none;padding:var(--evo-space-2) var(--evo-space-8);border-radius:var(--evo-radius-pill);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}',
+  '.evo-hist-health{display:inline-flex;align-self:flex-start;margin-top:var(--evo-space-2);color:var(--evo-tone-danger)}',
   // Two kinds of control, two shapes: one acts (bordered), one only reveals more (borderless, with a
   // drawn chevron), one chooses between two views (borderless text, no chevron). The primary tone is
   // reserved for the click that writes (W7/W14).

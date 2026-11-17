@@ -622,6 +622,36 @@
       "pt": "{mode} {target} — {state}",
       "ru": "{mode} {target} — {state}"
     },
+    "health.verdict.warn": {
+      "zh": "需关注",
+      "en": "Needs attention",
+      "ja": "要注意",
+      "es": "Requiere atención",
+      "fr": "À surveiller",
+      "de": "Beachten",
+      "pt": "Requer atenção",
+      "ru": "Требует внимания"
+    },
+    "health.verdict.needs-restructure": {
+      "zh": "需整理",
+      "en": "Needs tidying",
+      "ja": "整理が必要",
+      "es": "Necesita orden",
+      "fr": "À ranger",
+      "de": "Aufräumen nötig",
+      "pt": "Precisa organizar",
+      "ru": "Нужно упорядочить"
+    },
+    "health.verdict.unreadable": {
+      "zh": "无法读取",
+      "en": "Unreadable",
+      "ja": "読み取り不可",
+      "es": "Ilegible",
+      "fr": "Illisible",
+      "de": "Nicht lesbar",
+      "pt": "Ilegível",
+      "ru": "Не читается"
+    },
     "markdown.footnotes": {
       "zh": "脚注",
       "en": "Footnotes",

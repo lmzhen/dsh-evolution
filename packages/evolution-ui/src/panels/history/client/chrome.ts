@@ -44,8 +44,8 @@ function cellText(copy: Copy, cell: RowCell): string {
  * @param hover - hover text the host cannot express (the local clock), by cell key.
  * @returns the line element.
  */
-function cellLine(cells: readonly RowCell[], copy: Copy, className: string, hover: Readonly<Record<string, string>> = {}): ReactNode {
-  return createElement('div', { className },
+function cellLine(cells: readonly RowCell[], copy: Copy, className: string, hover: Readonly<Record<string, string>> = {}, key?: string): ReactNode {
+  return createElement('div', { key, className },
     cells.map(cell => createElement('span', {
       key: cell.key,
       className: 'evo-hist-cell evo-hist-slot-' + cell.slot + ' evo-hist-tone-' + cell.tone,
@@ -86,11 +86,15 @@ export function skillLine(copy: Copy, row: SkillRow, selected: boolean, onOpen: 
     const description = row.cells.meta.filter(cell => cell.key === 'description')
     const facts = row.cells.meta.filter(cell => cell.key !== 'description')
     return [
-      description.length === 0 ? null : cellLine(description, copy, 'evo-hist-cell-line evo-hist-skill-description'),
-      facts.length === 0 ? null : cellLine(facts, copy, 'evo-hist-cell-line evo-hist-cell-meta'),
-      health === undefined || (health.verdict === 'ok' && health.findings === 0)
+      description.length === 0 ? null : cellLine(description, copy, 'evo-hist-cell-line evo-hist-skill-description', {}, 'description'),
+      facts.length === 0 ? null : cellLine(facts, copy, 'evo-hist-cell-line evo-hist-cell-meta', {}, 'facts'),
+      health === undefined || health.verdict === 'healthy' || health.verdict === 'unknown' || (health.verdict === 'ok' && health.findings === 0)
         ? null
-        : createElement('span', { key: 'health', className: 'evo-hist-chip evo-hist-health', title: health.bodyChars === null ? undefined : `${health.bodyChars} chars` }, health.verdict),
+        : createElement('span', {
+          key: 'health',
+          className: 'evo-hist-chip evo-hist-health',
+          title: health.bodyChars === null ? undefined : `${health.bodyChars} chars`,
+        }, copy.t('health.verdict.' + health.verdict) === 'health.verdict.' + health.verdict ? health.verdict : copy.t('health.verdict.' + health.verdict)),
     ]
   })())
 }
