@@ -58,21 +58,21 @@ curator 负责技能库的生命周期整理。默认在宿主启动约 10 秒�
 
 默认 `llmReview=false`，curator 不运行 LLM 提名通道，因而不执行由该通道产生的近重复合并。需要独立事务、暂存树和回执的技能合并，使用下面的 merge 流程。
 
-## 技能整理：offload / condense
+## 技能整理：restructure / condense
 
-`/evolution offload <skill>` 把一个技能的会话细节章节移到 `references/`，并把 SKILL.md 里对应位置换成指针；加 `--heading <heading>` 时只处理指定章节。`/evolution condense <skill>` 则逐章节压缩正文，一次只改一个章节。
+offload 不需要独立执行器。技能正文达到硬上限时写入会被拒绝，并提示拆小 SKILL.md、把支撑内容放进 `references/` 或 `templates/`；达到软上限时健康检查显示 `warn` / `needs-restructure`。真正执行“移到 references”的是 `/evolution restructure <name> "<heading>" <to_file>`：一个 unit、CAS、可 undo，也支持 start/end 子块。
 
-两者都由一个独立的 governance 子智能体执行：
+`/evolution condense <skill>` 是逐章节压缩，使用一个独立的 governance 子智能体：
 
 - 全新上下文，不 fork 父会话、不复用对话前缀
-- 只读目标技能，直接调 `skill_manage`，默认每步一个 unit
+- 只读目标技能，直接调 `skill_manage patch`，默认每步一个 unit
 - 有技能历史，可按 unit 撤销
 - 后台运行；命令返回 `runId`，结果摘要和失败信息写入 `reports/`
-- `/evolution offload|condense --dry-run` 只预览
+- `--dry-run` 只预览
 
-入口有两种：技能历史详情里的「整理」菜单复制命令；有活动会话时也可接一键后台。没有活动会话时不能凭空启动子智能体，只能复制命令到任意活体会话执行。
+入口：技能历史详情里的「整理」菜单复制 condense 命令；offload 直接走 restructure。没有活动会话时不能凭空启动子智能体。
 
-自动复盘只负责提名“这个技能值得整理”，不直接跑长任务；offload/condense 的显式执行由 governance 子智能体完成。
+自动复盘只负责提名“这个技能值得整理”，不直接跑长任务。
 
 ## Merge：显式技能合并
 

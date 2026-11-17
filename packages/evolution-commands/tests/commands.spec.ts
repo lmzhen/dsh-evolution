@@ -594,7 +594,7 @@ describe('evolution-commands', () => {
     throw new Error(`maintenance run ${id} never settled`)
   }
 
-  it('offload --dry-run never grants the child a write tool', async () => {
+  it('condense --dry-run never grants the child a write tool', async () => {
     const dir = await tempHome('evo-commands-offload-dry-')
     const root = join(dir, 'skills')
     await mkdir(join(root, 'demo-skill'), { recursive: true })
@@ -617,7 +617,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: root })
     const result = await captured!.handler({
       agent: { ctx, session: { id: 'parent-session', header: { origin: 'foreground' } } },
-      rawInput: 'offload demo-skill --dry-run',
+      rawInput: 'condense demo-skill --dry-run',
     })
     expect(result.kind).toBe('success')
     expect(result.text).toContain('已启动治理')
@@ -633,7 +633,7 @@ describe('evolution-commands', () => {
     expect(normalized.every(allow => !allow.includes('skill_manage'))).toBe(true)
   })
 
-  it('offload settles failed when the governance child fails', async () => {
+  it('condense settles failed when the governance child fails', async () => {
     const dir = await tempHome('evo-commands-offload-fail-')
     const root = join(dir, 'skills')
     await mkdir(join(root, 'demo-skill'), { recursive: true })
@@ -653,7 +653,7 @@ describe('evolution-commands', () => {
     await ctx.plugin(Commands, { root: root })
     const started = await captured!.handler({
       agent: { ctx, session: { id: 'parent-session', header: { origin: 'foreground' } } },
-      rawInput: 'offload demo-skill',
+      rawInput: 'condense demo-skill',
     })
     expect(started.kind).toBe('success')
     const runId = /run=([^\s）]+)/.exec(started.text)?.[1]

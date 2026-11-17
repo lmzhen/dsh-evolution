@@ -844,14 +844,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           await (ctx.get('skillUsage') as { record?: (name: string, kind: 'patch') => Promise<void> } | undefined)?.record?.(name, 'patch')
           return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
           }
-          case 'offload':
           case 'condense': {
-          if (!('positionals' in command)) return err(`用法：/evolution ${command.name} <skill> [--dry-run]`)
+          if (!('positionals' in command)) return err('用法：/evolution condense <skill> [--dry-run]')
           const target = command.positionals[0] ?? ''
-          if (target === '') return err(`用法：/evolution ${command.name} <skill> [--dry-run]`)
-          const mode = command.name === 'offload' ? 'offload' : 'condense'
-          const headingFlag = command.flags.get('heading')
-          const heading = typeof headingFlag === 'string' && headingFlag.trim() !== '' ? headingFlag.trim() : undefined
+          if (target === '') return err('用法：/evolution condense <skill> [--dry-run]')
+          const mode = 'condense'
+          const heading: string | undefined = undefined
           const dryRun = command.flags.has('dry-run')
           // P1-3: the child writes as a background origin. Any enabled approval
           // queue stages those writes regardless of `stageForeground`, so a run

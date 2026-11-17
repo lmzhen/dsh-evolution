@@ -100,22 +100,24 @@ export function apply(ctx: Context): void {
         try {
           const raw = await io.readText(run.resultRef)
           const report = raw === null ? undefined : JSON.parse(raw) as { mode?: unknown }
-          if (report?.mode === 'offload') counts.offload += 1
-          else if (report?.mode === 'condense') counts.condense += 1
+          if (report?.mode === 'condense') counts.condense += 1
         } catch { /* a missing report is not a successful count */ }
       }
-      // extract is counted per committed cross-skill unit, not per path row.
-      const units = new Set<string>()
+      // offload is restructure now; extract is one cross-skill unit.
+      const restructureUnits = new Set<string>()
+      const extractUnits = new Set<string>()
       try {
         for (const skill of await curator.skills.list()) {
           const history = await curator.history(skill.name)
           for (const entry of history) {
-            if (entry.action !== 'extract' || typeof entry.unitId !== 'string' || entry.unitId === '') continue
-            units.add(entry.unitId)
+            if (typeof entry.unitId !== 'string' || entry.unitId === '') continue
+            if (entry.action === 'restructure') restructureUnits.add(entry.unitId)
+            else if (entry.action === 'extract') extractUnits.add(entry.unitId)
           }
         }
       } catch { return null }
-      counts.extract = units.size
+      counts.offload = restructureUnits.size
+      counts.extract = extractUnits.size
       return counts
     },
   }, audit))

@@ -63,7 +63,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 | `/evolution pending` | 查看等待审批的普通写入 |
 | `/evolution skill history <name>` | 查看技能正文和支撑文件的历史 |
 | `/evolution skill undo <name>` | 回退技能正文；不恢复支撑文件 |
-| `/evolution offload <name>` | 用治理子智能体把会话细节章节移到 references |
+| `/evolution restructure <name> "<heading>" <to_file>` | 把一节（或 start/end 子块）移到 references |
 | `/evolution condense <name>` | 用治理子智能体逐章节压缩正文 |
 | `/evolution curator status` | 查看自动整理状态 |
 | `/evolution merge status <runId>` | 查看已发起的合并运行 |

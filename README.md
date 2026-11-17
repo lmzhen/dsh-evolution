@@ -71,7 +71,7 @@ Use `all` for normal installs. The old `preset`, `agent` and layered install for
 | `/evolution pending` | List ordinary writes waiting for approval |
 | `/evolution skill history <name>` | Inspect body and support-file history |
 | `/evolution skill undo <name>` | Revert the skill body; support files are not restored |
-| `/evolution offload <name>` | Move session-detail sections into references via a governance subagent |
+| `/evolution restructure <name> "<heading>" <to_file>` | Move a section (or start/end sub-block) into references |
 | `/evolution condense <name>` | Compress the body section by section via a governance subagent |
 | `/evolution curator status` | Inspect automatic curation state |
 | `/evolution merge status <runId>` | Inspect an initiated merge run |
