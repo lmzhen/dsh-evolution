@@ -27,7 +27,7 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-commands': { kind: 'evolution-commands' } & ContextFormed
   }
 }
-import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, reviewPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
 import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport, EXTRACT_PROMPT_V1, ownerCandidatesFromSummaries } from '@deepseek-ai/dsh-evolution-core/extract'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
@@ -600,6 +600,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // REPORTED, which is not the same as every skill being readable and healthy.
           if (rows.length === 0) return ok(['Structure health: no degraded row was reported (this does NOT assert that every skill is readable).', banner].filter(Boolean).join(' '))
           return ok([banner ? `Structure health (${rows.length} degraded): ${banner}` : `Structure health (${rows.length} degraded):`, ...aggregate, ...rows.map(line)].join('\n'))
+          }
+          case 'review': {
+          const requested = ('positionals' in command ? command.positionals[0] : undefined) ?? 'combined'
+          if (requested !== 'memory' && requested !== 'skill' && requested !== 'combined') {
+            return err('用法：/evolution review [memory|skill|combined]')
+          }
+          const missing = agentMissing('review')
+          if (missing) return missing
+          const message = createUserMessage({
+            content: [{ type: 'text', text: reviewPrompt(requested, 'inject') }],
+            source: { kind: 'evolution-commands', form: 'notice', summary: 'manual evolution review' },
+          })
+          const agent = invocationAgent as { followup?: unknown; inject?: unknown }
+          let woke = false
+          if (typeof agent.followup === 'function') {
+            (agent as unknown as { followup: (message: unknown) => void }).followup(message)
+            woke = true
+          } else if (typeof agent.inject === 'function') {
+            (agent as unknown as { inject: (message: unknown) => void }).inject(message)
+          } else {
+            return err(hostError('e-305-the-invocation-agent-exposes', { a1: 'this review request' }))
+          }
+          return ok(`已注入 ${requested} 复审请求；${woke ? '它会在当前会话立即执行。' : '它会在下一次唤醒时执行。'}`)
           }
           case 'learn': {
           // V25-08 (v25): the free-text request keeps the user's original

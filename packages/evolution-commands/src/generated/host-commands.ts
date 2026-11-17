@@ -183,6 +183,16 @@ export const HOST_COMMANDS = {
       "ru": "Отправить запрос на обучение в эту сессию",
       "pt": "Enviar uma solicitação de aprendizado para esta sessão"
     },
+    "summary.review": {
+      "zh": "立即向本会话注入一次复盘（不等空闲）",
+      "en": "Inject one review into this session now (no idle wait)",
+      "ja": "このセッションに今すぐレビューを注入（idle 待ちなし）",
+      "es": "Inyectar una revisión en esta sesión ahora (sin esperar idle)",
+      "fr": "Injecter une revue dans cette session maintenant (sans attendre idle)",
+      "de": "Jetzt eine Review in diese Sitzung einspeisen (ohne Idle-Warten)",
+      "ru": "Сразу внедрить проверку в эту сессию (без ожидания idle)",
+      "pt": "Injetar uma revisão nesta sessão agora (sem esperar idle)"
+    },
     "summary.maintain": {
       "zh": "起一次维护扫描并立即回 run id（后台跑；--facts 为 0 token 预览）",
       "en": "Start a maintenance scan and return the run id immediately (runs in the background; --facts is a 0-token preview)",
