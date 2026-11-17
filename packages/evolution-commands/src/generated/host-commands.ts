@@ -293,6 +293,26 @@ export const HOST_COMMANDS = {
       "ru": "Привести навык в порядок: фоновый подагент сокращает или сжимает его по разделам (--dry-run только предпросмотр)",
       "pt": "Organizar uma skill: um subagente em segundo plano a enxuga ou condensa seção por seção (--dry-run apenas pré-visualiza)"
     },
+    "summary.offload": {
+      "zh": "把技能正文的会话细节章节移到 references（后台子智能体，--dry-run 只预览）",
+      "en": "Move session-detail sections from a skill body into references (background subagent; --dry-run previews only)",
+      "ja": "スキル本文のセッション詳細セクションを references へ移す（バックグラウンド子エージェント、--dry-run はプレビューのみ）",
+      "es": "Mover secciones de detalle de sesión del cuerpo de un skill a references (subagente en segundo plano; --dry-run solo previsualiza)",
+      "fr": "Déplacer les sections de détail de session d’un skill vers references (sous-agent en arrière-plan ; --dry-run prévisualise seulement)",
+      "de": "Sitzungsdetail-Abschnitte aus einem Skill-Text nach references verschieben (Hintergrund-Subagent; --dry-run zeigt nur die Vorschau)",
+      "ru": "Перенести разделы с деталями сессии из текста навыка в references (фоновый подагент; --dry-run только предпросмотр)",
+      "pt": "Mover seções de detalhe de sessão do corpo de uma skill para references (subagente em segundo plano; --dry-run apenas pré-visualiza)"
+    },
+    "summary.condense": {
+      "zh": "逐章节压缩技能正文（后台子智能体，多次小改，--dry-run 只预览）",
+      "en": "Condense a skill body section by section (background subagent, repeated small edits; --dry-run previews only)",
+      "ja": "スキル本文をセクション単位で圧縮（バックグラウンド子エージェント、小さな編集を繰り返す、--dry-run はプレビューのみ）",
+      "es": "Condensar el cuerpo de un skill sección por sección (subagente en segundo plano, ediciones pequeñas repetidas; --dry-run solo previsualiza)",
+      "fr": "Condenser le corps d’un skill section par section (sous-agent en arrière-plan, petites modifications répétées ; --dry-run prévisualise seulement)",
+      "de": "Einen Skill-Text Abschnitt für Abschnitt verdichten (Hintergrund-Subagent, wiederholte kleine Änderungen; --dry-run zeigt nur die Vorschau)",
+      "ru": "Сжимать текст навыка по разделам (фоновый подагент, повторные небольшие правки; --dry-run только предпросмотр)",
+      "pt": "Condensar o corpo de uma skill seção por seção (subagente em segundo plano, pequenas edições repetidas; --dry-run apenas pré-visualiza)"
+    },
     "summary.extract": {
       "zh": "预览把源技能的可复用部分提取到已有类级 owner；默认 plan，--apply 才写（多根一次事务）",
       "en": "Preview extracting a source skill's reusable part into an existing class-level owner; by default it produces a plan, and only --apply writes (multiple roots in one transaction)",
