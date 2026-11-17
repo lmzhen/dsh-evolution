@@ -633,6 +633,38 @@ describe('evolution-commands', () => {
     expect(normalized.every(allow => !allow.includes('skill_manage'))).toBe(true)
   })
 
+  it('offload settles failed when the governance child fails', async () => {
+    const dir = await tempHome('evo-commands-offload-fail-')
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    provideChannel(ctx, ({
+      async start() {
+        return {
+          dispose: async () => {},
+          result: Promise.reject(new Error('governance child failed')),
+        }
+      },
+    }))
+    await ctx.plugin(Commands, { root: root })
+    const started = await captured!.handler({
+      agent: { ctx, session: { id: 'parent-session', header: { origin: 'foreground' } } },
+      rawInput: 'offload demo-skill',
+    })
+    expect(started.kind).toBe('success')
+    const runId = /run=([^\s）]+)/.exec(started.text)?.[1]
+    expect(runId).toBeTruthy()
+    await vi.waitFor(async () => {
+      const status = await captured!.handler({ agent: { ctx }, rawInput: `maintain status ${runId}` })
+      expect(status.text).not.toMatch(/\srunning\s/)
+      expect(status.text).toContain('failed')
+    })
+  })
+
   it('maintain enriches support files and reports pointer_missing truthfully (v11 P1-1)', async () => {
     // tempHome, not tempRoot: the run registry and the report live under the
     // evolution home now, and a test must not write into the real one.
