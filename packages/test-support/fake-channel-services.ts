@@ -53,7 +53,7 @@ export function legacyChannel(legacy: LegacySubagents) {
       readonly parent: unknown
       readonly label: string
       readonly promptText: string
-      readonly kind: 'reviewer' | 'maintainer'
+      readonly kind: 'reviewer' | 'maintainer' | 'governance'
       readonly allow: readonly string[]
       readonly outputSchema?: unknown
       readonly agentOptions?: unknown

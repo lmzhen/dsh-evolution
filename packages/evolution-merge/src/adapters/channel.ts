@@ -35,7 +35,7 @@ export interface SubagentChannelLike {
     parent: unknown
     label: string
     promptText: string
-    kind: 'reviewer' | 'maintainer'
+    kind: 'reviewer' | 'maintainer' | 'governance'
     allow: readonly string[]
     cwd?: string
     timeoutMs: number

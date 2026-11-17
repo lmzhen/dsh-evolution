@@ -5,7 +5,7 @@ import type { SubagentStopReason } from '../platform/index.ts'
 import type { ObjectJsonSchema } from '../platform/index.ts'
 
 export type ChannelCode = 'E-323' | 'E-324'
-export type ChannelKind = 'reviewer' | 'maintainer'
+export type ChannelKind = 'reviewer' | 'maintainer' | 'governance'
 
 export interface PresetStatus {
   readonly id: string

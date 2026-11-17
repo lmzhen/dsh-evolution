@@ -31,7 +31,7 @@ interface ActiveConversation {
 }
 
 export function createSubagentKernel(ctx: Context): SubagentChannel {
-  let lastKind: 'reviewer' | 'maintainer' = 'reviewer'
+  let lastKind: ChannelKind = 'reviewer'
   const active = new Map<SessionId, ActiveConversation>()
   const disposed = new Set<SessionId>()
 

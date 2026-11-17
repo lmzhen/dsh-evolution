@@ -26,7 +26,7 @@ export interface ConversationChannelLike {
     readonly parent: unknown
     readonly label: string
     readonly promptText: string
-    readonly kind: 'reviewer' | 'maintainer'
+    readonly kind: 'reviewer' | 'maintainer' | 'governance'
     readonly allow: readonly string[]
     readonly cwd?: string
     readonly timeoutMs: number
