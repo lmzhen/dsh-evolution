@@ -786,6 +786,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               io: ioRegistry.provider(),
               ctx,
               threatExemptLabels: config.threatExemptLabels,
+              limits: {
+                ...DEFAULT_SKILL_LIMITS,
+                ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
+              },
             })
             if (await preflight.isPinned(target)) {
               return err(`技能「${target}」已固定（pinned），治理子智能体不能修改；先 /evolution skill unpin ${target}。`)
