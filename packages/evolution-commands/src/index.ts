@@ -772,6 +772,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const channel = createSubagentChannel(ctx)
           if (channel.state.kind !== 'available') return err(`治理子智能体不可用：${channel.state.reason}`)
           if (channel.open === undefined) return err('当前部署的 subagent 通道不支持治理运行。')
+          if (runs === undefined) return err('未挂载 evolution-io 注册表：无法记录治理运行。')
+          const run = await runs.begin('governance')
+          await runs.stage(run.id, 'author', { done: 0, total: 1 })
           const prompt = GOVERNANCE_PROMPT_TEMPLATE
             .replace('%SKILL%', target)
             .replace('%MODE%', mode)
@@ -786,17 +789,24 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 kind: 'governance',
                 allow: ['skill', 'read', 'glob', 'grep', 'skill_manage'],
                 timeoutMs: 15 * 60 * 1000,
+                signal: run.signal,
               })
               if (opened.kind === 'ok') {
                 await channel.dispose?.(opened.childId).catch(() => { /* best-effort activation cleanup */ })
+                await runs.stage(run.id, 'settle', { done: 1, total: 1 })
+                await runs.settle(run.id, { state: 'succeeded' })
                 return
               }
-              ctx.logger.warn(`dsh-evolution-commands: tidy ${target} ended as ${opened.kind}${opened.kind === 'unavailable' ? ` (${opened.reason})` : ''}`)
+              await runs.settle(run.id, opened.kind === 'aborted'
+                ? { state: 'cancelled' }
+                : { state: 'failed', failure: opened.reason })
             } catch (error) {
-              ctx.logger.warn(`dsh-evolution-commands: tidy ${target} failed: ${error instanceof Error ? error.message : String(error)}`)
+              const failure = error instanceof Error ? error.message : String(error)
+              ctx.logger.warn(`dsh-evolution-commands: tidy ${target} failed: ${failure}`)
+              await runs.settle(run.id, { state: 'failed', failure })
             }
           })()
-          return ok(`已启动治理：${target}（mode=${mode}${dryRun ? '，dry-run' : ''}）。完成后在技能历史查看摘要；失败会记录在宿主日志。`)
+          return ok(`已启动治理：${target}（mode=${mode}${dryRun ? '，dry-run' : ''}；run=${run.id}）。完成后在技能历史查看摘要；用 /evolution maintain status ${run.id} 查状态。`)
           }
           case 'merge': {
           const merge = ctx.get('evolutionMerge') as undefined | { run(input: string, invocation?: { agent?: unknown }): Promise<{ ok: boolean; text: string }> }

@@ -47,7 +47,7 @@ import type { RunOutcome } from './contract.ts'
 export type { RunOutcome } from './contract.ts'
 
 /** The kinds of long-running work the registry tracks. */
-export type RunKind = 'maintain' | 'merge'
+export type RunKind = 'maintain' | 'merge' | 'governance'
 
 /** Which merge command opened a run. `kind` stays the work family; this is the command. */
 export type RunCommand = 'scan' | 'pair' | 'approve' | 'resume'
