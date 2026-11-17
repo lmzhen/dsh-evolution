@@ -896,7 +896,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           try {
             run = await runs.begin('governance', { exclusive: true })
           } catch {
-            return err('已有治理运行在跑。先等它完成，或用 /evolution maintain status 查看。')
+            const current = runs.inFlight('governance')
+            return err(current === undefined
+              ? '已有治理运行在跑。先等它完成，或用 /evolution maintain status 查看。'
+              : `已有治理运行在跑：${current.id}。先等它完成，或用 /evolution maintain status ${current.id} 查看。`)
           }
           await runs.stage(run.id, 'author', { done: 0, total: 1 })
           const prompt = GOVERNANCE_PROMPT_TEMPLATE
@@ -909,7 +912,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const writeReport = async (state: 'succeeded' | 'failed' | 'cancelled', text: string, failure?: string): Promise<boolean> => {
             if (io === undefined) return false
             try {
-              await io.writeText(reportPath, JSON.stringify({
+              const write = io.writeText(reportPath, JSON.stringify({
                 version: 1,
                 runId: run.id,
                 target,
@@ -921,8 +924,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 finishedAt: new Date().toISOString(),
                 text,
                 ...(failure === undefined ? {} : { failure }),
-              }, null, 2) + '\n')
-              return true
+              }, null, 2) + '\n').then(() => true).catch(() => false)
+              return await Promise.race([
+                write,
+                new Promise<boolean>(resolve => setTimeout(() => resolve(false), 10_000)),
+              ])
             } catch (error) {
               ctx.logger.warn(`dsh-evolution-commands: tidy ${target} report write failed: ${error instanceof Error ? error.message : String(error)}`)
               return false
@@ -941,7 +947,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 signal: run.signal,
               }))
               if (opened.kind === 'ok') {
-                await channel.dispose?.(opened.childId).catch(() => { /* best-effort activation cleanup */ })
+                const dispose = channel.dispose?.(opened.childId)
+                if (dispose !== undefined) {
+                  await Promise.race([
+                    dispose.catch(() => { /* best-effort activation cleanup */ }),
+                    new Promise<void>(resolve => setTimeout(resolve, 5_000)),
+                  ])
+                }
                 const wrote = await writeReport('succeeded', opened.turn.text)
                 await runs.stage(run.id, 'settle', { done: 1, total: 1 })
                 await runs.settle(run.id, { state: 'succeeded', ...(wrote ? { resultRef: reportPath } : {}) })
