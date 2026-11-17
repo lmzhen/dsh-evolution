@@ -80,5 +80,24 @@
         "repeatedPrepareIdempotent": true
       }
     }
-  ]
+  ],
+  "traceability": {
+    "universe": {
+      "A": 22,
+      "B": 18,
+      "C": 12
+    },
+    "covered": 52,
+    "total": 52,
+    "planned": false,
+    "source": "verify-traceability --strict on 8b1de0c1 (OK 52/52)"
+  },
+  "faces": {
+    "web": {
+      "diagnosticsSchemaVersion": 2,
+      "facts": 7,
+      "runtime": 8
+    }
+  },
+  "generatedAt": "2026-11-17T02:45:00.000Z"
 }

@@ -12,7 +12,7 @@ node packages/scripts/verify-architecture-baseline.mjs \
   --overlay D:\line-b6 --json
 ```
 
-检查三件事：`v0.49.0` tag/commit、7 个必需文档、3 个 spec 的逐文件计数（8/30/37）。2026-11-16 实测 exit 0；日志 `D:\dsh\_phase0-baseline-verify4.log`。
+检查三件事：`v0.49.0` tag/commit、7 个必需文档、3 个 spec 的逐文件计数（9/30/37）。2026-11-16 实测 exit 0；日志 `D:\dsh\_phase0-baseline-verify4.log`。
 
 
 ## 0.1 双版本编译矩阵

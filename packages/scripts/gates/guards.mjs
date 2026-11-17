@@ -13,7 +13,7 @@ export const guards = [
     title: "`node packages/evolution/scripts/verify-family-types.mjs`",
     argv: ["node","packages/evolution/scripts/verify-family-types.mjs"],
     lanes: ["local"],
-    registration: {"reason":"this row is executable only on the build overlay; the flat mirror has no packages/evolution tree, so a no-overlay local run cannot resolve it","owner":"scripts/toolchain","expiry":"0.50.0","plan":"run local gates from the flat mirror with --overlay (the supported release line), or give the row a mirror-local per-package tsc fallback","renewal":"Registered at 0.49.0 (expiry 0.50.0): the overlay tsc row passes on the release line; the registration only covers the no-overlay invocation."},
+    registration: {"reason":"this row is executable only on the build overlay; the flat mirror has no packages/evolution tree, so a no-overlay local run cannot resolve it","owner":"scripts/toolchain","expiry":"0.51.0","plan":"run local gates from the flat mirror with --overlay (the supported release line), or give the row a mirror-local per-package tsc fallback","renewal":"Registered at 0.49.0, renewed at 0.50.0 (expiry 0.51.0): the overlay tsc row passes on the release line; the registration only covers the no-overlay invocation."},
   }),
 
   gate("gate-02", {
@@ -30,7 +30,7 @@ export const guards = [
     title: "`node packages/evolution/scripts/smoke-built-entries.mjs packages/evolution`",
     argv: ["node","packages/evolution/scripts/smoke-built-entries.mjs","packages/evolution"],
     lanes: ["local"],
-    registration: {"reason":"smoke-built-entries needs built lib artifacts that a source checkout does not carry","owner":"scripts/gates","expiry":"0.50.0","plan":"run after build-lib on the build line","renewal":"Renewed at 0.49.0 (expiry 0.50.0): smoke-built-entries still needs built lib artifacts that a source checkout does not carry; this is a registered debt, not a pass."},
+    registration: {"reason":"smoke-built-entries needs built lib artifacts that a source checkout does not carry","owner":"scripts/gates","expiry":"0.51.0","plan":"run after build-lib on the build line","renewal":"Renewed at 0.50.0 (expiry 0.51.0): smoke-built-entries still needs built lib artifacts that a source checkout does not carry; this is a registered debt, not a pass."},
   }),
 
   gate("gate-06", {
@@ -225,7 +225,7 @@ export const guards = [
     // CI uses a synthetic plane home (the action's --home "$RUNNER_TEMP/plane-home").
     ci: { argv: ["node","packages/scripts/verify-write-inventory.mjs","packages","--strict","--home","${RUNNER_TEMP}/plane-home"] },
     lanes: ["local","ci-static"],
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.50.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.49.0 (expiry 0.50.0): the write-inventory row still needs the CI-only $RUNNER_TEMP/plane-home argument; this is a registered debt, not a pass."},
+    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.51.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.50.0 (expiry 0.51.0): the write-inventory row still needs the CI-only $RUNNER_TEMP/plane-home argument; this is a registered debt, not a pass."},
   }),
 
   gate("gate-30", {
@@ -553,7 +553,7 @@ export const guards = [
     title: "node packages/scripts/verify-health-admission.mjs",
     argv: ["node","packages/scripts/verify-health-admission.mjs"],
     lanes: ["local"],
-    registration: {"reason":"the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge","owner":"scripts/gates","expiry":"0.50.0","plan":"the CI lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay"},
+    registration: {"reason":"the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge","owner":"scripts/gates","expiry":"0.51.0","plan":"the CI lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay"},
   }),
 
   gate("gate-82", {
