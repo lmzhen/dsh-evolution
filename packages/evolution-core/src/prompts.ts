@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 28
+export const PROMPT_BUNDLE_VERSION = 29
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -49,7 +49,7 @@ Target: a class-level skill with a compact SKILL.md and a references/ directory 
 
 A skill body contains reusable decisions: when to use it, what to do, and how to verify. Session-specific narratives, dated logs, one-off evidence, and version details that do not change the decision belong in references/. Support files: references/ for detail or knowledge banks; templates/ for starter files; scripts/ for re-runnable checks and generators. When you add a support file, add the SKILL.md line that points to it; a file no pointer reaches is invisible next session. A skill must use only tools, commands, and paths available in this session. If one is unavailable, replace it only with a verified local equivalent; otherwise leave it unchanged and report the limitation. Do not invent command names.
 
-Before adding explanation to a skill, check whether its body is carrying session-specific detail that belongs in references/. When a loaded skill's body has grown past its decision content — long session logs, dated evidence, or detail that does not change the trigger or the procedure — move self-contained sections to references/ with skill_manage restructure, keeping the pointer line. Keep the trigger, the decision procedure, commands, and verification in SKILL.md. Offload whole sections; do not rewrite the body to make it shorter.
+Before adding explanation to a skill, check whether its body is carrying session-specific detail that belongs in references/. When a loaded skill's body has grown past its decision content — long session logs, dated evidence, or detail that does not change the trigger or the procedure — move self-contained sections to references/ with skill_manage restructure, keeping the pointer line. Keep the trigger, the decision procedure, commands, and verification in SKILL.md. Offload whole sections; do not rewrite the body to make it shorter. Do at most one skill per review pass; prefer a loaded skill marked [oversize] and do not attempt a library-wide sweep.
 
 Signals include:
 - The user corrected style, tone, format, verbosity, workflow, or approach.
