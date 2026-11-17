@@ -831,7 +831,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               await runs.settle(run.id, { state: 'failed', ...(io === undefined ? {} : { resultRef: reportPath }), failure })
             }
           })()
-          return ok(`已启动治理：${target}（mode=${mode}${dryRun ? '，dry-run' : ''}；run=${run.id}）。完成后在技能历史查看摘要；用 /evolution maintain status ${run.id} 查状态。`)
+          return ok(`已启动治理：${target}（mode=${mode}${dryRun ? '，dry-run' : ''}；run=${run.id}）。完成后在技能历史查看摘要；用 /evolution maintain status ${run.id} 查状态；报告 ${reportPath}。`)
           }
           case 'merge': {
           const merge = ctx.get('evolutionMerge') as undefined | { run(input: string, invocation?: { agent?: unknown }): Promise<{ ok: boolean; text: string }> }
