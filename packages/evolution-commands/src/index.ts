@@ -844,6 +844,47 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           await (ctx.get('skillUsage') as { record?: (name: string, kind: 'patch') => Promise<void> } | undefined)?.record?.(name, 'patch')
           return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
           }
+          case 'offload': {
+          if (!('positionals' in command)) return err('用法：/evolution offload <skill> [--heading <heading>] [--dry-run]')
+          const target = command.positionals[0] ?? ''
+          if (target === '') return err('用法：/evolution offload <skill> [--heading <heading>] [--dry-run]')
+          const headingFlag = command.flags.get('heading')
+          const heading = typeof headingFlag === 'string' && headingFlag.trim() !== '' ? headingFlag.trim() : undefined
+          const dryRun = command.flags.has('dry-run')
+          if (!dryRun && approval !== undefined && approval.isEnabled !== false) {
+            return err('当前部署开启了写入审批：offload 的子智能体是 background origin，写入会被暂存。请先关闭审批，或用 --dry-run 预览。')
+          }
+          const agent = invocationAgent
+          if (agent === undefined) return err(hostError('e-305-this-invocation-carries-no', { a1: 'offload subagent' }))
+          const channel = createSubagentChannel(ctx)
+          if (channel.state.kind !== 'available') return err(`offload 子智能体不可用：${channel.state.reason}`)
+          if (channel.open === undefined) return err('当前部署的 subagent 通道不支持 offload。')
+          const allow = dryRun ? ['skill', 'read', 'glob', 'grep'] : ['skill', 'read', 'glob', 'grep', 'skill_manage']
+          const prepared = await channel.prepare({ kind: 'governance', allow })
+          if (prepared.kind !== 'available') return err(`offload 子智能体不可用：${prepared.reason}`)
+          const prompt = GOVERNANCE_PROMPT_TEMPLATE
+            .replace('%SKILL%', target)
+            .replace('%MODE%', 'offload')
+            .replace('%HEADING%', heading ?? 'whole skill')
+            .replace('%DRY%', dryRun ? 'yes (no writes)' : 'no')
+          const runId = 'offload-' + Date.now().toString(36)
+          // Model channel only: the child decides/reads/calls restructure; the
+          // platform agent loop owns timeout/cancel. No governance run/status.
+          const opened = await withReviewContext({ reviewId: runId, runId, reads: new Set<string>() }, async () => await channel.open!({
+            parent: agent as never,
+            label: `offload:${target}`,
+            promptText: prompt,
+            kind: 'governance',
+            allow,
+            timeoutMs: 15 * 60 * 1000,
+          }))
+          if (opened.kind === 'ok') {
+            await channel.dispose?.(opened.childId).catch(() => { /* platform cleanup */ })
+            return ok(opened.turn.text)
+          }
+          if (opened.kind === 'unavailable') return err(`offload 子智能体不可用：${opened.reason}`)
+          return err('offload 已取消。')
+          }
           case 'condense': {
           if (!('positionals' in command)) return err('用法：/evolution condense <skill> [--dry-run]')
           const target = command.positionals[0] ?? ''

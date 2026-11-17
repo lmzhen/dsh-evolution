@@ -594,6 +594,29 @@ describe('evolution-commands', () => {
     throw new Error(`maintenance run ${id} never settled`)
   }
 
+  it('offload returns the child result without a governance run', async () => {
+    const dir = await tempHome('evo-commands-offload-thin-')
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    provideChannel(ctx, ({
+      async start() {
+        return { dispose: async () => {}, result: Promise.resolve({ text: 'moved the Run section' }) }
+      },
+    }))
+    await ctx.plugin(Commands, { root: root })
+    const result = await captured!.handler({
+      agent: { ctx, session: { id: 'parent-session', header: { origin: 'foreground' } } },
+      rawInput: 'offload demo-skill',
+    })
+    expect(result.kind).toBe('success')
+    expect(result.text).not.toContain('已启动治理')
+  })
+
   it('condense --dry-run never grants the child a write tool', async () => {
     const dir = await tempHome('evo-commands-offload-dry-')
     const root = join(dir, 'skills')
