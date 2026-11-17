@@ -763,6 +763,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const planFlag = command.flags.get('plan')
           const planRunId = typeof planFlag === 'string' ? planFlag : undefined
+          const startFlag = command.flags.get('start')
+          const endFlag = command.flags.get('end')
+          const start = typeof startFlag === 'string' ? startFlag : undefined
+          const end = typeof endFlag === 'string' ? endFlag : undefined
+          if ((start === undefined) !== (end === undefined)) return err('--start 和 --end 必须同时提供。')
+          const move = { heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), toFile }
           if (!toFile.startsWith('references/')) return err('to_file 必须位于 references/ 之下（日志或明细的落地位置）。')
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法重构。')
@@ -805,7 +811,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const decision = await approval.request({
               kind: 'skill',
               summary: `/evolution restructure ${name}${planRunId ? ` (plan ${planRunId})` : ''}`,
-              args: { operation: { action: 'restructure', name, restructure: [{ heading, to_file: toFile }] }, origin: 'foreground', libraryOrigin: 'foreground' },
+              args: { operation: { action: 'restructure', name, restructure: [move] }, origin: 'foreground', libraryOrigin: 'foreground' },
               origin: 'foreground',
               // A session-less caller only reaches this request when staging
               // is OFF (the refusal above covers the staging deployment), so
@@ -837,7 +843,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
             },
           })
-          const result = await library.restructure(name, [{ heading, toFile: toFile }], 'foreground')
+          const result = await library.restructure(name, [move], 'foreground')
           if (!result.ok) return err(result.message)
           // Same mutating observation surface as skill_manage performs for the
           // same action — the patch_count bump keeps the signals coherent.
