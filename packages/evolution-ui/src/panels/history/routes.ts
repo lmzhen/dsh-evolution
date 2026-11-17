@@ -46,6 +46,8 @@ export interface RouteServices {
   readonly getUsage?: () => Promise<unknown>
   /** Per-skill feedback scores; absent or malformed stays null. */
   readonly getFeedback?: (names: readonly string[]) => unknown
+  /** Recent governance runs (bounded, newest first); absent stays null. */
+  readonly getGovernance?: () => Promise<unknown>
 }
 
 /**
@@ -286,6 +288,7 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
           .filter((name): name is string => typeof name === 'string' && name !== '')
         const feedbackRead = services.getFeedback?.(names)
         const feedback = feedbackRead !== null && typeof feedbackRead === 'object' ? feedbackRead : null
+        const governance = await services.getGovernance?.().catch(() => null) ?? null
         return json(200, {
           ok: true,
           data: {
@@ -293,6 +296,7 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
             rows: view,
             usage,
             feedback,
+            governance,
             scan: { status: 'complete' },
             readAt: Date.now(),
           },

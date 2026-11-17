@@ -14,6 +14,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 // Activates the Context merges this row reads. Type-only: the platform packages stay dev-time edges.
 import type {} from '@deepseek-ai/dsh-evolution-curator'
+import { newRunRegistry, evolutionHome, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { makeSkillHistoryRoutes } from './routes.ts'
 
@@ -49,6 +50,37 @@ export function apply(ctx: Context): void {
       const scores: Record<string, number> = {}
       for (const name of names) scores[name] = feedback.score(name, 'skill')
       return scores
+    },
+    getGovernance: async () => {
+      const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+      if (ioRegistry === undefined) return null
+      const io = ioRegistry.provider()
+      const registry = newRunRegistry({ io, home: evolutionHome() })
+      const loaded = await registry.load()
+      if (!loaded.ok) return null
+      const recent = registry.runs('governance').slice(0, 5)
+      const rows: Array<{ runId: string; state: string; startedAt: number; target: string | null; mode: string | null; resultRef: string | null }> = []
+      for (const run of recent) {
+        let target: string | null = null
+        let mode: string | null = null
+        if (run.resultRef !== undefined) {
+          try {
+            const raw = await io.readText(run.resultRef)
+            const parsed = raw === null ? undefined : JSON.parse(raw) as { target?: unknown; mode?: unknown }
+            if (typeof parsed?.target === 'string') target = parsed.target
+            if (typeof parsed?.mode === 'string') mode = parsed.mode
+          } catch { /* a missing/corrupt report does not hide the run row */ }
+        }
+        rows.push({
+          runId: run.id,
+          state: run.state,
+          startedAt: run.startedAt,
+          target,
+          mode,
+          resultRef: run.resultRef ?? null,
+        })
+      }
+      return rows
     },
   }, audit))
 }
