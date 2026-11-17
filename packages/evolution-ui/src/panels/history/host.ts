@@ -35,5 +35,13 @@ export function apply(ctx: Context): void {
       const curator = ctx.get('evolutionCurator') as { healthView?: () => Promise<unknown> } | undefined
       return curator?.healthView?.()
     },
+    getUsage: async () => {
+      const usage = ctx.get('skillUsage') as { report?: () => Promise<unknown> } | undefined
+      return usage?.report?.()
+    },
+    getFeedback: () => {
+      const feedback = ctx.get('evolutionFeedback') as { snapshot?: () => unknown } | undefined
+      return feedback?.snapshot?.()
+    },
   }, audit))
 }

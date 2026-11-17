@@ -42,6 +42,10 @@ export interface RouteServices {
   readonly getCurator: () => CuratorFace | undefined
   /** The aggregate health read: absent means this deployment cannot answer it yet. */
   readonly getHealthView?: () => Promise<unknown>
+  /** Per-skill usage report; absent or a non-Map answer stays null. */
+  readonly getUsage?: () => Promise<unknown>
+  /** Feedback aggregate; absent or a non-object answer stays null. */
+  readonly getFeedback?: () => unknown
 }
 
 /**
@@ -274,13 +278,17 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
         // only a real array upgrades the body to the aggregate read.
         const view = await services.getHealthView?.()
         if (!Array.isArray(view)) return json(200, { ok: true, data: { surface: 'skill-history' } })
+        const usageRead = await services.getUsage?.()
+        const usage = usageRead instanceof Map ? Object.fromEntries(usageRead) : null
+        const feedbackRead = services.getFeedback?.()
+        const feedback = feedbackRead !== null && typeof feedbackRead === 'object' ? feedbackRead : null
         return json(200, {
           ok: true,
           data: {
             surface: 'skill-history',
             rows: view,
-            usage: null,
-            feedback: null,
+            usage,
+            feedback,
             scan: { status: 'complete' },
             readAt: Date.now(),
           },
