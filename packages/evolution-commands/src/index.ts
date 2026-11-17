@@ -28,7 +28,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
-import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core/extract'
+import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport, EXTRACT_PROMPT_V1, ownerCandidatesFromSummaries } from '@deepseek-ai/dsh-evolution-core/extract'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
@@ -139,6 +139,54 @@ function renderRunRecord(record: RunRecord): string {
  * a user can hand-edit, so a row with a blank id is skipped rather than answered from. */
 function newestRun(registry: RunRegistry, kind: 'maintain' | 'merge' | 'governance' = 'maintain'): RunRecord | undefined {
   return registry.runs(kind).find(record => record.id.trim() !== '')
+}
+
+/** Source-only extract discovery: the child proposes an owner; it never writes. */
+async function discoverExtract(ctx: Context, parent: unknown, source: string, library: ReturnType<typeof newSkillLibrary>): Promise<string> {
+  const body = await library.read(source)
+  if (body === null) return `技能「${source}」不存在。`
+  const summaries = await library.model.list({ withContent: true, withFrontmatter: true })
+  const lookup = ownerCandidatesFromSummaries(source, summaries)
+  const support = await library.listSupportFiles(source)
+  const input = JSON.stringify({
+    source,
+    body,
+    support: isPresent(support) ? support.value : null,
+    candidates: lookup.candidates.map(candidate => ({ name: candidate.name, description: candidate.description, whenToUse: candidate.whenToUse ?? null, headings: candidate.headings })),
+    excluded: lookup.excluded,
+  })
+  const outcome = await createSubagentChannel(ctx).run({
+    parent: parent as never,
+    label: 'dsh-evolution-extract',
+    kind: 'maintainer',
+    allow: ['skill'],
+    promptText: EXTRACT_PROMPT_V1 + '\n\nEXTRACT INPUT\n' + input,
+    timeoutMs: 120_000,
+    outputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['outcome', 'reason'],
+      properties: {
+        outcome: { type: 'string', enum: ['keep', 'extract', 'mixed', 'owner-gap'] },
+        target: { type: 'string' },
+        neededOwner: { type: 'string' },
+        reason: { type: 'string' },
+        parts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['heading'], properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' } } } },
+      },
+    },
+  })
+  if (outcome.kind !== 'ok') return `extract proposal 不可用：${'reason' in outcome ? outcome.reason : outcome.kind}`
+  const proposal = outcome.structured as { outcome?: string; target?: string; neededOwner?: string; reason?: string; parts?: Array<{ heading?: string }> }
+  const parts = Array.isArray(proposal.parts) ? proposal.parts.map(part => part.heading).filter((heading): heading is string => typeof heading === 'string') : []
+  return [
+    'extract proposal（未写入）',
+    'outcome: ' + String(proposal.outcome ?? 'unknown'),
+    'target: ' + String(proposal.target ?? '—'),
+    'neededOwner: ' + String(proposal.neededOwner ?? '—'),
+    'parts: ' + (parts.length === 0 ? '—' : parts.join(', ')),
+    'reason: ' + String(proposal.reason ?? '—'),
+    'apply 需要显式 target/heading，或保存 proposal 后使用 --proposal。',
+  ].join('\n')
 }
 
 /** Sentence F, ONE wording for the three id-less forms (design `10` cell 13): an index that could
@@ -584,6 +632,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const proposalFlag = command.flags.get('proposal')
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法执行 extract。')
+          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
+            config: { root: skillsRootValue },
+            io: ioRegistry.provider(),
+            ctx,
+            threatExemptLabels: config.threatExemptLabels,
+            limits: {
+              ...DEFAULT_SKILL_LIMITS,
+              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
+            },
+          })
           let target = command.positionals[1] ?? ''
           let heading = command.positionals[2] ?? ''
           let start: string | undefined
@@ -601,7 +659,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             proposalOutcome = proposal.outcome === 'extract' || proposal.outcome === 'mixed' ? proposal.outcome : undefined
             extractItems = proposal.parts.map(part => ({ heading: part.heading, ...(part.anchor.start === undefined ? {} : { start: part.anchor.start }), ...(part.anchor.end === undefined ? {} : { end: part.anchor.end }), to_skill: target }))
           } else {
-            if (source === '' || target === '' || heading === '') {
+            if (source === '') {
+              return err('用法：/evolution extract <source> [<target> "<heading>"] [--start <line>] [--end <line>]')
+            }
+            if (target === '' && heading === '') {
+              return ok(await discoverExtract(ctx, invocationAgent, source, library))
+            }
+            if (target === '' || heading === '') {
               return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
             }
             const startFlag = command.flags.get('start')
@@ -615,16 +679,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (outcomeFlag !== undefined && outcomeFlag !== 'extract' && outcomeFlag !== 'mixed') {
             return err('--outcome 只能是 extract 或 mixed。')
           }
-          const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }),
-            config: { root: skillsRootValue },
-            io: ioRegistry.provider(),
-            ctx,
-            threatExemptLabels: config.threatExemptLabels,
-            limits: {
-              ...DEFAULT_SKILL_LIMITS,
-              ...policyStageLimits((ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
-            },
-          })
           const built = await buildExtractPlanFromLibrary(library, {
             source,
             items: extractItems,

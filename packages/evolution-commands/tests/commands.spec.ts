@@ -665,6 +665,37 @@ describe('evolution-commands', () => {
     })
   })
 
+  it('extract without a target returns a read-only owner proposal', async () => {
+    const dir = await tempHome('evo-commands-extract-discover-')
+    const root = join(dir, 'skills')
+    await mkdir(join(root, 'demo-skill'), { recursive: true })
+    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
+    const ctx = new Context()
+    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
+    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
+    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
+    provideChannel(ctx, ({
+      async start() {
+        return {
+          dispose: async () => {},
+          result: Promise.resolve({
+            text: 'proposal',
+            structured: { outcome: 'extract', target: 'owner-skill', reason: 'the Run section is reusable', parts: [{ heading: 'Run' }] },
+          }),
+        }
+      },
+    }))
+    await ctx.plugin(Commands, { root: root })
+    const result = await captured!.handler({
+      agent: { ctx, session: { id: 'parent-session', header: { origin: 'foreground' } } },
+      rawInput: 'extract demo-skill',
+    })
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('extract proposal（未写入）')
+    expect(result.text).toContain('target: owner-skill')
+    expect(result.text).toContain('parts: Run')
+  })
+
   it('maintain enriches support files and reports pointer_missing truthfully (v11 P1-1)', async () => {
     // tempHome, not tempRoot: the run registry and the report live under the
     // evolution home now, and a test must not write into the real one.
