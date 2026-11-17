@@ -18,7 +18,7 @@ import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { clearReviewChannel, markReviewChannel } from '@deepseek-ai/dsh-evolution-core'
+import { clearReviewChannel, markReviewChannel, withReviewContext } from '@deepseek-ai/dsh-evolution-core'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -91,6 +91,23 @@ describe('review-channel origin (S2.2, v37 P1-2)', () => {
       // A different, unmarked session is unaffected by the mark.
       const other = await run(PLAIN_SESSION, { action: 'update', name: 'pinned-skill', content: skill('pinned-skill', 'Body v4.') })
       expect(okOf(other), messageOf(other)).toBe(true)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('a review-run skill read counts as write evidence', async () => {
+    const { run, messageOf, okOf, cleanup } = await setup()
+    try {
+      markReviewChannel(MARKED_SESSION)
+      const created = await run(PLAIN_SESSION, { action: 'create', name: 'run-read-skill', content: skill('run-read-skill', 'Body v1.') })
+      expect(okOf(created), messageOf(created)).toBe(true)
+      const blocked = await withReviewContext({ reviewId: 'read-proof', runId: 'read-proof', reads: new Set<string>() }, async () =>
+        await run(MARKED_SESSION, { action: 'update', name: 'run-read-skill', content: skill('run-read-skill', 'Body v2.') }))
+      expect(okOf(blocked)).toBe(false)
+      const allowed = await withReviewContext({ reviewId: 'read-proof', runId: 'read-proof', reads: new Set(['run-read-skill']) }, async () =>
+        await run(MARKED_SESSION, { action: 'update', name: 'run-read-skill', content: skill('run-read-skill', 'Body v3.') }))
+      expect(okOf(allowed), messageOf(allowed)).toBe(true)
     } finally {
       await cleanup()
     }

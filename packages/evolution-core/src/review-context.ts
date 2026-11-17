@@ -15,6 +15,8 @@ export interface ReviewExecutionContext {
   readonly reviewId: string
   /** Execution id; currently the same run id. */
   readonly runId: string
+  /** Skills this review has actually read (successful `skill` tool calls). */
+  readonly reads?: Set<string>
 }
 
 const STORAGE_KEY = Symbol.for('dsh.evolution.review-context.storage')
@@ -37,4 +39,15 @@ export function withReviewContext<T>(context: ReviewExecutionContext, task: () =
  */
 export function currentReviewContext(): ReviewExecutionContext | undefined {
   return storage.getStore()
+}
+
+/**
+ * Record a successful skill read in the CURRENT review run. A no-op outside a
+ * review loop or when the run has no read set.
+ * @param name - the skill name the review actually loaded.
+ */
+export function recordReviewRead(name: string): void {
+  const context = storage.getStore()
+  if (context?.reads === undefined || name.trim() === '') return
+  context.reads.add(name.trim())
 }

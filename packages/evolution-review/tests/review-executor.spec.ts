@@ -6,6 +6,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import { runReview } from '../src/review-executor.ts'
 import type { ReviewLlmPort, ReviewParent, ReviewToolPort } from '../src/review-executor.ts'
+import { withReviewContext } from '@deepseek-ai/dsh-evolution-core'
 
 const call = { type: 'tool-call' as const, id: ToolCallId('call-1'), name: 'skill_manage', arguments: '{"name":"probe"}' }
 const toolCallChunks: StreamChunk[] = [
@@ -111,6 +112,33 @@ describe('runReview', () => {
     expect(result.finalText).toBe('done')
     expect(seen.agent).toBeUndefined()
     expect(cleared).toBe(1)
+  })
+
+  it('records a successful skill read in the review run context', async () => {
+    const skillCall = { type: 'tool-call' as const, id: ToolCallId('read-call'), name: 'skill', arguments: '{"name":"read-skill"}' }
+    const chunks: StreamChunk[] = [
+      { type: 'block-start', index: 0, blockType: 'tool-call' },
+      { type: 'block-end', index: 0, block: skillCall },
+      { type: 'finish', reason: { kind: 'tool-calls' } },
+    ]
+    const reads = new Set<string>()
+    await withReviewContext({ reviewId: 'read-review', runId: 'read-review', reads }, async () => {
+      await runReview({
+        parent: parent(),
+        llm: llm([chunks, textChunks]),
+        tools: {
+          async execute() {
+            return { results: [{ callId: skillCall.id, result: { content: [{ type: 'text' as const, text: 'loaded' }], isError: false } }] }
+          },
+        },
+        instruction: 'review',
+        toolAllow: new Set(['skill']),
+        signal: new AbortController().signal,
+        markReview: () => {},
+        clearReview: () => {},
+      })
+    })
+    expect(reads.has('read-skill')).toBe(true)
   })
 })
 

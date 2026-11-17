@@ -12,6 +12,7 @@ import {
   createToolResultMessage,
   createUserMessage,
 } from '@deepseek-ai/dsh-evolution-core/platform'
+import { recordReviewRead } from '@deepseek-ai/dsh-evolution-core'
 import type {
   ContentBlock,
   ContextFormed,
@@ -224,6 +225,16 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
           target: toolTarget(call.name, call.arguments),
           status: item.result.isError ? 'error' : item.result.content.some(block => block.type === 'text' && /staged id:|已暂存|pending_id/.test(block.text)) ? 'staged' : 'ok',
         })
+        if (call.name === 'skill' && item.result.isError !== true) {
+          try {
+            const parsed: unknown = JSON.parse(call.arguments)
+            if (parsed !== null && typeof parsed === 'object' && typeof (parsed as { name?: unknown }).name === 'string') {
+              recordReviewRead((parsed as { name: string }).name)
+            }
+          } catch {
+            // Malformed args are the tool's problem; no read evidence is inferred.
+          }
+        }
         messages.push(createToolResultMessage({
           callId: item.callId,
           content: item.result.content,

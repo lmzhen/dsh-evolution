@@ -20,7 +20,7 @@
 
 import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
-import { skillWriteGateContext, protectedSkillNamesOf, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
+import { currentReviewContext, skillWriteGateContext, protectedSkillNamesOf, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool, registerEvolutionTool, skillsPort, type SystemPromptPort } from '@deepseek-ai/dsh-evolution-core/platform'
@@ -1363,7 +1363,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         args,
         origin: libraryOrigin,
         protectedNames: protectedSkillNamesOf(ctx.get('evolutionPolicy')),
-        readNames: sessionReadSkillNames(ctx, exec.agent?.session),
+        readNames: (() => {
+          const run = currentReviewContext()?.reads
+          if (run === undefined) return sessionReadSkillNames(ctx, exec.agent?.session)
+          const merged = new Set<string>()
+          sessionReadSkillNames(ctx, exec.agent?.session)?.forEach(name => merged.add(name))
+          run.forEach(name => merged.add(name))
+          return merged
+        })(),
         readSupportFiles: sessionReadSupportFiles(ctx, exec.agent?.session, { root: library.root }),
         confirm: async request => confirmSkillWrite(request, exec),
         // Read at the WRITE, not at apply: a settings edit lands on the next write with no restart.

@@ -1026,7 +1026,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       let error: string | undefined
       try {
         const prompt = reviewPrompt(kind, 'aux')
-        const result = await withReviewContext({ reviewId, runId: reviewId }, () => runReview({
+        const result = await withReviewContext({ reviewId, runId: reviewId, reads: new Set<string>() }, () => runReview({
           parent: agent,
           llm: { stream: options => llm(options) },
           tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent }) },
