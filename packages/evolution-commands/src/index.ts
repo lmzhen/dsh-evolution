@@ -27,7 +27,7 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-commands': { kind: 'evolution-commands' } & ContextFormed
   }
 }
-import { appendEvolutionEvent, buildLearnPrompt, reviewPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, reviewPrompt, markReviewChannel, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
 import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport, EXTRACT_PROMPT_V1, ownerCandidatesFromSummaries } from '@deepseek-ai/dsh-evolution-core/extract'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
@@ -608,6 +608,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const missing = agentMissing('review')
           if (missing) return missing
+          const reviewSession = invocationAgent?.session
+          if (reviewSession?.id !== undefined) markReviewChannel(String(reviewSession.id))
           const message = createUserMessage({
             content: [{ type: 'text', text: reviewPrompt(requested, 'inject') }],
             source: { kind: 'evolution-commands', form: 'notice', summary: 'manual evolution review' },
@@ -898,13 +900,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             .replace('%DRY%', dryRun ? 'yes (no writes)' : 'no')
           const runId = 'offload-' + Date.now().toString(36)
           // Model channel only: the child decides/reads/calls restructure; the
-          // platform agent loop owns timeout/cancel. No governance run/status.
+          // platform agent loop owns timeout, and the command's abort signal is
+          // linked so a cancelled request also cancels the child. No governance run/status.
           const opened = await withReviewContext({ reviewId: runId, runId, reads: new Set<string>() }, async () => await channel.open!({
             parent: agent as never,
             label: `offload:${target}`,
             promptText: prompt,
             kind: 'governance',
             allow,
+            ...(invocation.signal === undefined ? {} : { signal: invocation.signal }),
             timeoutMs: 15 * 60 * 1000,
           }))
           if (opened.kind === 'ok') {

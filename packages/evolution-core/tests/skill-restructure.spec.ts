@@ -69,6 +69,17 @@ it('moves an exact sub-block and keeps the heading', async () => {
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('rejects a whole-section move that swallows an earlier sub-block', async () => {
+  const { root, lib } = await makeLib()
+  const result = await lib.restructure('demo-skill', [
+    { heading: 'Details log', start: '- rc.67 fixed X', end: '- rc.67 fixed X', toFile: 'references/a.md' },
+    { heading: 'Details log', toFile: 'references/b.md' },
+  ], 'background_review')
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain('overlaps')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 const withCitation = (target: string): string => BODY.replace('Use it with care.', 'See ' + target + ' for the details.')
 
 it('carries one model summary to every after entry of the restructure unit', async () => {

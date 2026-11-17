@@ -987,8 +987,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
  * request prefix and refuses if the session grows. A long goal loop is never
  * idle, so aux review could never run there. A frozen proxy keeps the exact
  * messages/header/tool-history/seq at the trigger point; review tools still
- * execute with the review context (background_review), and the parent can
- * continue without the seq guard tripping.
+ * execute with the real parent agent (real Session/scope/approval), and the
+ * parent can continue without the seq guard tripping.
  */
 function snapshotReviewParent(agent: Agent): Agent {
   const session = agent.session
@@ -1066,7 +1066,7 @@ function snapshotReviewParent(agent: Agent): Agent {
         const result = await withReviewContext({ reviewId, runId: reviewId, reads: new Set<string>() }, () => runReview({
           parent: reviewParent,
           llm: { stream: options => llm(options) },
-          tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent: reviewParent }) },
+          tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent }) },
           instruction: prompt,
           toolAllow,
           maxRounds: config.reviewMaxRounds,

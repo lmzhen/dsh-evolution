@@ -55,6 +55,11 @@ export function selectSections(body: string, requests: readonly SectionSelection
     const partial = request.start !== undefined || request.end !== undefined
     if (!partial) {
       if (section.end === section.start + 1) return { ok: false, code: 'heading-empty', message: 'heading "## ' + wanted + '" has an empty section' }
+      // A whole-section move must not swallow an already selected sub-block
+      // (the reverse order was already caught by the partial overlap check).
+      if (selected.some(entry => section.start < entry.end && section.end > entry.start)) {
+        return { ok: false, code: 'part-anchor-overlaps', message: 'heading "## ' + wanted + '" selection overlaps another selected block' }
+      }
       selected.push({ heading: wanted, start: section.start, end: section.end, text: lines.slice(section.start, section.end).join(LF), requestIndex })
       continue
     }
