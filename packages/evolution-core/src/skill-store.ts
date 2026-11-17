@@ -3228,7 +3228,7 @@ export class SkillLibrary {
       eventAction: 'restructure',
     })
     if (!result.ok) return { ok: false, message: result.errors.map(error => error.message).join('；') }
-    return { ok: true, message: `已重构「${name}」：把 ${plan.sections.length} 个章节搬到 references/。`, path: dir }
+    return { ok: true, message: `已重构「${name}」：把 ${plan.sections.length} 个章节搬到 references/（正文 ${md.length} → ${finalMd.length} 字符）。`, path: dir }
   }
 
   /**
