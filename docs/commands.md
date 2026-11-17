@@ -65,7 +65,7 @@
 |---|---|
 | `/evolution learn [request]` | 向当前会话发一条学习请求 |
 | `/evolution replay` | 从活动记录比较不同会话和重启之间的计划结果 |
-| `/evolution restructure <name> "<heading>" <to_file> [--plan <runId>]` | 把技能正文的一节（或 start/end 子块）移到 references 文件；就是 offload 的执行器 |
+| `/evolution restructure <name> "<heading>" <to_file> [--start <line>] [--end <line>] [--plan <runId>]` | 把技能正文的一节（或 start/end 子块）移到 references 文件；就是 offload 的执行器 |
 | `/evolution condense <name> [--dry-run]` | 逐章节压缩技能正文（后台治理子智能体，多次小改） |
 | `/evolution extract <source> [<target> "<heading>"] [--start <line>] [--end <line>] [--outcome extract|mixed] [--apply]` | 预览或执行跨技能提取；source-only 时只返回 owner proposal |
 
