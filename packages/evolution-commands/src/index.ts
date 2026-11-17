@@ -759,16 +759,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           await (ctx.get('skillUsage') as { record?: (name: string, kind: 'patch') => Promise<void> } | undefined)?.record?.(name, 'patch')
           return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
           }
-          case 'tidy':
           case 'offload':
           case 'condense': {
-          if (!('positionals' in command)) return err('用法：/evolution tidy|offload|condense <skill> [--dry-run]')
+          if (!('positionals' in command)) return err(`用法：/evolution ${command.name} <skill> [--dry-run]`)
           const target = command.positionals[0] ?? ''
-          if (target === '') return err(`用法：/evolution ${command.name} <skill>${command.name === 'tidy' ? ' [--mode auto|offload|condense]' : ''} [--dry-run]`)
-          const forcedMode = command.name === 'offload' ? 'offload' : command.name === 'condense' ? 'condense' : undefined
-          const modeFlag = command.flags.get('mode')
-          const mode = forcedMode ?? (typeof modeFlag === 'string' ? modeFlag : 'auto')
-          if (mode !== 'auto' && mode !== 'offload' && mode !== 'condense') return err('--mode 只能是 auto、offload 或 condense。')
+          if (target === '') return err(`用法：/evolution ${command.name} <skill> [--dry-run]`)
+          const mode = command.name === 'offload' ? 'offload' : 'condense'
           const dryRun = command.flags.has('dry-run')
           const agent = invocationAgent
           if (agent === undefined) return err(hostError('e-305-this-invocation-carries-no', { a1: 'governance subagent' }))

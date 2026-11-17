@@ -283,16 +283,6 @@ export const HOST_COMMANDS = {
       "ru": "Перенести один раздел текста навыка в файл references",
       "pt": "Mover uma seção do corpo de uma skill para um arquivo references"
     },
-    "summary.tidy": {
-      "zh": "整理一个技能：后台子智能体按章节瘦身/压缩（--dry-run 只预览）",
-      "en": "Tidy one skill: a background subagent offloads or condenses it section by section (--dry-run previews only)",
-      "ja": "スキルを1つ整理：バックグラウンド子エージェントがセクション単位で退避／圧縮（--dry-run はプレビューのみ）",
-      "es": "Ordenar un skill: un subagente en segundo plano lo aligera o condensa sección por sección (--dry-run solo previsualiza)",
-      "fr": "Ranger un skill : un sous-agent en arrière-plan l’allège ou le condense section par section (--dry-run prévisualise seulement)",
-      "de": "Einen Skill aufräumen: Ein Hintergrund-Subagent verschlankt oder verdichtet ihn Abschnitt für Abschnitt (--dry-run zeigt nur die Vorschau)",
-      "ru": "Привести навык в порядок: фоновый подагент сокращает или сжимает его по разделам (--dry-run только предпросмотр)",
-      "pt": "Organizar uma skill: um subagente em segundo plano a enxuga ou condensa seção por seção (--dry-run apenas pré-visualiza)"
-    },
     "summary.offload": {
       "zh": "把技能正文的会话细节章节移到 references（后台子智能体，--dry-run 只预览）",
       "en": "Move session-detail sections from a skill body into references (background subagent; --dry-run previews only)",
