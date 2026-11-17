@@ -1254,7 +1254,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       file_path: { type: 'string' },
       file_content: { type: 'string' },
       absorbed_into: { type: 'string' },
-      summary: { type: 'string', description: 'One-line change summary for the skill history. Max 50 Unicode characters by default; over-limit is rejected with the current limit.' },
+      summary: { type: 'string', description: 'One-line change summary for the skill history. Required for restructure/extract/delete in model-origin writes; max 50 Unicode characters by default, over-limit is rejected with the current limit.' },
       problem: { type: 'string', enum: ['wrong', 'outdated', 'incomplete', 'unsafe'], description: 'feedback only: why the loaded skill did not help.' },
       restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, to_file: { type: 'string' } } } },
       extract: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_skill: { type: 'string' }, to_heading: { type: 'string' } } } },
