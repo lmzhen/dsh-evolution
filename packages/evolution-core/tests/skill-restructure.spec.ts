@@ -4,7 +4,7 @@ vi.setConfig({ testTimeout: 30_000 })
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SKILL_LIMITS, isPresent, missingSupportPointers } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_SKILL_LIMITS, isPresent, missingSupportPointers, withReviewContext } from '@deepseek-ai/dsh-evolution-core'
 import { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { SkillLibrary, validateRestructureTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
@@ -65,6 +65,16 @@ it('carries one model summary to every after entry of the restructure unit', asy
   expect(new Set(after.map(version => version.unitId)).size).toBe(1)
   expect(after.every(version => version.summary === 'moved two sections')).toBe(true)
   expect(after.every(version => version.summarySource === 'model')).toBe(true)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('carries the review runId on the unit head', async () => {
+  const { root, lib } = await makeLib()
+  const result = await withReviewContext({ reviewId: 'review-1', runId: 'run-42' }, async () => await lib.restructure('demo-skill', [{ heading: 'Details log', toFile: 'references/release-log.md' }], 'background_review', { text: 'moved log', source: 'model' }))
+  expect(result.ok).toBe(true)
+  const versions = await lib.listVersions('demo-skill')
+  const head = versions.find(version => version.unitHead?.runId !== undefined)?.unitHead
+  expect(head?.runId).toBe('run-42')
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 

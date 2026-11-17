@@ -858,7 +858,8 @@ export class SkillLibrary {
         ...(provenance.get(op.target) === undefined ? {} : { provenance: provenance.get(op.target) }),
       })
     }
-    return { moves, sources: roots.map(skill => ({ skill })) }
+    const runId = currentReviewContext()?.runId
+    return { ...(runId === undefined ? {} : { runId }), moves, sources: roots.map(skill => ({ skill })) }
   }
 
   private async withMutationLock<T>(task: () => Promise<T>): Promise<T> {
