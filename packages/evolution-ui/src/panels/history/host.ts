@@ -29,5 +29,11 @@ export const inject: string[] = []
  * @param ctx - the host context; the connection and curator arrive through it.
  */
 export function apply(ctx: Context): void {
-  registerHostRoutes(ctx, audit => makeSkillHistoryRoutes({ getCurator: () => ctx.get('evolutionCurator') }, audit))
+  registerHostRoutes(ctx, audit => makeSkillHistoryRoutes({
+    getCurator: () => ctx.get('evolutionCurator'),
+    getHealthView: async () => {
+      const curator = ctx.get('evolutionCurator') as { healthView?: () => Promise<unknown> } | undefined
+      return curator?.healthView?.()
+    },
+  }, audit))
 }

@@ -40,6 +40,8 @@ export type CuratorFace = Pick<Context['evolutionCurator'], 'history' | 'undo' |
  */
 export interface RouteServices {
   readonly getCurator: () => CuratorFace | undefined
+  /** The aggregate health read: absent means this deployment cannot answer it yet. */
+  readonly getHealthView?: () => Promise<unknown>
 }
 
 /**
@@ -266,9 +268,23 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
       path: SKILL_HISTORY_ROUTES.health,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: (request) => {
-        if (request.method !== 'GET') return Promise.resolve(methodNotAllowed(['GET']))
-        return Promise.resolve(json(200, { ok: true, data: { surface: 'skill-history' } }))
+      fetch: async (request) => {
+        if (request.method !== 'GET') return methodNotAllowed(['GET'])
+        // Keep the probe answer stable for deployments that have no health view yet;
+        // only a real array upgrades the body to the aggregate read.
+        const view = await services.getHealthView?.()
+        if (!Array.isArray(view)) return json(200, { ok: true, data: { surface: 'skill-history' } })
+        return json(200, {
+          ok: true,
+          data: {
+            surface: 'skill-history',
+            rows: view,
+            usage: null,
+            feedback: null,
+            scan: { status: 'complete' },
+            readAt: Date.now(),
+          },
+        })
       },
     },
   ]
