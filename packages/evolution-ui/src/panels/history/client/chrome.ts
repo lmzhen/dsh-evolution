@@ -216,7 +216,15 @@ function CopyCommandButton(props: { copy: Copy; command: string; label: string }
 /** The pane's heading and its one control. */
 export function panelHead(copy: Copy, onRefresh: () => void, title?: string, name?: string): ReactNode {
   const actions: ReactNode[] = [
-    button({ key: 'refresh', title: copy.t('refresh'), onClick: onRefresh, children: copy.t('refresh') }),
+    createElement('button', {
+      key: 'refresh',
+      type: 'button',
+      className: 'evo-hist-button',
+      'data-kind': 'action',
+      'data-tone': 'quiet',
+      title: copy.t('refresh'),
+      onClick: onRefresh,
+    }, copy.t('refresh')),
   ]
   if (name !== undefined) {
     actions.push(createElement('details', { key: 'tidy', className: 'evo-hist-more' },
