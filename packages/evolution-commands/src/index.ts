@@ -763,6 +763,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const target = command.positionals[0] ?? ''
           if (target === '') return err(`用法：/evolution ${command.name} <skill> [--dry-run]`)
           const mode = command.name === 'offload' ? 'offload' : 'condense'
+          const headingFlag = command.flags.get('heading')
+          const heading = typeof headingFlag === 'string' && headingFlag.trim() !== '' ? headingFlag.trim() : undefined
           const dryRun = command.flags.has('dry-run')
           // P1-3: an approval-enabled deployment would stage every child write and
           // report the run as succeeded with no unit. Refuse honestly instead of
@@ -812,6 +814,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const prompt = GOVERNANCE_PROMPT_TEMPLATE
             .replace('%SKILL%', target)
             .replace('%MODE%', mode)
+            .replace('%HEADING%', heading ?? 'whole skill')
             .replace('%DRY%', dryRun ? 'yes (no writes)' : 'no')
           const io = (ctx.get('evolutionIo') as { provider?(name?: string): { writeText(path: string, content: string): Promise<void> } } | undefined)?.provider?.()
           const reportPath = join(evolutionHome(), 'reports', `governance-${run.id}.json`)
@@ -823,6 +826,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 runId: run.id,
                 target,
                 mode,
+                ...(heading === undefined ? {} : { heading }),
                 dryRun,
                 state,
                 startedAt: run.startedAt,

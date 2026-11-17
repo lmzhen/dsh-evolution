@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 30
+export const PROMPT_BUNDLE_VERSION = 31
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -287,11 +287,12 @@ export const GOVERNANCE_PROMPT_TEMPLATE = `You are a skill governance worker. Wo
 
 Target skill: %SKILL%
 Mode: %MODE%
+Target section: %HEADING%
 Dry run: %DRY%
 
 Rules:
 - Use the skill tool to read the target before writing.
-- For offload: use skill_manage restructure to move self-contained H2 sections into references/<topic>.md. Keep triggers, decision steps, commands, and verification in SKILL.md. At most five sections per call; include a short summary.
+- For offload: use skill_manage restructure to move self-contained H2 sections into references/<topic>.md. Keep triggers, decision steps, commands, and verification in SKILL.md. At most five sections per call; include a short summary. When Target section names one heading, only that section may move.
 - For condense: use skill_manage patch with section: {heading, content} one section at a time. Read the result before the next edit. Do not resend the whole body; include a short summary. No content-conservation gate is applied.
 - Keep the H2 heading line for whole-section edits; replace only its content.
 - Do not create, delete, archive, merge, or split skills. Do not touch pinned or protected skills.

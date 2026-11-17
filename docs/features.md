@@ -60,7 +60,7 @@ curator 负责技能库的生命周期整理。默认在宿主启动约 10 秒�
 
 ## 技能整理：offload / condense
 
-`/evolution offload <skill>` 把一个技能的会话细节章节移到 `references/`，并把 SKILL.md 里对应位置换成指针；`/evolution condense <skill>` 则逐章节压缩正文，一次只改一个章节。
+`/evolution offload <skill>` 把一个技能的会话细节章节移到 `references/`，并把 SKILL.md 里对应位置换成指针；加 `--heading <heading>` 时只处理指定章节。`/evolution condense <skill>` 则逐章节压缩正文，一次只改一个章节。
 
 两者都由一个独立的 governance 子智能体执行：
 
