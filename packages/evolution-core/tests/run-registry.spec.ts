@@ -32,6 +32,21 @@ describe('core run registry (S2)', () => {
     expect(typeof registry.lastSettledAt()).toBe('number')
   })
 
+  it('exclusive begin refuses a second run of the same kind until the first settles', async () => {
+    const dir = await home()
+    const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
+    await registry.load()
+    const first = await registry.begin('governance', { exclusive: true })
+    await expect(registry.begin('governance', { exclusive: true })).rejects.toThrow('run-kind-active:governance')
+    // Another kind is not blocked by the governance single-flight.
+    const merge = await registry.begin('merge', { command: 'scan' })
+    await registry.settle(merge.id, { state: 'succeeded' })
+    await registry.settle(first.id, { state: 'succeeded' })
+    const second = await registry.begin('governance', { exclusive: true })
+    expect(second.id).not.toBe(first.id)
+    await registry.settle(second.id, { state: 'succeeded' })
+  })
+
   it('tracks merge command/stage/progress and filters by kind', async () => {
     const dir = await home()
     const registry = newRunRegistry({ io: nodeEvolutionIo(), home: dir })
