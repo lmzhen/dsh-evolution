@@ -142,7 +142,7 @@ function newestRun(registry: RunRegistry, kind: 'maintain' | 'merge' | 'governan
 }
 
 /** Source-only extract discovery: the child proposes an owner; it never writes. */
-async function discoverExtract(ctx: Context, parent: unknown, source: string, library: ReturnType<typeof newSkillLibrary>): Promise<string> {
+async function discoverExtract(ctx: Context, parent: unknown, source: string, library: ReturnType<typeof newSkillLibrary>, io: EvolutionIoLike): Promise<string> {
   const body = await library.read(source)
   if (body === null) return `技能「${source}」不存在。`
   const summaries = await library.model.list({ withContent: true, withFrontmatter: true })
@@ -178,6 +178,36 @@ async function discoverExtract(ctx: Context, parent: unknown, source: string, li
   if (outcome.kind !== 'ok') return `extract proposal 不可用：${'reason' in outcome ? outcome.reason : outcome.kind}`
   const proposal = outcome.structured as { outcome?: string; target?: string; neededOwner?: string; reason?: string; parts?: Array<{ heading?: string }> }
   const parts = Array.isArray(proposal.parts) ? proposal.parts.map(part => part.heading).filter((heading): heading is string => typeof heading === 'string') : []
+  const outcomeName: 'extract' | 'mixed' | 'keep' | 'owner-gap' = proposal.outcome === 'extract' || proposal.outcome === 'mixed' ? proposal.outcome : proposal.outcome === 'keep' ? 'keep' : 'owner-gap'
+  const runId = 'extract-' + Date.now().toString(36)
+  const target = typeof proposal.target === 'string' && proposal.target !== '' ? proposal.target : undefined
+  const record = {
+    version: 1 as const,
+    id: 'extract-' + runId + '-' + source,
+    source,
+    outcome: outcomeName,
+    parts: Array.isArray(proposal.parts)
+      ? proposal.parts
+        .filter(part => typeof part.heading === 'string')
+        .map(part => ({ heading: part.heading as string, anchor: { heading: part.heading as string }, reason: 'proposed by extract agent' }))
+      : [],
+    owner: {
+      mode: target === undefined ? 'owner-gap' as const : 'covered' as const,
+      ...(target === undefined ? {} : { name: target }),
+      ...(proposal.neededOwner === undefined ? {} : { neededOwner: proposal.neededOwner }),
+      triggerCovers: target !== undefined,
+      outcomeCovers: target !== undefined,
+      reason: String(proposal.reason ?? ''),
+    },
+    warnings: [],
+    provenance: { promptVersion: 'v1' as const, runId, at: Date.now() },
+    status: 'proposed' as const,
+  }
+  let proposalLine = 'proposal: —'
+  try {
+    await writeProposalReport(io, record)
+    proposalLine = `proposal: ${record.id}\n应用：/evolution extract ${source} --proposal ${record.id}`
+  } catch { /* the proposal is still readable in this answer */ }
   return [
     'extract proposal（未写入）',
     'outcome: ' + String(proposal.outcome ?? 'unknown'),
@@ -185,7 +215,7 @@ async function discoverExtract(ctx: Context, parent: unknown, source: string, li
     'neededOwner: ' + String(proposal.neededOwner ?? '—'),
     'parts: ' + (parts.length === 0 ? '—' : parts.join(', ')),
     'reason: ' + String(proposal.reason ?? '—'),
-    'apply 需要显式 target/heading，或保存 proposal 后使用 --proposal。',
+    proposalLine,
   ].join('\n')
 }
 
@@ -663,7 +693,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               return err('用法：/evolution extract <source> [<target> "<heading>"] [--start <line>] [--end <line>]')
             }
             if (target === '' && heading === '') {
-              return ok(await discoverExtract(ctx, invocationAgent, source, library))
+              return ok(await discoverExtract(ctx, invocationAgent, source, library, ioRegistry.provider()))
             }
             if (target === '' || heading === '') {
               return err('用法：/evolution extract <source> <target> "<heading>" [--start <line>] [--end <line>]')
