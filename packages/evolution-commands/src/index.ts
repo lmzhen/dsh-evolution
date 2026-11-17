@@ -834,7 +834,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             const decision = await approval.request({
               kind: 'skill',
               summary: `/evolution restructure ${name}${planRunId ? ` (plan ${planRunId})` : ''}`,
-              args: { operation: { action: 'restructure', name, restructure: [move] }, origin: 'foreground', libraryOrigin: 'foreground' },
+              args: { operation: { action: 'restructure', name, restructure: [{ heading, ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), to_file: toFile }] }, origin: 'foreground', libraryOrigin: 'foreground' },
               origin: 'foreground',
               // A session-less caller only reaches this request when staging
               // is OFF (the refusal above covers the staging deployment), so
