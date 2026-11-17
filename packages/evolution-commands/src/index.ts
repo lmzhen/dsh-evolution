@@ -609,7 +609,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           const missing = agentMissing('review')
           if (missing) return missing
           const reviewSession = invocationAgent?.session
-          if (reviewSession?.id !== undefined) markReviewChannel(String(reviewSession.id))
           const message = createUserMessage({
             content: [{ type: 'text', text: reviewPrompt(requested, 'inject') }],
             source: { kind: 'evolution-commands', form: 'notice', summary: 'manual evolution review' },
@@ -624,6 +623,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           } else {
             return err(hostError('e-305-the-invocation-agent-exposes', { a1: 'this review request' }))
           }
+          if (reviewSession?.id !== undefined) markReviewChannel(String(reviewSession.id))
           return ok(`已注入 ${requested} 复审请求；${woke ? '它会在当前会话立即执行。' : '它会在下一次唤醒时执行。'}`)
           }
           case 'learn': {
