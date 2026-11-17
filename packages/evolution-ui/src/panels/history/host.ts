@@ -43,9 +43,12 @@ export function apply(ctx: Context): void {
       const usage = ctx.get('skillUsage') as { report?: () => Promise<unknown> } | undefined
       return usage?.report?.()
     },
-    getFeedback: () => {
-      const feedback = ctx.get('evolutionFeedback') as { snapshot?: () => unknown } | undefined
-      return feedback?.snapshot?.()
+    getFeedback: (names) => {
+      const feedback = ctx.get('evolutionFeedback') as { score?: (name: string, kind?: 'skill' | 'session') => number } | undefined
+      if (typeof feedback?.score !== 'function') return undefined
+      const scores: Record<string, number> = {}
+      for (const name of names) scores[name] = feedback.score(name, 'skill')
+      return scores
     },
   }, audit))
 }

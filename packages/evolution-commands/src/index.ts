@@ -134,13 +134,11 @@ function renderRunRecord(record: RunRecord): string {
   return parts.join(' ')
 }
 
-/** The newest MAINTENANCE run this home knows — the default when a subcommand omits its id
- * (G2/0.20.0). The registry view is newest-first and already carries the cross-plane rows. The
- * index is a file a user can hand-edit, so a row with a blank id is skipped rather than answered
- * from (review P2-7: it produced text like `Run  (succeeded) …`). `RunKind` has one member today,
- * so kind needs no filter — a second kind must add one here when it lands. */
-function newestRun(registry: RunRegistry): RunRecord | undefined {
-  return registry.runs().find(record => record.id.trim() !== '')
+/** The newest run of one kind this home knows — the default when a subcommand omits its id.
+ * The registry view is newest-first and already carries the cross-plane rows. The index is a file
+ * a user can hand-edit, so a row with a blank id is skipped rather than answered from. */
+function newestRun(registry: RunRegistry, kind: 'maintain' | 'merge' | 'governance' = 'maintain'): RunRecord | undefined {
+  return registry.runs(kind).find(record => record.id.trim() !== '')
 }
 
 /** Sentence F, ONE wording for the three id-less forms (design `10` cell 13): an index that could
@@ -766,12 +764,42 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (target === '') return err(`用法：/evolution ${command.name} <skill> [--dry-run]`)
           const mode = command.name === 'offload' ? 'offload' : 'condense'
           const dryRun = command.flags.has('dry-run')
+          // P1-3: an approval-enabled deployment would stage every child write and
+          // report the run as succeeded with no unit. Refuse honestly instead of
+          // producing a fake success; dry-run has no writes and stays available.
+          if (!dryRun) {
+            const staged = unreplayableWriteRefusal('治理运行')
+            if (staged !== undefined) return staged
+          }
           const agent = invocationAgent
           if (agent === undefined) return err(hostError('e-305-this-invocation-carries-no', { a1: 'governance subagent' }))
+          // The child is a write-capable subagent; its origin is not the review
+          // channel, so the store's pinned guard cannot see it. Refuse the
+          // explicitly pinned target before spending a child session on it.
+          const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+          if (ioRegistry !== undefined) {
+            const preflight = newSkillLibrary({
+              authority: authorityFrom({ origin: 'foreground' }),
+              config: { root: skillsRootValue },
+              io: ioRegistry.provider(),
+              ctx,
+              threatExemptLabels: config.threatExemptLabels,
+            })
+            if (await preflight.isPinned(target)) {
+              return err(`技能「${target}」已固定（pinned），治理子智能体不能修改；先 /evolution skill unpin ${target}。`)
+            }
+          }
           const channel = createSubagentChannel(ctx)
           if (channel.state.kind !== 'available') return err(`治理子智能体不可用：${channel.state.reason}`)
           if (channel.open === undefined) return err('当前部署的 subagent 通道不支持治理运行。')
           if (runs === undefined) return err('未挂载 evolution-io 注册表：无法记录治理运行。')
+          const allow = dryRun ? ['skill', 'read', 'glob', 'grep'] : ['skill', 'read', 'glob', 'grep', 'skill_manage']
+          // P1-2: `open` resolves only after the child has been started, so a
+          // preset/allow failure would otherwise be reported as "started" and
+          // only surface in the report. `prepare` is the same preflight kernel
+          // uses; answer before promising a run.
+          const prepared = await channel.prepare({ kind: 'governance', allow })
+          if (prepared.kind !== 'available') return err(`治理子智能体不可用：${prepared.reason}`)
           const active = await runs.findActive('governance')
           if (active !== undefined) return err(`已有治理运行在跑：${active.id}。先等它完成，或用 /evolution maintain status ${active.id} 查看。`)
           const run = await runs.begin('governance')
@@ -806,10 +834,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             try {
               const opened = await open({
                 parent: agent as never,
-                label: `tidy:${target}`,
+                label: `governance:${target}`,
                 promptText: prompt,
                 kind: 'governance',
-                allow: ['skill', 'read', 'glob', 'grep', 'skill_manage'],
+                allow,
                 timeoutMs: 15 * 60 * 1000,
                 signal: run.signal,
               })

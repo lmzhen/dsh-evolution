@@ -44,8 +44,8 @@ export interface RouteServices {
   readonly getHealthView?: () => Promise<unknown>
   /** Per-skill usage report; absent or a non-Map answer stays null. */
   readonly getUsage?: () => Promise<unknown>
-  /** Feedback aggregate; absent or a non-object answer stays null. */
-  readonly getFeedback?: () => unknown
+  /** Per-skill feedback scores; absent or malformed stays null. */
+  readonly getFeedback?: (names: readonly string[]) => unknown
 }
 
 /**
@@ -280,7 +280,10 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
         if (!Array.isArray(view)) return json(200, { ok: true, data: { surface: 'skill-history' } })
         const usageRead = await services.getUsage?.()
         const usage = usageRead instanceof Map ? Object.fromEntries(usageRead) : null
-        const feedbackRead = services.getFeedback?.()
+        const names = view
+          .map(row => row !== null && typeof row === 'object' && 'name' in row ? (row as { name?: unknown }).name : undefined)
+          .filter((name): name is string => typeof name === 'string' && name !== '')
+        const feedbackRead = services.getFeedback?.(names)
         const feedback = feedbackRead !== null && typeof feedbackRead === 'object' ? feedbackRead : null
         return json(200, {
           ok: true,
