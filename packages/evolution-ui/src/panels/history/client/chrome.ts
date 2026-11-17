@@ -73,7 +73,7 @@ export function searchField(copy: Copy, query: string, onQuery: (value: string) 
  * @param onOpen - what a click does.
  * @returns the row.
  */
-export function skillLine(copy: Copy, row: SkillRow, selected: boolean, onOpen: () => void): ReactNode {
+export function skillLine(copy: Copy, row: SkillRow, selected: boolean, onOpen: () => void, health?: { readonly verdict: string; readonly bodyChars: number | null; readonly findings: number }): ReactNode {
   return createElement('button', {
     key: row.name,
     type: 'button',
@@ -88,6 +88,9 @@ export function skillLine(copy: Copy, row: SkillRow, selected: boolean, onOpen: 
     return [
       description.length === 0 ? null : cellLine(description, copy, 'evo-hist-cell-line evo-hist-skill-description'),
       facts.length === 0 ? null : cellLine(facts, copy, 'evo-hist-cell-line evo-hist-cell-meta'),
+      health === undefined || (health.verdict === 'ok' && health.findings === 0)
+        ? null
+        : createElement('span', { key: 'health', className: 'evo-hist-chip evo-hist-health', title: health.bodyChars === null ? undefined : `${health.bodyChars} chars` }, health.verdict),
     ]
   })())
 }

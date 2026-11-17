@@ -13,7 +13,7 @@ import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } f
 import { emptyState, groupHeading, localTime, notice, panelHead, searchField, skillLine, versionRow, type Copy, type OpenKind } from './chrome.ts'
 import { DiffBody, PreviewBody, type BodyState, type DiffState } from './document.ts'
 import { historyViewModel } from './history-presentation.ts'
-import { SkillHistoryRefusal, type GovernanceRow, type SkillRow, type VersionBodyRow, type VersionDiffRow, type VersionsPayload, type VersionRow } from './api.ts'
+import { SkillHistoryRefusal, type GovernanceRow, type HealthPayload, type SkillRow, type VersionBodyRow, type VersionDiffRow, type VersionsPayload, type VersionRow } from './api.ts'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { fillTemplate } from '@lmzhen/dsh-evolution-client-kit'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
@@ -27,6 +27,7 @@ export interface PanelFace extends Copy {
   readonly loadSkills: () => Promise<readonly SkillRow[]>
   readonly loadVersions: (name: string) => Promise<VersionsPayload>
   readonly loadGovernance?: () => Promise<readonly GovernanceRow[]>
+  readonly loadHealth?: () => Promise<HealthPayload>
   readonly loadDiff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly loadBody: (name: string, v: number) => Promise<VersionBodyRow>
   readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>
@@ -77,6 +78,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   const [diffs, setDiffs] = useState<ReadonlyMap<number, DiffState>>(new Map())
   const [bodies, setBodies] = useState<ReadonlyMap<number, BodyState>>(new Map())
   const [governance, setGovernance] = useState<readonly GovernanceRow[]>([])
+  const [healthByName, setHealthByName] = useState<ReadonlyMap<string, HealthPayload['rows'][number]>>(new Map())
   // Every rows read takes a ticket, and only the newest one may write state. Without it a slow reply
   // for skill A lands while B is open: B would show A's rows, and B's restore buttons would post A's
   // version number at B's name — a write against the wrong skill.
@@ -243,12 +245,20 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   useEffect(reloadSkills, [])
 
   useEffect(() => {
-    const load = face.loadGovernance
-    if (load === undefined) return
+    const loadHealth = face.loadHealth
+    const loadGovernance = face.loadGovernance
+    if (loadHealth === undefined && loadGovernance === undefined) return
     let live = true
-    void load().then((rows) => { if (live) setGovernance(rows) }).catch(() => { /* the list is optional */ })
+    const read = loadHealth !== undefined
+      ? loadHealth().then((payload) => {
+        if (!live) return
+        setGovernance(payload.governance)
+        setHealthByName(new Map(payload.rows.map(row => [row.name, row])))
+      })
+      : loadGovernance!().then((rows) => { if (live) setGovernance(rows) })
+    void read.catch(() => { /* the aggregate read is optional */ })
     return () => { live = false }
-  }, [face.loadGovernance])
+  }, [face.loadGovernance, face.loadHealth])
 
   const needle = query.trim().toLowerCase()
   const visible = useMemo(() => needle === ''
@@ -298,7 +308,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
           ? emptyState(face.t(skillsLoaded ? 'empty.skills' : 'loading'))
           : visible.length === 0
             ? emptyState(face.t('search.none'))
-            : visible.map(skill => skillLine(face, skill, skill.name === selected, () => { open(skill.name) })))),
+            : visible.map(skill => skillLine(face, skill, skill.name === selected, () => { open(skill.name) }, healthByName.get(skill.name)))),
     createElement('div', { className: 'evo-hist-main' },
       panelHead(face, refresh, selected ?? face.t('bodyTitle'), selected),
       notice(noteText, noteError),
@@ -343,7 +353,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
           group(face.t('group.history'), model.older, undefined),
           model.support.length === 0 ? null : group(face.t('group.support'), model.support, face.t('group.support.note')),
           model.hasAny ? null : createElement('p', { className: 'evo-hist-hint' }, face.t('empty.versions')))
-        : null)))
+        : null))))
 }
 
 /**

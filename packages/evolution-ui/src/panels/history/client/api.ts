@@ -135,6 +135,20 @@ export interface GovernanceRow {
   readonly resultRef: string | null
 }
 
+/** One measured skill row from the aggregate health read. */
+export interface HealthRow {
+  readonly name: string
+  readonly verdict: string
+  readonly bodyChars: number | null
+  readonly supportFiles: number | null
+  readonly findings: number
+}
+
+export interface HealthPayload {
+  readonly rows: readonly HealthRow[]
+  readonly governance: readonly GovernanceRow[]
+}
+
 export interface VersionsPayload {
   readonly content: readonly VersionRow[]
   readonly support: readonly VersionRow[]
@@ -144,7 +158,7 @@ export interface VersionsPayload {
 export interface SkillHistoryApi {
   readonly skills: () => Promise<readonly SkillRow[]>
   readonly versions: (name: string) => Promise<VersionsPayload>
-  readonly governance: () => Promise<readonly GovernanceRow[]>
+  readonly health: () => Promise<HealthPayload>
   readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>
   readonly diff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly body: (name: string, v: number) => Promise<VersionBodyRow>
@@ -178,9 +192,19 @@ export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHis
   return {
     skills: async () => await request(HOST_ROUTES.skills) as readonly SkillRow[],
     versions: async (name: string) => await request(HOST_ROUTES.versions + '?name=' + encodeURIComponent(name)) as VersionsPayload,
-    governance: async () => {
-      const data = await request(HOST_ROUTES.health) as { governance?: unknown }
-      return Array.isArray(data.governance) ? data.governance as readonly GovernanceRow[] : []
+    health: async () => {
+      const data = await request(HOST_ROUTES.health) as { rows?: unknown; governance?: unknown }
+      const rows = Array.isArray(data.rows)
+        ? (data.rows as Array<Record<string, unknown>>).map(row => ({
+          name: typeof row.name === 'string' ? row.name : '',
+          verdict: typeof row.verdict === 'string' ? row.verdict : 'unknown',
+          bodyChars: typeof row.bodyChars === 'number' ? row.bodyChars : null,
+          supportFiles: typeof row.supportFiles === 'number' ? row.supportFiles : null,
+          findings: Array.isArray(row.findings) ? row.findings.length : 0,
+        })).filter(row => row.name !== '')
+        : []
+      const governance = Array.isArray(data.governance) ? data.governance as readonly GovernanceRow[] : []
+      return { rows, governance }
     },
     diff: async (name: string, v: number) => await request(HOST_ROUTES.diff + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionDiffRow,
     body: async (name: string, v: number) => await request(HOST_ROUTES.body + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionBodyRow,
