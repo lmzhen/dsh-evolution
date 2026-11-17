@@ -772,6 +772,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (channel.state.kind !== 'available') return err(`治理子智能体不可用：${channel.state.reason}`)
           if (channel.open === undefined) return err('当前部署的 subagent 通道不支持治理运行。')
           if (runs === undefined) return err('未挂载 evolution-io 注册表：无法记录治理运行。')
+          const active = await runs.findActive('governance')
+          if (active !== undefined) return err(`已有治理运行在跑：${active.id}。先等它完成，或用 /evolution maintain status ${active.id} 查看。`)
           const run = await runs.begin('governance')
           await runs.stage(run.id, 'author', { done: 0, total: 1 })
           const prompt = GOVERNANCE_PROMPT_TEMPLATE
