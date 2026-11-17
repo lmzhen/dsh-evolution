@@ -207,7 +207,9 @@ function CopyCommandButton(props: { copy: Copy; command: string; label: string }
   const text = state === 'ok' ? props.copy.t('copy.copied') : state === 'fail' ? props.copy.t('copy.failed') : props.label
   return createElement('button', {
     type: 'button',
-    className: 'evo-hist-copy',
+    className: 'evo-hist-button evo-hist-copy',
+    'data-kind': 'action',
+    'data-tone': 'quiet',
     'data-copy-state': state,
     onClick: () => { void run() },
   }, text)
