@@ -281,6 +281,16 @@
       "ru": "Перенести один раздел текста навыка в файл references",
       "pt": "Mover uma seção do corpo de uma skill para um arquivo references"
     },
+    "summary.tidy": {
+      "zh": "整理一个技能：后台子智能体按章节瘦身/压缩（--dry-run 只预览）",
+      "en": "Tidy one skill: a background subagent offloads or condenses it section by section (--dry-run previews only)",
+      "ja": "スキルを1つ整理：バックグラウンド子エージェントがセクション単位で退避／圧縮（--dry-run はプレビューのみ）",
+      "es": "Ordenar un skill: un subagente en segundo plano lo aligera o condensa sección por sección (--dry-run solo previsualiza)",
+      "fr": "Ranger un skill : un sous-agent en arrière-plan l’allège ou le condense section par section (--dry-run prévisualise seulement)",
+      "de": "Einen Skill aufräumen: Ein Hintergrund-Subagent verschlankt oder verdichtet ihn Abschnitt für Abschnitt (--dry-run zeigt nur die Vorschau)",
+      "ru": "Привести навык в порядок: фоновый подагент сокращает или сжимает его по разделам (--dry-run только предпросмотр)",
+      "pt": "Organizar uma skill: um subagente em segundo plano a enxuga ou condensa seção por seção (--dry-run apenas pré-visualiza)"
+    },
     "summary.extract": {
       "zh": "预览把源技能的可复用部分提取到已有类级 owner；默认 plan，--apply 才写（多根一次事务）",
       "en": "Preview extracting a source skill's reusable part into an existing class-level owner; by default it produces a plan, and only --apply writes (multiple roots in one transaction)",

@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto'
  * changes semantically: the bundle digest is the fail-closed signal for
  * review workers, so a stale id across deployments must be distinguishable.
  */
-export const PROMPT_BUNDLE_VERSION = 29
+export const PROMPT_BUNDLE_VERSION = 30
 // 0.3.16 (S1.12, T-5): the id is DERIVED from the version — a one-number bump
 // can no longer drift the two apart.
 export const PROMPT_BUNDLE_ID = `dsh-evolution@${PROMPT_BUNDLE_VERSION}`
@@ -283,8 +283,23 @@ export function reviewPrompt(kind: 'memory' | 'skill' | 'combined', surface: Rev
   return INJECT_COMBINED_REVIEW_PROMPT
 }
 
-export interface PromptBundle {
-  id: string
+export const GOVERNANCE_PROMPT_TEMPLATE = `You are a skill governance worker. Work on exactly one skill.
+
+Target skill: %SKILL%
+Mode: %MODE%
+Dry run: %DRY%
+
+Rules:
+- Use the skill tool to read the target before writing.
+- For offload: use skill_manage restructure to move self-contained H2 sections into references/<topic>.md. Keep triggers, decision steps, commands, and verification in SKILL.md. At most five sections per call; include a short summary.
+- For condense: use skill_manage patch with section: {heading, content} one section at a time. Read the result before the next edit. Do not resend the whole body; include a short summary. No content-conservation gate is applied.
+- Keep the H2 heading line for whole-section edits; replace only its content.
+- Do not create, delete, archive, merge, or split skills. Do not touch pinned or protected skills.
+- Dry run: report what you would do; do not write.
+- Finish with: what changed, body characters before/after, and unit id(s).
+`
+
+export interface PromptBundle {  id: string
   version: number
   prompts: Readonly<Record<string, string>>
   sha256: string
@@ -324,6 +339,7 @@ export const PROMPT_BUNDLE: PromptBundle = createPromptBundle({
   // (see MAINTAIN_OUTPUT_INSTRUCTION). Digest changes with this entry.
   maintainOutput: MAINTAIN_OUTPUT_INSTRUCTION,
   skillsGuidance: SKILLS_GUIDANCE,
+  governance: GOVERNANCE_PROMPT_TEMPLATE,
 })
 
 export function verifyPromptBundle(bundle: PromptBundle = PROMPT_BUNDLE): boolean {

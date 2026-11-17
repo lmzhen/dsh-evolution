@@ -10,7 +10,7 @@ import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 // by `vendor/hmr/src/index.ts`. The probes are capability checks — absence degrades a feature and
 // `/evolution doctor` reports it.
 import type { Context, Volatile } from '@deepseek-ai/cordis'
-import { createSubagentChannel, authorityFrom, mutationLockFrom } from '@deepseek-ai/dsh-evolution-core'
+import { createSubagentChannel, authorityFrom, mutationLockFrom, GOVERNANCE_PROMPT_TEMPLATE } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
 import { makeDiagnosticsRoutes } from './diagnostics-route.ts'
@@ -758,6 +758,38 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // same action — the patch_count bump keeps the signals coherent.
           await (ctx.get('skillUsage') as { record?: (name: string, kind: 'patch') => Promise<void> } | undefined)?.record?.(name, 'patch')
           return ok(planRunId ? `${result.message}\n[audit] plan=${planRunId}` : result.message)
+          }
+          case 'tidy': {
+          if (!('positionals' in command)) return err('用法：/evolution tidy <skill> [--mode auto|offload|condense] [--dry-run]')
+          const target = command.positionals[0] ?? ''
+          if (target === '') return err('用法：/evolution tidy <skill> [--mode auto|offload|condense] [--dry-run]')
+          const modeFlag = command.flags.get('mode')
+          const mode = typeof modeFlag === 'string' ? modeFlag : 'auto'
+          if (mode !== 'auto' && mode !== 'offload' && mode !== 'condense') return err('--mode 只能是 auto、offload 或 condense。')
+          const dryRun = command.flags.has('dry-run')
+          const agent = invocationAgent
+          if (agent === undefined) return err(hostError('e-305-this-invocation-carries-no', { a1: 'governance subagent' }))
+          const channel = createSubagentChannel(ctx)
+          if (channel.state.kind !== 'available') return err(`治理子智能体不可用：${channel.state.reason}`)
+          if (channel.open === undefined) return err('当前部署的 subagent 通道不支持治理运行。')
+          const prompt = GOVERNANCE_PROMPT_TEMPLATE
+            .replace('%SKILL%', target)
+            .replace('%MODE%', mode)
+            .replace('%DRY%', dryRun ? 'yes (no writes)' : 'no')
+          const opened = await channel.open({
+            parent: agent as never,
+            label: `tidy:${target}`,
+            promptText: prompt,
+            kind: 'governance',
+            allow: ['skill', 'read', 'glob', 'grep', 'skill_manage'],
+            timeoutMs: 15 * 60 * 1000,
+          })
+          if (opened.kind === 'ok') {
+            await channel.dispose?.(opened.childId).catch(() => { /* best-effort activation cleanup */ })
+            return ok(opened.turn.text)
+          }
+          if (opened.kind === 'unavailable') return err(`治理子智能体不可用：${opened.reason}`)
+          return err('治理运行已取消。')
           }
           case 'merge': {
           const merge = ctx.get('evolutionMerge') as undefined | { run(input: string, invocation?: { agent?: unknown }): Promise<{ ok: boolean; text: string }> }
