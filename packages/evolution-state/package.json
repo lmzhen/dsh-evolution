@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-state",
   "description": "Durable evolution state consumer over pluggable storage providers",
-  "version": "0.50.0",
+  "version": "0.51.0",
   "publishConfig": {
     "access": "public"
   },
@@ -47,3 +47,4 @@
   },
   "devDependencies": {}
 }
+

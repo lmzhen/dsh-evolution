@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-commands",
   "description": "Human commands for the evolution family (/evolution pending|curator|maintain|doctor)",
-  "version": "0.50.0",
+  "version": "0.51.0",
   "publishConfig": {
     "access": "public"
   },
@@ -46,3 +46,4 @@
     "@deepseek-ai/dsh-commands": "workspace:^"
   }
 }
+

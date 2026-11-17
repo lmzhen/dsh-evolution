@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-ui",
   "description": "Web UI umbrella for the evolution family: settings and skill-history panels",
-  "version": "0.50.0",
+  "version": "0.51.0",
   "publishConfig": {
     "access": "public"
   },
@@ -56,3 +56,4 @@
     "react": "^18.2.0"
   }
 }
+

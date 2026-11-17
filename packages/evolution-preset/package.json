@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-preset",
   "description": "Compatibility one-click bundle (legacy; new installs should use evolution-all)",
-  "version": "0.50.0",
+  "version": "0.51.0",
   "publishConfig": {
     "access": "public"
   },
@@ -60,3 +60,4 @@
   },
   "types": "lib/types/index.d.ts"
 }
+

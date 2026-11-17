@@ -1,6 +1,6 @@
 {
   "name": "dsh-evolution",
-  "version": "0.50.0",
+  "version": "0.51.0",
   "private": true,
   "description": "Hermes-inspired self-evolution plugin family, purpose-built for DeepSeek Harness",
   "license": "MIT",
@@ -15,3 +15,4 @@
     "url": "git+https://github.com/lmzhen/dsh-evolution.git"
   }
 }
+

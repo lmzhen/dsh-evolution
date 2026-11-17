@@ -1,3 +1,13 @@
+## 0.51.0 (2026-11-17) — 技能治理：summary、复盘快照、offload/condense、统一面板
+
+> **范围**：① 技能历史写入摘要（`SkillVersion.summary` + `summarySource`，按动作分档）；② review aux 在长 goal loop 中用**阈值回合结束位置的冻结前缀快照**运行，不再要求 live idle；③ `/evolution review [memory|skill|combined]` 手动前台复盘；④ `/evolution offload` 为薄 subagent（模型通道），实际搬运仍走 `restructure`（工具通道）；⑤ `/evolution condense` 为 governance 子智能体，逐章节小改；⑥ `restructure` 支持 `--start/--end` 连续行子块；⑦ 技能历史面板三 tab（技能/待批/合并）+ 健康 chip + 最近治理 + 成功次数；`skillHistory.health` 聚合 route；⑧ `/evolution extract <source>` source-only proposal、`--proposal` 二次 apply。
+>
+> **行为变更**：`offload` 不再登记 governance run/single-flight/status/report；`reviewMode` 默认仍是 `aux`，但 busy parent 会用快照执行；`inject` 仍是兼容/手动路径。
+>
+> **验证（本地）**：全量 480 files / 2827 passed / 2 skipped；local lane pass 57 / fail 1（gate-18 本机缺 upstream 树）/ cannotDecide 3 / skip 1；build 0；独立复核 P0/P1 清零。rc.3 真机验收按用户指示放到发布后执行；发布前未取得真机截图。
+>
+> **迁移**：无需数据迁移；已有 review-state/history 继续读取。旧 `/evolution tidy` 已不存在。
+
 ## 0.50.0 (2026-11-17) — rc.3-only 架构收口
 
 > **范围**：① 平台边界只剩 `evolutionPlatform` 端口：agents/subagents/userQuestions/connection/systemPrompt/commands/settings/storageDomain/skills/sessionQuery/workingDirectory/pluginManager/pluginInventory/configEditor/profileContext/llm/tools；② 子代理统一 `createSubagentKernel` + `SubagentRun`，`run/open` 共用 `prepare()+startRun()`；③ 技能 13 个 action 统一 `SKILL_ACTIONS` 表 + `commitSkillAction`，extract 走 `SkillPlan`；④ client 契约生成、`platformUiModule` 单门、`registerSurface` 统一 verb；⑤ `Result`/`FamilyError` 基础与 `ConnectionPort.tryRegister` 边界；⑥ core 新增 `extract`/`result`/`errors` 子路径，根导出 72→69。
