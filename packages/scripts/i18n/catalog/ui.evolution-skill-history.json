@@ -552,6 +552,56 @@
       "pt": "Copiar",
       "ru": "Копировать"
     },
+    "copy.tidy": {
+      "zh": "整理",
+      "en": "Tidy",
+      "ja": "整理",
+      "es": "Ordenar",
+      "fr": "Ranger",
+      "de": "Aufräumen",
+      "pt": "Organizar",
+      "ru": "Привести в порядок"
+    },
+    "copy.offload": {
+      "zh": "复制 offload 命令",
+      "en": "Copy offload command",
+      "ja": "offload コマンドをコピー",
+      "es": "Copiar comando offload",
+      "fr": "Copier la commande offload",
+      "de": "offload-Befehl kopieren",
+      "pt": "Copiar comando offload",
+      "ru": "Скопировать команду offload"
+    },
+    "copy.condense": {
+      "zh": "复制 condense 命令",
+      "en": "Copy condense command",
+      "ja": "condense コマンドをコピー",
+      "es": "Copiar comando condense",
+      "fr": "Copier la commande condense",
+      "de": "condense-Befehl kopieren",
+      "pt": "Copiar comando condense",
+      "ru": "Скопировать команду condense"
+    },
+    "copy.copied": {
+      "zh": "已复制",
+      "en": "Copied",
+      "ja": "コピーしました",
+      "es": "Copiado",
+      "fr": "Copié",
+      "de": "Kopiert",
+      "pt": "Copiado",
+      "ru": "Скопировано"
+    },
+    "copy.failed": {
+      "zh": "复制失败",
+      "en": "Copy failed",
+      "ja": "コピー失敗",
+      "es": "Error al copiar",
+      "fr": "Échec de la copie",
+      "de": "Kopieren fehlgeschlagen",
+      "pt": "Falha ao copiar",
+      "ru": "Не удалось скопировать"
+    },
     "markdown.footnotes": {
       "zh": "脚注",
       "en": "Footnotes",

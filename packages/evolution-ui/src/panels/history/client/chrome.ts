@@ -11,7 +11,7 @@
  * `document.ts`; the two faces share the scale in `tokens.ts` and nothing else (§15.2 L2b).
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
-import { createElement, type ReactNode } from 'react'
+import { createElement, useState, type ReactNode } from 'react'
 import { formatLocalDateTime } from '@lmzhen/dsh-evolution-client-kit'
 import { button, chip, note } from './atoms.ts'
 import type { RowCell, SkillRow, VersionRow } from './api.ts'
@@ -192,10 +192,40 @@ export function notice(text: string | undefined, error: boolean): ReactNode {
   return note({ error, children: text })
 }
 
+/** A copy control that reports the clipboard verdict instead of swallowing it. */
+function CopyCommandButton(props: { copy: Copy; command: string; label: string }): ReactNode {
+  const [state, setState] = useState<'idle' | 'ok' | 'fail'>('idle')
+  const run = async (): Promise<void> => {
+    try {
+      if (typeof navigator === 'undefined' || navigator.clipboard === undefined) throw new Error('clipboard unavailable')
+      await navigator.clipboard.writeText(props.command)
+      setState('ok')
+    } catch {
+      setState('fail')
+    }
+  }
+  const text = state === 'ok' ? props.copy.t('copy.copied') : state === 'fail' ? props.copy.t('copy.failed') : props.label
+  return createElement('button', {
+    type: 'button',
+    className: 'evo-hist-copy',
+    'data-copy-state': state,
+    onClick: () => { void run() },
+  }, text)
+}
+
 /** The pane's heading and its one control. */
-export function panelHead(copy: Copy, onRefresh: () => void, title?: string): ReactNode {
+export function panelHead(copy: Copy, onRefresh: () => void, title?: string, name?: string): ReactNode {
+  const actions: ReactNode[] = [
+    button({ key: 'refresh', title: copy.t('refresh'), onClick: onRefresh, children: copy.t('refresh') }),
+  ]
+  if (name !== undefined) {
+    actions.push(createElement('details', { key: 'tidy', className: 'evo-hist-more' },
+      createElement('summary', null, copy.t('copy.tidy')),
+      createElement(CopyCommandButton, { key: 'offload', copy, command: `/evolution offload ${name}`, label: copy.t('copy.offload') }),
+      createElement(CopyCommandButton, { key: 'condense', copy, command: `/evolution condense ${name}`, label: copy.t('copy.condense') })))
+  }
   return createElement('div', { className: 'evo-hist-head' },
     createElement('h2', { className: 'evo-hist-title' }, title ?? copy.t('title')),
-    button({ key: 'refresh', title: copy.t('refresh'), onClick: onRefresh, children: copy.t('refresh') }))
+    ...actions)
 }
 
