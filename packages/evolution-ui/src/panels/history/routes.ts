@@ -147,6 +147,7 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
               ...entry,
               actionKind: versionActionKind(entry.action),
               age: elapsedSince(entry.at, now),
+              ...(entry.unitHead?.runId === undefined ? {} : { runId: entry.unitHead.runId }),
               // A delta is offered only where a DIFF is served: the diff route answers for the body
               // chain, so advertising one on a support row would render a refusal as an error.
               ...!withDelta || previous === undefined ? {} : { charsDelta: entry.chars - previous.chars },

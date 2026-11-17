@@ -120,6 +120,15 @@ export function versionRow(props: VersionRowProps): ReactNode {
   const { copy, row, confirming, open, expanded, onRestore, onCancel, onToggle } = props
   const current = row.undoable === false
   const actions: ReactNode[] = []
+  // A unit's run is a grouping fact, not an action: show it as a quiet chip and keep
+  // the full id in the title (the row already carries the unit's own version facts).
+  if (row.runId !== undefined) {
+    actions.push(createElement('span', {
+      key: 'run',
+      className: 'evo-hist-chip',
+      title: `run ${row.runId}`,
+    }, `run ${row.runId.slice(0, 8)}`))
+  }
   if (current) actions.push(chip({ key: 'current', children: copy.t('current') }))
   if (current) actions.push(button({
     key: 'preview', kind: 'toggle', tone: 'primary', expanded: open === 'preview',

@@ -87,6 +87,8 @@ export interface VersionRow {
   readonly path?: string
   /** Present when this row belongs to a cross-skill write unit; undo then restores the whole unit. */
   readonly unitId?: string
+  /** The review/restructure run this unit belongs to, when the writer recorded one. */
+  readonly runId?: string
 }
 
 /** One skill that has recorded versions, with what the listing already knows about it. */
