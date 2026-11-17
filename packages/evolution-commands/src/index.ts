@@ -137,6 +137,9 @@ function renderRunRecord(record: RunRecord): string {
 /** The newest run of one kind this home knows — the default when a subcommand omits its id.
  * The registry view is newest-first and already carries the cross-plane rows. The index is a file
  * a user can hand-edit, so a row with a blank id is skipped rather than answered from. */
+const GOVERNANCE_DISPOSE_TIMEOUT_MS = 5_000
+const GOVERNANCE_REPORT_TIMEOUT_MS = 10_000
+
 function newestRun(registry: RunRegistry, kind: 'maintain' | 'merge' | 'governance' = 'maintain'): RunRecord | undefined {
   return registry.runs(kind).find(record => record.id.trim() !== '')
 }
@@ -927,7 +930,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
               }, null, 2) + '\n').then(() => true).catch(() => false)
               return await Promise.race([
                 write,
-                new Promise<boolean>(resolve => setTimeout(() => resolve(false), 10_000)),
+                new Promise<boolean>(resolve => setTimeout(() => resolve(false), GOVERNANCE_REPORT_TIMEOUT_MS)),
               ])
             } catch (error) {
               ctx.logger.warn(`dsh-evolution-commands: tidy ${target} report write failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -951,7 +954,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 if (dispose !== undefined) {
                   await Promise.race([
                     dispose.catch(() => { /* best-effort activation cleanup */ }),
-                    new Promise<void>(resolve => setTimeout(resolve, 5_000)),
+                    new Promise<void>(resolve => setTimeout(resolve, GOVERNANCE_DISPOSE_TIMEOUT_MS)),
                   ])
                 }
                 const wrote = await writeReport('succeeded', opened.turn.text)

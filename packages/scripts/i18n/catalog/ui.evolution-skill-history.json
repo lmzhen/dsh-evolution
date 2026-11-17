@@ -652,6 +652,56 @@
       "pt": "Bem-sucedidas: offload {offload} · condense {condense} · extract {extract}",
       "ru": "Успешно: offload {offload} · condense {condense} · extract {extract}"
     },
+    "governance.separator": {
+      "zh": " · ",
+      "en": " · ",
+      "ja": " · ",
+      "es": " · ",
+      "fr": " · ",
+      "de": " · ",
+      "pt": " · ",
+      "ru": " · "
+    },
+    "run.chip": {
+      "zh": "run {id}",
+      "en": "run {id}",
+      "ja": "run {id}",
+      "es": "run {id}",
+      "fr": "run {id}",
+      "de": "run {id}",
+      "pt": "run {id}",
+      "ru": "run {id}"
+    },
+    "copy.command.offload": {
+      "zh": "/evolution offload {name}",
+      "en": "/evolution offload {name}",
+      "ja": "/evolution offload {name}",
+      "es": "/evolution offload {name}",
+      "fr": "/evolution offload {name}",
+      "de": "/evolution offload {name}",
+      "pt": "/evolution offload {name}",
+      "ru": "/evolution offload {name}"
+    },
+    "copy.command.condense": {
+      "zh": "/evolution condense {name}",
+      "en": "/evolution condense {name}",
+      "ja": "/evolution condense {name}",
+      "es": "/evolution condense {name}",
+      "fr": "/evolution condense {name}",
+      "de": "/evolution condense {name}",
+      "pt": "/evolution condense {name}",
+      "ru": "/evolution condense {name}"
+    },
+    "copy.command.extract": {
+      "zh": "/evolution extract {name}",
+      "en": "/evolution extract {name}",
+      "ja": "/evolution extract {name}",
+      "es": "/evolution extract {name}",
+      "fr": "/evolution extract {name}",
+      "de": "/evolution extract {name}",
+      "pt": "/evolution extract {name}",
+      "ru": "/evolution extract {name}"
+    },
     "health.verdict.warn": {
       "zh": "需关注",
       "en": "Needs attention",

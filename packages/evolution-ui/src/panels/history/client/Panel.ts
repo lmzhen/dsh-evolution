@@ -325,7 +325,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
                 target: row.target ?? '—',
                 state: row.state,
               }),
-              ' · ',
+              face.t('governance.separator'),
               localTime(new Date(row.startedAt).toISOString())))),
           counts === null || counts.offload + counts.condense + counts.extract === 0
             ? null
