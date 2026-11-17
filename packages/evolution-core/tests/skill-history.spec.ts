@@ -13,12 +13,27 @@ import { DEFAULT_SKILL_LIMITS } from '../src/limits.ts'
 import { nodeEvolutionIo, type EvolutionIoLike } from '../src/io.ts'
 import { SkillLibrary } from '../src/skill-store.ts'
 import { contentHash } from '../src/mutations.ts'
-import { BASELINE_ACTION, contentRetentionFeedback, entryTarget, HISTORY_INDEX_VERSION, historyIndexFile, loadVersions, nextHistoryIndex, orderVersions, partitionVersions, parseHistoryIndex, readHistoryIndex, latestVersionAt, loadVersionContent, recordVersions, RETENTION_FEEDBACK_MIN_CHARS, type SkillVersion, textDiffFacts, TEXT_DIFF_MAX_LINES, versionActionKind, versionTarget } from '../src/skill-history.ts'
+import { BASELINE_ACTION, clipChangeSummary, contentRetentionFeedback, DEFAULT_SKILL_WRITE_SUMMARY_CHARS, entryTarget, HISTORY_INDEX_VERSION, historyIndexFile, loadVersions, nextHistoryIndex, normalizeChangeSummary, orderVersions, partitionVersions, parseHistoryIndex, readHistoryIndex, latestVersionAt, loadVersionContent, recordVersions, RETENTION_FEEDBACK_MIN_CHARS, type SkillVersion, textDiffFacts, TEXT_DIFF_MAX_LINES, versionActionKind, versionTarget } from '../src/skill-history.ts'
 
 const skill = (name: string, body = 'Body.'): string => `---\nname: ${name}\ndescription: history fixture\n---\n${body}\n`
 
 /** A version entry as the index stores it, with a hash that stands in for real content. */
 const entry = (v: number, hash: string, action = 'update'): SkillVersion => ({ v, at: `2026-09-27T00:00:0${v}Z`, action, hash, chars: 10 })
+
+describe('change summary normalization', () => {
+  it('counts Unicode code points and rejects over-limit or multiline model text', () => {
+    expect(normalizeChangeSummary('  moved two sections  ')).toEqual({ ok: true, text: 'moved two sections' })
+    expect(normalizeChangeSummary('😀'.repeat(DEFAULT_SKILL_WRITE_SUMMARY_CHARS + 1))).toMatchObject({ ok: false, reason: 'length' })
+    expect(normalizeChangeSummary('a\nb')).toMatchObject({ ok: false, reason: 'multiline' })
+    expect(normalizeChangeSummary('')).toMatchObject({ ok: false, reason: 'missing' })
+  })
+
+  it('clips host text to the cap with an ellipsis', () => {
+    const clipped = clipChangeSummary('😀'.repeat(DEFAULT_SKILL_WRITE_SUMMARY_CHARS + 5))
+    expect([...clipped]).toHaveLength(DEFAULT_SKILL_WRITE_SUMMARY_CHARS)
+    expect(clipped.endsWith('…')).toBe(true)
+  })
+})
 
 async function tempRoot(prefix: string): Promise<string> {
   return await mkdtemp(join(tmpdir(), prefix))

@@ -59,7 +59,7 @@ import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
-import { type UnitHead, contentRetentionFeedback, HISTORY_DIR, loadVersionContent, loadVersions, recordVersions, type HistoryFence, type RecordedVersions, type SkillVersion } from './skill-history.ts'
+import { type ChangeSummary, type UnitHead, clipChangeSummary, contentRetentionFeedback, DEFAULT_SKILL_WRITE_SUMMARY_CHARS, HISTORY_DIR, loadVersionContent, loadVersions, normalizeChangeSummary, recordVersions, type HistoryFence, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { getRecord, loadUsage, mutateUsage, suppressedFile, usageFile } from './usage.ts'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, lintBody, type SkillHealthAssessment, type SkillHealthThresholds } from './skill-health.ts'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_VERSION_KEEP, PROTECTED_BUILTIN_SKILLS, SKILL_NAME_RE, SUPPORT_DIRS } from './constants.ts'
@@ -1547,6 +1547,16 @@ export class SkillLibrary {
     }
   }
 
+  /** Host fallback for the user-facing change summary when the writer did not supply one. */
+  private hostChangeSummary(action: string, before: string | null, after: string | null, path: string | undefined, machine: string): ChangeSummary {
+    const target = path ?? 'SKILL.md'
+    let text = machine
+    if (action === 'update' || action === 'edit') text = `updated ${target} (${before?.length ?? 0} → ${after?.length ?? 0})`
+    else if (action === 'create') text = `created ${target} (${after?.length ?? 0})`
+    else if (action === 'patch') text = machine.trim() === '' || machine === 'patched' ? `patched ${target}` : machine
+    return { text: clipChangeSummary(text, DEFAULT_SKILL_WRITE_SUMMARY_CHARS), source: 'host' }
+  }
+
   /** Best-effort audit trail entry; never blocks the mutation.
    *
    * Two independent best-effort writes run here, because either one failing must not cost the
@@ -1571,11 +1581,18 @@ export class SkillLibrary {
     unitHead?: UnitHead,
     origin?: string,
     fenceHeld = false,
+    change?: ChangeSummary,
   ): Promise<void> {
     // A committed hook or outer tree operation already holds the home fence.
     // Keep per-file transactions, but do not queue behind our own lease.
     const fence = fenceHeld ? undefined : this.fence
     const at = new Date().toISOString()
+    const finalSummary = change === undefined
+      ? this.hostChangeSummary(action, before, after, path, summary)
+      : (() => {
+        const normalized = normalizeChangeSummary(change.text, DEFAULT_SKILL_WRITE_SUMMARY_CHARS)
+        return normalized.ok ? { text: normalized.text, source: change.source } : this.hostChangeSummary(action, before, after, path, summary)
+      })()
     let versions: RecordedVersions | null = null
     try {
       const keep = this.limits.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP
@@ -1589,6 +1606,8 @@ export class SkillLibrary {
         ...path === undefined ? {} : { path },
         ...unitId === undefined ? {} : { unitId },
         ...unitHead === undefined ? {} : { unitHead },
+        summary: finalSummary.text,
+        summarySource: finalSummary.source,
       }
       versions = await recordVersions(this.root, this.io, input, keep, fence)
     } catch (error) {
@@ -2306,11 +2325,11 @@ export class SkillLibrary {
     } catch { /* lifecycle telemetry is best-effort; the archive already landed */ }
   }
 
-  async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
-    return await this.archiveCore(rawName, options, origin, false)
+  async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary): Promise<SkillActionResult> {
+    return await this.archiveCore(rawName, options, origin, false, change)
   }
 
-  private async archiveCore(rawName: string, options: ArchiveOptions, origin: WriteOrigin, fenceHeld: boolean): Promise<SkillActionResult> {
+  private async archiveCore(rawName: string, options: ArchiveOptions, origin: WriteOrigin, fenceHeld: boolean, change?: ChangeSummary): Promise<SkillActionResult> {
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
 
@@ -2417,7 +2436,7 @@ export class SkillLibrary {
     } catch {
       // Same posture as .archive-reason: metadata only, never abort the archive.
     }
-    await this.audit(name, 'archive', md, null, reason, undefined, options.unitId, options.unitHead, origin, fenceHeld)
+    await this.audit(name, 'archive', md, null, reason, undefined, options.unitId, options.unitHead, origin, fenceHeld, change)
     this.notifyMutation({ action: 'archive', name, archivedPath: dest })
     return { ok: true, message: `技能「${name}」已归档到 .archive。`, path: dest }
   }
@@ -3066,15 +3085,16 @@ export class SkillLibrary {
     rawName: string,
     moves: SkillRestructureMove[],
     origin: WriteOrigin = this.authority.origin,
+    change?: ChangeSummary,
   ): Promise<SkillActionResult> {
     const name = rawName.trim()
     await this.ensureRecovered()
     // F-208: the whole read→plan→write runs under the in-process serialize
     // queue so two concurrent restructures on one skill never interleave.
-    return await this.restructureCore(name, moves, origin)
+    return await this.restructureCore(name, moves, origin, change)
   }
 
-  private async restructureCore(name: string, moves: SkillRestructureMove[], origin: WriteOrigin): Promise<SkillActionResult> {
+  private async restructureCore(name: string, moves: SkillRestructureMove[], origin: WriteOrigin, change?: ChangeSummary): Promise<SkillActionResult> {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
     if (moves.length === 0) return { ok: false, message: '重构至少需要一次章节搬移。' }
@@ -3183,7 +3203,7 @@ export class SkillLibrary {
         let headPlaced = false
         for (const op of event.ops) {
           const rel = relative(dir, op.target).split(String.fromCharCode(92)).join('/')
-          await this.audit(name, 'restructure', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : this.unitHeadForOps(event.ops, [name]), origin, true)
+          await this.audit(name, 'restructure', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : this.unitHeadForOps(event.ops, [name]), origin, true, change)
           headPlaced = true
         }
         this.notifyMutation({ action: 'restructure', name, skillDir: dir })
@@ -3225,7 +3245,7 @@ export class SkillLibrary {
    * @param origin - write face recorded in the audit ledger.
    * @returns the kernel result; a refusal writes nothing.
    */
-  async extract(plan: ExtractPlanDraft, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+  async extract(plan: ExtractPlanDraft, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary): Promise<SkillActionResult> {
     await this.ensureRecovered()
     if (plan.outcome === 'owner-gap' || plan.owner.mode !== 'covered') return { ok: false, message: '提取被拒绝：owner-gap 不是写操作。' }
     if (plan.support.unresolved.length > 0 || plan.support.dangling.length > 0) return { ok: false, message: '提取被拒绝：support closure 存在 unresolved/dangling。' }
@@ -3295,7 +3315,7 @@ export class SkillLibrary {
         for (const op of event.ops) {
           if (op.skill === undefined) continue
           const rel = relative(this.dirOf(op.skill), op.target).split(String.fromCharCode(92)).join('/')
-          await this.audit(op.skill, 'extract', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : head, origin, true)
+          await this.audit(op.skill, 'extract', op.before, op.after, summary, rel === 'SKILL.md' ? undefined : rel, event.unitId, headPlaced ? undefined : head, origin, true, change)
           headPlaced = true
         }
         for (const name of roots) this.notifyMutation({ action: 'extract', name, skillDir: this.dirOf(name) })

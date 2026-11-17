@@ -42,6 +42,43 @@ export const HISTORY_INDEX_VERSION = 1
  * feature existed, or a hand-edited tree): it says "this is what was there", not what wrote it. */
 export const BASELINE_ACTION = 'baseline'
 
+/** Where a one-line change summary came from. */
+export type SummarySource = 'model' | 'host' | 'fallback'
+
+/** One user-facing change summary, separate from the machine label in the mutation ledger. */
+export interface ChangeSummary {
+  text: string
+  source: SummarySource
+}
+
+/** Default hard cap for a change summary, counted in Unicode code points. */
+export const DEFAULT_SKILL_WRITE_SUMMARY_CHARS = 50
+
+/** Count a summary the same way the write gate does (code points, not UTF-16 units). */
+export function summaryChars(text: string): number {
+  return [...text].length
+}
+
+/** Normalize a model-supplied summary: single line, trimmed, non-empty, within the hard cap. */
+export function normalizeChangeSummary(
+  value: unknown,
+  cap = DEFAULT_SKILL_WRITE_SUMMARY_CHARS,
+): { ok: true; text: string } | { ok: false; reason: 'missing' | 'multiline' | 'length'; length: number } {
+  if (typeof value !== 'string') return { ok: false, reason: 'missing', length: 0 }
+  const text = value.replace(/\s+/g, ' ').trim()
+  if (text === '') return { ok: false, reason: 'missing', length: 0 }
+  if (value.includes('\n') || value.includes('\r')) return { ok: false, reason: 'multiline', length: summaryChars(text) }
+  const length = summaryChars(text)
+  return length <= cap ? { ok: true, text } : { ok: false, reason: 'length', length }
+}
+
+/** Clip a host-generated summary to the same hard cap; host facts are not rejected. */
+export function clipChangeSummary(text: string, cap = DEFAULT_SKILL_WRITE_SUMMARY_CHARS): string {
+  const line = text.replace(/\s+/g, ' ').trim()
+  const chars = [...line]
+  return chars.length <= cap ? line : chars.slice(0, Math.max(1, cap - 1)).join('') + '…'
+}
+
 /** G3b: one unit's head. Exactly one of the two forms is present (they never coexist). */
 export interface UnitHead {
   /** The merge run this unit belongs to, when the writer recorded one. */
@@ -81,10 +118,12 @@ export interface SkillVersion {
   beforeHash?: string
   /** True on the synthetic entry that records a REMOVAL; its hash is the removed bytes. */
   removed?: boolean
-  /** One line saying what this write changed, when the deployment turned the summarizer on
-   * (registry `skillVersionSummary`). Absent is a first-class state: the faces say so instead of
-   * inventing a sentence, and a version recorded before the feature existed simply has none. */
+  /** One line saying what this write changed, when the writer supplied one. Absent is a first-class
+   * state: the faces say so instead of inventing a sentence, and a version recorded before the
+   * feature existed simply has none. */
   summary?: string
+  /** Where {@link summary} came from; absent on legacy entries. */
+  summarySource?: SummarySource
   /**
    * Which support file these bytes came from, RELATIVE to the skill directory (`references/foo.md`),
    * when this entry records a support-file write or remove. Absent is a first-class state: content
@@ -105,6 +144,8 @@ export interface VersionRecordInput {
   at: string
   /** The one-line summary of THIS write, or undefined when the deployment does not summarize. */
   summary?: string
+  /** Where {@link summary} came from. */
+  summarySource?: SummarySource
   /** The support file this write touched, relative to the skill directory; undefined for content. */
   path?: string
   /** G3a: the unit this write belongs to — one tree change writes N paths under ONE id. */
@@ -318,6 +359,9 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
   // only by the chain link, so a field added here cannot be forgotten by one of them (a field this
   // reader drops is dropped for good on the next write).
   const summary = typeof candidate.summary === 'string' && candidate.summary !== '' ? candidate.summary : undefined
+  const summarySource = candidate.summarySource === 'model' || candidate.summarySource === 'host' || candidate.summarySource === 'fallback'
+    ? candidate.summarySource
+    : undefined
   const path = typeof candidate.path === 'string' && candidate.path !== '' ? candidate.path : undefined
   const unitId = typeof candidate.unitId === 'string' && candidate.unitId !== '' ? candidate.unitId : undefined
   const removed = candidate.removed === true ? true : undefined
@@ -330,6 +374,7 @@ function readVersionEntry(entry: unknown): SkillVersion | null {
     hash: candidate.hash,
     chars: candidate.chars,
     ...summary === undefined ? {} : { summary },
+    ...summarySource === undefined ? {} : { summarySource },
     ...path === undefined ? {} : { path },
     ...unitId === undefined ? {} : { unitId },
     ...removed === undefined ? {} : { removed },
@@ -444,6 +489,7 @@ export function nextHistoryIndex(
         // The summary describes THIS write, so it rides the after-entry only: the baseline minted
         // above is the state BEFORE it and has nothing to summarize.
         ...input.summary === undefined ? {} : { summary: input.summary },
+        ...input.summarySource === undefined ? {} : { summarySource: input.summarySource },
         // The authoritative predecessor link: what THIS write replaced, read under the write lock.
         ...beforeHash === null ? {} : { beforeHash },
       })
@@ -469,6 +515,7 @@ export function nextHistoryIndex(
         // otherwise a pure-deletion representative would leave the unit headless.
         ...input.unitHead === undefined ? {} : { unitHead: input.unitHead },
         ...input.summary === undefined ? {} : { summary: input.summary },
+        ...input.summarySource === undefined ? {} : { summarySource: input.summarySource },
       })
     }
   }

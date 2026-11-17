@@ -27,7 +27,7 @@ import { defineTool, registerEvolutionTool, skillsPort, type SystemPromptPort } 
 import type { Agent } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, computeDedupGroups, nearDuplicateSummaries, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
-import { DEFAULT_HEALTH_THRESHOLDS, newSkillLibrary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
+import { DEFAULT_HEALTH_THRESHOLDS, DEFAULT_SKILL_WRITE_SUMMARY_CHARS, newSkillLibrary, normalizeChangeSummary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type ChangeSummary, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fuzzyPatch } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
@@ -374,6 +374,8 @@ interface SkillWriteArgs {
   file_path?: string
   file_content?: string
   absorbed_into?: string
+  /** One-line user-facing change summary; host generates one when omitted. */
+  summary?: string
   /** restructure: body sections (by exact `## heading`) moved to references/ (008 batch B). */
   restructure?: Array<{ heading?: string; to_file?: string }>
   /** extract: parts moved to an existing class-level owner. */
@@ -846,6 +848,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const action = args.action
     const name = args.name ?? ''
     const actionMeta = skillActionOf(action)
+    let change: ChangeSummary | undefined
+    if (args.summary !== undefined) {
+      const normalized = normalizeChangeSummary(args.summary, DEFAULT_SKILL_WRITE_SUMMARY_CHARS)
+      if (!normalized.ok) {
+        const reason = normalized.reason === 'length'
+          ? `摘要为 ${normalized.length} 个字符，超过上限 ${DEFAULT_SKILL_WRITE_SUMMARY_CHARS}。`
+          : normalized.reason === 'multiline' ? '摘要必须是单行。' : '摘要不能为空。'
+        return { ok: false, message: reason, skills: [] }
+      }
+      change = { text: normalized.text, source: 'model' }
+    }
     if (actionMeta?.needsName === true && name === '') {
       return { ok: false, message: `动作「${action}」需要 name。`, skills: [] }
     }
@@ -922,7 +935,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       edit: () => library.update(name, args.content ?? '', origin, stagedAnchor),
       update: () => library.update(name, args.content ?? '', origin, stagedAnchor),
       patch: () => library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin),
-      delete: () => library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {}),
+      delete: () => library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {}, undefined, change),
       write_file: () => library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor),
       remove_file: () => library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor),
       pin: () => library.setPinned(name, true, origin),
@@ -938,7 +951,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return library.restructure(name, moves.map(move => ({
           heading: typeof move.heading === 'string' ? move.heading : '',
           toFile: typeof move.to_file === 'string' ? move.to_file : '',
-        })), origin)
+        })), origin, change)
       },
       extract: async () => {
         let result: SkillActionResult | undefined
@@ -982,7 +995,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const candidateLines = built.candidates.slice(0, 8).map(candidate => '- ' + candidate.name + '：' + candidate.description + (candidate.whenToUse === undefined ? '' : '；whenToUse: ' + candidate.whenToUse) + (candidate.headings.length === 0 ? '' : '；headings: ' + candidate.headings.join(' / ')))
         result = args.dry_run === true
           ? { ok: true, message: '提取计划（未写入）：' + plan.parts.map(part => '## ' + part.heading).join(', ') + ' -> ' + plan.target.name + '\n' + decisionLine + (candidateLines.length === 0 ? '' : '\n候选 owner：\n' + candidateLines.join('\n')) }
-          : await library.extract(plan, origin)
+          : await library.extract(plan, origin, change)
         if (result.ok && built.warnings !== undefined && built.warnings.length > 0) {
           result = { ...result, message: result.message + '\n' + built.warnings.join('\n') }
         }
@@ -1222,6 +1235,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       file_path: { type: 'string' },
       file_content: { type: 'string' },
       absorbed_into: { type: 'string' },
+      summary: { type: 'string', description: 'One-line change summary for the skill history. Max 50 Unicode characters by default; over-limit is rejected with the current limit.' },
       restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, to_file: { type: 'string' } } } },
       extract: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_skill: { type: 'string' }, to_heading: { type: 'string' } } } },
       outcome: { type: 'string', enum: ['extract', 'mixed'] },

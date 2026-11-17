@@ -53,6 +53,21 @@ it('moves a body section to references/ and replaces it with a pointer line (B)'
 
 const withCitation = (target: string): string => BODY.replace('Use it with care.', 'See ' + target + ' for the details.')
 
+it('carries one model summary to every after entry of the restructure unit', async () => {
+  const { root, lib } = await makeLib()
+  const result = await lib.restructure('demo-skill', [
+    { heading: 'Details log', toFile: 'references/release-log.md' },
+    { heading: 'Usage', toFile: 'references/usage.md' },
+  ], 'background_review', { text: 'moved two sections', source: 'model' })
+  expect(result.ok).toBe(true)
+  const after = (await lib.listVersions('demo-skill')).filter(version => version.action === 'restructure' && version.summary !== undefined)
+  expect(after).toHaveLength(3)
+  expect(new Set(after.map(version => version.unitId)).size).toBe(1)
+  expect(after.every(version => version.summary === 'moved two sections')).toBe(true)
+  expect(after.every(version => version.summarySource === 'model')).toBe(true)
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 it('A3 (design §2.2): a section citing an EXISTING support file moves under the default policy', async () => {
   const { root, lib } = await makeLib()
   await lib.writeSupportFile('demo-skill', 'references/guide.md', '# guide', 'foreground')
