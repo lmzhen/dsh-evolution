@@ -18,6 +18,7 @@ export type SkillActionId =
   | 'remove_file'
   | 'restructure'
   | 'extract'
+  | 'feedback'
   | 'pin'
   | 'unpin'
 
@@ -43,6 +44,7 @@ export const SKILL_ACTIONS: Readonly<Record<SkillActionId, SkillActionMeta>> = O
   restructure: { mutates: true, needsName: true, gate: 'write' },
   // extract may be addressed by proposal_id instead of a skill name.
   extract: { mutates: true, needsName: false, gate: 'write' },
+  feedback: { mutates: false, needsName: true, gate: 'none' },
   pin: { mutates: false, needsName: true, gate: 'none' },
   unpin: { mutates: false, needsName: true, gate: 'none' },
 })

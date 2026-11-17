@@ -376,6 +376,8 @@ interface SkillWriteArgs {
   absorbed_into?: string
   /** One-line user-facing change summary; host generates one when omitted. */
   summary?: string
+  /** feedback: why the loaded skill did not help. */
+  problem?: 'wrong' | 'outdated' | 'incomplete' | 'unsafe'
   /** restructure: body sections (by exact `## heading`) moved to references/ (008 batch B). */
   restructure?: Array<{ heading?: string; to_file?: string }>
   /** extract: parts moved to an existing class-level owner. */
@@ -883,6 +885,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return { ok: false, message: `skill_manage list：技能目录树扫描失败（${error instanceof Error ? error.message : String(error)}）。`, skills: [] }
       }
     }
+    if (action === 'feedback') {
+      const service = ctx.get('evolutionFeedback') as { record?: (target: string, rating: 'negative', note?: string, kind?: 'skill') => void } | undefined
+      if (service?.record === undefined) return { ok: false, message: '反馈服务未挂载，未记录。', skills: [] }
+      service.record(name, 'negative', args.problem ?? 'unspecified', 'skill')
+      return { ok: true, message: `已记录对「${name}」的问题反馈。`, skills: [] }
+    }
     // The write-admission sequence, EXECUTION point (design §3): the gates whose verdict can
     // change between admission and execution run here, at the bytes. The replay channel enters
     // HERE with STORED arguments and no schema in front of it, so the scalar shape and the
@@ -1226,7 +1234,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       + 'extract moves a reusable part (exact heading, optional start/end sub-block) into an existing class-level owner: extract: [{heading, start?, end?, to_skill}]. One target per call; an empty extract list returns the child-agent proposal (outcome/target/neededOwner/parts) without writing; supply extract items to apply, and use owner_covers only as an explicit override; owner-gap is reported, never auto-created.'
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
-      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'extract', 'pin', 'unpin'] },
+      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'extract', 'feedback', 'pin', 'unpin'] },
       name: { type: 'string' },
       content: { type: 'string' },
       old_string: { type: 'string' },
@@ -1236,6 +1244,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       file_content: { type: 'string' },
       absorbed_into: { type: 'string' },
       summary: { type: 'string', description: 'One-line change summary for the skill history. Max 50 Unicode characters by default; over-limit is rejected with the current limit.' },
+      problem: { type: 'string', enum: ['wrong', 'outdated', 'incomplete', 'unsafe'], description: 'feedback only: why the loaded skill did not help.' },
       restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, to_file: { type: 'string' } } } },
       extract: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_skill: { type: 'string' }, to_heading: { type: 'string' } } } },
       outcome: { type: 'string', enum: ['extract', 'mixed'] },

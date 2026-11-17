@@ -5,11 +5,12 @@ import { SKILL_ACTIONS, isReadOnlySkillAction, skillActionOf } from '../src/skil
 describe('SKILL_ACTIONS', () => {
   it('registers every tool action exactly once', () => {
     expect(Object.keys(SKILL_ACTIONS).sort()).toEqual([
-      'create', 'delete', 'edit', 'extract', 'list', 'patch', 'pin',
+      'create', 'delete', 'edit', 'extract', 'feedback', 'list', 'patch', 'pin',
       'remove_file', 'restructure', 'review', 'unpin', 'update', 'write_file',
     ])
     expect(skillActionOf('list')?.mutates).toBe(false)
     expect(skillActionOf('review')?.mutates).toBe(false)
+    expect(skillActionOf('feedback')?.mutates).toBe(false)
     expect(skillActionOf('pin')?.mutates).toBe(false)
     expect(skillActionOf('create')?.mutates).toBe(true)
     expect(skillActionOf('extract')?.needsName).toBe(false)

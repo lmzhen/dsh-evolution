@@ -1200,3 +1200,24 @@ it('C: create reports a near-duplicate hint, writes anyway, and cannot see bodie
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('records negative feedback through the existing service without touching skill history', async () => {
+  const { ctx, root, previousHome } = await setup()
+  const calls: unknown[][] = []
+  ctx.provide('evolutionFeedback', { record: (...args: unknown[]) => { calls.push(args) } })
+  try {
+    const result = await executeOne(ctx, {
+      callId: ToolCallId(`feedback-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: { action: 'feedback', name: 'boundary-skill', problem: 'wrong' },
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    expect(result.isError).toBe(false)
+    expect(calls).toEqual([['boundary-skill', 'negative', 'wrong', 'skill']])
+  } finally {
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
