@@ -11,7 +11,7 @@
  * `document.ts`; the two faces share the scale in `tokens.ts` and nothing else (§15.2 L2b).
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
-import { createElement, useState, type ReactNode } from 'react'
+import { createElement, useEffect, useState, type ReactNode } from 'react'
 import { formatLocalDateTime } from '@lmzhen/dsh-evolution-client-kit'
 import { button, chip, note } from './atoms.ts'
 import type { RowCell, SkillRow, VersionRow } from './api.ts'
@@ -195,6 +195,9 @@ export function notice(text: string | undefined, error: boolean): ReactNode {
 /** A copy control that reports the clipboard verdict instead of swallowing it. */
 function CopyCommandButton(props: { copy: Copy; command: string; label: string }): ReactNode {
   const [state, setState] = useState<'idle' | 'ok' | 'fail'>('idle')
+  // The details menu keeps the same element slots while the selected skill changes;
+  // a stale "Copied" must not claim the NEW skill's command is on the clipboard.
+  useEffect(() => { setState('idle') }, [props.command])
   const run = async (): Promise<void> => {
     try {
       if (typeof navigator === 'undefined' || navigator.clipboard === undefined) throw new Error('clipboard unavailable')
@@ -211,6 +214,8 @@ function CopyCommandButton(props: { copy: Copy; command: string; label: string }
     'data-kind': 'action',
     'data-tone': 'quiet',
     'data-copy-state': state,
+    title: props.command,
+    'aria-live': 'polite',
     onClick: () => { void run() },
   }, text)
 }

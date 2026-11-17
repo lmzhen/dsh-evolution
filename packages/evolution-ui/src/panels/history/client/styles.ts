@@ -70,8 +70,8 @@ export const CSS = [
   '.evo-hist-tone-secondary{color:var(--dsw-alias-label-secondary)}',
   '.evo-hist-tone-tertiary{color:var(--dsw-alias-label-tertiary)}',
   '.evo-hist-main{flex:1 1 32ch;min-width:min(100%,32ch);min-height:0;overflow-y:auto;padding:var(--evo-space-12) var(--evo-space-12)}',
-  '.evo-hist-head{display:flex;align-items:center;gap:var(--evo-space-10);margin:0 0 var(--evo-space-4)}',
-  '.evo-hist-title{flex:1 1 auto;margin:0;font-size:var(--evo-type-lg);font-weight:600}',
+  '.evo-hist-head{display:flex;align-items:center;flex-wrap:wrap;gap:var(--evo-space-10);margin:0 0 var(--evo-space-4)}',
+  '.evo-hist-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font-size:var(--evo-type-lg);font-weight:600}',
   '.evo-hist-hint{margin:0 0 var(--evo-space-10);color:var(--dsw-alias-label-secondary);line-height:var(--evo-leading-base)}',
   // A notice owns a surface and a glyph, so a refusal is not carried by colour alone (W13).
   '.evo-hist-note{display:flex;align-items:flex-start;gap:var(--evo-space-6);margin:0 0 var(--evo-space-10);color:var(--dsw-alias-label-secondary);line-height:var(--evo-leading-base)}',
@@ -115,6 +115,8 @@ export const CSS = [
   '.evo-hist-button:hover{background:var(--dsw-alias-interactive-bg-hover)}',
   '.evo-hist-button:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '.evo-hist-button[data-tone="primary"]{border-color:var(--evo-tone-primary);color:var(--evo-tone-primary)}',
+  '.evo-hist-copy[data-copy-state="ok"]{border-color:var(--evo-tone-success);color:var(--evo-tone-success)}',
+  '.evo-hist-copy[data-copy-state="fail"]{border-color:var(--evo-tone-danger);color:var(--evo-tone-danger)}',
   // ─── the reading face: one version as a document, and the rendered diff ───
   // A document is the page, not a card on it: no surface of its own, no inner scroll, and one measure
   // whatever the window is doing (W18/W20/W21). The pane's scrollbar is the only one a reader meets.
