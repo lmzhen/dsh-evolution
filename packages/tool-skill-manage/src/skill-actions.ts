@@ -29,24 +29,26 @@ export interface SkillActionMeta {
   readonly needsName: boolean
   /** none = read-only; write = SkillLibrary write path; approval = staged gate. */
   readonly gate: 'none' | 'write' | 'approval'
+  /** Whether the user-facing change summary is model-required, host-derived, or absent. */
+  readonly summary: 'required' | 'host' | 'none'
 }
 
 export const SKILL_ACTIONS: Readonly<Record<SkillActionId, SkillActionMeta>> = Object.freeze({
-  list: { mutates: false, needsName: false, gate: 'none' },
-  review: { mutates: false, needsName: false, gate: 'none' },
-  create: { mutates: true, needsName: true, gate: 'write' },
-  edit: { mutates: true, needsName: true, gate: 'write' },
-  update: { mutates: true, needsName: true, gate: 'write' },
-  patch: { mutates: true, needsName: true, gate: 'write' },
-  delete: { mutates: true, needsName: true, gate: 'approval' },
-  write_file: { mutates: true, needsName: true, gate: 'write' },
-  remove_file: { mutates: true, needsName: true, gate: 'write' },
-  restructure: { mutates: true, needsName: true, gate: 'write' },
+  list: { mutates: false, needsName: false, gate: 'none', summary: 'none' },
+  review: { mutates: false, needsName: false, gate: 'none', summary: 'none' },
+  create: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
+  edit: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
+  update: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
+  patch: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
+  delete: { mutates: true, needsName: true, gate: 'approval', summary: 'required' },
+  write_file: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
+  remove_file: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
+  restructure: { mutates: true, needsName: true, gate: 'write', summary: 'required' },
   // extract may be addressed by proposal_id instead of a skill name.
-  extract: { mutates: true, needsName: false, gate: 'write' },
-  feedback: { mutates: false, needsName: true, gate: 'none' },
-  pin: { mutates: false, needsName: true, gate: 'none' },
-  unpin: { mutates: false, needsName: true, gate: 'none' },
+  extract: { mutates: true, needsName: false, gate: 'write', summary: 'required' },
+  feedback: { mutates: false, needsName: true, gate: 'none', summary: 'none' },
+  pin: { mutates: false, needsName: true, gate: 'none', summary: 'none' },
+  unpin: { mutates: false, needsName: true, gate: 'none', summary: 'none' },
 })
 
 export function skillActionOf(action: unknown): SkillActionMeta | undefined {
