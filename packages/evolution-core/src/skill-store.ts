@@ -296,6 +296,17 @@ export interface SkillRestructureMove {
 /** Upper bound of moves per restructure proposal (validator and core agree). */
 export const MAX_RESTRUCTURE_MOVES = 5
 
+/** One incremental section edit: replace a whole H2 content area or an exact sub-block. */
+export interface SkillSectionEdit {
+  /** Exact `##` heading title (without the leading `## `). */
+  heading: string
+  /** Optional inclusive content anchors; both must be provided together. */
+  start?: string
+  end?: string
+  /** Replacement content (without the `##` heading line for a whole-section edit). */
+  content: string
+}
+
 /** Restructure targets are plain markdown files under references/ — no
  * subdirectories, no other support kind. V8-10 (0.3.47): the regex-level
  * `(?!.*\.\.)` keeps the restructure-created set EXACTLY the set
@@ -2074,6 +2085,62 @@ export class SkillLibrary {
     // F-208: the whole read→patch→write runs under the in-process serialize
     // queue so two concurrent patches on one skill never interleave.
     return await this.serial(() => this.patchCore(name, oldString, newString, filePath, replaceAll, origin))
+  }
+
+  /**
+   * Replace ONE section's content (or one exact sub-block) in place. Keeps the
+   * H2 heading line for whole-section edits, so a model can compress one
+   * section at a time without re-sending the body. No content-conservation
+   * gate: the version history is the rollback, and existing structural
+   * validation still applies through {@link update}.
+   * @param rawName - skill name.
+   * @param edit - section selector plus replacement text.
+   * @param origin - write face.
+   * @returns the normalized result, with before/after body sizes.
+   */
+  async patchSection(rawName: string, edit: SkillSectionEdit, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+    await this.ensureRecovered()
+    return await this.patchSectionCore(rawName.trim(), edit, origin)
+  }
+
+  private async patchSectionCore(name: string, edit: SkillSectionEdit, origin: WriteOrigin): Promise<SkillActionResult> {
+    const badName = this.badName(name)
+    if (badName) return { ok: false, message: badName }
+    if (typeof edit.heading !== 'string' || edit.heading.trim() === '') return { ok: false, message: '章节改写需要非空 heading。' }
+    const dir = this.dirOf(name)
+    const path = join(dir, 'SKILL.md')
+    let md: string | null
+    try {
+      md = await this.io.readText(path)
+    } catch (error) {
+      return unreadableTarget(name, error)
+    }
+    if (md === null) return { ok: false, message: `技能「${name}」不存在。` }
+    const block = frontmatterBlock(md)
+    if (!block) return { ok: false, message: 'SKILL.md 没有有效的 frontmatter；拒绝章节改写。' }
+    const header = block.lines.slice(0, block.end + 1).join('\n')
+    const body = md.slice(header.length).replace(/\r\n/g, '\n')
+    const selection = selectSections(body, [{
+      heading: edit.heading,
+      ...edit.start === undefined ? {} : { start: edit.start },
+      ...edit.end === undefined ? {} : { end: edit.end },
+    }])
+    if (!selection.ok) return { ok: false, message: `章节改写被拒绝：${selection.message}` }
+    const section = selection.sections[0]
+    if (section === undefined) return { ok: false, message: '章节改写被拒绝：没有匹配的章节。' }
+    const lines = body.split('\n')
+    // Whole-section: keep the heading itself and replace only the content
+    // after it. Sub-block: replace the selected inclusive lines.
+    const start = section.anchorStart === undefined ? section.start + 1 : section.start
+    const end = section.end
+    const replacement = edit.content === '' ? [] : edit.content.replace(/\r\n/g, '\n').split('\n')
+    const nextBody = [...lines.slice(0, start), ...replacement, ...lines.slice(end)].join('\n')
+    const next = `${header}${nextBody}`
+    const finalMd = block.nl === '\r\n' ? next.replace(/\n/g, '\r\n') : next
+    if (finalMd.trimEnd() === md.trimEnd()) return { ok: true, message: `技能「${name}」未变更：章节内容一致，未写入。`, noop: true, path: dir }
+    const result = await this.update(name, finalMd, origin, { sha256: contentHash(md) })
+    if (!result.ok) return result
+    return { ok: true, message: `已更新「${name}」的「${edit.heading}」章节（正文 ${md.length} → ${finalMd.length} 字符）。`, path: dir }
   }
 
   private async patchCore(

@@ -78,6 +78,18 @@ it('carries the review runId on the unit head', async () => {
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('replaces one section content in place and keeps the heading and neighbours', async () => {
+  const { root, lib } = await makeLib()
+  const result = await lib.patchSection('demo-skill', { heading: 'Details log', content: '- compressed' })
+  expect(result.ok, result.message).toBe(true)
+  const md = await lib.read('demo-skill')
+  expect(md ?? '').toContain('## Details log')
+  expect(md ?? '').toContain('- compressed')
+  expect(md ?? '').not.toContain('rc.67')
+  expect(md ?? '').toContain('## Usage')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 it('A3 (design §2.2): a section citing an EXISTING support file moves under the default policy', async () => {
   const { root, lib } = await makeLib()
   await lib.writeSupportFile('demo-skill', 'references/guide.md', '# guide', 'foreground')

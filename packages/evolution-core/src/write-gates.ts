@@ -275,7 +275,16 @@ const MISSING_ARGS: WriteGate = {
     const required = action === undefined || !Object.hasOwn(SKILL_ACTION_REQUIRED_FIELDS, action)
       ? []
       : SKILL_ACTION_REQUIRED_FIELDS[action] ?? []
-    const missing = required.filter(field => view.scalars[field] === undefined || view.scalars[field] === null)
+    // A section patch replaces the old/new pair with one in-place edit.
+    const section = view.scalars['section']
+    const sectionPatch = action === 'patch'
+      && typeof section === 'object' && section !== null
+      && typeof (section as { heading?: unknown }).heading === 'string'
+      && typeof (section as { content?: unknown }).content === 'string'
+    const missing = required.filter(field => {
+      if (sectionPatch && (field === 'old_string' || field === 'new_string')) return false
+      return view.scalars[field] === undefined || view.scalars[field] === null
+    })
     if (missing.length === 0) return null
     return `skill_manage ${action} requires ${missing.join(', ')}; the tool description lists the arguments per action.`
   },

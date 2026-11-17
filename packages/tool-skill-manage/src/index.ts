@@ -384,6 +384,8 @@ interface SkillWriteArgs {
   problem?: 'wrong' | 'outdated' | 'incomplete' | 'unsafe'
   /** restructure: body sections (by exact `## heading`) moved to references/ (008 batch B). */
   restructure?: Array<{ heading?: string; to_file?: string }>
+  /** patch: replace one H2 section's content (or an exact sub-block) in place. */
+  section?: { heading?: string; start?: string; end?: string; content?: string }
   /** extract: parts moved to an existing class-level owner. */
   extract?: Array<{ heading?: string; start?: string; end?: string; to_skill?: string; to_heading?: string }>
   /** Semantic outcome supplied by the caller; omitted falls back to explicit-section shape. */
@@ -953,7 +955,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       },
       edit: () => library.update(name, args.content ?? '', origin, stagedAnchor),
       update: () => library.update(name, args.content ?? '', origin, stagedAnchor),
-      patch: () => library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin),
+      patch: async () => {
+        const section = args.section
+        if (section === undefined) return await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
+        if (typeof section.heading !== 'string' || typeof section.content !== 'string') {
+          return { ok: false, message: 'patch.section 需要 heading 与 content。' }
+        }
+        return await library.patchSection(name, {
+          heading: section.heading,
+          content: section.content,
+          ...typeof section.start === 'string' ? { start: section.start } : {},
+          ...typeof section.end === 'string' ? { end: section.end } : {},
+        }, origin)
+      },
       delete: () => library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {}, undefined, change),
       write_file: () => library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor),
       remove_file: () => library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor),
@@ -1254,7 +1268,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // (absent = SKILL.md), and `replace_all` decides first-occurrence-only
       // versus every occurrence. Both are real behavior; a description that
       // omits them left the model guessing.
-      + 'Per-action arguments: patch needs name + old_string + new_string and patches SKILL.md unless file_path names a support file (e.g. "references/topic.md"); patch replaces the FIRST occurrence only unless replace_all=true, and the result message reports how many anchors the file carried. write_file needs name + file_path + file_content; remove_file needs name + file_path; create/edit/update need name + content; delete needs name. A rejected patch names the reason and the remedy (missing anchor, stale snapshot, frontmatter that cannot be auto-quoted, byte/char limit). '
+      + 'Per-action arguments: patch needs name + old_string + new_string and patches SKILL.md unless file_path names a support file (e.g. "references/topic.md"); patch replaces the FIRST occurrence only unless replace_all=true, and the result message reports how many anchors the file carried. patch also accepts section: {heading, start?, end?, content} to replace one H2 section content (or an exact sub-block) in place without resending the old text; the heading line is kept for a whole-section edit. write_file needs name + file_path + file_content; remove_file needs name + file_path; create/edit/update need name + content; delete needs name. A rejected patch names the reason and the remedy (missing anchor, stale snapshot, frontmatter that cannot be auto-quoted, byte/char limit). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
       + 'restructure moves entire body sections (by their exact "## heading" line, via restructure: [{heading, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change. '
@@ -1272,6 +1286,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       absorbed_into: { type: 'string' },
       summary: { type: 'string', description: 'One-line change summary for the skill history. Required for restructure/extract/delete in model-origin writes; max 50 Unicode characters by default, over-limit is rejected with the current limit.' },
       problem: { type: 'string', enum: ['wrong', 'outdated', 'incomplete', 'unsafe'], description: 'feedback only: why the loaded skill did not help.' },
+      section: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, content: { type: 'string' } } },
       restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, to_file: { type: 'string' } } } },
       extract: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_skill: { type: 'string' }, to_heading: { type: 'string' } } } },
       outcome: { type: 'string', enum: ['extract', 'mixed'] },
