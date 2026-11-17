@@ -289,6 +289,9 @@ export interface SkillActionResult {
 export interface SkillRestructureMove {
   /** The `##` heading title, matched as an exact line (leading `##` + spaces); no fuzzy matching. */
   heading: string
+  /** Optional inclusive content anchors inside the heading; both must be provided together. */
+  start?: string
+  end?: string
   /** Destination support file: `references/<topic>.md` (references/ only — moved content is log/detail, never a template or script). */
   toFile: string
 }
@@ -711,7 +714,11 @@ function planRestructureSections(body: string, moves: SkillRestructureMove[]): R
   // One scan (h2Sections) and one selection rule; extract reuses the same
   // selector for start/end sub-blocks, so restructure and extract cannot drift
   // on heading ambiguity, empty sections or duplicate moves.
-  const selection = selectSections(body, moves.map(move => ({ heading: move.heading })))
+  const selection = selectSections(body, moves.map(move => ({
+    heading: move.heading,
+    ...(move.start === undefined ? {} : { start: move.start }),
+    ...(move.end === undefined ? {} : { end: move.end }),
+  })))
   if (!selection.ok) return { error: selection.message }
   const lines = body.split('\n')
   const spans = selection.sections.map(section => {
@@ -3179,6 +3186,12 @@ export class SkillLibrary {
       }
       if (typeof move.heading !== 'string' || !move.heading.trim()) {
         return { ok: false, message: '每次重构搬移都需要非空的 heading。' }
+      }
+      if ((move.start === undefined) !== (move.end === undefined)) {
+        return { ok: false, message: '子块搬移必须同时提供 start 和 end。' }
+      }
+      if (move.start !== undefined && (typeof move.start !== 'string' || typeof move.end !== 'string' || !move.start.trim() || !move.end.trim())) {
+        return { ok: false, message: '子块搬移的 start/end 必须是匹配行的非空文本。' }
       }
       // A1-6 (v18): reuse the single validator (regex + Windows device stems)
       // so restructure cannot mint a target the support-file layer refuses.

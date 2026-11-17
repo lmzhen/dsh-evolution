@@ -383,7 +383,7 @@ interface SkillWriteArgs {
   /** feedback: why the loaded skill did not help. */
   problem?: 'wrong' | 'outdated' | 'incomplete' | 'unsafe'
   /** restructure: body sections (by exact `## heading`) moved to references/ (008 batch B). */
-  restructure?: Array<{ heading?: string; to_file?: string }>
+  restructure?: Array<{ heading?: string; start?: string; end?: string; to_file?: string }>
   /** patch: replace one H2 section's content (or an exact sub-block) in place. */
   section?: { heading?: string; start?: string; end?: string; content?: string }
   /** extract: parts moved to an existing class-level owner. */
@@ -983,6 +983,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         return library.restructure(name, moves.map(move => ({
           heading: typeof move.heading === 'string' ? move.heading : '',
+          ...(typeof move.start === 'string' ? { start: move.start } : {}),
+          ...(typeof move.end === 'string' ? { end: move.end } : {}),
           toFile: typeof move.to_file === 'string' ? move.to_file : '',
         })), origin, change)
       },
@@ -1271,7 +1273,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       + 'Per-action arguments: patch needs name + old_string + new_string and patches SKILL.md unless file_path names a support file (e.g. "references/topic.md"); patch replaces the FIRST occurrence only unless replace_all=true, and the result message reports how many anchors the file carried. patch also accepts section: {heading, start?, end?, content} to replace one H2 section content (or an exact sub-block) in place without resending the old text; the heading line is kept for a whole-section edit. write_file needs name + file_path + file_content; remove_file needs name + file_path; create/edit/update need name + content; delete needs name. A rejected patch names the reason and the remedy (missing anchor, stale snapshot, frontmatter that cannot be auto-quoted, byte/char limit). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'Prefer patching an umbrella over creating narrow skills. '
-      + 'restructure moves entire body sections (by their exact "## heading" line, via restructure: [{heading, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change. '
+      + 'restructure moves entire body sections (by their exact "## heading" line, or an optional start/end sub-block, via restructure: [{heading, start?, end?, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change. '
       + 'extract moves a reusable part (exact heading, optional start/end sub-block) into an existing class-level owner: extract: [{heading, start?, end?, to_skill}]. One target per call; an empty extract list returns the child-agent proposal (outcome/target/neededOwner/parts) without writing; supply extract items to apply, and use owner_covers only as an explicit override; owner-gap is reported, never auto-created.'
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
@@ -1287,7 +1289,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       summary: { type: 'string', description: 'One-line change summary for the skill history. Required for restructure/extract/delete in model-origin writes; max 50 Unicode characters by default, over-limit is rejected with the current limit.' },
       problem: { type: 'string', enum: ['wrong', 'outdated', 'incomplete', 'unsafe'], description: 'feedback only: why the loaded skill did not help.' },
       section: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, content: { type: 'string' } } },
-      restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, to_file: { type: 'string' } } } },
+      restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_file: { type: 'string' } } } },
       extract: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_skill: { type: 'string' }, to_heading: { type: 'string' } } } },
       outcome: { type: 'string', enum: ['extract', 'mixed'] },
       owner_covers: { type: 'boolean' },

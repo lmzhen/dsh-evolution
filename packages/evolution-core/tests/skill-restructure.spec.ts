@@ -51,6 +51,24 @@ it('moves a body section to references/ and replaces it with a pointer line (B)'
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('moves an exact sub-block and keeps the heading', async () => {
+  const { root, lib } = await makeLib()
+  const result = await lib.restructure('demo-skill', [{
+    heading: 'Details log',
+    start: '- rc.67 fixed X',
+    end: '- abc1234 more detail',
+    toFile: 'references/release-log.md',
+  }], 'background_review')
+  expect(result.ok).toBe(true)
+  const md = await lib.read('demo-skill') ?? ''
+  expect(md).toContain('## Details log')
+  expect(md).toContain('> 详见 references/release-log.md')
+  expect(md).not.toContain('rc.67')
+  const moved = await readFile(join(root, 'demo-skill', 'references', 'release-log.md'), 'utf8').catch(() => '')
+  expect(moved).toBe('- rc.67 fixed X\n- abc1234 more detail')
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 const withCitation = (target: string): string => BODY.replace('Use it with care.', 'See ' + target + ' for the details.')
 
 it('carries one model summary to every after entry of the restructure unit', async () => {
