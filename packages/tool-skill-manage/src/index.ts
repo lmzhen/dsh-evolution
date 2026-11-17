@@ -866,6 +866,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
       change = { text: normalized.text, source: 'model' }
     }
+    // Model-origin structural writes must explain themselves; foreground/human
+    // writes keep the host fallback so the CLI and UI are never blocked.
+    const structural = action === 'restructure' || action === 'extract' || action === 'delete'
+    if (structural && origin !== 'foreground' && change === undefined) {
+      return { ok: false, message: `动作「${action}」的后台写入必须提供 summary（一句变更原因）。`, skills: [] }
+    }
     if (actionMeta?.needsName === true && name === '') {
       return { ok: false, message: `动作「${action}」需要 name。`, skills: [] }
     }

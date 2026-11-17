@@ -10,7 +10,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { SKILLS_GUIDANCE, contentHash } from '@deepseek-ai/dsh-evolution-core'
+import { SKILLS_GUIDANCE, contentHash, markReviewChannel, clearReviewChannel } from '@deepseek-ai/dsh-evolution-core'
 import { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -1215,6 +1215,36 @@ it('records negative feedback through the existing service without touching skil
     expect(result.isError).toBe(false)
     expect(calls).toEqual([['boundary-skill', 'negative', 'wrong', 'skill']])
   } finally {
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
+it('requires a summary for model-origin structural writes and accepts a valid one', async () => {
+  const { ctx, root, previousHome } = await setup()
+  const reviewSession = 'summary-review'
+  const reviewAgent = { session: { id: reviewSession, header: {} } } as unknown as Agent
+  markReviewChannel(reviewSession)
+  const run = (args: Record<string, unknown>) => executeOne(ctx, {
+    callId: ToolCallId(`summary-${Math.random()}`),
+    name: 'skill_manage',
+    arguments: args,
+    agent: reviewAgent,
+    signal: new AbortController().signal,
+  })
+  const ok = (result: { value?: unknown }): boolean => (result.value as { ok?: boolean } | undefined)?.ok === true
+  const message = (result: { value?: unknown }): string => (result.value as { message?: string } | undefined)?.message ?? ''
+  try {
+    const created = await run({ action: 'create', name: 'summary-skill', content: SKILL.replace('boundary-skill', 'summary-skill').replace('Body.', '## Body\n\nBody.') })
+    expect(ok(created), message(created)).toBe(true)
+    const missing = await run({ action: 'restructure', name: 'summary-skill', restructure: [{ heading: 'Body', to_file: 'references/body.md' }] })
+    expect(ok(missing)).toBe(false)
+    expect(message(missing)).toContain('必须提供 summary')
+    const accepted = await run({ action: 'restructure', name: 'summary-skill', summary: 'moved body to references', restructure: [{ heading: 'Body', to_file: 'references/body.md' }] })
+    expect(ok(accepted), message(accepted)).toBe(true)
+  } finally {
+    clearReviewChannel(reviewSession)
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
