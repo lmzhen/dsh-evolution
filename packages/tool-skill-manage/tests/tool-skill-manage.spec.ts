@@ -386,7 +386,9 @@ describe('tool-skill-manage', () => {
     expect(mutationEvents).toBe(1)
     const review = await execute({ action: 'review' })
     expect(review.isError).toBe(false)
-    expect((review.value as { message?: string } | undefined)?.message ?? '').toContain('Skills:')
+    const reviewText = (review.value as { message?: string } | undefined)?.message ?? ''
+    expect(reviewText).toContain('Skills:')
+    expect(reviewText).toMatch(/audit-skill .*chars:\d+/)
     // Create is authorship, not a patch (rc.44 M3-3.3): the counter stays 0
     // so mutation maturity is not inflated by mere creation.
     const patchesBefore = (await ctx.skillUsage.report()).get('audit-skill')?.patch_count ?? 0

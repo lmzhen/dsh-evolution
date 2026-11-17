@@ -1199,6 +1199,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // renders an explicit note instead of reading as a clean pass.
     const dedup = computeDedupGroups({ contents })
     const groups = dedup.groups
+    // Body size is a review signal: the same per-skill read that feeds dedup
+    // also says which bodies are oversize, so the model can offload whole
+    // sections instead of guessing. Bodies that were unreadable/empty keep the
+    // old line (no fabricated 0).
+    const sizedLines = lines.map((line, index) => {
+      const body = contents.get(list[index]?.name ?? '')
+      return body === undefined ? line : `${line} chars:${body.length}`
+    })
     const dedupLines = groups.slice(0, MAX_DEDUP_GROUPS_IN_REVIEW).map(group => `- ${group.join(' ~ ')}`)
     if (dedup.truncated) dedupLines.push(`- note: dedup scan truncated at the pair-comparison budget (${groups.length} group(s) so far); groups may be incomplete`)
     // PLAN-R2 P2-5 (2026-09-16): say so when bodies were left out of the
@@ -1225,8 +1233,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       : `\nWarning skills (${warned.length}): ${warned.join(', ')} — low quality; consider consolidating them before authoring new skills.`
     const header = list.length === 0
       ? 'No skills yet. Create one with action=create, or it is safe to author a new class-level umbrella.'
-      : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low) and protection.${groups.length > 0 ? `\n\nNear-duplicate groups (${groups.length}):` : ''}`
-    return [header, '', ...lines, ...dedupLines, ...(excludedBodies > 0 ? [excludedLine] : []), ...(unreadableBodies > 0 ? [unreadableLine] : []), warningLine].join('\n')
+      : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low), protection, and body chars when readable.${groups.length > 0 ? `\n\nNear-duplicate groups (${groups.length}):` : ''}`
+    return [header, '', ...sizedLines, ...dedupLines, ...(excludedBodies > 0 ? [excludedLine] : []), ...(unreadableBodies > 0 ? [unreadableLine] : []), warningLine].join('\n')
   }
 
   registerEvolutionTool(ctx, defineTool({
