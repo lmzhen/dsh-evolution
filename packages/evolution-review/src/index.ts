@@ -33,10 +33,10 @@ import { classifySessionEvent, paramRowId, readDispatchSignal, sessionAudited, s
 
 import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, type ReviewNotice } from './review-notice.ts'
 
-/** Model requests per auxiliary review run. Offload normally needs 3; 4 leaves one retry. */
-const DEFAULT_REVIEW_MAX_ROUNDS = 4
-/** Keep a mistyped deployment value from turning one review into a long-running loop. */
-const MAX_REVIEW_MAX_ROUNDS = 12
+/** Model requests per auxiliary review run. One skill of incremental edits may need many rounds. */
+const DEFAULT_REVIEW_MAX_ROUNDS = 12
+/** Keep a mistyped deployment value from turning one review into an unbounded loop. */
+const MAX_REVIEW_MAX_ROUNDS = 200
 
 // The read-before-write RULE moved to evolution-core (ONE rule for both enforcement points: the
 // tool path and this plan path — design dsh-evolution-write-gate-design.md §4.2); the READER is
@@ -110,7 +110,7 @@ export interface Config {
    * the policy snapshot like the memory cadence. */
   reviewSkillInterval?: Volatile<number | undefined>
   reviewTimeoutMs?: number
-  /** Model requests per aux review run (E2 internal). Default 4; offload normally needs 3. */
+  /** Model requests per aux review run (E2 internal). Default 12; set dozens for incremental condense. */
   reviewMaxRounds?: number
   /** E3/P1-8 (v11) — TRUE semantics: this flag gates ONLY the completion
    * channel. The cadence latch stays active regardless of the value (a
