@@ -781,7 +781,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             .replace('%MODE%', mode)
             .replace('%DRY%', dryRun ? 'yes (no writes)' : 'no')
           const io = (ctx.get('evolutionIo') as { provider?(name?: string): { writeText(path: string, content: string): Promise<void> } } | undefined)?.provider?.()
-          const reportPath = join(evolutionHome(), 'reports', `tidy-${run.id}.json`)
+          const reportPath = join(evolutionHome(), 'reports', `governance-${run.id}.json`)
           const writeReport = async (state: 'succeeded' | 'failed' | 'cancelled', text: string, failure?: string): Promise<void> => {
             if (io === undefined) return
             try {
