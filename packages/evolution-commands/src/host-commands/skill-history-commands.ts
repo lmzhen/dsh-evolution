@@ -27,7 +27,7 @@ export async function runSkillHistoryCommand(context: SkillHistoryCommandContext
   const versions = await curator.history(name)
   if (versions.length === 0) return ok(`技能 "${name}" 还没有内容版本：下一次经 skill_manage 写入后才会出现。`)
   const groups = partitionVersions(versions)
-  const row = (entry: SkillVersion): string => `v${entry.v}\t${entry.at}\t${entry.action}\t${entry.chars} chars\t${entry.hash.slice(0, 12)}${entry.unitId === undefined ? '' : `\tunit:${entry.unitId}`}`
+  const row = (entry: SkillVersion): string => `v${entry.v}\t${entry.at}\t${entry.action}\t${entry.chars} chars\t${entry.hash.slice(0, 12)}${entry.unitId === undefined ? '' : `\tunit:${entry.unitId}`}${entry.summary === undefined ? '' : `\t${entry.summary}`}`
   const lines = [`技能 "${name}" 的内容版本（由旧到新，${groups.content.length} 条，最多保留这么多）：`, ...groups.content.map(row)]
   if (groups.support.length > 0) {
     lines.push('支撑文件版本（仅在历史里 —— 撤销恢复的是 SKILL.md，不是这些字节）：', ...groups.support.map(row))

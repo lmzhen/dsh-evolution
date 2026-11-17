@@ -42,7 +42,7 @@ describe('evolution-commands', () => {
       history: async (name: string) => {
         calls.push(`history:${name}`)
         return [
-          { v: 1, at: '2026-09-27T00:00:00.000Z', action: 'create', hash: 'aaaaaaaaaaaaaaaaaaaa', chars: 42, unitId: 'u-create-1' },
+          { v: 1, at: '2026-09-27T00:00:00.000Z', action: 'create', hash: 'aaaaaaaaaaaaaaaaaaaa', chars: 42, unitId: 'u-create-1', summary: 'created by test', summarySource: 'model' },
           { v: 2, at: '2026-09-27T00:01:00.000Z', action: 'update', hash: 'bbbbbbbbbbbbbbbbbbbb', chars: 43 },
           // A support file shares the index: it must not read as a version of the body (0.10.1).
           { v: 3, at: '2026-09-27T00:02:00.000Z', action: 'write_file', hash: 'cccccccccccccccccccc', chars: 9 },
@@ -72,6 +72,7 @@ describe('evolution-commands', () => {
     expect(historyResult.kind).toBe('success')
     expect(historyResult.text).toContain('技能 "source-b" 的内容版本（由旧到新，2 条，最多保留这么多）：')
     expect(historyResult.text).toContain('v1	2026-09-27T00:00:00.000Z	create	42 chars	aaaaaaaaaaaa')
+    expect(historyResult.text).toContain('created by test')
     expect(historyResult.text).toContain('支撑文件版本（仅在历史里')
     expect(historyResult.text).toContain('v3	2026-09-27T00:02:00.000Z	write_file	9 chars	cccccccccccc')
     // skill undo parses the optional --to (with or without the v prefix) and defaults to "previous".
