@@ -983,6 +983,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
     const running = auxRunning.get(session.id)
     if (running !== undefined) { running.rerun = kind; return true }
+    // A long-running goal loop can keep the parent non-idle across every
+    // cadence boundary. Do not burn a review attempt (and do not record a
+    // failed review) in that window: the caller holds the cadence latch and
+    // re-delivers at the next idle boundary.
+    if (agent.status !== 'idle') return false
     const header = session.requestHeader()
     if (header === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — parent has no request header'); return false }
     const llm = llmPort(ctx)?.streamRaw
