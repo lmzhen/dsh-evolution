@@ -8,8 +8,6 @@ import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
 import { registerSurface, PAGE_SURFACE_CSS, ROUTES, type ConfigFormsSeat, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
-import type { DiagnosticsCardFace } from '../../settings/DiagnosticsCard.ts'
-import { createDiagnosticsApi } from '../../settings/diagnostics-state.ts'
 import { dictionaries as settingsDictionaries, NS as SETTINGS_NS } from '../../settings/messages.ts'
 import { bindLocale } from '@lmzhen/dsh-evolution-client-kit'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
@@ -63,7 +61,6 @@ export function apply(ctx: ClientContext): void {
   })
   const approvalApi = createApprovalApi((input, init) => fetch(input, init))
   const pendingFace = (): PendingCardFace => ({ t: pendingT, api: approvalApi, confirmMode, fallback: FALLBACKS.approval })
-  const diagnosticsFace = (): DiagnosticsCardFace => ({ t: pendingT, api: createDiagnosticsApi((input, init) => fetch(input, init)), fallback: FALLBACKS.diagnostics })
 
   const loadTaskCounts = async (): Promise<WorkbenchTaskCounts> => {
     const pending = approvalApi.pending().then(answer => answer.ok ? answer.data.length : 0).catch(() => 0)
@@ -90,7 +87,7 @@ export function apply(ctx: ClientContext): void {
     styles: { css: CSS + WORKBENCH_CSS + PAGE_SURFACE_CSS, tagId: CSS_TAG_ID },
     icon: WorkbenchIcon,
     component: WorkbenchPage as unknown as (props: never) => ReactNode,
-    body: (t): WorkbenchFace => ({ t, store: workbenchStore, history: historyFace(t), pending: pendingFace(), diagnostics: diagnosticsFace(), hasView, loadTaskCounts }),
+    body: (t): WorkbenchFace => ({ t, store: workbenchStore, history: historyFace(t), pending: pendingFace(), hasView, loadTaskCounts }),
     children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
   })
 }
