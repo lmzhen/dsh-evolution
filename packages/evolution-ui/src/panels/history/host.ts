@@ -29,6 +29,10 @@ export const inject: string[] = []
  * @param ctx - the host context; the connection and curator arrive through it.
  */
 export function apply(ctx: Context): void {
+  // platform-declaration anchor: the optional `skillUsage` seat is declared by
+  // evolution-core/src/usage.ts, and `evolutionFeedback` by
+  // evolution-activity/src/feedback/index.ts. Both are probes for an optional
+  // aggregate read; absence keeps the route's usage/feedback fields null.
   registerHostRoutes(ctx, audit => makeSkillHistoryRoutes({
     getCurator: () => ctx.get('evolutionCurator'),
     getHealthView: async () => {
