@@ -95,6 +95,8 @@ export interface Config {
    * like the four caps above — the settings layer deliberately has no card for it (retention is
    * storage policy, not an authoring knob). */
   skillVersionKeep?: number
+  /** Hard cap for the one-line change summary; E2 internal (restart-only), no settings card. */
+  skillWriteSummaryChars?: number
   /** What the ONE confirmation before a create or a bare delete does (registry `skillWriteConfirm`).
    * Default `auto`: an unattended run must not park a tool call on a question nobody will answer. */
   skillWriteConfirm?: Volatile<WriteConfirmMode>
@@ -128,6 +130,8 @@ export const Config = z.object({
   // storage policy, not an authoring knob — it stays out of the live set on purpose.
   // Lower bound 1 — the history trim would otherwise drop the version it just recorded.
   skillVersionKeep: z.number().min(1).default(DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
+  // E2 internal: a one-line summary is a model-output bound, not a user authoring knob.
+  skillWriteSummaryChars: z.number().min(1).default(DEFAULT_SKILL_WRITE_SUMMARY_CHARS),
   // The write-admission confirmation (0.12.0). The DEFAULT is `auto`: a background pass, a
   // scheduled review or a headless session has nobody to answer a question, and a tool call parked
   // on one blocks the run. `ask` restores the wait-forever behaviour; `timeout` asks and cancels.
@@ -852,10 +856,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const actionMeta = skillActionOf(action)
     let change: ChangeSummary | undefined
     if (args.summary !== undefined) {
-      const normalized = normalizeChangeSummary(args.summary, DEFAULT_SKILL_WRITE_SUMMARY_CHARS)
+      const summaryChars = limit('skillWriteSummaryChars', rawConfig.skillWriteSummaryChars, DEFAULT_SKILL_WRITE_SUMMARY_CHARS)
+      const normalized = normalizeChangeSummary(args.summary, summaryChars)
       if (!normalized.ok) {
         const reason = normalized.reason === 'length'
-          ? `摘要为 ${normalized.length} 个字符，超过上限 ${DEFAULT_SKILL_WRITE_SUMMARY_CHARS}。`
+          ? `摘要为 ${normalized.length} 个字符，超过上限 ${summaryChars}。`
           : normalized.reason === 'multiline' ? '摘要必须是单行。' : '摘要不能为空。'
         return { ok: false, message: reason, skills: [] }
       }
