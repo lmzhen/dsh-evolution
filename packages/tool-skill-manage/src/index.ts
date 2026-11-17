@@ -1209,6 +1209,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const oversize = body.length >= DEFAULT_HEALTH_THRESHOLDS.softBodyChars ? ' [oversize]' : ''
       return `${line} chars:${body.length}${oversize}`
     })
+    const oversizeNames = list
+      .filter(summary => (contents.get(summary.name)?.length ?? 0) >= DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
+      .map(summary => summary.name)
+    const oversizeLine = oversizeNames.length === 0
+      ? ''
+      : `\nOversize skills (${oversizeNames.length}): ${oversizeNames.join(', ')} — offload whole sections to references/ before adding more body.`
     const dedupLines = groups.slice(0, MAX_DEDUP_GROUPS_IN_REVIEW).map(group => `- ${group.join(' ~ ')}`)
     if (dedup.truncated) dedupLines.push(`- note: dedup scan truncated at the pair-comparison budget (${groups.length} group(s) so far); groups may be incomplete`)
     // PLAN-R2 P2-5 (2026-09-16): say so when bodies were left out of the
@@ -1236,7 +1242,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const header = list.length === 0
       ? 'No skills yet. Create one with action=create, or it is safe to author a new class-level umbrella.'
       : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low), protection, and body chars when readable ([oversize] = at or over the health soft line).${groups.length > 0 ? `\n\nNear-duplicate groups (${groups.length}):` : ''}`
-    return [header, '', ...sizedLines, ...dedupLines, ...(excludedBodies > 0 ? [excludedLine] : []), ...(unreadableBodies > 0 ? [unreadableLine] : []), warningLine].join('\n')
+    return [header, '', ...sizedLines, ...dedupLines, ...(excludedBodies > 0 ? [excludedLine] : []), ...(unreadableBodies > 0 ? [unreadableLine] : []), warningLine, oversizeLine].join('\n')
   }
 
   registerEvolutionTool(ctx, defineTool({
