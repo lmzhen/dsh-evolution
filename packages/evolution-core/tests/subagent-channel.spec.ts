@@ -33,6 +33,7 @@ function harness(options: Options = {}) {
   const listeners = new Map<string, Set<(info: Record<string, unknown>) => void>>()
   const subagents = {
     getProvider: () => (options.providerMissing === true ? undefined : provider),
+    async start(spec: Record<string, unknown>) { return this.startActivation(spec) },
     async startActivation(spec: Record<string, unknown>) {
       calls.push(spec)
       log.push('start')
@@ -61,9 +62,10 @@ function harness(options: Options = {}) {
     // oxlint-disable-next-line typescript/unbound-method -- fixture delegates to the fake registry; neither method uses `this`
     register: registry.register,
   }
-  const agents = { get: () => (options.childMissing === true ? undefined : { id: 'child-1' }) }
+  const agents = { get: () => (options.childMissing === true ? undefined : { id: 'child-1' }), isRoot: () => true }
+  const platform = { ports: { agents, subagents, presets: agentPresets } }
   const ctx = {
-    get: (name: string) => ({ subagents, agentPresets, agents } as Record<string, unknown>)[name],
+    get: (name: string) => (name === 'evolutionPlatform' ? platform : ({ subagents, agentPresets, agents } as Record<string, unknown>)[name]),
     on: (event: string, listener: (info: Record<string, unknown>) => void) => {
       const set = listeners.get(event) ?? new Set()
       set.add(listener)
@@ -85,7 +87,7 @@ describe('subagent channel (G3-S1/S2)', () => {
     expect(outcome).toMatchObject({ kind: 'ok', structured: { ok: true }, childId: 'child-1', stopReason: 'completed' })
     expect(h.calls).toHaveLength(1)
     expect(h.calls[0]).toMatchObject({ provider: 'spawn', label: 'review', delivery: 'caller' })
-    expect((h.calls[0] as { request: Record<string, unknown> }).request).toMatchObject({ agentPreset: REVIEWER_PRESET_ID, prompt: [{ type: 'text', text: 'task' }] })
+    expect(h.calls[0]).toMatchObject({ parent, agentPreset: REVIEWER_PRESET_ID, prompt: [{ type: 'text', text: 'task' }] })
     expect(h.disposed()).toBe(1)
     expect(h.log).toEqual(['register', 'start', 'dispose'])
   })
@@ -152,7 +154,8 @@ describe('subagent channel (G3-S1/S2)', () => {
       timeoutMs: 1_000,
     })
     expect(opened).toMatchObject({ kind: 'ok', childId: 'child-1', turn: { text: 'round-1', stopReason: 'completed' } })
-    expect((h.calls[0] as { request: Record<string, unknown> }).request).toMatchObject({
+    expect(h.calls[0]).toMatchObject({
+      parent,
       agentPreset: REVIEWER_PRESET_ID,
       cwd: 'D:/dsh/tmp/staging-probe',
       prompt: [{ type: 'text', text: 'decide' }],
@@ -164,6 +167,28 @@ describe('subagent channel (G3-S1/S2)', () => {
     await channel.dispose!(childId)
     expect(h.disposed()).toBe(1)
     expect(await channel.continueTurn!(childId, 'after-dispose')).toMatchObject({ kind: 'unavailable', code: 'E-324' })
+  })
+
+  it('reports a non-completed continuation as unavailable, never ok', async () => {
+    const h = harness({
+      result: { output: [{ type: 'text', text: 'round-1' }], stopReason: 'completed' },
+      round2Stop: 'error',
+    })
+    const channel = createSubagentChannel(h.ctx as never)
+    const opened = await channel.open!({
+      parent,
+      label: 'merge-author',
+      promptText: 'decide',
+      kind: 'reviewer',
+      allow: ['tool-skill'],
+      timeoutMs: 1_000,
+    })
+    const childId = (opened as unknown as { childId: never }).childId
+    expect(await channel.continueTurn!(childId, 'author', { timeoutMs: 1_000 })).toMatchObject({
+      kind: 'unavailable',
+      code: 'E-323',
+      reason: 'round 2 did not complete: error',
+    })
   })
 
   it('probes availability and reflects the registry status', async () => {

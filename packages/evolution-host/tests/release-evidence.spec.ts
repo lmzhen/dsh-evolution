@@ -36,10 +36,10 @@ const run = promisify(execFile)
 const script = fileURLToPath(new URL('../../scripts/verify-release-evidence.mjs', import.meta.url))
 const assembleScript = fileURLToPath(new URL('../../scripts/assemble-release-evidence.mjs', import.meta.url))
 const FAMILY_VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version
-const PLATFORM_LINE = { version: '0.2.2-rc.1', floor: '0.2.2-rc.0', peersRange: '^0.2.2-rc.0', enginesRange: '>=0.2.2-rc.0 <0.2.3-0', upstreamRef: 'dsh-v0.2.2-rc.1' }
+const PLATFORM_LINE = { version: '0.2.2-rc.3', floor: '0.2.2-rc.3', peersRange: '^0.2.2-rc.3', enginesRange: '>=0.2.2-rc.3 <0.2.3-0', upstreamRef: 'dsh-v0.2.2-rc.3' }
 
 function spike(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.2-rc.1', familyVersion: FAMILY_VERSION, startedAt: new Date(Date.now() - 3_600_000).toISOString(), readings: { route: 200 }, artifactSha256: 'b'.repeat(64), commit: 'a'.repeat(40), inputsSha256: 'c'.repeat(64), ...overrides }
+  return { spike: id, verdict: 'pass', face: 'headless', hostVersion: '0.2.2-rc.3', familyVersion: FAMILY_VERSION, startedAt: new Date(Date.now() - 3_600_000).toISOString(), readings: { route: 200 }, artifactSha256: 'b'.repeat(64), commit: 'a'.repeat(40), inputsSha256: 'c'.repeat(64), ...overrides }
 }
 
 function staging(): Record<string, unknown> {
@@ -283,4 +283,5 @@ describe('release-evidence assembly (W3 injection)', () => {
     } finally { await rm(dir, { recursive: true, force: true }) }
   })
 })
+
 

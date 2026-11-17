@@ -16,12 +16,20 @@ function harness(options: { readonly noConnection?: boolean; readonly remote?: b
       },
     },
   }
+  const port = options.noConnection === true
+    ? undefined
+    : {
+        allowsRemoteAuthorities: options.remote === true,
+        register: (route: unknown) => connection.fetch.register(route as Record<string, unknown>),
+      }
+  const platform = { ports: { connection: port } }
+  const get = (name: string) => name === 'evolutionPlatform' ? platform : undefined
   const owner = {
-    get: () => (options.noConnection === true ? undefined : connection),
+    get,
     inject(names: readonly string[], run: (scope: unknown) => void) { injected.push({ names, run }) },
   }
   const scope = {
-    connection: options.noConnection === true ? undefined : connection,
+    get,
     effect(run: () => (() => void) | void) { const result = run(); effectRuns.push(typeof result === 'function' ? result : () => {}); return () => {} },
   }
   return { owner, scope, injected, registered, disposed, effectRuns }
@@ -62,4 +70,5 @@ describe('host route registration (G4-S1)', () => {
     expect(hostSurface({ get: () => undefined } as never)).toEqual({ available: false, code: 'E-325', reason: 'connection-missing' })
   })
 })
+
 

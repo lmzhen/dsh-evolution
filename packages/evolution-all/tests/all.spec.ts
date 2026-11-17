@@ -33,7 +33,7 @@ it('evolution-all aggregates the host entry, the mounted row packages and the sh
   for (const name of ['@deepseek-ai/dsh-evolution-agent-preset', '@deepseek-ai/dsh-evolution-core', '@deepseek-ai/dsh-tool-session-query']) {
     expect(declared.has(name), name + ' must be a dependency of evolution-all').toBe(true)
   }
-  expect(manifest.dependencies['@deepseek-ai/dsh-tool-session-query']).toBe('^0.2.2-rc.0')
+  expect(manifest.dependencies['@deepseek-ai/dsh-tool-session-query']).toBe('^0.2.2-rc.3')
 })
 
 it('G-C: every model row package named by the all.patch resolves in the dependency closure (0.3.54)', () => {
@@ -71,3 +71,4 @@ it('documents the full-bundle default: all = infra + model tools, host = shrink 
   expect(entry.toLowerCase()).toContain('profile-root')
   expect(entry).not.toContain('hidden')
 })
+

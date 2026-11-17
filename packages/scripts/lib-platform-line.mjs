@@ -74,7 +74,7 @@ export function parsePlatformLine(raw, sourcePath = '<inline>') {
   if (semver.valid(parsed.version) === null) die('version is not a valid semver: ' + parsed.version)
   if (semver.valid(parsed.floor) === null) die('floor is not a valid semver: ' + parsed.floor)
   if (!sameTuple(semver, parsed.version, parsed.floor)) die('version and floor must share one major.minor.patch tuple (single-line anchor); got ' + parsed.version + ' / ' + parsed.floor)
-  if (!(semver.compare(parsed.floor, parsed.version) < 0)) die('floor must sort below version; got floor=' + parsed.floor + ' version=' + parsed.version)
+  // DCR-2: a single-version line (floor === version) is valid; it pins the\n  // package to exactly that platform release and its later patch line.\n  if (semver.compare(parsed.floor, parsed.version) > 0) die('floor must sort below or equal version; got floor=' + parsed.floor + ' version=' + parsed.version)
   const nextPatch = parsed.version.replace(/-.*$/, '').replace(/^(\d+)\.(\d+)\.(\d+)$/, (m, a, b, c) => a + '.' + b + '.' + (Number(c) + 1)) + '-0'
   return Object.freeze({
     version: parsed.version,
@@ -117,6 +117,8 @@ export function windowRows(platformLine) {
     '0.2.1',
     '0.2.2-0',
     '0.2.2-rc.1',
+    '0.2.2-rc.2',
+    '0.2.2-rc.3',
     '0.2.2',
     '0.3.0-rc.1',
   ]

@@ -38,6 +38,8 @@
  * @module
  */
 import type { Context } from '@deepseek-ai/cordis'
+import type { EvolutionPlatform } from './runtime/platform.ts'
+import { toolsPort } from './platform/tools.ts'
 import { scopeOf } from './platform/index.ts'
 import type { OpaqueScopeKey } from './scope.ts'
 
@@ -91,16 +93,6 @@ export function scopedProbeReport(): ScopedProbeReport {
 }
 
 /**
- * The two platform services this probe reads, kept structural: they are read
- * through `ctx.get` (the global store — the documented form for an optional
- * service, postmortem 0001), and a deployment may mount neither.
- */
-interface SessionProbeContext {
-  get(name: 'agents'): { get(id: string): { ctx?: Context } | undefined } | undefined
-  get(name: 'tools'): { get(name: string, scope?: OpaqueScopeKey): unknown } | undefined
-}
-
-/**
  * Does this session's scope see the family's model tools?
  *
  * The scope is the live agent's — the platform's own addressing for "what does
@@ -113,12 +105,12 @@ interface SessionProbeContext {
  * @returns true when at least one family model tool is visible to that session.
  */
 export function sessionSeesFamilyTools(ctx: Context, sessionId: string): boolean {
-  const probe = ctx as unknown as SessionProbeContext
-  const tools = probe.get('tools')
+  const platform = ctx.get('evolutionPlatform') as EvolutionPlatform | undefined
+  const tools = platform?.ports.tools ?? toolsPort(ctx)
   if (tools === undefined) return false
-  const agent = probe.get('agents')?.get(sessionId)
-  const scope = agent?.ctx === undefined ? undefined : scopeOf(agent.ctx)
-  return FAMILY_SESSION_TOOL_NAMES.some(name => tools.get(name, scope) !== undefined)
+  const agent = platform?.ports.agents?.get(sessionId)
+  const scope = agent?.ctx === undefined ? undefined : scopeOf(agent.ctx as Context)
+  return FAMILY_SESSION_TOOL_NAMES.some(name => tools.get(name, scope as OpaqueScopeKey | undefined) !== undefined)
 }
 
 /**
@@ -164,3 +156,4 @@ export function sessionAudited(ctx: Context, sessionId: string, sessionScoped: b
   noteScopedProbeMiss(ctx)
   return false
 }
+

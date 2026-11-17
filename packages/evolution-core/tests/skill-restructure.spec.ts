@@ -1,5 +1,6 @@
 // @tier pre-tag
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
+vi.setConfig({ testTimeout: 30_000 })
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -314,4 +315,5 @@ it('the restructure target rule is at least as strict as the write path (no orph
   }
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
+
 

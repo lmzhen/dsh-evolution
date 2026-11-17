@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-core",
   "description": "Shared stores, prompts, signals and lifecycle logic for the dsh-evolution plugin family",
-  "version": "0.49.0",
+  "version": "0.50.0",
   "publishConfig": {
     "access": "public"
   },
@@ -58,6 +58,18 @@
     "./contract": {
       "types": "./lib/types/contract.d.ts",
       "default": "./lib/contract.js"
+    },
+    "./result": {
+      "types": "./lib/types/result.d.ts",
+      "default": "./lib/result.js"
+    },
+    "./errors": {
+      "types": "./lib/types/errors.d.ts",
+      "default": "./lib/errors.js"
+    },
+    "./extract": {
+      "types": "./lib/types/extract.d.ts",
+      "default": "./lib/extract.js"
     },
     "./io-registry": {
       "types": "./lib/types/io-registry.d.ts",

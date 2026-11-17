@@ -12,6 +12,8 @@
  */
 
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
+import { configEditorPort, pluginInventoryPort, pluginManagerPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Context } from '@deepseek-ai/cordis'
 
 /** One installed bundle as the platform reports it (the fields the doctor reads). */
 export interface PlatformBundle {
@@ -83,22 +85,6 @@ export interface PlatformView {
   readonly presets: readonly PlatformPreset[] | undefined
 }
 
-/** The members this module calls; a missing method is a missing surface, never a guess. */
-interface ManagerLike {
-  listBundles?(): unknown
-  listPlugins?(): unknown
-}
-
-/** The optional inventory row's service (Web compositions only). */
-interface InventoryLike {
-  list?(): unknown
-}
-
-/** The config editor's read of every managed entry. */
-interface EditorLike {
-  configuration?(): unknown
-}
-
 /** What `pluginInventory.list()` answers: the live entries and the presets they compose. */
 interface InventorySnapshot {
   readonly entries?: readonly PlatformPlugin[]
@@ -146,9 +132,9 @@ async function objectOf<T>(read: (() => unknown) | undefined): Promise<T | undef
 export async function readPlatformView(ctx: { get(name: string): unknown }): Promise<PlatformView> {
 // platform-declaration anchor: the platform’s `pluginManager`, `configEditor` and `pluginInventory` services
 //(all optional; undefined ⇒ the view reports it as missing)
-  const manager = ctx.get('pluginManager') as ManagerLike | undefined
-  const editor = ctx.get('configEditor') as EditorLike | undefined
-  const inventory = ctx.get('pluginInventory') as InventoryLike | undefined
+  const manager = pluginManagerPort(ctx as Context)
+  const editor = configEditorPort(ctx as Context)
+  const inventory = pluginInventoryPort(ctx as Context)
   const listed = await objectOf<InventorySnapshot>(inventory?.list === undefined ? undefined : () => inventory.list?.())
   const plugins = await arrayOf<PlatformPlugin>(manager?.listPlugins === undefined ? undefined : () => manager.listPlugins?.())
   return {

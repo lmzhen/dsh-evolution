@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 it('registers guidance and snapshot with interpolate:false', () => {
   const source = readFileSync(fileURLToPath(new URL('../../src/tools/index.ts', import.meta.url)), 'utf8')
-  expect(source).toContain('text: () => snapshotText,\n      interpolate: false,')
-  expect(source).toContain('text: MEMORY_GUIDANCE,\n      interpolate: false,')
+  expect(source).toMatch(/text: \(\) => snapshotText,\s+interpolate: false,/)
+  expect(source).toMatch(/text: MEMORY_GUIDANCE,\s+interpolate: false,/)
 })
+

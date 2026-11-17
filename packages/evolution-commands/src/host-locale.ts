@@ -1,6 +1,7 @@
 /** Host human-output locale: one resolver, output boundaries only. */
 import type { Context } from '@deepseek-ai/cordis'
-import { errorTextIn, HOST_LOCALES, type EvolutionErrorId, type HostLocale, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
+import { errorTextIn, HOST_LOCALES, type EvolutionErrorId, type HostLocale } from '@deepseek-ai/dsh-evolution-core'
+import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import { HOST_COMMANDS, type HostCommandKey } from './generated/host-commands.ts'
 
 /**
@@ -12,7 +13,7 @@ import { HOST_COMMANDS, type HostCommandKey } from './generated/host-commands.ts
 export function resolveHostLocale(ctx: Pick<Context, 'get'>): HostLocale {
   try {
     // platform-declaration anchor: settings is a declared optional platform service; this probe only reads the locale row.
-    const settings = ctx.get('settings') as SettingsProviderLike | undefined
+    const settings = settingsPort(ctx as Context)
     const value = settings?.describe?.({ redactSecrets: false })?.find(entry => entry.ns === 'locale')?.value
     const preference = typeof value === 'object' && value !== null ? (value as { preference?: unknown }).preference : undefined
     if (preference === undefined || preference === null) return 'zh'

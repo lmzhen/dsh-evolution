@@ -15,6 +15,7 @@ interface RestrictedSlot {
   state?: RestrictedPresetState | undefined
   release?: (() => Promise<void>) | undefined
   inflight?: Promise<RestrictedPresetState> | undefined
+  inflightKey?: string | undefined
   effectInstalled?: boolean | undefined
 }
 
@@ -50,9 +51,17 @@ export async function ensureRestrictedPreset(ctx: Context, req: EnsureRestricted
   const allow = normalizeAllow(req.allow)
   const key = req.parentPresetId + '\n' + allow.join('\n')
   const slot = slotFor(ctx, req.kind)
-  if (slot.readyKey === key && slot.state !== undefined && slot.state.kind === 'ready') return slot.state
-  if (slot.inflight !== undefined) return slot.inflight
-  slot.inflight = (async (): Promise<RestrictedPresetState> => {
+  // One registration per kind is the invariant. A same-key caller joins the
+  // in-flight promise; a different-key caller must NOT join it (that was the
+  // cross-allow race), so it waits for the current attempt and re-evaluates.
+  for (;;) {
+    if (slot.readyKey === key && slot.state !== undefined && slot.state.kind === 'ready') return slot.state
+    const inflight = slot.inflight
+    if (inflight === undefined) break
+    if (slot.inflightKey === key) return inflight
+    await inflight.catch(() => undefined)
+  }
+  const pending = (async (): Promise<RestrictedPresetState> => {
     await releaseRestrictedPreset(ctx, req.kind, slot)
     if (allow.length === 0) {
       slot.state = { kind: 'failed', code: 'E-324', reason: 'allow set is empty' }
@@ -78,10 +87,15 @@ export async function ensureRestrictedPreset(ctx: Context, req: EnsureRestricted
       return slot.state
     }
   })()
+  slot.inflight = pending
+  slot.inflightKey = key
   try {
-    return await slot.inflight
+    return await pending
   } finally {
-    slot.inflight = undefined
+    if (slot.inflight === pending) {
+      slot.inflight = undefined
+      slot.inflightKey = undefined
+    }
   }
 }
 

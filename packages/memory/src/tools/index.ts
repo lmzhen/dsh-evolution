@@ -3,10 +3,11 @@
  * @module @deepseek-ai/dsh-tool-memory
  */
 
-import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
+import { settingsPort, systemPromptPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import { defineTool, registerEvolutionTool, type PromptContext, type PromptSection } from '@deepseek-ai/dsh-evolution-core/platform'
+import { defineTool, registerEvolutionTool } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '../index.ts'
 import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText } from '@deepseek-ai/dsh-evolution-core'
 import { resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -112,8 +113,8 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
   // family renders its own card from the registry). Probed, not assumed: a host
   // without the capability still loads.
   ctx.inject(['settings'], (injected) => {
-    const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
-    if (typeof settings?.configure !== 'function') return
+    const settings = settingsPort(injected)
+    if (settings?.configure === undefined) return
     // v46 S1.12b (finding 6-1): the owner argument is what the platform looks the presentation up by.
     // Omitting it registers the suppression on the settings service's own fiber, so a row that
     // re-mounts keeps a dead key and the auto form can return (platform precedent:
@@ -160,10 +161,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
   // PromptContext's `(ctx) => string`) — upstream signature drift now fails
   // `tsc` at the mirror. (The hand-written shape was { section({name,order,
   // text}): () => void; context({name,order,text}): () => void } | undefined.)
-  const systemPrompt = ctx.get('systemPrompt') as {
-    section(section: PromptSection): () => void
-    context(context: PromptContext): () => void
-  } | undefined
+  const systemPrompt = systemPromptPort(ctx)
   let snapshotText = ''
   if (!memoryDisabled) {
     try {
@@ -184,12 +182,14 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
       text: MEMORY_GUIDANCE,
       interpolate: false,
     }), 'tool-memory.memory-guidance')
-    ctx.effect(() => systemPrompt.context({
-      name: 'evolution:memory-snapshot',
-      order: 150,
-      text: () => snapshotText,
-      interpolate: false,
-    }), 'tool-memory.memory-snapshot')
+    if (systemPrompt.context !== undefined) {
+      ctx.effect(() => systemPrompt.context!({
+        name: 'evolution:memory-snapshot',
+        order: 150,
+        text: () => snapshotText,
+        interpolate: false,
+      }), 'tool-memory.memory-snapshot')
+    }
     // P2 fix: the snapshot refresh moved to the write sink (MemoryRegistry
     // emits evolution/memory-applied after ANY successful write). Bypass paths —
     // `/graph edit|delete memory:`, background review direct writes — refresh the

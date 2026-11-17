@@ -1,3 +1,13 @@
+## 0.50.0 (2026-11-17) — rc.3-only 架构收口
+
+> **范围**：① 平台边界只剩 `evolutionPlatform` 端口：agents/subagents/userQuestions/connection/systemPrompt/commands/settings/storageDomain/skills/sessionQuery/workingDirectory/pluginManager/pluginInventory/configEditor/profileContext/llm/tools；② 子代理统一 `createSubagentKernel` + `SubagentRun`，`run/open` 共用 `prepare()+startRun()`；③ 技能 13 个 action 统一 `SKILL_ACTIONS` 表 + `commitSkillAction`，extract 走 `SkillPlan`；④ client 契约生成、`platformUiModule` 单门、`registerSurface` 统一 verb；⑤ `Result`/`FamilyError` 基础与 `ConnectionPort.tryRegister` 边界；⑥ core 新增 `extract`/`result`/`errors` 子路径，根导出 72→69。
+>
+> **破坏性变更（DCR-2）**：0.50.0 **只支持 DSH 0.2.2-rc.3+**。`peerDependencies` 为 `^0.2.2-rc.3`，`engines.dsh` 为 `>=0.2.2-rc.3 <0.2.3-0`；0.2.2-rc.1/rc.2 宿主会被平台兼容门拒绝，请停留在 0.49.x。包集合不变（20 个包），不新增 npm 包名。
+>
+> **验证**：CI run `44008520889` 全绿（Node 22/24 validate、pack、Windows desktop install）；rc.3 定向测试 96/96；mutation coverage 23/23；20 包 tarball audit 通过；rc.3 npm web host 真机打开「技能自动进化」面板（自进化/技能历史/待批/合并/诊断），console 无 error。
+>
+> **迁移**：rc.1/rc.2 用户不要升级；rc.3 用户可直接用 0.50.0。旧 rc.1 兼容桥已删除，无自动迁移路径。
+
 ## 0.49.0 (2026-11-15) — 迁移单入口、净删收口
 
 > **范围**：① merge 迁移改为一个 `dsh-evolution-merge-migrate` 入口（dry-run / apply / restore），宿主启动与 CLI 共用 `migrateMergeStateToV4`；② 迁移 blocked 提示按 readiness code 分四种，8 个 locale 由平台 catalog 生成；③ D5 hunk 行渲染单源；④ 删除零引用脚本/导出/helper，净减 **−5,552 行**。

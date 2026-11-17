@@ -3,11 +3,12 @@
  * @module @deepseek-ai/dsh-evolution-review
  */
 
-import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
+import { llmPort, settingsPort, toolsPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
-import type { Agent, ContentBlock, ContextFormed, GenerateOptions, StreamChunk, ToolCallBlock, ToolCallId } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-core/platform'
 import { ReviewPartialFailure, runReview } from './review-executor.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
@@ -313,8 +314,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // family renders its own card from the registry). Probed, not assumed: a host
   // without the capability still loads.
   ctx.inject(['settings'], (injected) => {
-    const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
-    if (typeof settings?.configure !== 'function') return
+    const settings = settingsPort(injected)
+    if (settings?.configure === undefined) return
     // v46 S1.12b (finding 6-1): the owner argument is what the platform looks the presentation up by.
     // Omitting it registers the suppression on the settings service's own fiber, so a row that
     // re-mounts keeps a dead key and the auto form can return (platform precedent:
@@ -974,12 +975,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (running !== undefined) { running.rerun = kind; return true }
     const header = session.requestHeader()
     if (header === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — parent has no request header'); return false }
-    const llm = ctx.get('llm') as { stream(options: GenerateOptions): AsyncIterable<StreamChunk> } | undefined
-    const tools = ctx.get('tools') as {
-      execute(input: { calls: readonly ToolCallBlock[]; signal: AbortSignal; agent?: Agent }): Promise<{
-        results: readonly { callId: ToolCallId; result: { content: ContentBlock[]; isError: boolean } }[]
-      }>
-    } | undefined
+    const llm = llmPort(ctx)?.streamRaw
+    const tools = toolsPort(ctx)?.execute
     if (llm === undefined || tools === undefined) {
       ctx.logger.warn('dsh-evolution-review: aux review skipped — llm/tools service is not mounted')
       return false
@@ -1019,8 +1016,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         const prompt = reviewPrompt(kind, 'aux')
         const result = await withReviewContext({ reviewId, runId: reviewId }, () => runReview({
           parent: agent,
-          llm: { stream: options => llm.stream(options) },
-          tools: { execute: input => tools.execute({ calls: input.calls, signal: input.signal, agent }) },
+          llm: { stream: options => llm(options) },
+          tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent }) },
           instruction: prompt,
           toolAllow,
           signal: controller.signal,

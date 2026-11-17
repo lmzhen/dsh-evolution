@@ -9,12 +9,14 @@
  * actions so any finding carries its next step.
  */
 import { hostCommandText } from './host-locale.ts'
+import type { Context } from '@deepseek-ai/cordis'
+import { sessionQueryPort, settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
 import { readFileSync } from 'node:fs'
 import { scopedPackageName, asRecord } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
-import { evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, resolveParamId, scopedProbeReport, absentHostServices, type EvolutionIoLike, type PlatformServiceProbe, type ScopedProbeReport, type SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionRoot, isDeprecatedParamId, PARAM_EXPOSURE, paramSettingsId, resolveParamId, scopedProbeReport, absentHostServices, type EvolutionIoLike, type PlatformServiceProbe, type ScopedProbeReport } from '@deepseek-ai/dsh-evolution-core'
 import { composePresetEntry, presetRowBlock, presetRowBody, presetRowId } from '@deepseek-ai/dsh-evolution-core/composition'
 import type { DiagnosticsView } from '@deepseek-ai/dsh-evolution-core'
 import { processScopeViolations } from '@deepseek-ai/dsh-evolution-state'
@@ -605,7 +607,7 @@ function probePresetFreshness(home: string, servicePresent: (name: string) => bo
 async function legacyMigrationRow(ctx: { get(name: string): unknown }, home: string): Promise<LegacyMigrationRow> {
 // platform-declaration anchor: the platform’s `settings` and `sessionQuery` services
 //(both optional; undefined ⇒ the corresponding check is skipped)
-  const settings = ctx.get('settings') as SettingsProviderLike | undefined
+  const settings = settingsPort(ctx as Context)
   const io = (ctx.get('evolutionIo') as { provider?(): EvolutionIoLike } | undefined)?.provider?.()
   if (settings?.describe === undefined || io === undefined) return { state: 'unavailable', source: undefined, pending: [] }
   try {
@@ -966,11 +968,8 @@ async function probeBounded<T>(work: () => Promise<T>, label: string): Promise<{
  * @returns one or two messages; empty when the service is absent or healthy.
  */
 async function sessionQueryIssues(ctx: { get(name: string): unknown }): Promise<string[]> {
-  const service = ctx.get('sessionQuery') as { listSessions?: (signal?: AbortSignal) => Promise<unknown> } | undefined
-  // Bind the receiver: the platform's service methods are prototype methods and a
-  // detached reference loses `this` (the family's N13b rule, learned on the
-  // platform Agent's send()/followup()).
-  const list = service?.listSessions?.bind(service)
+  const service = sessionQueryPort(ctx as Context)
+  const list = service?.listSessions
   if (list === undefined) return []
   // R-1: bounded — the listing path is precisely what a concurrent writer stalls,
   // so an unbounded await here would hang the command on the state it reports.

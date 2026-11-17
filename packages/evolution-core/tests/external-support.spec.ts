@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { planExtract, readExternalSupport } from '@deepseek-ai/dsh-evolution-core'
+import { planExtract, readExternalSupport } from '@deepseek-ai/dsh-evolution-core/extract'
 
 it('copies an external file under the allowed root and annotates provenance', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-external-support-'))
@@ -38,3 +38,4 @@ it('copies an external file under the allowed root and annotates provenance', as
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
+

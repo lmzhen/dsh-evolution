@@ -91,6 +91,34 @@ describe('ensureRestrictedPreset lifecycle (G2-S5 skeleton)', () => {
     expect(fake.stats()).toEqual({ registers: 1, releases: 0 })
   })
 
+  it('serializes different allow sets instead of joining the first inflight', async () => {
+    let releaseFirst = (): void => {}
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const registered: Array<{ readonly plugins?: readonly { readonly id?: string; readonly config?: { readonly allow?: readonly string[] } }[] }> = []
+    let registers = 0
+    const registry: PresetRegistryLike = {
+      async readDocument() { return PARENT },
+      async register(definition) {
+        registers += 1
+        if (registers === 1) await firstGate
+        registered.push(definition as { readonly plugins?: readonly { readonly id?: string; readonly config?: { readonly allow?: readonly string[] } }[] })
+        return async () => {}
+      },
+    }
+    const { ctx } = fakeCtx(registry)
+    const first = ensureRestrictedPreset(ctx as never, { kind: 'reviewer', parentPresetId: 'standard', allow: ['tool-skill'] })
+    await Promise.resolve()
+    const second = ensureRestrictedPreset(ctx as never, { kind: 'reviewer', parentPresetId: 'standard', allow: ['tool-skill', 'evolution_memory'] })
+    releaseFirst()
+    const [a, b] = await Promise.all([first, second])
+    expect(a).toMatchObject({ kind: 'ready', allow: ['tool-skill'] })
+    expect(b).toMatchObject({ kind: 'ready', allow: ['evolution_memory', 'tool-skill'] })
+    expect(registers).toBe(2)
+    expect(registered).toHaveLength(2)
+    const restrictor = registered[1]?.plugins?.find((row) => row.id === RESTRICTED_TOOLS_ROW_ID)
+    expect(restrictor?.config?.allow).toEqual(['evolution_memory', 'tool-skill'])
+  })
+
   it('releases the old registration and re-registers when the allow set changes', async () => {
     const fake = fakeRegistry()
     const { ctx } = fakeCtx(fake.registry)

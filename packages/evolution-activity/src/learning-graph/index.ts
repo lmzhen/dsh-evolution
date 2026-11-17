@@ -13,6 +13,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { isPresent, isUnknown, authorityFrom, runWriteGates, skillWriteGateContext } from '@deepseek-ai/dsh-evolution-core'
 import { type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
+import { commandsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
@@ -352,7 +353,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // `CommandDefinition` type are the contract (previously a local cast to
     // `{ register(definition: unknown) }`, which silenced every upstream shape
     // change). `@deepseek-ai/dsh-commands` is a declared peer.
-    const commands = commandCtx.commands
+    const commands = commandsPort(commandCtx)
+    if (commands === undefined) return
     // M-11 (v3 audit): the register disposer must be bound to the fiber — an
     // unbound registration survives HMR/reload and duplicates the command.
     // v28 G0.3 (CMD-01): the definition is a const so `handler` can delegate

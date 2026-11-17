@@ -52,6 +52,8 @@ export interface EvolutionLlmRequest {
 export interface LlmPort {
   stream(request: EvolutionLlmRequest): AsyncIterable<StreamChunk>
   completeText(request: EvolutionLlmRequest): Promise<string>
+  /** Raw platform stream for features that own their full GenerateOptions (review aux path). */
+  streamRaw?(options: GenerateOptions): AsyncIterable<StreamChunk>
 }
 
 interface LlmRuntimeLike {
@@ -81,6 +83,7 @@ export function llmPort(ctx: Context): LlmPort | undefined {
       if (llm.stream === undefined) throw new EvolutionLlmError('transport', 'llm service has no stream()')
       yield* llm.stream(options)
     },
+    ...(llm.stream === undefined ? {} : { streamRaw: (options: GenerateOptions) => llm.stream!(options) }),
     async completeText(request) {
       let text = ''
       for await (const chunk of port.stream(request)) {

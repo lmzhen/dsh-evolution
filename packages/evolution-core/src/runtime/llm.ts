@@ -23,20 +23,17 @@ export interface EvolutionLlmInput {
 export class EvolutionLlm extends Service {
   static inject = []
 
-  private port: LlmPort | undefined
-
   constructor(ctx: Context) {
     super(ctx, 'evolutionLlm')
   }
 
-  protected [Service.init](): void {
-    const platform = this.ctx.get('evolutionPlatform') as EvolutionPlatform | undefined
-    this.port = platform?.ports.llm
-    if (this.port === undefined) this.ctx.logger.warn('evolution-core-runtime: llm service unavailable; model calls fail with llm-unavailable')
+  /** Resolve the port per call so a late-mounted llm service is usable. */
+  private port(): LlmPort | undefined {
+    return (this.ctx.get('evolutionPlatform') as EvolutionPlatform | undefined)?.ports.llm
   }
 
   /** Whether the platform llm service is mounted. */
-  available(): boolean { return this.port !== undefined }
+  available(): boolean { return this.port() !== undefined }
 
   /** One assembled text response. */
   async text(input: EvolutionLlmInput): Promise<string> {
@@ -59,7 +56,7 @@ export class EvolutionLlm extends Service {
   }
 
   private prepare(input: EvolutionLlmInput): { port: LlmPort; request: EvolutionLlmRequest; timeout?: AbortSignal; caller?: AbortSignal } {
-    const port = this.port
+    const port = this.port()
     if (port === undefined) throw new EvolutionLlmError('model-unavailable', 'llm-unavailable: no llm service is mounted')
     const route = input.route ?? modelRoute(this.ctx, input.agent, input.session)
     if (route === undefined) throw new EvolutionLlmError('no-route', 'llm-unavailable: no model route is configured')

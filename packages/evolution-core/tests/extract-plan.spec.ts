@@ -1,6 +1,6 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { planExtract, type OwnerDecision } from '@deepseek-ai/dsh-evolution-core'
+import { planExtract, type OwnerDecision } from '@deepseek-ai/dsh-evolution-core/extract'
 
 const NL = String.fromCharCode(10)
 const BASE = [
@@ -221,3 +221,4 @@ it('warns about external references instead of silently treating them as relativ
   expect(result.plan.support.external).toEqual([])
   expect(result.plan.warnings.some(warning => warning.startsWith('external-support-not-copied: '))).toBe(true)
 })
+

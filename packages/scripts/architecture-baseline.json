@@ -1,0 +1,33 @@
+{
+  "$comment": "Phase 0 behavior baseline. Spec paths are relative to the overlay checkout. Counts are assertionResults per file, not test-case descriptions.",
+  "tag": "v0.49.0",
+  "commit": "aeedc8fe",
+  "recordedAt": "2026-11-16",
+  "requiredDocs": [
+    "docs/developer/architecture-optimization/README.md",
+    "docs/developer/architecture-optimization/platform-ports.md",
+    "docs/developer/architecture-optimization/characterization.md",
+    "docs/developer/architecture.md",
+    "docs/developer/development.md",
+    "docs/developer/units-and-undo.md",
+    "docs/README.md"
+  ],
+  "specs": [
+    {
+      "path": "packages/evolution/evolution-core/tests/subagent-channel.spec.ts",
+      "tests": 9,
+      "why": "subagent one-shot/two-turn/abort/dispose"
+    },
+    {
+      "path": "packages/evolution/tool-skill-manage/tests/write-gates.spec.ts",
+      "tests": 30,
+      "why": "write gates, confirm, approval staging"
+    },
+    {
+      "path": "packages/evolution/tool-skill-manage/tests/tool-skill-manage.spec.ts",
+      "tests": 37,
+      "why": "skill_manage user-visible action paths"
+    }
+  ]
+}
+

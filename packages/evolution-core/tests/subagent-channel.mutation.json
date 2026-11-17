@@ -2,7 +2,7 @@
   "probe": "beh-subagent-channel-outcomes",
   "edits": [
     {
-      "file": "packages/evolution-core/src/subagent/channel.ts",
+      "file": "packages/evolution-core/src/subagent/kernel.ts",
       "find": "if (stopReason === 'aborted') return { kind: 'aborted' }",
       "replace": "if (stopReason === 'aborted') return { kind: 'no-structured', childId: activation.childId, stopReason: 'aborted' }"
     }

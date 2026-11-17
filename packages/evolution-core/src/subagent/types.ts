@@ -1,5 +1,5 @@
 // Subagent channel contract types (frozen in W1; implementation in channel.ts/readiness.ts).
-import type { Agent, AgentOptions } from '../platform/index.ts'
+import type { Agent, AgentIdentity, AgentOptions } from '../platform/index.ts'
 import type { SessionId } from '../platform/index.ts'
 import type { SubagentStopReason } from '../platform/index.ts'
 import type { ObjectJsonSchema } from '../platform/index.ts'
@@ -34,7 +34,7 @@ export interface ChannelSpec<T = undefined> {
   readonly maxDepth?: number
   readonly timeoutMs: number
   readonly signal?: AbortSignal
-  readonly afterResult?: (child: Agent) => T
+  readonly afterResult?: (child: AgentIdentity) => T
 }
 
 /** Open one child for a multi-turn conversation. Round 1 is the prompt. */
@@ -78,3 +78,4 @@ export interface SubagentChannel {
   continueTurn?(childId: SessionId, promptText: string, options?: ConversationTurnOptions): Promise<ConversationOutcome>
   dispose?(childId: SessionId): Promise<void>
 }
+

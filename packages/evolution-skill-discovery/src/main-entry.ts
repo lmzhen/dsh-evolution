@@ -2,6 +2,7 @@ import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
+import { commandsPort, workingDirectoryPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Agent } from '@deepseek-ai/dsh-evolution-core/platform'
 import { isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -81,10 +82,6 @@ class PlatformSource implements SkillIndexSource {
   }
 }
 
-interface WorkingDirectoryService {
-  ensure(agent: Agent, signal?: AbortSignal | undefined): Promise<string>
-}
-
 function searchUnavailable() {
   return { results: [], truncated: false, degraded: true, hint: 'Skill search is unavailable without a session working directory.' }
 }
@@ -97,7 +94,7 @@ export function apply(ctx: Context, config: Config): void {
   const library = newSkillLibrary({ config: {}, io, ctx, authority: authorityFrom({ origin: 'foreground' }) })
   const source = new PlatformSource(ctx, library)
   const index = new SkillIndex(source)
-  const workingDirectory = ctx.get('workingDirectory') as WorkingDirectoryService | undefined
+  const workingDirectory = workingDirectoryPort(ctx)
   if (workingDirectory === undefined) throw new Error('evolution-skill-discovery: workingDirectory service is required')
   const root = evolutionRoot()
   let mode: 'off' | 'on' = config.mode ?? 'off'
@@ -203,7 +200,7 @@ export function apply(ctx: Context, config: Config): void {
     }
   }, { prepend: true })
   const coordinator = generation === undefined ? undefined : new DomainGenerationCoordinator(map, generation)
-  const commandRuntime = ctx.get('commands') as { register: (definition: { name: string; description: string; handler: (invocation: { rawInput: string; agent: Agent }) => Promise<{ kind: 'success'; text?: string } | { kind: 'error'; text: string }> }) => () => void } | undefined
+  const commandRuntime = commandsPort(ctx)
   if (commandRuntime !== undefined) {
     ctx.effect(() => commandRuntime.register({
       name: 'skill-domain',

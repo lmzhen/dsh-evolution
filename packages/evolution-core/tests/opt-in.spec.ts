@@ -21,6 +21,12 @@ function probeContext(options: {
   const ctx = new Context()
   if (options.tools !== undefined) ctx.provide('tools', options.tools)
   if (options.agents !== undefined) ctx.provide('agents', options.agents)
+  ctx.provide('evolutionPlatform', {
+    ports: {
+      ...(options.tools === undefined ? {} : { tools: options.tools }),
+      ...(options.agents === undefined ? {} : { agents: options.agents }),
+    },
+  })
   return ctx
 }
 

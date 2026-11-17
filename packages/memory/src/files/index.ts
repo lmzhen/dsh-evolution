@@ -3,7 +3,8 @@
  * @module @deepseek-ai/dsh-memory-files
  */
 
-import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
+import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import z from '@deepseek-ai/schemastery'
@@ -62,8 +63,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // family renders its own card from the registry). Probed, not assumed: a host
   // without the capability still loads.
   ctx.inject(['settings'], (injected) => {
-    const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
-    if (typeof settings?.configure !== 'function') return
+    const settings = settingsPort(injected)
+    if (settings?.configure === undefined) return
     // v46 S1.12b (finding 6-1): the owner argument is what the platform looks the presentation up by.
     // Omitting it registers the suppression on the settings service's own fiber, so a row that
     // re-mounts keeps a dead key and the auto form can return (platform precedent:
@@ -267,4 +268,3 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   })
   ctx.effect(() => ctx.memory.registerProvider(provider), 'memory-files.provider')
 }
-

@@ -4,7 +4,7 @@
 
 ## 先决条件
 
-- DeepSeek Harness 官方 **0.2.2-rc.1** 或同一兼容线。
+- DeepSeek Harness 官方 **0.2.2-rc.3**（npm `next` 线；`latest` 尚未提升）。0.50.0 不再支持 rc.1/rc.2；旧平台请继续用 0.49.x。
 - Node.js `^22.19.0` 或 `>=24.0.0`。
 - 可用的 `pnpm`：`dsh plugin` 会把 add/remove 转发给 pnpm。
 - 一个能正常启动的 `dsh` profile。桌面 GUI 使用 `desktop`，Web/headless 通常使用 `web`。
@@ -54,7 +54,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-host
 4. 升级家族 bundle：
 
 ```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.49.0
+dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.50.0
 ```
 
 5. 重启后运行 `/evolution doctor`，再实际写一次记忆、改一次技能。
@@ -86,3 +86,4 @@ node packages/scripts/install-layered.mjs --profile web --mode all --home "$DSH_
 - **UI 不出现**：确认使用 all + Web/桌面 GUI，并检查客户端与连接服务。
 - **设置面板不可用**：平台没有设置分区时（旧平台线）参数改不了，只能用 `/evolution params` 只读查看；不再有 `/evolution policy` 命令。
 - **启动报重复注册**：同一 profile 挂了多个家族形态；移除多余 bundle 后重启。
+

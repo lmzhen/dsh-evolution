@@ -14,6 +14,7 @@
 import { createElement, useMemo } from 'react'
 const h = createElement as (...args: unknown[]) => ReactNode
 import type { ReactNode } from 'react'
+import { platformUiModule } from '@lmzhen/dsh-evolution-client-kit'
 
 /** The three localized words the platform renderer needs; the face owns them. */
 export interface MarkdownWords {
@@ -50,7 +51,6 @@ export type MarkdownRender =
   | { readonly ok: false }
 
 /** The module-table specifier; kept in one place so the seam is the only reader. */
-const PLATFORM_UI_MODULE = '@deepseek-ai/dsh-client-ui-primitives'
 
 /**
  * The renderer a module row carries, when it carries one.
@@ -83,16 +83,8 @@ export function rendererOf(row: { MarkdownText?: unknown }): MarkdownTextCompone
  * @returns the component, or undefined when it cannot be reached.
  */
 function markdownText(): MarkdownTextComponent | undefined {
-  try {
-    // The module table's copy, reached the way `react` is: the specifier cannot be imported as
-    // source (see platform-ui.d.ts), and the loader's require is the only door to it.
-    // oxlint-disable-next-line typescript/no-require-imports -- the client module table is reachable only through the loader's require
-    return rendererOf(require(PLATFORM_UI_MODULE) as { MarkdownText?: unknown })
-  } catch {
-    // No client-ui-primitives row in this deployment: stay quiet and let the caller fall back to
-    // the source view rather than taking the panel down.
-    return undefined
-  }
+  const row = platformUiModule()
+  return row === undefined ? undefined : rendererOf(row)
 }
 
 /**
@@ -125,4 +117,3 @@ export function renderMarkdown(text: string, words: MarkdownWords): MarkdownRend
   if (component === undefined) return { ok: false }
   return { ok: true, node: h(MarkdownBlock, { component, text, words }) }
 }
-

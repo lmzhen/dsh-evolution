@@ -2,11 +2,11 @@
   "probe": "beh-hmr-double-apply",
   "edits": [
     {
-      "file": "packages/evolution-core/src/http-routes.ts",
-      "find": "      return () => {\n        for (const dispose of disposers) {",
-      "replace": "      return () => {\n        for (const dispose of disposers.slice(0, 0)) {"
+      "file": "packages/evolution-ui/src/panels/history/host.ts",
+      "find": "registerHostRoutes(ctx, audit => makeSkillHistoryRoutes({ getCurator: () => ctx.get('evolutionCurator') }, audit))",
+      "replace": "registerHostRoutes(ctx, () => [])"
     }
   ],
   "expect": "red",
-  "note": "dispose must release every registered route; skipping the disposer leaves the first cycle mounted"
+  "note": "the history host must register its six routes; an empty factory leaves the surface absent"
 }

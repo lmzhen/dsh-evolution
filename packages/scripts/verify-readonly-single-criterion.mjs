@@ -42,7 +42,7 @@ for (const entry of readdirSync(root, { withFileTypes: true })) {
       if (file.endsWith('verify-readonly-single-criterion.mjs')) return
       scanned += 1
       const text = stripComments(readFileSync(file, 'utf8'))
-      if (/const isReadOnlyAction\b/.test(text) && /READ_ONLY_ACTIONS\b/.test(text)) defines += 1
+      if (/(?:const|function)\s+isReadOnlySkillAction\b/.test(text) && /SKILL_ACTIONS\b/.test(text)) defines += 1
       if (INLINE.test(text)) {
         problems.push(file + ': spells the read-only comparison inline again — call isReadOnlyAction')
       }
@@ -52,7 +52,7 @@ for (const entry of readdirSync(root, { withFileTypes: true })) {
   }
 }
 
-if (defines === 0) problems.push('no source file defines isReadOnlyAction + READ_ONLY_ACTIONS (the criterion is missing)')
+if (defines === 0) problems.push('no source file defines isReadOnlySkillAction + SKILL_ACTIONS (the criterion is missing)')
 if (defines > 1) problems.push('the criterion is defined in ' + defines + ' files — it must live once')
 
 if (problems.length > 0) {
@@ -61,3 +61,6 @@ if (problems.length > 0) {
   process.exit(1)
 }
 console.log('verify-readonly-single-criterion: OK — 1 criterion, ' + scanned + ' source file(s) scanned')
+
+
+

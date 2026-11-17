@@ -1,3 +1,4 @@
+import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 /**
  * Deterministic skill lifecycle curator with interval gate and archive.
  * @module @deepseek-ai/dsh-evolution-curator
@@ -26,7 +27,8 @@ import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 /** Shape of one history index file (only the field this reading needs). */
 type RawIndex = { versions?: unknown[] }
-import { eventsFile, EXTRACT_PROMPT_HASH, readEvolutionEvents, writeProposalReport, type ProposalView } from '@deepseek-ai/dsh-evolution-core'
+import { eventsFile, readEvolutionEvents, writeProposalReport, type ProposalView } from '@deepseek-ai/dsh-evolution-core'
+import { EXTRACT_PROMPT_HASH } from '@deepseek-ai/dsh-evolution-core/extract'
 import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { foldCuratorFields, loadUsage, mutateUsage, type UsageMap } from '@deepseek-ai/dsh-evolution-core'
 import { markerEntryName } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -375,8 +377,8 @@ export class EvolutionCurator extends Service {
     // G1: suppress the platform auto-generated page for this row (the family renders
     // its own card). Probed, not assumed: a host without the capability still loads.
     ctx.inject(['settings'], (injected) => {
-      const settings = (injected as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
-      if (typeof settings?.configure !== 'function') return
+      const settings = settingsPort(injected)
+      if (settings?.configure === undefined) return
       // v46 S1.12b (finding 6-1): the owner argument is what the platform looks the presentation up by.
       // Omitting it registers the suppression on the settings service's own fiber, so a row that
       // re-mounts keeps a dead key and the auto form can return (platform precedent:
@@ -1892,9 +1894,10 @@ export class EvolutionCurator extends Service {
 
   private recentSessionActive(): boolean {
     const settings = this.settings()
-    const agents = this.ctx.get('agents') as {
-      list(): Array<{ session: Session }>
+    const platform = this.ctx.get('evolutionPlatform') as {
+      ports?: { agents?: { list(): Array<{ session: Session }> } }
     } | undefined
+    const agents = platform?.ports?.agents
     if (!agents) {
       // E-54: fail-open is the shipped default — an always-off `agents` service
       // (headless/scheduled composition) must not defer automatic curation

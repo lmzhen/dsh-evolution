@@ -1,3 +1,4 @@
+import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 /**
  * Human commands for the evolution family: /evolution learn|pending|curator|restore|consolidate|skills refresh.
  * @module @deepseek-ai/dsh-evolution-commands
@@ -8,7 +9,7 @@
 // `packages/settings/settings/src/index.ts`, tools by `packages/core/tools/src/index.ts` and hmr
 // by `vendor/hmr/src/index.ts`. The probes are capability checks — absence degrades a feature and
 // `/evolution doctor` reports it.
-import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import { createSubagentChannel, authorityFrom, mutationLockFrom } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
@@ -16,7 +17,7 @@ import { makeDiagnosticsRoutes } from './diagnostics-route.ts'
 import z from '@deepseek-ai/schemastery'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
-import { createUserMessage } from '@deepseek-ai/dsh-evolution-core/platform'
+import { commandsPort, createUserMessage, toolsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { ContextFormed } from '@deepseek-ai/dsh-evolution-core/platform'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
@@ -26,8 +27,8 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-commands': { kind: 'evolution-commands' } & ContextFormed
   }
 }
-import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, type SettingsProviderLike, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
-import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
+import { buildExtractPlanFromLibrary, ownerDecisionText, proposalFromPlan, readProposalReport, writeProposalReport } from '@deepseek-ai/dsh-evolution-core/extract'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
@@ -314,8 +315,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // pages editing one row make a write on the wrong one look ignored. Probed, not assumed: a host
   // without the capability still loads.
   ctx.inject(['settings'], (scope) => {
-    const settings = (scope as { settings?: { configure?: (presentation: { auto?: boolean }, owner?: Fiber) => unknown } }).settings
-    if (typeof settings?.configure !== 'function') return
+    const settings = settingsPort(scope)
+    if (settings?.configure === undefined) return
     const disposer = settings.configure({ auto: false }, ctx.fiber)
     if (typeof disposer === 'function') scope.effect(() => disposer as () => void, 'evolution-commands: settings presentation')
   })
@@ -361,7 +362,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // required member to the definition or the invocation failed to compile
     // nowhere in this family). `@deepseek-ai/dsh-commands` is a declared peer,
     // so the types resolve through the same package the platform mounts.
-    const commands = commandCtx.commands
+    const commands = commandsPort(commandCtx)
+    if (commands === undefined) return
     // M-11 (S6.2, E-29): bind the register disposer to the fiber — an unbound
     // registration survives reload/HMR and registers /evolution twice.
     // evolution-learning-graph is the aligned precedent
@@ -454,7 +456,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             if (def === undefined || isParseFailure(command)) break
             const handler = HOST_COMMAND_HANDLERS[def.id]
             if (handler === undefined) break
-            const handled = await handler({ input, command, approval, locale: hostLocale, provider: ctx.get('settings') as SettingsProviderLike | undefined, ctx, runs: doctorRuns, refusal: unreplayableWriteRefusal })
+            const handled = await handler({ input, command, approval, locale: hostLocale, provider: settingsPort(ctx), ctx, runs: doctorRuns, refusal: unreplayableWriteRefusal })
             if (handled !== undefined) return handled
             break
           }
@@ -1094,7 +1096,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                   // the orchestrator can degrade the subagent toolFilter when the
                   // host bundle's maintenance_probe row is not mounted.
                   evolutionPolicy: { get: () => (ctx.get('evolutionPolicy') as { get(): { curatorModel?: string | undefined } } | undefined)?.get() },
-                  tools: { get: (name: string) => (ctx.get('tools') as { get(name: string): unknown } | undefined)?.get(name) },
+                  tools: { get: (name: string) => toolsPort(ctx)?.get(name) },
                   logger: { warn: (message: string) => { ctx.logger.warn(message) } },
                   // V27 M-02: the io seam lists a missing directory as empty, so
                   // the orchestrator needs this probe to tell a misconfigured root

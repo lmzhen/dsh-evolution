@@ -13,6 +13,9 @@
  * @module
  */
 
+import type { Context } from '@deepseek-ai/cordis'
+import { settingsPort } from './platform/settings.ts'
+
 /** Deprecated alias (plugin-row name) -> canonical id (policy/snapshot name).
  * Retained for the one-time legacy-document migration and the doctor's old-key report;
  * live readers use the canonical id only. */
@@ -338,7 +341,7 @@ export function paramSettingsId(owner: string): string | undefined {
  */
 export function userSetKeys(ctx: { get(name: string): unknown }, rowId: string): ReadonlySet<string> {
 // platform-declaration anchor: the platform’s `settings` service (optional; undefined ⇒ the source column reports “unknown”)
-  const settings = ctx.get('settings') as { describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; user?: Record<string, unknown> }> } | undefined
+  const settings = settingsPort(ctx as Context)
   const entry = settings?.describe?.({ redactSecrets: false }).find(item => item.ns === rowId)
   return new Set(Object.keys(entry?.user ?? {}))
 }

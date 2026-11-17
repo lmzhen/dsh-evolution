@@ -21,6 +21,12 @@ function fakeAgent(origin: string | undefined): Agent {
   return { session: { header: { origin }, append: () => {} } } as unknown as Agent
 }
 
+/** Mount the tool against the testkit's real systemPrompt through the platform port. */
+async function mountToolSkillManage(ctx: Context, config?: Record<string, unknown>): Promise<void> {
+  ctx.provide('evolutionPlatform', { ports: { systemPrompt: ctx.systemPrompt } })
+  await ctx.plugin(ToolSkillManage, config)
+}
+
 /** v30: shared approval-replay harness — `executeCore` through the runner, no
  * schema in front (the forged-pending-record route). */
 function replayRun(ctx: Context, operation: Record<string, unknown>, libraryOrigin: 'foreground' | 'background_review' = 'foreground') {
@@ -45,7 +51,7 @@ async function setup() {
     // Explicit root keeps the usage sidecar local to this fixture instead of
     // sharing a registry-level default across tests (B7).
     await ctx.plugin(SkillUsageRegistry, { root })
-    await ctx.plugin(ToolSkillManage)
+    await mountToolSkillManage(ctx)
     return { ctx, root, previousHome }
   } catch (error) {
     if (previousHome === undefined) delete process.env.DSH_HOME
@@ -74,7 +80,7 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-')) })
-    await ctx.plugin(ToolSkillManage)
+    await mountToolSkillManage(ctx)
     expect(ctx.tools.get('skill_manage')).toBeDefined()
   })
 
@@ -84,7 +90,7 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-guidance-')) })
-    await ctx.plugin(ToolSkillManage)
+    await mountToolSkillManage(ctx)
     const assembly = await ctx.systemPrompt.assemble()
     const rendered = (assembly.sections ?? []).map(s => (typeof s === 'string' ? s : s.text)).join('\n')
     expect(rendered).toContain('Skills guidance:')
@@ -114,7 +120,7 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-skill-usage-guard-')) })
-    await ctx.plugin(ToolSkillManage)
+    await mountToolSkillManage(ctx)
     let protectedNames: string[] = []
     let policyThrows = false
     ctx.provide('evolutionPolicy', {
@@ -327,7 +333,7 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
-    await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
+    await mountToolSkillManage(ctx, { descriptionStrict: true })
     const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
     const result = await executeOne(ctx, {
       callId: ToolCallId(`strict-${Math.random()}`),
@@ -457,7 +463,7 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
-    await ctx.plugin(ToolSkillManage, { descriptionStrict: true })
+    await mountToolSkillManage(ctx, { descriptionStrict: true })
     const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
     // edit routes to the same full-content update as update — the gate must not be bypassable.
     const result = await executeOne(ctx, {
@@ -479,7 +485,7 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
-    await ctx.plugin(ToolSkillManage)
+    await mountToolSkillManage(ctx)
     const body = `---
 name: fat-body
 description: restructure fixture.
@@ -526,7 +532,7 @@ Use it.
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     await ctx.plugin(SkillUsageRegistry, { root })
-    await ctx.plugin(ToolSkillManage)
+    await mountToolSkillManage(ctx)
     const source = `---
 name: extract-source
 description: extract fixture.
@@ -667,7 +673,7 @@ Existing.
     // NaN passes the number schema (`z.number().min(1)`), so the assembly
     // clamp is the net that must keep the DEFAULT limits enforced — a NaN
     // limit would make every comparison false and silently unlimit writes.
-    await ctx.plugin(ToolSkillManage, {
+    await mountToolSkillManage(ctx, {
       maxSkillNameLength: NaN,
       maxDescriptionLength: NaN,
       skillContentChars: NaN,
@@ -750,7 +756,7 @@ Existing.
     // The pass-through forwards the labels to the SkillLibrary options
     // (`threatExemptLabels` → core ScanOptions.excludeLabels, linked core
     // change in plan batch 3a.3); the construction itself must stay clean.
-    await ctx.plugin(ToolSkillManage, { threatExemptLabels: ['release-doc-examples'] })
+    await mountToolSkillManage(ctx, { threatExemptLabels: ['release-doc-examples'] })
     expect(ctx.tools.get('skill_manage')).toBeDefined()
   })
 })

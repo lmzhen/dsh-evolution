@@ -10,7 +10,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
-import { defineDomain, domainTable, DomainError, type Domain } from '@deepseek-ai/dsh-evolution-core/platform'
+import { defineDomain, domainTable, DomainError, storageDomainPort, type Domain } from '@deepseek-ai/dsh-evolution-core/platform'
 import {
   assertCloneable,
   canClaimPending,
@@ -107,10 +107,6 @@ export const EVOLUTION_DOMAIN = defineDomain({
   },
 })
 
-interface StorageDomainLike {
-  open(spec: typeof EVOLUTION_DOMAIN): Promise<Domain<typeof EVOLUTION_DOMAIN>>
-}
-
 /**
  * Bounded open() retry (rc.42 audit P1-4, package-private): a rejected open
  * used to poison the shared `opening` promise forever, so one transient
@@ -154,12 +150,12 @@ export function apply(ctx: Context): void {
     if (domain) return domain
     if (!opening) {
       opening = (async () => {
-        const facility = ctx.get('storageDomain') as StorageDomainLike | undefined
+        const facility = storageDomainPort(ctx)
         if (!facility) throw new Error('evolution-state-domain requires @deepseek-ai/dsh-storage-domain')
         let lastError: unknown
         for (let attempt = 1; attempt <= OPEN_MAX_ATTEMPTS; attempt += 1) {
           try {
-            return await facility.open(EVOLUTION_DOMAIN)
+            return await facility.open<Domain<typeof EVOLUTION_DOMAIN>>(EVOLUTION_DOMAIN)
           } catch (error) {
             lastError = error
             // P2-6 (v37): retrying a deterministic failure only re-runs the

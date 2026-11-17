@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-15T15:46:04.689Z",
+  "generatedAt": "2026-11-17T03:09:31.063Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -17,14 +17,14 @@
     },
     {
       "probe": "beh-hmr-double-apply",
-      "signature": "6ff7beee6740a0bd61ba86dee0f2241d99255f1e100afffca27046bf43c27ca8",
-      "provenAt": "2026-11-15T15:28:43.975Z",
+      "signature": "ad7b84ab028b66cff5757ea674b35c562920283972fa3855a727c56b73a343a5",
+      "provenAt": "2026-11-16T22:14:44.545Z",
       "tree": "overlay"
     },
     {
       "probe": "beh-host-route-registration",
-      "signature": "563d78e6d7a34ffdf5a44607255f5ea2198ff2062c9bbf9dbb257d750acd5a80",
-      "provenAt": "2026-11-15T15:38:10.189Z",
+      "signature": "b65f5e4800c1e4279e6f117daea01e8ac4a8394bff696b172db13d49f2da82c6",
+      "provenAt": "2026-11-16T20:38:40.471Z",
       "tree": "overlay"
     },
     {
@@ -35,8 +35,8 @@
     },
     {
       "probe": "beh-memory-interpolation",
-      "signature": "0661112aefceb36d281a8fd2063b5fe82daf83254551ace6aec7942c8809c158",
-      "provenAt": "2026-11-15T15:28:44.026Z",
+      "signature": "73a97cf1d879994d1d1f17ed5dd4a772c71231c6d016bb9e97d21f152d2e1fa1",
+      "provenAt": "2026-11-16T20:53:09.868Z",
       "tree": "overlay"
     },
     {
@@ -47,8 +47,8 @@
     },
     {
       "probe": "beh-restricted-preset-lifecycle",
-      "signature": "cf426ca0de03351e6616fabf76e8717fbb5dd85483074d1b28ef3ea46496a1f4",
-      "provenAt": "2026-11-15T15:28:43.740Z",
+      "signature": "477b88afdffdf04083cca69300545e65087981b30ed1930d3c77cf109245d681",
+      "provenAt": "2026-11-16T20:36:33.513Z",
       "tree": "overlay"
     },
     {
@@ -59,8 +59,8 @@
     },
     {
       "probe": "beh-review-inject-fallback",
-      "signature": "64800cc61c08753d2ffc9ff3e68bb257c4e67c0f501ce37639772e6dc43bdf37",
-      "provenAt": "2026-11-15T15:28:43.886Z",
+      "signature": "8ea50b62970b9d91ca8413d5c9b1316563f6e2fff340ed8d9ca0a1d27dae7a30",
+      "provenAt": "2026-11-16T20:41:39.993Z",
       "tree": "overlay"
     },
     {
@@ -83,8 +83,8 @@
     },
     {
       "probe": "beh-subagent-channel-outcomes",
-      "signature": "7a76730db10cc0300ff5074dc3b6a40fedaf9298db4e0da31fa45cf5f85de598",
-      "provenAt": "2026-11-15T15:28:43.679Z",
+      "signature": "84f4c5e6f3e23c48d4db6c7f5ca601855cb88a6332720a7720310b8c83595c7d",
+      "provenAt": "2026-11-17T03:09:31.055Z",
       "tree": "overlay"
     },
     {
@@ -107,8 +107,8 @@
     },
     {
       "probe": "decl-contracts-surface",
-      "signature": "5e0678efaed26a85f63557a0605dec184f2f8306e05f28835d28681a68c9c0ff",
-      "provenAt": "2026-11-15T15:28:43.551Z",
+      "signature": "1171d6a66f0a4e19f1a3939e828eb1eed1ac11e9bd90f357338270bb43cdf507",
+      "provenAt": "2026-11-16T20:34:17.065Z",
       "tree": "overlay"
     },
     {
@@ -131,20 +131,20 @@
     },
     {
       "probe": "decl-platform-line-grid",
-      "signature": "afcc65706a5716ce7b358a423f6fd5610f4a0c2df4294af0cab9c30f0e74b3dd",
-      "provenAt": "2026-11-15T15:28:43.477Z",
+      "signature": "9b5dd14388ae303e31100fbe50d1837c151cfcb6c913847f8135d7b9f58523ff",
+      "provenAt": "2026-11-16T20:49:06.334Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-platform-ranges",
-      "signature": "81c6f9703663d178a80d97ccaa55012a934350ca3582fe186a9be285d3751c00",
-      "provenAt": "2026-11-15T15:28:44.409Z",
+      "signature": "eba3cbfc1fe5b8e687afdaf9130f8d386222c81ac08c59bd04b0f2f8cee71ab3",
+      "provenAt": "2026-11-16T21:33:40.746Z",
       "tree": "overlay"
     },
     {
       "probe": "decl-platform-view",
-      "signature": "2f2e5707627daceb6f8e98c84388ba0dc0e7144107be31d82f62b528fb71f5f2",
-      "provenAt": "2026-11-15T15:28:44.155Z",
+      "signature": "09bdbb952223096e833cef29266a79adb3f297126cbc090d3947b6e87bbf7d61",
+      "provenAt": "2026-11-16T21:30:21.488Z",
       "tree": "overlay"
     }
   ]

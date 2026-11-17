@@ -4,7 +4,7 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
-import { registerWorkbenchView } from '@lmzhen/dsh-evolution-client-kit'
+import { registerSurface } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
 import { NS, dictionaries } from './messages.ts'
@@ -31,7 +31,8 @@ function HealthView(props: HealthFace & { activeView?: string; openHistory?: (na
  */
 export function apply(ctx: ClientContext): void {
   requireClientSeats(ctx, 'skill-health')
-  registerWorkbenchView<HealthFace>(ctx, {
+  registerSurface<HealthFace>(ctx, {
+    surface: 'workbench',
     id: PANEL_ID,
     order: PANEL_ORDER,
     namespace: NS,

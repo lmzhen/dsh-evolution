@@ -15,7 +15,7 @@ inputs:
   platform_version:
     description: Platform package version used to assemble the full packed-import consumer.
     required: false
-    default: '0.2.2-rc.1'
+    default: '0.2.2-rc.3'
   install_smoke:
     description: >-
       'true' additionally installs the PACKED dist tarballs into a throwaway
@@ -339,3 +339,4 @@ runs:
         # No `working-directory`: the table lives in the FAMILY checkout, not in the overlaid
         # `upstream/` tree the other steps work in.
         node packages/scripts/verify-gate-manifest.mjs packages
+

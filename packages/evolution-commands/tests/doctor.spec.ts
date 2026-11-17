@@ -790,7 +790,9 @@ describe('doctor (WB2, 0.3.55)', () => {
       const ctx = new Context()
       // The host-only shape returns nothing; a session that carries the family's
       // model rows returns the definition.
-      ctx.provide('tools', { get: (name: string) => seen !== undefined && name === seen.name ? seen : undefined })
+      const tools = { get: (name: string) => seen !== undefined && name === seen.name ? seen : undefined }
+      ctx.provide('tools', tools)
+      ctx.provide('evolutionPlatform', { ports: { tools, agents: { get: () => undefined } } })
       return ctx
     }
     const home = await mkdtemp(join(tmpdir(), 'doctor-scoped-probe-'))
