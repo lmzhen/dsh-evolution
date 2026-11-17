@@ -10,10 +10,10 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { emptyState, groupHeading, notice, panelHead, searchField, skillLine, versionRow, type Copy, type OpenKind } from './chrome.ts'
+import { emptyState, groupHeading, localTime, notice, panelHead, searchField, skillLine, versionRow, type Copy, type OpenKind } from './chrome.ts'
 import { DiffBody, PreviewBody, type BodyState, type DiffState } from './document.ts'
 import { historyViewModel } from './history-presentation.ts'
-import { SkillHistoryRefusal, type SkillRow, type VersionBodyRow, type VersionDiffRow, type VersionsPayload, type VersionRow } from './api.ts'
+import { SkillHistoryRefusal, type GovernanceRow, type SkillRow, type VersionBodyRow, type VersionDiffRow, type VersionsPayload, type VersionRow } from './api.ts'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { fillTemplate } from '@lmzhen/dsh-evolution-client-kit'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
@@ -26,6 +26,7 @@ export interface PanelFace extends Copy {
   readonly markdownWords: MarkdownWords
   readonly loadSkills: () => Promise<readonly SkillRow[]>
   readonly loadVersions: (name: string) => Promise<VersionsPayload>
+  readonly loadGovernance?: () => Promise<readonly GovernanceRow[]>
   readonly loadDiff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly loadBody: (name: string, v: number) => Promise<VersionBodyRow>
   readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>
@@ -75,6 +76,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   const [expanded, setExpanded] = useState<OpenRow | undefined>(undefined)
   const [diffs, setDiffs] = useState<ReadonlyMap<number, DiffState>>(new Map())
   const [bodies, setBodies] = useState<ReadonlyMap<number, BodyState>>(new Map())
+  const [governance, setGovernance] = useState<readonly GovernanceRow[]>([])
   // Every rows read takes a ticket, and only the newest one may write state. Without it a slow reply
   // for skill A lands while B is open: B would show A's rows, and B's restore buttons would post A's
   // version number at B's name — a write against the wrong skill.
@@ -240,6 +242,14 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
   // One read on mount; every later read is a user action. There is no store and no subscription.
   useEffect(reloadSkills, [])
 
+  useEffect(() => {
+    const load = face.loadGovernance
+    if (load === undefined) return
+    let live = true
+    void load().then((rows) => { if (live) setGovernance(rows) }).catch(() => { /* the list is optional */ })
+    return () => { live = false }
+  }, [face.loadGovernance])
+
   const needle = query.trim().toLowerCase()
   const visible = useMemo(() => needle === ''
     ? skills
@@ -292,6 +302,19 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     createElement('div', { className: 'evo-hist-main' },
       panelHead(face, refresh, selected ?? face.t('bodyTitle'), selected),
       notice(noteText, noteError),
+      governance.length === 0
+        ? null
+        : createElement('section', { className: 'evo-hist-governance' },
+          createElement('h3', { className: 'evo-hist-group' }, face.t('governance.title')),
+          createElement('ul', { className: 'evo-hist-governance-list' },
+            governance.map(row => createElement('li', { key: row.runId, className: 'evo-hist-governance-row' },
+              face.format('governance.line', {
+                mode: row.mode ?? '—',
+                target: row.target ?? '—',
+                state: row.state,
+              }),
+              ' · ',
+              localTime(new Date(row.startedAt).toISOString()))))),
       failure === undefined ? null : createElement('div', { className: 'evo-hist-failure' }, failureBlock(face.t, failure)),
       // The explanation is for the screen that has nothing else on it (W12): a reader who can see
       // versions does not need to be told what a version is.

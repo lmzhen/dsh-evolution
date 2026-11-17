@@ -602,6 +602,26 @@
       "pt": "Falha ao copiar",
       "ru": "Не удалось скопировать"
     },
+    "governance.title": {
+      "zh": "最近治理",
+      "en": "Recent governance",
+      "ja": "最近の整備",
+      "es": "Gobernanza reciente",
+      "fr": "Gouvernance récente",
+      "de": "Letzte Pflege",
+      "pt": "Governança recente",
+      "ru": "Последнее управление"
+    },
+    "governance.line": {
+      "zh": "{mode} {target} — {state}",
+      "en": "{mode} {target} — {state}",
+      "ja": "{mode} {target} — {state}",
+      "es": "{mode} {target} — {state}",
+      "fr": "{mode} {target} — {state}",
+      "de": "{mode} {target} — {state}",
+      "pt": "{mode} {target} — {state}",
+      "ru": "{mode} {target} — {state}"
+    },
     "markdown.footnotes": {
       "zh": "脚注",
       "en": "Footnotes",

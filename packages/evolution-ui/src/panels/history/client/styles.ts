@@ -72,6 +72,9 @@ export const CSS = [
   '.evo-hist-main{flex:1 1 32ch;min-width:min(100%,32ch);min-height:0;overflow-y:auto;padding:var(--evo-space-12) var(--evo-space-12)}',
   '.evo-hist-head{display:flex;align-items:center;flex-wrap:wrap;gap:var(--evo-space-10);margin:0 0 var(--evo-space-4)}',
   '.evo-hist-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font-size:var(--evo-type-lg);font-weight:600}',
+  '.evo-hist-governance{margin:0 0 var(--evo-space-10);padding:var(--evo-space-8) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control)}',
+  '.evo-hist-governance-list{list-style:none;margin:0;padding:0;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
+  '.evo-hist-governance-row{padding:var(--evo-space-2) 0}',
   '.evo-hist-hint{margin:0 0 var(--evo-space-10);color:var(--dsw-alias-label-secondary);line-height:var(--evo-leading-base)}',
   // A notice owns a surface and a glyph, so a refusal is not carried by colour alone (W13).
   '.evo-hist-note{display:flex;align-items:flex-start;gap:var(--evo-space-6);margin:0 0 var(--evo-space-10);color:var(--dsw-alias-label-secondary);line-height:var(--evo-leading-base)}',

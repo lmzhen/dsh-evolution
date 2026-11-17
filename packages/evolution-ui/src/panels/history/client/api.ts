@@ -125,6 +125,16 @@ export interface VersionBodyRow {
  * compares it (`undoable: entry.hash !== liveHash`, routes.ts) and delivers the verdict per row, so the
  * "current" marker has one source. A declared field nobody reads is drift waiting to happen.
  */
+/** One recent governance run, as the aggregate health route reports it. */
+export interface GovernanceRow {
+  readonly runId: string
+  readonly state: string
+  readonly startedAt: number
+  readonly target: string | null
+  readonly mode: string | null
+  readonly resultRef: string | null
+}
+
 export interface VersionsPayload {
   readonly content: readonly VersionRow[]
   readonly support: readonly VersionRow[]
@@ -134,6 +144,7 @@ export interface VersionsPayload {
 export interface SkillHistoryApi {
   readonly skills: () => Promise<readonly SkillRow[]>
   readonly versions: (name: string) => Promise<VersionsPayload>
+  readonly governance: () => Promise<readonly GovernanceRow[]>
   readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>
   readonly diff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly body: (name: string, v: number) => Promise<VersionBodyRow>
@@ -167,6 +178,10 @@ export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHis
   return {
     skills: async () => await request(HOST_ROUTES.skills) as readonly SkillRow[],
     versions: async (name: string) => await request(HOST_ROUTES.versions + '?name=' + encodeURIComponent(name)) as VersionsPayload,
+    governance: async () => {
+      const data = await request(HOST_ROUTES.health) as { governance?: unknown }
+      return Array.isArray(data.governance) ? data.governance as readonly GovernanceRow[] : []
+    },
     diff: async (name: string, v: number) => await request(HOST_ROUTES.diff + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionDiffRow,
     body: async (name: string, v: number) => await request(HOST_ROUTES.body + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionBodyRow,
     undo: async (name: string, v?: number, unitId?: string) => {
