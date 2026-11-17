@@ -1017,6 +1017,9 @@ function snapshotReviewParent(agent: Agent): Agent {
   async function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
     const running = auxRunning.get(session.id)
     if (running !== undefined) { running.rerun = kind; return true }
+    // Cutoff is the caller's boundary (turn/end), taken synchronously before
+    // any lease wait so later goal-loop turns can never leak into the review.
+    const reviewParent = snapshotReviewParent(agent)
     const header = session.requestHeader()
     if (header === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — parent has no request header'); return false }
     const llm = llmPort(ctx)?.streamRaw
@@ -1049,7 +1052,6 @@ function snapshotReviewParent(agent: Agent): Agent {
     }
     const AUX_TOOL_ALLOW = new Set(['skill_manage', 'memory', 'skill', 'skill_search', 'read', 'glob', 'grep'])
     const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
-    const reviewParent = snapshotReviewParent(agent)
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
