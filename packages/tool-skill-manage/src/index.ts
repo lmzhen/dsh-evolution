@@ -1205,7 +1205,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // old line (no fabricated 0).
     const sizedLines = lines.map((line, index) => {
       const body = contents.get(list[index]?.name ?? '')
-      return body === undefined ? line : `${line} chars:${body.length}`
+      if (body === undefined) return line
+      const oversize = body.length >= DEFAULT_HEALTH_THRESHOLDS.softBodyChars ? ' [oversize]' : ''
+      return `${line} chars:${body.length}${oversize}`
     })
     const dedupLines = groups.slice(0, MAX_DEDUP_GROUPS_IN_REVIEW).map(group => `- ${group.join(' ~ ')}`)
     if (dedup.truncated) dedupLines.push(`- note: dedup scan truncated at the pair-comparison budget (${groups.length} group(s) so far); groups may be incomplete`)
@@ -1233,7 +1235,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       : `\nWarning skills (${warned.length}): ${warned.join(', ')} — low quality; consider consolidating them before authoring new skills.`
     const header = list.length === 0
       ? 'No skills yet. Create one with action=create, or it is safe to author a new class-level umbrella.'
-      : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low), protection, and body chars when readable.${groups.length > 0 ? `\n\nNear-duplicate groups (${groups.length}):` : ''}`
+      : `Skills: ${list.length} total. Below each name: state, use/view/patch counts, quality (0-1, ⚠ = low), protection, and body chars when readable ([oversize] = at or over the health soft line).${groups.length > 0 ? `\n\nNear-duplicate groups (${groups.length}):` : ''}`
     return [header, '', ...sizedLines, ...dedupLines, ...(excludedBodies > 0 ? [excludedLine] : []), ...(unreadableBodies > 0 ? [unreadableLine] : []), warningLine].join('\n')
   }
 
