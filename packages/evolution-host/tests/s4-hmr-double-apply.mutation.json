@@ -3,10 +3,10 @@
   "edits": [
     {
       "file": "packages/evolution-ui/src/panels/history/host.ts",
-      "find": "registerHostRoutes(ctx, audit => makeSkillHistoryRoutes({ getCurator: () => ctx.get('evolutionCurator') }, audit))",
-      "replace": "registerHostRoutes(ctx, () => [])"
+      "find": "export function apply(ctx: Context): void {",
+      "replace": "export function apply(ctx: Context): void { return"
     }
   ],
   "expect": "red",
-  "note": "the history host must register its six routes; an empty factory leaves the surface absent"
+  "note": "the history host must run apply and register its six routes; returning before registration leaves the surface absent"
 }
