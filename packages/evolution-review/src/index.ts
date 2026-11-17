@@ -980,14 +980,43 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   let inFlightControllers = new Set<AbortController>()
 
+/**
+ * Freeze the parent prefix for an aux review.
+ *
+ * The review executor requires an idle parent because it reuses the live
+ * request prefix and refuses if the session grows. A long goal loop is never
+ * idle, so aux review could never run there. A frozen proxy keeps the exact
+ * messages/header/tool-history/seq at the trigger point; review tools still
+ * execute with the review context (background_review), and the parent can
+ * continue without the seq guard tripping.
+ */
+function snapshotReviewParent(agent: Agent): Agent {
+  const session = agent.session
+  const seq = session.seq
+  const header = session.requestHeader()
+  const messages = session.deriveMessages()
+  const toolHistory = session.toolHistory()
+  const snapshotSession = {
+    id: session.id,
+    header: session.header,
+    seq,
+    requestHeader: () => header,
+    deriveMessages: () => messages,
+    toolHistory: () => toolHistory,
+  }
+  return new Proxy(agent, {
+    get(target, property) {
+      if (property === 'status') return 'idle'
+      if (property === 'session') return snapshotSession
+      const value = Reflect.get(target, property, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    },
+  })
+}
+
   async function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
     const running = auxRunning.get(session.id)
     if (running !== undefined) { running.rerun = kind; return true }
-    // A long-running goal loop can keep the parent non-idle across every
-    // cadence boundary. Do not burn a review attempt (and do not record a
-    // failed review) in that window: the caller holds the cadence latch and
-    // re-delivers at the next idle boundary.
-    if (agent.status !== 'idle') return false
     const header = session.requestHeader()
     if (header === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — parent has no request header'); return false }
     const llm = llmPort(ctx)?.streamRaw
@@ -1020,6 +1049,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     const AUX_TOOL_ALLOW = new Set(['skill_manage', 'memory', 'skill', 'skill_search', 'read', 'glob', 'grep'])
     const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
+    const reviewParent = snapshotReviewParent(agent)
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
@@ -1032,9 +1062,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       try {
         const prompt = reviewPrompt(kind, 'aux')
         const result = await withReviewContext({ reviewId, runId: reviewId, reads: new Set<string>() }, () => runReview({
-          parent: agent,
+          parent: reviewParent,
           llm: { stream: options => llm(options) },
-          tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent }) },
+          tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent: reviewParent }) },
           instruction: prompt,
           toolAllow,
           maxRounds: config.reviewMaxRounds,
