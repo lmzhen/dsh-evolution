@@ -28,6 +28,7 @@ export const PLATFORM_SERVICE_PROBES: readonly PlatformServiceProbe[] = Object.f
   { service: 'configForms', feature: 'the platform config-form seat the settings page renders through', side: 'client' },
   { service: 'evolutionApproval', feature: 'pending writes: list, approve and reject from the command surface', side: 'host' },
   { service: 'evolutionCurator', feature: '/evolution curator subcommands, skill undo and history', side: 'host' },
+  { service: 'evolutionFeedback', feature: 'the feedback aggregate and event log behind skill_manage feedback', side: 'host' },
   { service: 'evolutionIo', feature: 'every durable read and write (the IO seam)', side: 'host' },
   { service: 'evolutionMerge', feature: 'merge command delegation and the merge doctor fact', side: 'host' },
   { service: 'evolutionMutationAuthority', feature: 'the family-wide mutation lease, fence and lock authority', side: 'host' },
