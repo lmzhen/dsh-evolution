@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { buildFacts } from '../src/surface/merge-view.ts'
+import { buildBodyView, buildFacts } from '../src/surface/merge-view.ts'
 
 it('keeps active and last separate and uses processedPairs for terminal progress', () => {
   const active = { record: { id: 'r1', state: 'running', command: 'scan', progress: { done: 0, total: 2 }, startedAt: 1 }, meta: null, pairs: [], report: null }
@@ -10,4 +10,14 @@ it('keeps active and last separate and uses processedPairs for terminal progress
   expect(facts.active?.id).toBe('r1')
   expect(facts.last?.id).toBe('r2')
   expect(facts.last?.progress).toEqual({ done: 1, total: 1 })
+})
+
+it('bounds the body preview by bytes without splitting a surrogate pair', () => {
+  const text = '😀'.repeat(20_000)
+  const snapshot = { readAt: 5 } as never
+  const ref = { name: 'a', side: 'left' } as never
+  const view = buildBodyView(snapshot, ref, text)
+  expect(view.truncated).toBe(true)
+  expect(Buffer.byteLength(view.text, 'utf8')).toBeLessThanOrEqual(64 * 1024)
+  expect(view.text).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/)
 })

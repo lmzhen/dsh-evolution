@@ -114,7 +114,7 @@ export function PreviewBody(props: { face: DocumentFace; body: BodyState }): Rea
   const rendered = renderMarkdown(body.body.display, face.markdownWords)
   return h('div', { className: 'evo-doc-preview' },
     body.body.truncated
-      ? note({ children: face.format('preview.truncated', { shown: body.body.display.length, total: body.body.chars }) })
+      ? note({ children: face.format('preview.truncated', { shown: body.body.shown ?? body.body.display.length, total: body.body.total ?? body.body.chars }) })
       : null,
     rendered.ok ? rendered.node : h('pre', { className: 'evo-doc-source' }, body.body.display))
 }

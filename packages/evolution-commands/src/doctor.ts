@@ -1000,16 +1000,16 @@ function memoryBudgetIssues(ctx: { get(name: string): unknown }): string[] {
   if (budget === undefined || policy === undefined) return []
   const issues: string[] = []
   if (budget.memoryChars !== undefined && policy.memoryChars !== undefined && budget.memoryChars !== policy.memoryChars) {
-    issues.push(`store enforces memoryChars=${budget.memoryChars} (source: ${budget.memorySource ?? 'unknown'}) while evolution-policy declares memoryChars=${policy.memoryChars} — the review plans against the policy value and the store refuses what exceeds its own`)
+    issues.push(`store enforces memoryChars=${budget.memoryChars} (source: ${budget.memorySource ?? 'unknown'}) while evolution-policy declares memoryChars=${policy.memoryChars} — keep one character budget, or the effective legacy limit is ambiguous`)
   }
   if (budget.userChars !== undefined && policy.userChars !== undefined && budget.userChars !== policy.userChars) {
     issues.push(`store enforces userChars=${budget.userChars} (source: ${budget.userSource ?? 'unknown'}) while evolution-policy declares userChars=${policy.userChars} — same divergence as the memory limit`)
   }
   if (budget.memoryTokens !== undefined && budget.policyMemoryTokens !== undefined && budget.memoryTokens !== budget.policyMemoryTokens) {
-    issues.push(`store enforces memoryTokens=${budget.memoryTokens} while evolution-policy plans against memoryTokens=${budget.policyMemoryTokens} — align the row and policy token budgets`)
+    issues.push(`store enforces memoryTokens=${budget.memoryTokens} while evolution-policy declares memoryTokens=${budget.policyMemoryTokens} — align the row and policy token budgets`)
   }
   if (budget.userTokens !== undefined && budget.policyUserTokens !== undefined && budget.userTokens !== budget.policyUserTokens) {
-    issues.push(`store enforces userTokens=${budget.userTokens} while evolution-policy plans against userTokens=${budget.policyUserTokens} — same divergence as the memory budget`)
+    issues.push(`store enforces userTokens=${budget.userTokens} while evolution-policy declares userTokens=${budget.policyUserTokens} — same divergence as the memory budget`)
   }
   return issues
 }

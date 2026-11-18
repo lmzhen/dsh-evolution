@@ -19,7 +19,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { EvolutionIoLike, EvolutionPlanAppliedEvent, EvolutionReviewCompletedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, evolutionIoAdapter, transactIo } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, evolutionIoAdapter, transactIo, graphemeCount, truncateGraphemes } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 /** One persisted plan outcome (payload v2 of `evolution/plan-applied`). */
@@ -138,7 +138,7 @@ export function applyReviewActivityEvent(
     kind: event.kind,
     status: event.status,
     trigger: event.trigger,
-    finalText: event.finalText.length <= REVIEW_TEXT_PREVIEW_CHARS ? event.finalText : event.finalText.slice(0, REVIEW_TEXT_PREVIEW_CHARS),
+    finalText: graphemeCount(event.finalText) <= REVIEW_TEXT_PREVIEW_CHARS ? event.finalText : truncateGraphemes(event.finalText, REVIEW_TEXT_PREVIEW_CHARS, ''),
     finalTextChars: event.finalText.length,
     actions: event.actions,
     ...event.usage === undefined ? {} : { usage: event.usage },

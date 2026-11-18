@@ -1,6 +1,6 @@
-## 未发布 — 文本口径统一（候选 0.55.0）
+## 0.55.0 (2026-11-19) — 文本口径统一与 UI 文案
 
-> **范围**：① 新增 `text-metrics` / `text-budgets` 单一来源，门控显式声明 storage / display / context / quality 轴与 hard / soft / report 严重度；② 正文字符统计改走 codePoints，description / 摘要 / 反馈 note / 行宽 / 预览截断改走 graphemes，文件大小保持 bytes；③ 正文软线改为固定估算 token 预算（默认 7,273；2 倍判 needs-restructure），不再按 CJK/ASCII 字符权重折算；④ memory / user 默认预算改为 800 / 500 估算 token，旧 `memoryChars` / `userChars` 保留为字符模式迁移输入；⑤ 8 语言 UI 文案统一技能整理、待我确认、合并建议、健康状态与附带文件术语，并移除代码中硬编码的中文标点；⑥ 数据总览增加估算 token 列与总计，版本预览改 grapheme-safe 截断。
+> **范围**：① 新增 `text-metrics` / `text-budgets` 单一来源，门控显式声明 storage / display / context / quality 轴与 hard / soft / report 严重度；② 正文**硬上限**改走 codePoints，description / 摘要 / 反馈 note / 行宽 / 预览截断改走 graphemes，文件大小保持 bytes；数据总览的正文字符事实仍保留原计数，另以估算 tokens 展示；③ 正文软线改为固定估算 token 预算（默认 7,273；2 倍判 needs-restructure），不再按 CJK/ASCII 字符权重折算；④ memory / user 默认预算改为 800 / 500 估算 token，旧 `memoryChars` / `userChars` 保留为字符模式迁移输入；⑤ 8 语言 UI 文案统一技能整理、待我确认、合并建议、健康状态与附带文件术语，并移除代码中硬编码的中文标点；⑥ 数据总览增加估算 token 列与总计，版本预览改 grapheme-safe 截断。
 >
 > **迁移**：旧 `maxSkillContentChars` / `maxDescriptionLength` / `summaryChars` 继续作为迁移输入；旧 `healthSoftBodyChars` 按 2.75 字符/token 转换一次；旧 `memoryChars` / `userChars` 在 row 上显式设置时保持字符模式，只在 policy 中给出时按 2.75 换算。新旧字段冲突由 doctor 报告。旧报告和版本记录保留原始字符事实，不补写 token。
 >

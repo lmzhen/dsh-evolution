@@ -128,7 +128,9 @@ export const dictionaries = {
     "timeToday": "今天",
     "title": "能力进化",
     "unavailable": "这个功能没有启动（对应的插件没有安装）",
-    "writeTargetHost": "保存位置：插件配置（对所有会话生效）"
+    "writeTargetHost": "保存位置：插件配置（对所有会话生效）",
+    "approvalDiffAdded.one": "新增 1 行",
+    "approvalDiffRemoved.one": "删除 1 行"
   },
   en: {
     "aboutPurpose": "Capability evolution settings and skill history",
@@ -254,7 +256,9 @@ export const dictionaries = {
     "timeToday": "Today",
     "title": "Capability evolution",
     "unavailable": "This feature isn't running (its plugin isn't installed)",
-    "writeTargetHost": "Saved to: plugin config (applies to all sessions)"
+    "writeTargetHost": "Saved to: plugin config (applies to all sessions)",
+    "approvalDiffAdded.one": "1 line added",
+    "approvalDiffRemoved.one": "1 line removed"
   },
   ja: {
     "aboutPurpose": "能力進化の設定とスキル履歴",
@@ -380,7 +384,9 @@ export const dictionaries = {
     "timeToday": "今日",
     "title": "能力進化",
     "unavailable": "この機能は起動していません（対応するプラグインが未インストールです）",
-    "writeTargetHost": "保存先：プラグイン設定（すべてのセッションに反映）"
+    "writeTargetHost": "保存先：プラグイン設定（すべてのセッションに反映）",
+    "approvalDiffAdded.one": "1 行追加",
+    "approvalDiffRemoved.one": "1 行削除"
   },
   es: {
     "aboutPurpose": "Ajustes de evolución de capacidades e historial de skills",
@@ -506,7 +512,9 @@ export const dictionaries = {
     "timeToday": "Hoy",
     "title": "Evolución de capacidades",
     "unavailable": "esta función no está en marcha (su plugin no está instalado)",
-    "writeTargetHost": "Se guarda en: configuración del plugin (afecta a todas las sesiones)"
+    "writeTargetHost": "Se guarda en: configuración del plugin (afecta a todas las sesiones)",
+    "approvalDiffAdded.one": "1 línea añadida",
+    "approvalDiffRemoved.one": "1 línea eliminada"
   },
   fr: {
     "aboutPurpose": "Réglages d’évolution des capacités et historique des skills",
@@ -632,7 +640,9 @@ export const dictionaries = {
     "timeToday": "Aujourd’hui",
     "title": "Évolution des capacités",
     "unavailable": "cette fonction n’est pas démarrée (son plugin n’est pas installé)",
-    "writeTargetHost": "Enregistré dans : config du plugin (s’applique à toutes les sessions)"
+    "writeTargetHost": "Enregistré dans : config du plugin (s’applique à toutes les sessions)",
+    "approvalDiffAdded.one": "1 ligne ajoutée",
+    "approvalDiffRemoved.one": "1 ligne supprimée"
   },
   de: {
     "aboutPurpose": "Fähigkeitsentwicklung: Einstellungen und Skill-Verlauf",
@@ -758,7 +768,9 @@ export const dictionaries = {
     "timeToday": "Heute",
     "title": "Fähigkeitsentwicklung",
     "unavailable": "Diese Funktion läuft nicht (das zugehörige Plugin ist nicht installiert)",
-    "writeTargetHost": "Gespeichert in: Plugin-Konfiguration (gilt für alle Sitzungen)"
+    "writeTargetHost": "Gespeichert in: Plugin-Konfiguration (gilt für alle Sitzungen)",
+    "approvalDiffAdded.one": "1 Zeile hinzugefügt",
+    "approvalDiffRemoved.one": "1 Zeile entfernt"
   },
   ru: {
     "aboutPurpose": "Настройки развития возможностей и история навыков",
@@ -884,7 +896,9 @@ export const dictionaries = {
     "timeToday": "Сегодня",
     "title": "Развитие возможностей",
     "unavailable": "Функция не запущена (соответствующий плагин не установлен)",
-    "writeTargetHost": "Куда сохраняется: конфигурация плагина (действует на все сессии)"
+    "writeTargetHost": "Куда сохраняется: конфигурация плагина (действует на все сессии)",
+    "approvalDiffAdded.one": "Добавлена 1 строка",
+    "approvalDiffRemoved.one": "Удалена 1 строка"
   },
   pt: {
     "aboutPurpose": "Configurações de evolução de capacidades e histórico de skills",
@@ -1010,7 +1024,9 @@ export const dictionaries = {
     "timeToday": "Hoje",
     "title": "Evolução de capacidades",
     "unavailable": "este recurso não está em execução (o plugin correspondente não está instalado)",
-    "writeTargetHost": "Salvo em: configuração do plugin (vale para todas as sessões)"
+    "writeTargetHost": "Salvo em: configuração do plugin (vale para todas as sessões)",
+    "approvalDiffAdded.one": "1 linha adicionada",
+    "approvalDiffRemoved.one": "1 linha removida"
   },
 } as const
 

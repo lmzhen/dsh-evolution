@@ -12,7 +12,7 @@
 | 调整审批、记忆预算、复盘或整理频率 | [设置](configuration.md) |
 | 理解字符、grapheme、bytes、token 各管什么 | [文本预算与门控](text-budgets.md) |
 | 配置模型，了解无模型时的行为 | [API key 与模型](api-keys.md) |
-| 备份、升级、卸载和恢复数据 | [运维](operations.md)、[升级到 0.48](UPGRADE-0.48.md) |
+| 备份、升级、卸载和恢复数据 | [运维](operations.md)、[升级到 0.55](UPGRADE-0.55.md)、[升级到 0.48](UPGRADE-0.48.md) |
 | 按症状定位问题 | [排障](troubleshooting.md) |
 
 ## 常用路径

@@ -102,11 +102,9 @@ export const UPSTREAM_LIMIT_CHARS_PER_TOKEN = 2.75
  * budget, not as a per-body character line (see text-metrics). */
 export const DEFAULT_SOFT_BODY_TOKENS = Math.round(AUTHORING_SPLIT_LINE_CHARS / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
 
-/** The platform's own estimate basis: \`CHARS_PER_TOKEN = 4\` in
- * \`@deepseek-ai/dsh-token-meter/estimate.ts\` (its comment reads "used until exact
- * tokenization is needed"), matching upstream's ESTIMATE-side heuristic — "~4
- * chars/token is the usual English heuristic" (\`agent/prompt_builder.py:1179\`).
- * Estimates use this; limits use the constant above. */
+/** Hard storage cap for one skill file, in bytes. The platform token meter's
+ * `CHARS_PER_TOKEN = 4` is a session-pressure estimate only; plugin gates use
+ * `text-metrics` (see docs/text-budgets.md), not this byte cap, as a token meter. */
 export const MAX_SKILL_FILE_BYTES = 1_048_576
 
 // ── Cross-package shared tunable defaults ────────────────────────────────────

@@ -119,8 +119,12 @@ export interface VersionBodyRow {
    * the reader is told rather than silently cut. The exact bytes are the diff route's answer.
    */
   readonly display: string
-  /** How long the stored body is, whatever came back. */
+  /** How long the stored body is, whatever came back (UTF-16 characters). */
   readonly chars: number
+  /** Grapheme count of the displayed head; absent on older hosts. */
+  readonly shown?: number
+  /** Grapheme count of the full display body; absent on older hosts. */
+  readonly total?: number
   readonly truncated: boolean
 }
 

@@ -1,6 +1,7 @@
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isCommittedWarning, isProcessAlive, TransactionNotInvokedError, transactIo } from './io.ts'
+import { exceedsContentLimit } from './frontmatter.ts'
 import { WriteKernel } from './write-kernel.ts'
 import type { UnitClaimPort } from './unit-claim.ts'
 import type { MutationOwner } from './contract.ts'
@@ -124,7 +125,7 @@ export function validateMutationRequest(
         errors.push({ code: 'file-too-large', message: 'write exceeds ' + limits.maxSkillFileBytes + ' bytes', target })
         continue
       }
-      if (basename(target) === 'SKILL.md' && op.content.length > limits.maxSkillContentChars) {
+      if (basename(target) === 'SKILL.md' && exceedsContentLimit(op.content, limits.maxSkillContentChars)) {
         errors.push({ code: 'skill-too-large', message: 'SKILL.md exceeds ' + limits.maxSkillContentChars + ' characters', target })
         continue
       }

@@ -8,6 +8,7 @@
 
 import type { SessionEvent } from './platform/index.ts'
 import { dispatchStepOf, isSkillToolName } from './tool-dispatch.ts'
+import { graphemeCount } from './text-metrics.ts'
 
 export type ReviewKind = 'memory' | 'skill' | 'combined'
 
@@ -116,7 +117,7 @@ export function foldTurnEvent(state: TurnFoldState, event: SessionEvent): TurnFo
     const text = content.map(textOfBlock).join(' ')
     return {
       ...state,
-      userChars: state.userChars + text.length,
+      userChars: state.userChars + graphemeCount(text),
       memorySignal: state.memorySignal || CORRECTION_PATTERNS.some(pattern => pattern.test(text)),
       skillSignal: state.skillSignal || FIX_PATTERNS.some(pattern => pattern.test(text)),
     }
@@ -127,7 +128,7 @@ export function foldTurnEvent(state: TurnFoldState, event: SessionEvent): TurnFo
     const message = (data as { message?: { content?: Array<{ type: string; text?: string }> } }).message
     if (!message || !Array.isArray(message.content)) return state
     const text = message.content.map(textOfBlock).join(' ')
-    return { ...state, assistantChars: state.assistantChars + text.length }
+    return { ...state, assistantChars: state.assistantChars + graphemeCount(text) }
   }
   // Tool evidence (v37 P7a): the dispatch vocabulary lives in `tool-dispatch.ts` — the ONE reader
   // of the platform's dispatch event types — and `dispatchStepOf` is its pure half, so this fold

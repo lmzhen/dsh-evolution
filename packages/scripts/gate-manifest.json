@@ -24,9 +24,9 @@
       "registration": {
         "reason": "this row is executable only on the build overlay; the flat mirror has no packages/evolution tree, so a no-overlay local run cannot resolve it",
         "owner": "scripts/toolchain",
-        "expiry": "0.55.0",
+        "expiry": "0.56.0",
         "plan": "run local gates from the flat mirror with --overlay (the supported release line), or give the row a mirror-local per-package tsc fallback",
-        "renewal": "Registered at 0.49.0, renewed at 0.50.0 and 0.51.1 (expiry 0.52.0): the overlay tsc row passes on the release line; the registration only covers the no-overlay invocation."
+        "renewal": "Registered at 0.49.0, renewed at 0.50.0, 0.51.1 and 0.55.0 (expiry 0.56.0): the overlay tsc row passes on the release line; the registration only covers the no-overlay invocation."
       }
     },
     {
@@ -77,9 +77,9 @@
       "registration": {
         "reason": "smoke-built-entries needs built lib artifacts that a source checkout does not carry",
         "owner": "scripts/gates",
-        "expiry": "0.55.0",
+        "expiry": "0.56.0",
         "plan": "run after build-lib on the build line",
-        "renewal": "Renewed at 0.54.0 (expiry 0.55.0): smoke-built-entries still needs built lib artifacts and a complete platform scope; local runs remain a registered cannot-decide, CI runs it after build."
+        "renewal": "Renewed at 0.55.0 (expiry 0.56.0): smoke-built-entries still needs built lib artifacts and a complete platform scope; local runs remain a registered cannot-decide, CI runs it after build."
       }
     },
     {
@@ -559,9 +559,9 @@
       "registration": {
         "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
         "owner": "scripts/gate-manifest",
-        "expiry": "0.55.0",
+        "expiry": "0.56.0",
         "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-        "renewal": "Renewed at 0.54.0 (expiry 0.55.0): local argv keeps the <plane home> placeholder; the CI override supplies $RUNNER_TEMP/plane-home and is the release evidence."
+        "renewal": "Renewed at 0.55.0 (expiry 0.56.0): local argv keeps the <plane home> placeholder; the CI override supplies $RUNNER_TEMP/plane-home and is the release evidence."
       },
       "ci": {
         "argv": [
@@ -1336,9 +1336,9 @@
       "registration": {
         "reason": "the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge",
         "owner": "scripts/gates",
-        "expiry": "0.55.0",
+        "expiry": "0.56.0",
         "plan": "the CI lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay",
-        "renewal": "Renewed at 0.54.0 (expiry 0.55.0): local corpora are still absent; CI remains the green evidence."
+        "renewal": "Renewed at 0.55.0 (expiry 0.56.0): local corpora are still absent; CI remains the green evidence."
       }
     },
     {

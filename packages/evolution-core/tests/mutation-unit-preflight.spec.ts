@@ -79,6 +79,13 @@ describe('validateMutationRequest', () => {
     expect(result.errors.map(error => error.code)).toContain('skill-too-large')
   })
 
+  it('counts the SKILL.md cap in code points, not UTF-16 units', () => {
+    const result = validateMutationRequest(request({ ops: [
+      { kind: 'write', target: 'source/SKILL.md', content: '😀'.repeat(6), skill: 'source' },
+    ] }), { maxSkillFileBytes: 100, maxSkillContentChars: 10 })
+    expect(result.ok).toBe(true)
+  })
+
   it('accepts a target under its declared root directory', () => {
     const result = validateMutationRequest(request({
       rootDirs: { source: 'D:/skills/source', target: 'D:/skills/target' },

@@ -852,8 +852,8 @@ export function textDiffFacts(before: string, after: string, path: string, maxLi
   const window = (lines: readonly string[]): { text: string; cut: boolean } => {
     const byLines = lines.slice(0, maxLines)
     const joined = byLines.join('\n')
-    if (joined.length <= TEXT_DIFF_MAX_CHARS) return { text: joined, cut: lines.length > maxLines }
-    return { text: joined.slice(0, TEXT_DIFF_MAX_CHARS), cut: true }
+    if (graphemeCount(joined) <= TEXT_DIFF_MAX_CHARS) return { text: joined, cut: lines.length > maxLines }
+    return { text: truncateGraphemes(joined, TEXT_DIFF_MAX_CHARS, ''), cut: true }
   }
   const oldWindow = window(oldRegion)
   const newWindow = window(newRegion)

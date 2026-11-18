@@ -1621,6 +1621,66 @@
       "de": "{n} Zeichen",
       "pt": "{n} caracteres",
       "ru": "{n} символов"
+    },
+    "versions.count.one": {
+      "zh": "1 个版本",
+      "en": "1 version",
+      "ja": "1 個のバージョン",
+      "es": "1 versión",
+      "fr": "1 version",
+      "de": "1 Version",
+      "pt": "1 versão",
+      "ru": "1 версия"
+    },
+    "diff.added.one": {
+      "zh": "新增 1 行",
+      "en": "1 line added",
+      "ja": "1 行追加",
+      "es": "1 línea añadida",
+      "fr": "1 ligne ajoutée",
+      "de": "1 Zeile hinzugefügt",
+      "pt": "1 linha adicionada",
+      "ru": "Добавлена 1 строка"
+    },
+    "diff.removed.one": {
+      "zh": "删除 1 行",
+      "en": "1 line removed",
+      "ja": "1 行削除",
+      "es": "1 línea eliminada",
+      "fr": "1 ligne supprimée",
+      "de": "1 Zeile entfernt",
+      "pt": "1 linha removida",
+      "ru": "Удалена 1 строка"
+    },
+    "row.delta.up.one": {
+      "zh": "（+1 字符）",
+      "en": "(+1 char)",
+      "ja": "（+1 文字）",
+      "es": "(+1 carácter)",
+      "fr": "(+1 caractère)",
+      "de": "(+1 Zeichen)",
+      "pt": "(+1 caractere)",
+      "ru": "(+1 символ)"
+    },
+    "row.delta.down.one": {
+      "zh": "（-1 字符）",
+      "en": "(-1 char)",
+      "ja": "（-1 文字）",
+      "es": "(-1 carácter)",
+      "fr": "(-1 caractère)",
+      "de": "(-1 Zeichen)",
+      "pt": "(-1 caractere)",
+      "ru": "(-1 символ)"
+    },
+    "tooltip.bodyChars.one": {
+      "zh": "1 字符",
+      "en": "1 char",
+      "ja": "1 文字",
+      "es": "1 carácter",
+      "fr": "1 caractère",
+      "de": "1 Zeichen",
+      "pt": "1 caractere",
+      "ru": "1 символ"
     }
   }
 }

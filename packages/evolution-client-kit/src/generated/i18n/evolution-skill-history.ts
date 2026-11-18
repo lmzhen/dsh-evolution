@@ -166,7 +166,13 @@ export const dictionaries = {
     "stats.sortDesc": "降序",
     "errors.title": "报错说明历史",
     "stats.colon": "：",
-    "tooltip.bodyChars": "{n} 字符"
+    "tooltip.bodyChars": "{n} 字符",
+    "versions.count.one": "1 个版本",
+    "diff.added.one": "新增 1 行",
+    "diff.removed.one": "删除 1 行",
+    "row.delta.up.one": "（+1 字符）",
+    "row.delta.down.one": "（-1 字符）",
+    "tooltip.bodyChars.one": "1 字符"
   },
   en: {
     "action.archive": "Archived",
@@ -330,7 +336,13 @@ export const dictionaries = {
     "stats.sortDesc": "Descending",
     "errors.title": "Error note history",
     "stats.colon": ": ",
-    "tooltip.bodyChars": "{n} chars"
+    "tooltip.bodyChars": "{n} chars",
+    "versions.count.one": "1 version",
+    "diff.added.one": "1 line added",
+    "diff.removed.one": "1 line removed",
+    "row.delta.up.one": "(+1 char)",
+    "row.delta.down.one": "(-1 char)",
+    "tooltip.bodyChars.one": "1 char"
   },
   ja: {
     "action.archive": "アーカイブ",
@@ -494,7 +506,13 @@ export const dictionaries = {
     "stats.sortDesc": "降順",
     "errors.title": "エラー説明の履歴",
     "stats.colon": "：",
-    "tooltip.bodyChars": "{n} 文字"
+    "tooltip.bodyChars": "{n} 文字",
+    "versions.count.one": "1 個のバージョン",
+    "diff.added.one": "1 行追加",
+    "diff.removed.one": "1 行削除",
+    "row.delta.up.one": "（+1 文字）",
+    "row.delta.down.one": "（-1 文字）",
+    "tooltip.bodyChars.one": "1 文字"
   },
   es: {
     "action.archive": "archivado",
@@ -658,7 +676,13 @@ export const dictionaries = {
     "stats.sortDesc": "Descendente",
     "errors.title": "Historial de notas de error",
     "stats.colon": ": ",
-    "tooltip.bodyChars": "{n} caracteres"
+    "tooltip.bodyChars": "{n} caracteres",
+    "versions.count.one": "1 versión",
+    "diff.added.one": "1 línea añadida",
+    "diff.removed.one": "1 línea eliminada",
+    "row.delta.up.one": "(+1 carácter)",
+    "row.delta.down.one": "(-1 carácter)",
+    "tooltip.bodyChars.one": "1 carácter"
   },
   fr: {
     "action.archive": "archivé",
@@ -822,7 +846,13 @@ export const dictionaries = {
     "stats.sortDesc": "Décroissant",
     "errors.title": "Historique des notes d’erreur",
     "stats.colon": " : ",
-    "tooltip.bodyChars": "{n} caractères"
+    "tooltip.bodyChars": "{n} caractères",
+    "versions.count.one": "1 version",
+    "diff.added.one": "1 ligne ajoutée",
+    "diff.removed.one": "1 ligne supprimée",
+    "row.delta.up.one": "(+1 caractère)",
+    "row.delta.down.one": "(-1 caractère)",
+    "tooltip.bodyChars.one": "1 caractère"
   },
   de: {
     "action.archive": "archiviert",
@@ -986,7 +1016,13 @@ export const dictionaries = {
     "stats.sortDesc": "Absteigend",
     "errors.title": "Fehlernotizen",
     "stats.colon": ": ",
-    "tooltip.bodyChars": "{n} Zeichen"
+    "tooltip.bodyChars": "{n} Zeichen",
+    "versions.count.one": "1 Version",
+    "diff.added.one": "1 Zeile hinzugefügt",
+    "diff.removed.one": "1 Zeile entfernt",
+    "row.delta.up.one": "(+1 Zeichen)",
+    "row.delta.down.one": "(-1 Zeichen)",
+    "tooltip.bodyChars.one": "1 Zeichen"
   },
   ru: {
     "action.archive": "заархивировано",
@@ -1150,7 +1186,13 @@ export const dictionaries = {
     "stats.sortDesc": "По убыванию",
     "errors.title": "История ошибок",
     "stats.colon": ": ",
-    "tooltip.bodyChars": "{n} символов"
+    "tooltip.bodyChars": "{n} символов",
+    "versions.count.one": "1 версия",
+    "diff.added.one": "Добавлена 1 строка",
+    "diff.removed.one": "Удалена 1 строка",
+    "row.delta.up.one": "(+1 символ)",
+    "row.delta.down.one": "(-1 символ)",
+    "tooltip.bodyChars.one": "1 символ"
   },
   pt: {
     "action.archive": "arquivamento",
@@ -1314,7 +1356,13 @@ export const dictionaries = {
     "stats.sortDesc": "Decrescente",
     "errors.title": "Histórico de erros",
     "stats.colon": ": ",
-    "tooltip.bodyChars": "{n} caracteres"
+    "tooltip.bodyChars": "{n} caracteres",
+    "versions.count.one": "1 versão",
+    "diff.added.one": "1 linha adicionada",
+    "diff.removed.one": "1 linha removida",
+    "row.delta.up.one": "(+1 caractere)",
+    "row.delta.down.one": "(-1 caractere)",
+    "tooltip.bodyChars.one": "1 caractere"
   },
 } as const
 

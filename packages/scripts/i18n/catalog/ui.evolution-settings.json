@@ -1241,6 +1241,26 @@
       "de": "Gespeichert in: Plugin-Konfiguration (gilt für alle Sitzungen)",
       "pt": "Salvo em: configuração do plugin (vale para todas as sessões)",
       "ru": "Куда сохраняется: конфигурация плагина (действует на все сессии)"
+    },
+    "approvalDiffAdded.one": {
+      "zh": "新增 1 行",
+      "en": "1 line added",
+      "ja": "1 行追加",
+      "es": "1 línea añadida",
+      "fr": "1 ligne ajoutée",
+      "de": "1 Zeile hinzugefügt",
+      "pt": "1 linha adicionada",
+      "ru": "Добавлена 1 строка"
+    },
+    "approvalDiffRemoved.one": {
+      "zh": "删除 1 行",
+      "en": "1 line removed",
+      "ja": "1 行削除",
+      "es": "1 línea eliminada",
+      "fr": "1 ligne supprimée",
+      "de": "1 Zeile entfernt",
+      "pt": "1 linha removida",
+      "ru": "Удалена 1 строка"
     }
   }
 }

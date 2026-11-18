@@ -2,6 +2,7 @@
 import type { MergeSnapshot, SnapshotRow, SnapshotRun, BodyRef } from '../domain/merge-snapshot.ts'
 import type { Facts, QueuePage, RowFact, BodyView, HistoryView, RunView, RunDetail, RunsView, DoctorView, QueueId, MergeCounts, ActionRef, VerifySubState } from '../wire.ts'
 import { MERGE_COMMAND_SURFACE } from '../command-surface.ts'
+import { graphemeCount, truncateGraphemes } from '@deepseek-ai/dsh-evolution-core'
 
 const base = '/evolution merge '
 function counts(rows: readonly SnapshotRow[]): MergeCounts {
@@ -109,9 +110,19 @@ export function buildQueuePage(snapshot: MergeSnapshot, queue: QueueId, expiredO
 }
 export function buildBodyView(snapshot: MergeSnapshot, ref: BodyRef, text: string): BodyView {
   const max = 64 * 1024
-  const truncated = Buffer.byteLength(text, 'utf8') > max
-  const body = truncated ? text.slice(0, max) : text
-  return { wireVersion: 1, readAt: snapshot.readAt, name: ref.name, side: ref.side, text: body, markdown: true, truncated, totalBytes: Buffer.byteLength(text, 'utf8') }
+  const totalBytes = Buffer.byteLength(text, 'utf8')
+  if (totalBytes <= max) return { wireVersion: 1, readAt: snapshot.readAt, name: ref.name, side: ref.side, text, markdown: true, truncated: false, totalBytes }
+  // Cut on grapheme boundaries while keeping the encoded body within the byte
+  // bound. A code-unit slice here could both exceed the stated byte cap and
+  // split a surrogate pair.
+  let low = 0
+  let high = graphemeCount(text)
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2)
+    if (Buffer.byteLength(truncateGraphemes(text, mid, ''), 'utf8') <= max) low = mid
+    else high = mid - 1
+  }
+  return { wireVersion: 1, readAt: snapshot.readAt, name: ref.name, side: ref.side, text: truncateGraphemes(text, low, ''), markdown: true, truncated: true, totalBytes }
 }
 export function buildHistoryView(snapshot: MergeSnapshot): HistoryView { return { wireVersion: 1, readAt: snapshot.readAt, items: snapshot.history } }
 export function buildRunDetail(snapshot: MergeSnapshot, runId: string): RunDetail | null {

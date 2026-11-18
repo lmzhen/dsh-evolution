@@ -9,7 +9,7 @@ import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evol
 import z from '@deepseek-ai/schemastery'
 import { defineTool, registerEvolutionTool } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '../index.ts'
-import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, truncateGraphemes } from '@deepseek-ai/dsh-evolution-core'
 import { resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core/skills'
 
 export const name = 'tool-memory'
@@ -274,7 +274,7 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     return {
       ok: result.ok,
       message: result.message,
-      entries: result.entries.map(entry => entry.slice(0, previewChars())),
+      entries: result.entries.map(entry => truncateGraphemes(entry, previewChars(), '')),
       chars: result.chars,
       limit: result.limit,
       ...(result.tokens === undefined ? {} : { tokens: result.tokens }),

@@ -53,7 +53,13 @@ export function bindLocale(
     try { return seam.locale.bind(namespace)(key) } catch { return fallbackText }
   }
   return {
-    t: (key, values) => interpolate(lookup(key), values),
+    t: (key, values) => {
+      if (values?.n === 1) {
+        const singular = lookup(key + '.one')
+        if (singular !== key + '.one') return interpolate(singular, values)
+      }
+      return interpolate(lookup(key), values)
+    },
     label: () => lookup('entry.label'),
   }
 }

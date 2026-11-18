@@ -11,7 +11,7 @@
  */
 
 import { DEFAULT_SOFT_BODY_TOKENS, UPSTREAM_LIMIT_CHARS_PER_TOKEN } from './constants.ts'
-import { measureText } from './text-metrics.ts'
+import { measureText, measureUnit } from './text-metrics.ts'
 import { type LintFinding, lintSkill } from './skill-lint.ts'
 
 export interface SkillHealthThresholds {
@@ -212,8 +212,8 @@ export function assessStructureHealth(
   const overTwice = dims.bodyTokens >= tokenBudget * 2
   // G2 ③: the over-line judgement is now expressed as `findings` (see the RULES table in skill-lint);
   // the free-text copy that used to live here is gone, and `overLine`/`overTwice` feed the facts above.
-  if (snapshot.bodyText && snapshot.bodyChars >= MIN_STAMP_BODY_CHARS) {
-    const kb = Math.max(1, snapshot.bodyChars / 1024)
+  if (snapshot.bodyText && measureUnit(snapshot.bodyText, 'codePoints') >= MIN_STAMP_BODY_CHARS) {
+    const kb = Math.max(1, measureUnit(snapshot.bodyText, 'codePoints') / 1024)
     const stamps = (snapshot.bodyText.match(HEALTH_STAMP_RE) ?? []).length
     dims.stampDensityPerKb = stamps / kb
     dims.stampHits = stamps
