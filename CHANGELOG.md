@@ -9,7 +9,7 @@
 >
 > **不迁移**：没有磁盘数据格式变化；修复只清理 profile 安装面，不动记忆、技能、报告、审批历史或用户 patch。
 >
-> **验证（本地，发布前）**：发布 tarball 的 all 家族依赖全部精确为 0.54.0；`audit-release-tarballs` 20/20；临时混合 profile（0.53 夹具）repair 后 20 包全部同版本；installer 32/32、coherence 5/5；平台插件页真实按钮更新 0.53.0→0.54.0 成功（20/20，profile 只留 all）；启动一致性告警；详细证据在发布报告中补齐。
+> **验证（本地，发布前）**：发布 tarball 的 all 家族依赖全部精确为 0.54.0；`audit-release-tarballs` 20/20；临时混合 profile（0.53 夹具）repair 后 20 包全部同版本；installer 32/32、coherence 5/5；平台插件页真实按钮更新 0.53.0→0.54.0 成功（20/20，profile 只留 all）；启动一致性告警。**发布后**：主分支 CI `44315822755`、tag CI `44316938400` 全绿（publish + verify published bytes success）；npm 20/20 为 0.54.0 且 latest=0.54.0；独立 home `D:\dsh-homes\web0520` 的 npm054 profile 从 npm 安装 0.54.0，web 3115 familyVersion=0.54.0。
 
 ## 0.53.0 (2026-11-18) — 技能整理 C 端重构、单一状态源与响应式
 
