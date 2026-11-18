@@ -15,7 +15,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { undoableFor, unitUndoableFlags } from './unit-undoable.ts'
 import { buildSkillStatsSnapshot } from './stats.ts'
-import { contentHash, displayBodyOf, errorText } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, displayBodyOf, errorText, measureUnit, truncateGraphemes } from '@deepseek-ai/dsh-evolution-core'
 import { elapsedSince, latestVersionAt, partitionVersions, skillRowCells, textDiffFacts, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
 import { HOST_ROUTES, json, methodNotAllowed, readJsonObject } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
@@ -233,8 +233,8 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
           // The same read the undo path and the diff route use, so a version has ONE reader.
           const text = await curator.skills.readVersion(name, v)
           if (text === null) return json(404, { ok: false, code: 'not-found', message: '该版本的存储内容读不出来' })
-          const truncated = text.length > MAX_BODY_CHARS
-          const head = truncated ? text.slice(0, MAX_BODY_CHARS) : text
+          const truncated = measureUnit(text, 'codePoints') > MAX_BODY_CHARS
+          const head = truncated ? truncateGraphemes(text, MAX_BODY_CHARS, '') : text
           // What the version SAYS, not the bytes it stores: the frontmatter block is metadata the row
           // and the left column already carry, and the platform renderer reads its closing `---` as a
           // setext underline, which made the metadata line the document's biggest heading (W19). The

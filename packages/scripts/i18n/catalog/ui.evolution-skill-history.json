@@ -1192,6 +1192,16 @@
       "pt": "Corpo total",
       "ru": "Всего текста"
     },
+    "stats.total.bodyTokens": {
+      "zh": "正文估算 tokens",
+      "en": "Total body (est. tokens)",
+      "ja": "本文の推定トークン",
+      "es": "Texto total (tokens est.)",
+      "fr": "Corps total (tokens est.)",
+      "de": "Text gesamt (geschätzte Token)",
+      "pt": "Corpo total (tokens est.)",
+      "ru": "Всего текста (оценка токенов)"
+    },
     "stats.total.success": {
       "zh": "整理成功",
       "en": "Organized",
@@ -1321,6 +1331,16 @@
       "de": "Text",
       "pt": "Corpo",
       "ru": "Текст"
+    },
+    "stats.col.bodyTokens": {
+      "zh": "估算 tokens",
+      "en": "Est. tokens",
+      "ja": "推定トークン",
+      "es": "Tokens est.",
+      "fr": "Tokens est.",
+      "de": "Geschätzte Token",
+      "pt": "Tokens est.",
+      "ru": "Оценка токенов"
     },
     "stats.col.support": {
       "zh": "参考资料",

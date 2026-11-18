@@ -58,9 +58,9 @@ describe('stats page presentation', () => {
 
   it('keeps the table at wide and medium breaks and hides low-priority columns at medium', async () => {
     const wide = render(createElement(StatsPage, face('wide')))
-    await waitFor(() => { expect(wide.container.querySelectorAll('thead th')).toHaveLength(10) })
+    await waitFor(() => { expect(wide.container.querySelectorAll('thead th')).toHaveLength(11) })
     wide.unmount()
     const medium = render(createElement(StatsPage, face('medium')))
-    await waitFor(() => { expect(medium.container.querySelectorAll('thead th')).toHaveLength(5) })
+    await waitFor(() => { expect(medium.container.querySelectorAll('thead th')).toHaveLength(6) })
   })
 })

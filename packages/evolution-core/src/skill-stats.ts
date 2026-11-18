@@ -111,6 +111,8 @@ export interface SkillStatsTotals {
   readonly skills: number
   readonly needsAttention: number
   readonly bodyChars: number | null
+  /** Sum of the health rows' estimated tokens; null when any contributing row was unmeasured. */
+  readonly bodyTokens: number | null
   readonly supportFiles: number | null
   readonly successes: SkillStatsCounts | null
 }
@@ -147,6 +149,7 @@ export type SkillStatsSortKey =
   | 'name'
   | 'verdict'
   | 'bodyChars'
+  | 'bodyTokens'
   | 'supportFiles'
   | 'versions'
   | 'useCount'
@@ -189,6 +192,7 @@ export function sortValue(row: SkillStatsRow, key: SkillStatsSortKey): string | 
     case 'name': return row.name
     case 'verdict': return verdictRank(row.health?.verdict)
     case 'bodyChars': return row.health?.bodyChars ?? null
+    case 'bodyTokens': return row.health?.bodyTokens ?? null
     case 'supportFiles': return row.health?.supportFiles ?? null
     case 'versions': return row.versions
     case 'useCount': return row.usage?.useCount ?? null
@@ -250,6 +254,7 @@ export function computeSkillStatsTotals(rows: readonly SkillStatsRow[], counts: 
     skills: rows.length,
     needsAttention: rows.filter(needsAttention).length,
     bodyChars: sumNullable(rows.map(row => row.health?.bodyChars ?? null)),
+    bodyTokens: sumNullable(rows.map(row => row.health?.bodyTokens ?? null)),
     supportFiles: sumNullable(rows.map(row => row.health?.supportFiles ?? null)),
     successes: counts,
   }

@@ -32,6 +32,7 @@ export function sortValue(row: SkillStatsRow, key: SkillStatsSortKey): string | 
     case 'name': return row.name
     case 'verdict': return verdictRank(row.health?.verdict)
     case 'bodyChars': return row.health?.bodyChars ?? null
+    case 'bodyTokens': return row.health?.bodyTokens ?? null
     case 'supportFiles': return row.health?.supportFiles ?? null
     case 'versions': return row.versions
     case 'useCount': return row.usage?.useCount ?? null

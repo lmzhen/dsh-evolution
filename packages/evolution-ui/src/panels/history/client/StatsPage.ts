@@ -40,6 +40,7 @@ const FILTERS: readonly { readonly id: SkillStatsFilter; readonly key: string }[
 
 const SORT_OPTIONS: readonly { readonly key: SkillStatsSortKey; readonly label: string }[] = [
   { key: 'bodyChars', label: 'stats.col.body' },
+  { key: 'bodyTokens', label: 'stats.col.bodyTokens' },
   { key: 'viewCount30d', label: 'stats.col.loads30d' },
   { key: 'negativeFeedback30d', label: 'stats.col.negativeFeedback30d' },
   { key: 'feedbackRate30d', label: 'stats.col.feedbackRate' },
@@ -126,6 +127,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       render: row => createElement('span', { className: 'evo-stats-pill ' + statusTone(row.health?.verdict) }, face.t(statusKey(row.health?.verdict))),
     },
     { key: 'bodyChars', label: face.t('stats.col.body'), align: 'right', sortable: true, render: row => numberText(row.health?.bodyChars ?? null) },
+  { key: 'bodyTokens', label: face.t('stats.col.bodyTokens'), align: 'right', sortable: true, render: row => numberText(row.health?.bodyTokens ?? null) },
     { key: 'supportFiles', label: face.t('stats.col.support'), align: 'right', sortable: true, render: row => numberText(row.health?.supportFiles ?? null) },
     { key: 'versions', label: face.t('stats.col.versions'), align: 'right', sortable: true, render: row => numberText(row.versions) },
     { key: 'viewCount', label: face.t('stats.col.loads'), align: 'right', sortable: true, render: row => numberText(row.usage?.viewCount ?? null) },
@@ -161,6 +163,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       createElement('p', { className: 'evo-stats-card-desc' }, row.description || '—'),
       createElement('dl', { className: 'evo-stats-card-facts' },
         createElement('div', null, createElement('dt', null, face.t('stats.col.body')), createElement('dd', null, numberText(row.health?.bodyChars ?? null))),
+        createElement('div', null, createElement('dt', null, face.t('stats.col.bodyTokens')), createElement('dd', null, numberText(row.health?.bodyTokens ?? null))),
         createElement('div', null, createElement('dt', null, face.t('stats.col.loads30d')), createElement('dd', null, numberText(row.usage?.viewCount30d ?? null))),
         createElement('div', null, createElement('dt', null, face.t('stats.col.negativeFeedback30d')), createElement('dd', null, numberText(row.negativeFeedback30d))),
         createElement('div', null, createElement('dt', null, face.t('stats.col.feedbackRate')), createElement('dd', null, rateText(row.feedbackRate30d))),
@@ -197,6 +200,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       createElement('div', { className: 'evo-stats-stat' }, createElement('span', null, face.t('stats.total.skills')), createElement('b', null, totals === undefined ? '—' : totals.skills.toLocaleString())),
       createElement('div', { className: 'evo-stats-stat is-warn' }, createElement('span', null, face.t('stats.total.attention')), createElement('b', null, totals === undefined ? '—' : totals.needsAttention.toLocaleString())),
       createElement('div', { className: 'evo-stats-stat' }, createElement('span', null, face.t('stats.total.body')), createElement('b', null, totals === undefined ? '—' : numberText(totals.bodyChars))),
+      createElement('div', { className: 'evo-stats-stat' }, createElement('span', null, face.t('stats.total.bodyTokens')), createElement('b', null, totals === undefined ? '—' : numberText(totals.bodyTokens))),
       createElement('div', { className: 'evo-stats-stat is-ok' }, createElement('span', null, face.t('stats.total.success')), createElement('b', null, totals?.successes === null || totals === undefined ? '—' : (totals.successes.offload + totals.successes.condense + totals.successes.extract).toLocaleString()))),
     activity,
     createElement('div', { className: 'evo-stats-toolbar' },

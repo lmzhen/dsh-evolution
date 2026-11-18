@@ -137,6 +137,7 @@ function totalsOf(value: unknown, rows: readonly SkillStatsRow[]): SkillStatsTot
     skills: numberOrNull(source?.skills) ?? rows.length,
     needsAttention: numberOrNull(source?.needsAttention) ?? rows.filter(row => row.needsAttention).length,
     bodyChars: numberOrNull(source?.bodyChars),
+    bodyTokens: numberOrNull(source?.bodyTokens),
     supportFiles: numberOrNull(source?.supportFiles),
     successes,
   }
