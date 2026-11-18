@@ -154,7 +154,9 @@ export const dictionaries = {
     "row.summary.legacy": "早期插件版本，暂不存在 summary",
     "stats.col.loads30d": "近30天加载",
     "stats.col.feedback30d": "近30天反馈",
-    "stats.col.feedbackRate": "反馈率"
+    "stats.col.feedbackRate": "反馈率",
+    "stats.col.negativeFeedback30d": "近30天负反馈",
+    "stats.windowNote": "近30天指标从插件升级后开始统计；旧记录显示 —。"
   },
   en: {
     "action.archive": "Archived",
@@ -306,7 +308,9 @@ export const dictionaries = {
     "row.summary.legacy": "Early plugin version — no summary yet",
     "stats.col.loads30d": "Loads 30d",
     "stats.col.feedback30d": "Feedback 30d",
-    "stats.col.feedbackRate": "Feedback rate"
+    "stats.col.feedbackRate": "Feedback rate",
+    "stats.col.negativeFeedback30d": "Negative 30d",
+    "stats.windowNote": "30-day metrics start at the plugin upgrade; legacy records show —."
   },
   ja: {
     "action.archive": "アーカイブ",
@@ -458,7 +462,9 @@ export const dictionaries = {
     "row.summary.legacy": "初期プラグインバージョンのため summary はまだありません",
     "stats.col.loads30d": "30日読み込み",
     "stats.col.feedback30d": "30日フィードバック",
-    "stats.col.feedbackRate": "フィードバック率"
+    "stats.col.feedbackRate": "フィードバック率",
+    "stats.col.negativeFeedback30d": "30日ネガティブ",
+    "stats.windowNote": "30日指標はプラグイン更新後から集計します。旧レコードは — と表示します。"
   },
   es: {
     "action.archive": "archivado",
@@ -610,7 +616,9 @@ export const dictionaries = {
     "row.summary.legacy": "Versión inicial del plugin: todavía no hay summary",
     "stats.col.loads30d": "Cargas 30d",
     "stats.col.feedback30d": "Feedback 30d",
-    "stats.col.feedbackRate": "Tasa de feedback"
+    "stats.col.feedbackRate": "Tasa de feedback",
+    "stats.col.negativeFeedback30d": "Negativas 30d",
+    "stats.windowNote": "Las métricas de 30 días empiezan con la actualización del plugin; los registros antiguos muestran —."
   },
   fr: {
     "action.archive": "archivé",
@@ -762,7 +770,9 @@ export const dictionaries = {
     "row.summary.legacy": "Ancienne version du plugin : pas encore de summary",
     "stats.col.loads30d": "Chargements 30j",
     "stats.col.feedback30d": "Retours 30j",
-    "stats.col.feedbackRate": "Taux de retours"
+    "stats.col.feedbackRate": "Taux de retours",
+    "stats.col.negativeFeedback30d": "Négatifs 30j",
+    "stats.windowNote": "Les métriques sur 30 jours commencent à la mise à jour du plugin ; les anciens enregistrements affichent —."
   },
   de: {
     "action.archive": "archiviert",
@@ -914,7 +924,9 @@ export const dictionaries = {
     "row.summary.legacy": "Frühe Plugin-Version – noch keine Summary",
     "stats.col.loads30d": "Ladevorgänge 30T",
     "stats.col.feedback30d": "Feedback 30T",
-    "stats.col.feedbackRate": "Feedback-Rate"
+    "stats.col.feedbackRate": "Feedback-Rate",
+    "stats.col.negativeFeedback30d": "Negativ 30T",
+    "stats.windowNote": "30-Tage-Werte starten mit dem Plugin-Update; alte Einträge zeigen —."
   },
   ru: {
     "action.archive": "заархивировано",
@@ -1066,7 +1078,9 @@ export const dictionaries = {
     "row.summary.legacy": "Ранняя версия плагина — summary пока нет",
     "stats.col.loads30d": "Загрузки 30д",
     "stats.col.feedback30d": "Отзывы 30д",
-    "stats.col.feedbackRate": "Доля отзывов"
+    "stats.col.feedbackRate": "Доля отзывов",
+    "stats.col.negativeFeedback30d": "Негатив 30д",
+    "stats.windowNote": "Метрики за 30 дней начинаются с обновления плагина; старые записи показывают —."
   },
   pt: {
     "action.archive": "arquivamento",
@@ -1218,7 +1232,9 @@ export const dictionaries = {
     "row.summary.legacy": "Versão inicial do plugin: ainda sem summary",
     "stats.col.loads30d": "Carregamentos 30d",
     "stats.col.feedback30d": "Feedback 30d",
-    "stats.col.feedbackRate": "Taxa de feedback"
+    "stats.col.feedbackRate": "Taxa de feedback",
+    "stats.col.negativeFeedback30d": "Negativas 30d",
+    "stats.windowNote": "Métricas de 30 dias começam na atualização do plugin; registros antigos mostram —."
   },
 } as const
 

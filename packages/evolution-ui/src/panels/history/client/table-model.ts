@@ -39,6 +39,7 @@ export function sortValue(row: SkillStatsRow, key: SkillStatsSortKey): string | 
     case 'viewCount30d': return row.usage?.viewCount30d ?? null
     case 'feedback': return row.feedback
     case 'feedback30d': return row.feedback30d
+    case 'negativeFeedback30d': return row.negativeFeedback30d
     case 'feedbackRate30d': return row.feedbackRate30d
     case 'lastAt': return row.lastAt === null ? null : Date.parse(row.lastAt)
   }

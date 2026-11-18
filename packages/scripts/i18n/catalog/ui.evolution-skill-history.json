@@ -1501,6 +1501,26 @@
       "de": "Feedback-Rate",
       "pt": "Taxa de feedback",
       "ru": "Доля отзывов"
+    },
+    "stats.col.negativeFeedback30d": {
+      "zh": "近30天负反馈",
+      "en": "Negative 30d",
+      "ja": "30日ネガティブ",
+      "es": "Negativas 30d",
+      "fr": "Négatifs 30j",
+      "de": "Negativ 30T",
+      "pt": "Negativas 30d",
+      "ru": "Негатив 30д"
+    },
+    "stats.windowNote": {
+      "zh": "近30天指标从插件升级后开始统计；旧记录显示 —。",
+      "en": "30-day metrics start at the plugin upgrade; legacy records show —.",
+      "ja": "30日指標はプラグイン更新後から集計します。旧レコードは — と表示します。",
+      "es": "Las métricas de 30 días empiezan con la actualización del plugin; los registros antiguos muestran —.",
+      "fr": "Les métriques sur 30 jours commencent à la mise à jour du plugin ; les anciens enregistrements affichent —.",
+      "de": "30-Tage-Werte starten mit dem Plugin-Update; alte Einträge zeigen —.",
+      "pt": "Métricas de 30 dias começam na atualização do plugin; registros antigos mostram —.",
+      "ru": "Метрики за 30 дней начинаются с обновления плагина; старые записи показывают —."
     }
   }
 }

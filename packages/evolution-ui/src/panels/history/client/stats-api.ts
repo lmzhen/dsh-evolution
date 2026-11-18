@@ -80,6 +80,7 @@ function rowOf(value: unknown): SkillStatsRow | null {
     usage: usageOf(source.usage),
     feedback: numberOrNull(source.feedback),
     feedback30d: numberOrNull(source.feedback30d),
+    negativeFeedback30d: numberOrNull(source.negativeFeedback30d),
     feedbackRate30d: numberOrNull(source.feedbackRate30d),
   }
 }

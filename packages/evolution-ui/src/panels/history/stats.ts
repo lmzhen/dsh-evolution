@@ -183,6 +183,7 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
     const usage = usageOf(usageByName?.get(row.name))
     const window = feedbackWindow?.get(row.name)
     const feedback30d = window === undefined ? null : window.positive + window.negative
+    const negativeFeedback30d = window?.negative ?? null
     const loads30d = usage?.viewCount30d ?? null
     return {
       name: row.name,
@@ -193,7 +194,8 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
       usage,
       feedback: feedbackOf(feedbackRead, row.name),
       feedback30d,
-      feedbackRate30d: feedback30d !== null && loads30d !== null && loads30d > 0 ? feedback30d / loads30d : null,
+      negativeFeedback30d,
+      feedbackRate30d: negativeFeedback30d !== null && loads30d !== null && loads30d > 0 ? negativeFeedback30d / loads30d : null,
     }
   })
 

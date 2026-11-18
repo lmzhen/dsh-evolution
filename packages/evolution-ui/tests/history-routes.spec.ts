@@ -92,6 +92,7 @@ describe('skill-history routes: the stats snapshot', () => {
           usage: { useCount: number | null; viewCount: number | null; viewCount30d: number | null } | null
           feedback: number | null
           feedback30d: number | null
+          negativeFeedback30d: number | null
           feedbackRate30d: number | null
         }>
         totals: { skills: number; needsAttention: number; bodyChars: number | null; supportFiles: number | null }
@@ -110,7 +111,8 @@ describe('skill-history routes: the stats snapshot', () => {
     expect(row.feedback).toBe(0)
     expect(row.usage?.viewCount30d).toBe(2)
     expect(row.feedback30d).toBe(2)
-    expect(row.feedbackRate30d).toBe(1)
+    expect(row.negativeFeedback30d).toBe(1)
+    expect(row.feedbackRate30d).toBe(0.5)
     expect(stats.body.data.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
     expect(stats.body.data.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
     expect(stats.body.data.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }])

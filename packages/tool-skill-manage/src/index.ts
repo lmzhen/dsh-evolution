@@ -382,6 +382,10 @@ interface SkillWriteArgs {
   summary?: string
   /** feedback: why the loaded skill did not help. */
   problem?: 'wrong' | 'outdated' | 'incomplete' | 'unsafe'
+  /** feedback: positive or negative; omitted keeps the historical negative behavior. */
+  rating?: 'positive' | 'negative'
+  /** feedback: optional short explanation for a negative rating; max 20 code points. */
+  note?: string
   /** restructure: body sections (by exact `## heading`) moved to references/ (008 batch B). */
   restructure?: Array<{ heading?: string; start?: string; end?: string; to_file?: string }>
   /** patch: replace one H2 section's content (or an exact sub-block) in place. */
@@ -899,10 +903,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
     }
     if (action === 'feedback') {
-      const service = ctx.get('evolutionFeedback') as { record?: (target: string, rating: 'negative', note?: string, kind?: 'skill') => void } | undefined
+      const service = ctx.get('evolutionFeedback') as { record?: (target: string, rating: 'positive' | 'negative', note?: string, kind?: 'skill') => void } | undefined
       if (service?.record === undefined) return { ok: false, message: '反馈服务未挂载，未记录。', skills: [] }
-      service.record(name, 'negative', args.problem ?? 'unspecified', 'skill')
-      return { ok: true, message: `已记录对「${name}」的问题反馈。`, skills: [] }
+      const rating: 'positive' | 'negative' = args.rating === 'positive' ? 'positive' : 'negative'
+      const note = typeof args.note === 'string' ? args.note.trim() : ''
+      if (rating === 'positive' && note !== '') return { ok: false, message: '正反馈不接受 note；说明文字只用于负反馈。', skills: [] }
+      if ([...note].length > 20) return { ok: false, message: `负反馈说明为 ${[...note].length} 个字符，超过 20 上限。`, skills: [] }
+      const recordNote = rating === 'negative' ? (note === '' ? args.problem ?? 'unspecified' : note) : undefined
+      service.record(name, rating, recordNote, 'skill')
+      return {
+        ok: true,
+        message: rating === 'positive' ? `已记录对「${name}」的正反馈。` : `已记录对「${name}」的问题反馈。`,
+        skills: [],
+      }
     }
     // The write-admission sequence, EXECUTION point (design §3): the gates whose verdict can
     // change between admission and execution run here, at the bytes. The replay channel enters
@@ -1272,6 +1285,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // omits them left the model guessing.
       + 'Per-action arguments: patch needs name + old_string + new_string and patches SKILL.md unless file_path names a support file (e.g. "references/topic.md"); patch replaces the FIRST occurrence only unless replace_all=true, and the result message reports how many anchors the file carried. patch also accepts section: {heading, start?, end?, content} to replace one H2 section content (or an exact sub-block) in place without resending the old text; the heading line is kept for a whole-section edit. write_file needs name + file_path + file_content; remove_file needs name + file_path; create/edit/update need name + content; delete needs name. A rejected patch names the reason and the remedy (missing anchor, stale snapshot, frontmatter that cannot be auto-quoted, byte/char limit). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
+      + 'feedback records a rating for a loaded skill: rating positive|negative (default negative); a negative rating may include note (max 20 Unicode characters), and note is rejected on a positive rating. '
       + 'Prefer patching an umbrella over creating narrow skills. '
       + 'restructure moves entire body sections (by their exact "## heading" line, or an optional start/end sub-block, via restructure: [{heading, start?, end?, to_file: "references/<topic>.md"}]) into a references/ file and replaces each with a pointer line — the skill name and directory never change. '
       + 'extract moves a reusable part (exact heading, optional start/end sub-block) into an existing class-level owner: extract: [{heading, start?, end?, to_skill}]. One target per call; an empty extract list returns the child-agent proposal (outcome/target/neededOwner/parts) without writing; supply extract items to apply, and use owner_covers only as an explicit override; owner-gap is reported, never auto-created.'
@@ -1288,6 +1302,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       absorbed_into: { type: 'string' },
       summary: { type: 'string', description: 'One-line change summary for the skill history. Required for restructure/extract/delete in model-origin writes; max 50 Unicode characters by default, over-limit is rejected with the current limit.' },
       problem: { type: 'string', enum: ['wrong', 'outdated', 'incomplete', 'unsafe'], description: 'feedback only: why the loaded skill did not help.' },
+      rating: { type: 'string', enum: ['positive', 'negative'], description: 'feedback only: positive or negative; omitted keeps negative for compatibility.' },
+      note: { type: 'string', description: 'feedback only: optional short explanation for a negative rating; max 20 Unicode characters (runtime-enforced).' },
       section: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, content: { type: 'string' } } },
       restructure: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_file: { type: 'string' } } } },
       extract: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, to_skill: { type: 'string' }, to_heading: { type: 'string' } } } },
