@@ -161,6 +161,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
           createElement('div', { className: 'evo-stats-table-head' },
             createElement('strong', null, face.t('stats.tableTitle')),
             createElement('span', null, face.t('stats.tableHint'))),
+          createElement('p', { className: 'evo-stats-window-note' }, face.t('stats.windowNote')),
           createElement(Table, {
             rows: visible,
             columns,
@@ -171,8 +172,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
             empty: createElement('div', { className: 'evo-stats-empty' },
               createElement('strong', null, face.t('stats.empty')),
               createElement('span', null, face.t('stats.emptyHint'))),
-          }),
-          createElement('p', { className: 'evo-stats-window-note' }, face.t('stats.windowNote'))))
+          })))
 }
 
 /** Page styles; tokenVars is applied by the workbench shell. */
@@ -218,7 +218,7 @@ export const STATS_CSS = [
   '.evo-stats-failure{color:#a5482b;border-color:#efd6c9;background:#fbf6f2}',
   '.evo-stats-empty{display:flex;flex-direction:column;gap:4px;align-items:center}',
   '.evo-stats-empty strong{font-size:12px;font-weight:650;color:var(--dsw-alias-label-secondary,#6f766d)}',
-  '.evo-stats-window-note{margin:0;padding:7px 12px 9px;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;line-height:1.5;border-top:1px solid var(--dsw-alias-border-l1,#f0eee8)}',
+  '.evo-stats-window-note{margin:0;padding:6px 12px;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;line-height:1.5;border-bottom:1px solid var(--dsw-alias-border-l1,#f0eee8);background:var(--dsw-alias-bg-layer-2,#faf9f5)}',
   '@media (max-width:760px){.evo-stats-page{padding:16px}.evo-stats-hero{align-items:flex-start;flex-direction:column}.evo-stats-title{font-size:20px}}',
 ].join('')
 
