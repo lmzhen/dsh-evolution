@@ -10,6 +10,7 @@ import { makeSerialQueue } from './serial.ts'
 import { payloadText } from './payload.ts'
 import { scanMemoryThreats, type ScanOptions } from './threats.ts'
 import { ENTRY_DELIMITER, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_CONSOLIDATION_FAILURES } from './constants.ts'
+import { measureText } from './text-metrics.ts'
 
 
 /**
@@ -67,8 +68,25 @@ export interface MemoryApplyResult {
   ok: boolean
   message: string
   entries: string[]
+  /** Raw UTF-16 code units; the display/compat fact, never the token judgement. */
   chars: number
+  /** Active limit: tokens when token mode is configured, otherwise the legacy char limit. */
   limit: number
+  /** Estimated tokens for the same entries; present on public add/applyBatch results. */
+  tokens?: number
+  /** Token budget when token mode is configured; absent in legacy char mode. */
+  tokenLimit?: number
+}
+
+interface MemoryUsage {
+  readonly chars: number
+  readonly tokens: number
+}
+
+/** Count one entry list in both units; empty is zero in both. */
+function usageOf(entries: readonly string[]): MemoryUsage {
+  const text = entries.join(ENTRY_DELIMITER)
+  return { chars: text.length, tokens: text.length === 0 ? 0 : measureText(text).tokens.value }
 }
 
 export function memoryRoot(env: NodeJS.ProcessEnv = process.env): string {
@@ -108,8 +126,12 @@ export interface MemoryFence {
 }
 
 export interface MemoryStoreOptions {
+  /** Legacy character budgets; converted once when no token budget is supplied. */
   memoryCharLimit?: number
   userCharLimit?: number
+  /** Token budgets; the judged unit when present. */
+  memoryTokenLimit?: number
+  userTokenLimit?: number
   addDatePrefix?: boolean
   root?: string
   maxConsolidationFailures?: number
@@ -128,6 +150,8 @@ export type { EvolutionIoLike }
 export class MemoryStore {
   readonly memoryLimit: number
   readonly userLimit: number
+  private readonly memoryTokenLimit: number | undefined
+  private readonly userTokenLimit: number | undefined
   readonly addDatePrefix: boolean
   readonly root: string
   private readonly maxFailures: number
@@ -147,8 +171,10 @@ export class MemoryStore {
   constructor(options: MemoryStoreOptions = {}) {
     this.io = options.io ?? nodeEvolutionIo()
     this.fence = options.fence
-    this.memoryLimit = options.memoryCharLimit ?? DEFAULT_MEMORY_CHAR_LIMIT
-    this.userLimit = options.userCharLimit ?? DEFAULT_USER_CHAR_LIMIT
+    this.memoryTokenLimit = options.memoryTokenLimit
+    this.userTokenLimit = options.userTokenLimit
+    this.memoryLimit = options.memoryTokenLimit ?? options.memoryCharLimit ?? DEFAULT_MEMORY_CHAR_LIMIT
+    this.userLimit = options.userTokenLimit ?? options.userCharLimit ?? DEFAULT_USER_CHAR_LIMIT
     this.addDatePrefix = options.addDatePrefix ?? false
     this.root = options.root ?? memoryRoot()
     this.maxFailures = options.maxConsolidationFailures ?? DEFAULT_CONSOLIDATION_FAILURES
@@ -174,6 +200,44 @@ export class MemoryStore {
     return target === 'memory' ? this.memoryLimit : this.userLimit
   }
 
+  /** Token budget when the target opted into token mode; undefined keeps legacy chars. */
+  private tokenLimitFor(target: MemoryTarget): number | undefined {
+    return target === 'memory' ? this.memoryTokenLimit : this.userTokenLimit
+  }
+
+  /** The value the active gate compares: tokens in token mode, UTF-16 chars otherwise. */
+  private judgedValue(target: MemoryTarget, usage: MemoryUsage): number {
+    return this.tokenLimitFor(target) === undefined ? usage.chars : usage.tokens
+  }
+
+  /** Unit noun for model-facing messages; legacy mode keeps its old wording. */
+  private unitFor(target: MemoryTarget): 'tokens' | 'chars' {
+    return this.tokenLimitFor(target) === undefined ? 'chars' : 'tokens'
+  }
+
+  /**
+   * Byte ceiling for the oversized-read guard. It is NOT the token budget:
+   * a token cannot be compared to bytes. Token mode uses a conservative byte
+   * envelope so a canonical English/CJK file is never mistaken for corruption.
+   */
+  private byteGuardFor(target: MemoryTarget): number {
+    const tokenLimit = this.tokenLimitFor(target)
+    if (tokenLimit === undefined) return this.limitFor(target) * READ_GUARD_FACTOR
+    return Math.max(16 * 1024, tokenLimit * 4 * READ_GUARD_FACTOR)
+  }
+
+  /** Add the public dual-unit facts to one internal result. */
+  private decorateResult(target: MemoryTarget, result: MemoryApplyResult): MemoryApplyResult {
+    const usage = usageOf(result.entries)
+    const tokenLimit = this.tokenLimitFor(target)
+    return {
+      ...result,
+      chars: usage.chars,
+      tokens: usage.tokens,
+      ...(tokenLimit === undefined ? {} : { tokenLimit }),
+    }
+  }
+
   /** P2-1 (v18): the generated date prefix participates in duplicate detection
    * only when THIS store writes it. With addDatePrefix=false a fact's own
    * leading `## YYYY-MM-DD\n` is content, not a generated prefix. */
@@ -182,17 +246,18 @@ export class MemoryStore {
   }
 
   /**
-   * Read-guard probe: `{ size, limit }` when the on-disk file exceeds
-   * `limit * READ_GUARD_FACTOR` bytes, `null` when it is absent, unknown
-   * (backend without a size probe), under the bound, or the target has no
-   * limit configured.
+   * Read-guard probe: `{ size, byteLimit }` when the on-disk file exceeds the
+   * target's byte ceiling, `null` when it is absent, unknown, under the bound,
+   * or the target has no limit configured. The ceiling is bytes, never the
+   * token/char budget itself.
    */
-  private async oversizedFile(target: MemoryTarget): Promise<{ size: number; limit: number } | null> {
+  private async oversizedFile(target: MemoryTarget): Promise<{ size: number; byteLimit: number } | null> {
     const size = await this.io.size?.(fileFor(this.root, target))
     if (size === null || size === undefined) return null
     const limit = this.limitFor(target)
     if (limit <= 0) return null
-    return size > limit * READ_GUARD_FACTOR ? { size, limit } : null
+    const byteLimit = this.byteGuardFor(target)
+    return size > byteLimit ? { size, byteLimit } : null
   }
 
   async read(target: MemoryTarget): Promise<string[]> {
@@ -234,14 +299,15 @@ export class MemoryStore {
 
   /**
    * StorageHint percentage must clamp at 100 like the render header: a drifted
-   * entry can push chars past the limit, and "Storage at 125%" contradicts the
-   * clamped usage indicator.
+   * entry can push usage past the limit, and "Storage at 125%" contradicts the
+   * clamped usage indicator. The percentage is computed in the ACTIVE unit.
    */
-  private storageHint(target: MemoryTarget, chars: number): string {
+  private storageHint(target: MemoryTarget, usage: MemoryUsage): string {
     const limit = this.limitFor(target)
     if (limit <= 0) return ''
-    const percent = Math.min(100, Math.floor((chars * 100) / limit))
-    return percent >= 80 ? ` ⚠️ Storage at ${percent}% (${chars}/${limit} chars).` : ''
+    const value = this.judgedValue(target, usage)
+    const percent = Math.min(100, Math.floor((value * 100) / limit))
+    return percent >= 80 ? ` ⚠️ Storage at ${percent}% (${value}/${limit} ${this.unitFor(target)}).` : ''
   }
 
   /**
@@ -290,7 +356,7 @@ export class MemoryStore {
     const suffix = backup ? ` 已把备份保存到 ${basename(backup)}。` : ''
     return {
       ok: false,
-      message: `记忆文件为 ${oversized.size} 字节（上限 ${oversized.limit * READ_GUARD_FACTOR}）—— 跳过读取。${suffix} 请手动修复该文件后重试。`,
+      message: `记忆文件为 ${oversized.size} 字节（上限 ${oversized.byteLimit}）—— 跳过读取。${suffix} 请手动修复该文件后重试。`,
       entries: [], chars: 0, limit: this.limitFor(target),
     }
   }
@@ -370,7 +436,7 @@ export class MemoryStore {
   }
 
   async add(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
-    return await this.serial(() => this.addChained(target, facts))
+    return await this.serial(async () => this.decorateResult(target, await this.addChained(target, facts)))
   }
 
   private async addChained(target: MemoryTarget, facts: string): Promise<MemoryApplyResult> {
@@ -421,16 +487,18 @@ export class MemoryStore {
     // `add('alpha')` a false duplicate of a stored `## 2020-01-01\nalpha`.
     if (entries.some(entry => this.dedupeKey(entry) === content)) {
       this.resetFailures()
-      return { result: { ok: true, message: `该条目已存在（未重复添加）。${this.storageHint(target, entries.join(ENTRY_DELIMITER).length)}`, entries, chars: entries.join(ENTRY_DELIMITER).length, limit: this.limitFor(target) }, write: null }
+      const usage = usageOf(entries)
+      return { result: { ok: true, message: `该条目已存在（未重复添加）。${this.storageHint(target, usage)}`, entries, chars: usage.chars, tokens: usage.tokens, limit: this.limitFor(target) }, write: null }
     }
     const next = [...entries, prefixed]
-    const total = next.join(ENTRY_DELIMITER).length
+    const usage = usageOf(next)
+    const total = this.judgedValue(target, usage)
     const addLimit = this.limitFor(target)
     if (addLimit > 0 && total > addLimit) {
-      return { result: this.failure(target, `添加该条目会超过 ${addLimit} 字符上限。请先合并或删除过期条目，再重试。`, entries), write: null }
+      return { result: this.failure(target, `添加该条目会超过 ${addLimit} ${this.unitFor(target)} 上限。请先合并或删除过期条目，再重试。`, entries), write: null }
     }
     this.resetFailures()
-    return { result: { ok: true, message: `已添加条目。${this.storageHint(target, total)}`, entries: next, chars: total, limit: this.limitFor(target) }, write: render(next) }
+    return { result: { ok: true, message: `已添加条目。${this.storageHint(target, usage)}`, entries: next, chars: usage.chars, tokens: usage.tokens, limit: this.limitFor(target) }, write: render(next) }
   }
 
   /**
@@ -472,7 +540,7 @@ export class MemoryStore {
     if (render(entries) !== raw) return 'external'
     const limit = this.limitFor(target)
     // A zero/negative limit means "unbounded".
-    if (limit > 0 && entries.some(entry => entry.length > limit)) return 'over-limit'
+    if (limit > 0 && entries.some(entry => this.judgedValue(target, usageOf([entry])) > limit)) return 'over-limit'
     return null
   }
 
@@ -505,12 +573,17 @@ export class MemoryStore {
       if (shrinkOnly) return null
       const limit = this.limitFor(target)
       const entries = normalizeEntries(raw)
-      const over = entries.filter(entry => entry.length > limit).length
+      const over = entries.filter(entry => this.judgedValue(target, usageOf([entry])) > limit).length
+      const usage = usageOf(entries)
+      const limitName = this.tokenLimitFor(target) === undefined
+        ? (target === 'memory' ? 'memoryCharLimit' : 'userCharLimit')
+        : `${target} tokens`
       return {
         ok: false,
-        message: `${over} 条记忆超过了配置的 ${target}CharLimit（${limit}）；它们是在更高上限下写入的。请提高上限或删除条目 —— 删除类操作仍然可用。`,
+        message: `${over} 条记忆超过了配置的 ${limitName}（${limit}）；它们是在更高上限下写入的。请提高上限或删除条目 —— 删除类操作仍然可用。`,
         entries,
-        chars: entries.join(ENTRY_DELIMITER).length,
+        chars: usage.chars,
+        tokens: usage.tokens,
         limit,
       }
     }
@@ -520,7 +593,7 @@ export class MemoryStore {
   }
 
   async applyBatch(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
-    return await this.serial(() => this.applyBatchChained(target, operations))
+    return await this.serial(async () => this.decorateResult(target, await this.applyBatchChained(target, operations)))
   }
 
   private async applyBatchChained(target: MemoryTarget, operations: MemoryOperation[]): Promise<MemoryApplyResult> {
@@ -609,13 +682,14 @@ export class MemoryStore {
         working[matchIndex] = entryBody
       }
     }
-    const total = working.join(ENTRY_DELIMITER).length
+    const usage = usageOf(working)
+    const total = this.judgedValue(target, usage)
     const batchLimit = this.limitFor(target)
     if (batchLimit > 0 && total > batchLimit) {
-      return { result: this.failure(target, `批处理结果（${total} 字符）超过 ${batchLimit} 上限。请在同一个批里再删除或缩短一些条目。`, entries), write: null }
+      return { result: this.failure(target, `批处理结果（${total} ${this.unitFor(target)}）超过 ${batchLimit} 上限。请在同一个批里再删除或缩短一些条目。`, entries), write: null }
     }
     this.resetFailures()
-    return { result: { ok: true, message: `已应用 ${operations.length} 个操作。${this.storageHint(target, total)}`, entries: working, chars: total, limit: this.limitFor(target) }, write: render(working) }
+    return { result: { ok: true, message: `已应用 ${operations.length} 个操作。${this.storageHint(target, usage)}`, entries: working, chars: usage.chars, tokens: usage.tokens, limit: this.limitFor(target) }, write: render(working) }
   }
 
   async renderContext(): Promise<string> {
@@ -627,7 +701,7 @@ export class MemoryStore {
       // context states the skip instead of silently dropping the block.
       const oversized = entries.length === 0 ? await this.oversizedFile(target) : null
       if (oversized) {
-        parts.push(`## ${label} — file skipped: ${oversized.size} bytes (limit ${oversized.limit * READ_GUARD_FACTOR}); not read`)
+        parts.push(`## ${label} — file skipped: ${oversized.size} bytes (limit ${oversized.byteLimit}); not read`)
         continue
       }
       // V10-03 (P2-18): the same exempt labels apply on render — an entry the
@@ -637,14 +711,16 @@ export class MemoryStore {
       if (safe.length > 0) {
         const body = safe.join(ENTRY_DELIMITER)
         const limit = this.limitFor(target)
+        const usage = usageOf(safe)
+        const judged = this.judgedValue(target, usage)
         const note = safe.length === entries.length ? '' : ` (${entries.length - safe.length} threat-matched entries filtered)`
         // Usage indicator aligned with Hermes `_render_block`: floor percentage clamped at 100.
         // C-04: with no limit (limit <= 0) the whole usage segment is
         // omitted — the old form rendered a bogus "[0% — N/0 chars]".
-        const usage = limit > 0
-          ? ` [${Math.min(100, Math.floor((body.length * 100) / limit))}% — ${body.length}/${limit} chars]`
+        const usageText = limit > 0
+          ? ` [${Math.min(100, Math.floor((judged * 100) / limit))}% — ${judged}/${limit} ${this.unitFor(target)}]`
           : ''
-        parts.push(`## ${label} (${safe.length} entries)${usage}${note}\n${body}`)
+        parts.push(`## ${label} (${safe.length} entries)${usageText}${note}\n${body}`)
       } else if (entries.length > 0) {
         // P3-14 (v14): every entry was threat-matched. The block used to
         // vanish with no trace, so the model (and an operator reading the

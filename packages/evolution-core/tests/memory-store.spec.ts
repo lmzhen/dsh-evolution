@@ -25,6 +25,20 @@ it('memory add and batch (replace/remove semantics via applyBatch)', async () =>
   expect(await store.read('memory')).toEqual(['Run tests with pnpm test.'])
 })
 
+it('memory token mode gates and reports in tokens while keeping chars as a fact', async () => {
+  const root = await tempRoot('dsh-evo-memory-tokens-')
+  const store = new MemoryStore({ root, memoryTokenLimit: 8, userTokenLimit: 8 })
+  const first = await store.add('memory', '中'.repeat(8))
+  expect(first.ok).toBe(true)
+  expect(first).toMatchObject({ chars: 8, tokens: 8, limit: 8, tokenLimit: 8 })
+  expect(await store.renderContext()).toContain('8/8 tokens')
+
+  const over = await store.add('memory', '中')
+  expect(over.ok).toBe(false)
+  expect(over.message).toContain('tokens')
+  expect(await store.read('memory')).toEqual(['中'.repeat(8)])
+})
+
 it('PLAN-R2 P2-6 (2026-09-16): the core store honors the schema `content` alias in add and replace', async () => {
   // The dsh-memory contract and the tool-memory schema both accept `content`,
   // but applyBatchCore used to read `op.facts` only — a third-party provider
