@@ -13,6 +13,7 @@ import { latestVersionAt } from '@deepseek-ai/dsh-evolution-core/skills'
 import type {
   SkillHealthFacts,
   SkillStatsCounts,
+  SkillStatsGovernance,
   SkillStatsRow,
   SkillStatsSnapshot,
   SkillUsageFacts,
@@ -112,11 +113,32 @@ function feedbackOf(value: unknown, name: string): number | null {
   return numberOrNull(score)
 }
 
+/** Normalize the optional recent-governance read; a malformed row is skipped, not invented. */
+function governanceOf(value: unknown): SkillStatsGovernance[] {
+  if (!Array.isArray(value)) return []
+  const rows: SkillStatsGovernance[] = []
+  for (const raw of value) {
+    const source = objectOf(raw)
+    const runId = typeof source?.runId === 'string' ? source.runId : ''
+    const startedAt = numberOrNull(source?.startedAt)
+    if (runId === '' || startedAt === null) continue
+    rows.push({
+      runId,
+      state: typeof source?.state === 'string' ? source.state : 'unknown',
+      startedAt,
+      target: stringOrNull(source?.target),
+      mode: stringOrNull(source?.mode),
+      resultRef: stringOrNull(source?.resultRef),
+    })
+  }
+  return rows
+}
+
 /**
  * Build the complete stats snapshot for one request.
  * @param services - the host services the route already resolves.
  * @param curator - the live curator face.
- * @returns rows with per-dimension nulls plus totals and successful counts.
+ * @returns rows with per-dimension nulls plus totals, successes and recent governance.
  */
 export async function buildSkillStatsSnapshot(services: RouteServices, curator: CuratorFace): Promise<SkillStatsSnapshot> {
   const index = await readSkillIndex(curator)
@@ -132,6 +154,7 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
   const usageByName = usageRead instanceof Map ? usageRead as ReadonlyMap<string, unknown> : null
   const feedbackRead = services.getFeedback?.(index.map(row => row.name))
   const counts = countsOf(await services.getCounts?.().catch(() => null) ?? null)
+  const governance = governanceOf(await services.getGovernance?.().catch(() => null) ?? null)
 
   const rows: SkillStatsRow[] = index.map(row => ({
     name: row.name,
@@ -147,6 +170,7 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
     rows,
     totals: computeSkillStatsTotals(rows, counts),
     counts,
+    governance,
     generatedAt: new Date().toISOString(),
   }
 }

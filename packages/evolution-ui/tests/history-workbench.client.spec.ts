@@ -135,6 +135,7 @@ describe('history workbench', () => {
       }],
       totals: { skills: 1, needsAttention: 1, bodyChars: 12, supportFiles: 1, successes: { offload: 0, condense: 0, extract: 1 } },
       counts: { offload: 0, condense: 0, extract: 1 },
+      governance: [],
       generatedAt: '2026-01-01T00:00:00.000Z',
     }))
     const view = render(h(WorkbenchPage, {
@@ -153,6 +154,7 @@ describe('history workbench', () => {
     fireEvent.click(document.querySelector('.evo-workbench-back')!)
     await waitFor(() => { expect(document.getElementById('evo-workbench-tab-data')?.getAttribute('aria-selected')).toBe('true') })
     expect(document.querySelector('.evo-stats-skill-name')?.textContent).toContain('alpha')
+    expect(loadStats).toHaveBeenCalledTimes(1)
     view.unmount()
   })
 })

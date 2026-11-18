@@ -3,9 +3,10 @@
  * without creating another page or a second navigation registry.
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
-import { createElement, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createElement, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { PAGE_SURFACE_CLASS } from '@lmzhen/dsh-evolution-client-kit'
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
+import type { SkillStatsSnapshot } from '@deepseek-ai/dsh-evolution-core/skills'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
 import { PendingCard, type PendingCardFace } from '../../settings/PendingCard.ts'
 import { StatsPage, STATS_CSS, type StatsFace } from './StatsPage.ts'
@@ -30,6 +31,27 @@ export interface WorkbenchFace {
 
 export type { WorkbenchView } from './WorkbenchStore.ts'
 
+/**
+ * Share one stats read across the history view (health chips/governance/counts) and the data table.
+ * The promise is cached for the workbench lifetime; a failed read clears the cache so a retry is
+ * possible, and an absent loader stays absent (old hosts keep the legacy health route).
+ * @param loader - the stats read, when the host provides one.
+ * @returns the shared loader, or undefined when the host has no stats read.
+ */
+function useSharedStats(loader: (() => Promise<SkillStatsSnapshot>) | undefined): (() => Promise<SkillStatsSnapshot>) | undefined {
+  const cache = useRef<{ readonly promise: Promise<SkillStatsSnapshot> } | null>(null)
+  const load = useMemo<() => Promise<SkillStatsSnapshot>>(() => () => {
+    if (loader === undefined) return Promise.reject(new Error('stats loader missing'))
+    const current = cache.current
+    if (current !== null) return current.promise
+    const promise = loader()
+    cache.current = { promise }
+    promise.catch(() => { if (cache.current?.promise === promise) cache.current = null })
+    return promise
+  }, [loader])
+  return loader === undefined ? undefined : load
+}
+
 
 
 /**
@@ -46,6 +68,8 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
   const openHistory = (skill: string | undefined, origin?: 'data'): void => { props.store.openHistory(skill, origin) }
   const hasMerge = props.hasView?.('merge') ?? true
   const hasData = props.stats !== undefined
+  const loadSharedStats = useSharedStats(props.stats?.loadStats)
+  const history = loadSharedStats === undefined ? props.history : { ...props.history, loadStats: loadSharedStats }
   // Mount the data view on first visit and keep it mounted afterwards: its search/sort/scroll survive a
   // trip into a skill, while a host that never opens "Data overview" pays no stats read.
   const [dataMounted, setDataMounted] = useState(view === 'data')
@@ -98,7 +122,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
                 onClick: () => { props.store.backToData() },
               }, '← ' + props.t('workbench.backToData')))
             : null,
-          createElement(SkillHistoryPanel, { ...props.history, focusSkill: selectedSkill, focusRevision }))
+          createElement(SkillHistoryPanel, { ...history, focusSkill: selectedSkill, focusRevision }))
         : view === 'pending'
           ? createElement(PendingCard, { ...props.pending, onHistory: () => { openHistory(undefined) } })
           : null,
@@ -106,6 +130,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
         ? createElement('div', { hidden: view !== 'data', className: 'evo-workbench-feature evo-workbench-data' },
           createElement(StatsPage, {
             ...props.stats!,
+            loadStats: loadSharedStats ?? props.stats!.loadStats,
             openSkill: (name: string) => { openHistory(name, 'data') },
             onOrganize: () => { openHistory(undefined) },
           }))
@@ -156,3 +181,4 @@ export const WORKBENCH_CSS = [
   '.evo-workbench-body>.evolution-param-card{flex:1;min-width:0;overflow:auto}',
   '@media (max-width:720px){.evo-workbench-head{flex-wrap:wrap}.evo-workbench-tabs{flex-wrap:wrap}}',
 ].join('')
+

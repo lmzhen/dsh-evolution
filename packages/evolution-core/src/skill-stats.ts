@@ -64,11 +64,22 @@ export interface SkillStatsTotals {
   readonly successes: SkillStatsCounts | null
 }
 
+/** One recent governance run, as the aggregate read reports it. */
+export interface SkillStatsGovernance {
+  readonly runId: string
+  readonly state: string
+  readonly startedAt: number
+  readonly target: string | null
+  readonly mode: string | null
+  readonly resultRef: string | null
+}
+
 /** One complete read of the skill library, as the host route returns it. */
 export interface SkillStatsSnapshot {
   readonly rows: readonly SkillStatsRow[]
   readonly totals: SkillStatsTotals
   readonly counts: SkillStatsCounts | null
+  readonly governance: readonly SkillStatsGovernance[]
   readonly generatedAt: string
 }
 

@@ -53,7 +53,6 @@ export function apply(ctx: ClientContext): void {
     format: (key, values) => t(key, values),
     loadSkills: api.skills,
     loadVersions: api.versions,
-    loadHealth: api.health,
     loadStats: api.stats,
     loadDiff: api.diff,
     loadBody: api.body,

@@ -256,21 +256,40 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
   useEffect(reloadSkills, [])
 
   useEffect(() => {
+    const loadStats = face.loadStats
     const loadHealth = face.loadHealth
     const loadGovernance = face.loadGovernance
-    if (loadHealth === undefined && loadGovernance === undefined) return
+    if (loadStats === undefined && loadHealth === undefined && loadGovernance === undefined) return
     let live = true
-    const read = loadHealth !== undefined
-      ? loadHealth().then((payload) => {
+    const fromStats = loadStats === undefined
+      ? undefined
+      : loadStats().then((snapshot) => {
         if (!live) return
-        setGovernance(payload.governance)
-        setCounts(payload.counts)
-        setHealthByName(new Map(payload.rows.map(row => [row.name, row])))
-      })
-      : loadGovernance!().then((rows) => { if (live) setGovernance(rows) })
-    void read.catch(() => { /* the aggregate read is optional */ })
+        setGovernance(snapshot.governance ?? [])
+        setCounts(snapshot.counts)
+        setHealthByName(new Map(snapshot.rows
+          .filter(row => row.health !== null)
+          .map(row => [row.name, {
+            name: row.name,
+            verdict: row.health!.verdict,
+            bodyChars: row.health!.bodyChars,
+            supportFiles: row.health!.supportFiles,
+            findings: row.health!.findings,
+          }])))
+      }).catch(() => { /* fall back to the legacy health read below */ })
+    const read = loadStats !== undefined
+      ? fromStats
+      : loadHealth !== undefined
+        ? loadHealth().then((payload) => {
+          if (!live) return
+          setGovernance(payload.governance)
+          setCounts(payload.counts)
+          setHealthByName(new Map(payload.rows.map(row => [row.name, row])))
+        })
+        : loadGovernance!().then((rows) => { if (live) setGovernance(rows) })
+    void read?.catch(() => { /* the aggregate read is optional */ })
     return () => { live = false }
-  }, [face.loadGovernance, face.loadHealth])
+  }, [face.loadStats, face.loadHealth, face.loadGovernance])
 
   const needle = query.trim().toLowerCase()
   const visible = useMemo(() => needle === ''

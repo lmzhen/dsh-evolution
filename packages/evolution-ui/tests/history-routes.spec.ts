@@ -79,6 +79,7 @@ describe('skill-history routes: the stats snapshot', () => {
       getUsage: async () => new Map([['panel-skill', { use_count: 0, view_count: 2, patch_count: 1, last_used_at: '2026-01-01T00:00:00.000Z', last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false }]]),
       getFeedback: names => Object.fromEntries(names.map(name => [name, 0])),
       getCounts: async () => ({ offload: 0, condense: 0, extract: 1 }),
+      getGovernance: async () => [{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }],
     }, audit))
     const stats = await host.json<{
       ok: boolean
@@ -92,6 +93,7 @@ describe('skill-history routes: the stats snapshot', () => {
         }>
         totals: { skills: number; needsAttention: number; bodyChars: number | null; supportFiles: number | null }
         counts: { offload: number; condense: number; extract: number } | null
+        governance: Array<{ runId: string; state: string; startedAt: number; target: string | null; mode: string | null; resultRef: string | null }>
       }
     }>(SKILL_HISTORY_ROUTES.stats)
     expect(stats.status).toBe(200)
@@ -105,6 +107,7 @@ describe('skill-history routes: the stats snapshot', () => {
     expect(row.feedback).toBe(0)
     expect(stats.body.data.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
     expect(stats.body.data.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
+    expect(stats.body.data.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }])
   })
 
   it('keeps health/usage/feedback null when those services are absent', async () => {

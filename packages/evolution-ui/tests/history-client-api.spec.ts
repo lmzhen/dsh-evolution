@@ -74,6 +74,7 @@ describe('skill-history client api', () => {
           }, { description: 'no name' }],
           totals: { skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0, successes: { offload: 0, condense: 0, extract: 1 } },
           counts: { offload: 0, condense: 0, extract: 1 },
+          governance: [{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'a', mode: 'offload', resultRef: null }],
           generatedAt: '2026-01-01T00:00:00.000Z',
         },
       },
@@ -87,6 +88,7 @@ describe('skill-history client api', () => {
     expect(stats.rows[0]?.usage).toMatchObject({ useCount: 0, viewCount: null, patchCount: 1 })
     expect(stats.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0 })
     expect(stats.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
+    expect(stats.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'a', mode: 'offload', resultRef: null }])
   })
 
   it('surfaces a business refusal verbatim and never as a silent empty result', async () => {

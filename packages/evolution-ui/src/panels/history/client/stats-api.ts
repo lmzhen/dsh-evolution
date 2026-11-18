@@ -11,6 +11,7 @@
 import type {
   SkillHealthFacts,
   SkillStatsCounts,
+  SkillStatsGovernance,
   SkillStatsRow,
   SkillStatsSnapshot,
   SkillStatsTotals,
@@ -100,6 +101,27 @@ function totalsOf(value: unknown, rows: readonly SkillStatsRow[]): SkillStatsTot
   }
 }
 
+function governanceOf(value: unknown): SkillStatsGovernance[] {
+  if (!Array.isArray(value)) return []
+  const rows: SkillStatsGovernance[] = []
+  for (const raw of value) {
+    const source = recordOf(raw)
+    if (source === null) continue
+    const runId = typeof source?.runId === 'string' ? source.runId : ''
+    const startedAt = numberOrNull(source?.startedAt)
+    if (runId === '' || startedAt === null) continue
+    rows.push({
+      runId,
+      state: typeof source.state === 'string' ? source.state : 'unknown',
+      startedAt,
+      target: stringOrNull(source.target),
+      mode: stringOrNull(source.mode),
+      resultRef: stringOrNull(source.resultRef),
+    })
+  }
+  return rows
+}
+
 /**
  * Parse one stats response body. Rows with no name are dropped; every valid row keeps nulls.
  * @param value - the route's `data` payload.
@@ -114,6 +136,8 @@ export function parseSkillStats(value: unknown): SkillStatsSnapshot {
     rows,
     totals: totalsOf(source?.totals, rows),
     counts: countsOf(source?.counts),
+    governance: governanceOf(source?.governance),
     generatedAt: stringOrNull(source?.generatedAt) ?? '',
   }
 }
+
