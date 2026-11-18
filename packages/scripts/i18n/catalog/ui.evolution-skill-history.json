@@ -1115,342 +1115,342 @@
     "workbench.history": {
       "zh": "技能",
       "en": "Skills",
-      "ja": "Skills",
+      "ja": "スキル",
       "es": "Skills",
       "fr": "Skills",
       "de": "Skills",
       "pt": "Skills",
-      "ru": "Skills"
+      "ru": "Навыки"
     },
     "workbench.merge": {
       "zh": "合并建议",
       "en": "Merge suggestions",
-      "ja": "Merge suggestions",
-      "es": "Merge suggestions",
-      "fr": "Merge suggestions",
-      "de": "Merge suggestions",
-      "pt": "Merge suggestions",
-      "ru": "Merge suggestions"
+      "ja": "統合の提案",
+      "es": "Sugerencias de fusión",
+      "fr": "Suggestions de fusion",
+      "de": "Merge-Vorschläge",
+      "pt": "Sugestões de mescla",
+      "ru": "Предложения объединения"
     },
     "workbench.pending": {
       "zh": "待我确认",
       "en": "Needs review",
-      "ja": "Needs review",
-      "es": "Needs review",
-      "fr": "Needs review",
-      "de": "Needs review",
-      "pt": "Needs review",
-      "ru": "Needs review"
+      "ja": "確認待ち",
+      "es": "Por revisar",
+      "fr": "À vérifier",
+      "de": "Zu prüfen",
+      "pt": "A revisar",
+      "ru": "На проверке"
     },
     "workbench.title": {
       "zh": "技能整理",
       "en": "Skill organization",
-      "ja": "Skill organization",
-      "es": "Skill organization",
-      "fr": "Skill organization",
-      "de": "Skill organization",
-      "pt": "Skill organization",
-      "ru": "Skill organization"
+      "ja": "スキル整理",
+      "es": "Organización de skills",
+      "fr": "Organisation des skills",
+      "de": "Skill-Organisation",
+      "pt": "Organização de skills",
+      "ru": "Упорядочивание навыков"
     },
     "stats.eyebrow": {
       "zh": "技能库",
       "en": "Skill library",
-      "ja": "Skill library",
-      "es": "Skill library",
-      "fr": "Skill library",
-      "de": "Skill library",
-      "pt": "Skill library",
-      "ru": "Skill library"
+      "ja": "スキルライブラリ",
+      "es": "Biblioteca de skills",
+      "fr": "Bibliothèque de skills",
+      "de": "Skill-Bibliothek",
+      "pt": "Biblioteca de skills",
+      "ru": "Библиотека навыков"
     },
     "stats.title": {
       "zh": "数据总览",
       "en": "Data overview",
-      "ja": "Data overview",
-      "es": "Data overview",
-      "fr": "Data overview",
-      "de": "Data overview",
-      "pt": "Data overview",
-      "ru": "Data overview"
+      "ja": "データ概要",
+      "es": "Resumen de datos",
+      "fr": "Vue d’ensemble",
+      "de": "Datenübersicht",
+      "pt": "Visão geral",
+      "ru": "Обзор данных"
     },
     "stats.lede": {
       "zh": "把每个技能的体量、参考资料、版本、使用和反馈放在一起看。点列名排序，点技能名进入整理页。",
       "en": "See size, references, versions, usage and feedback for every skill. Sort by a column; open a skill by name.",
-      "ja": "See size, references, versions, usage and feedback for every skill. Sort by a column; open a skill by name.",
-      "es": "See size, references, versions, usage and feedback for every skill. Sort by a column; open a skill by name.",
-      "fr": "See size, references, versions, usage and feedback for every skill. Sort by a column; open a skill by name.",
-      "de": "See size, references, versions, usage and feedback for every skill. Sort by a column; open a skill by name.",
-      "pt": "See size, references, versions, usage and feedback for every skill. Sort by a column; open a skill by name.",
-      "ru": "See size, references, versions, usage and feedback for every skill. Sort by a column; open a skill by name."
+      "ja": "各スキルのサイズ、参照、バージョン、使用状況、フィードバックをまとめて表示します。列名で並べ替え、スキル名で整理ページを開けます。",
+      "es": "Consulta tamaño, referencias, versiones, uso y feedback de cada skill. Ordena por columna y abre una skill por su nombre.",
+      "fr": "Voyez taille, références, versions, usage et retours de chaque skill. Triez par colonne et ouvrez une skill par son nom.",
+      "de": "Größe, Referenzen, Versionen, Nutzung und Feedback jedes Skills auf einen Blick. Nach Spalte sortieren, Skill per Namen öffnen.",
+      "pt": "Veja tamanho, referências, versões, uso e feedback de cada skill. Ordene por coluna e abra uma skill pelo nome.",
+      "ru": "Размер, ссылки, версии, использование и отзывы по каждому навыку. Сортируйте по столбцу и открывайте навык по имени."
     },
     "stats.organize": {
       "zh": "整理一个技能",
       "en": "Organize a skill",
-      "ja": "Organize a skill",
-      "es": "Organize a skill",
-      "fr": "Organize a skill",
-      "de": "Organize a skill",
-      "pt": "Organize a skill",
-      "ru": "Organize a skill"
+      "ja": "スキルを整理",
+      "es": "Organizar una skill",
+      "fr": "Organiser une skill",
+      "de": "Skill aufräumen",
+      "pt": "Organizar uma skill",
+      "ru": "Упорядочить навык"
     },
     "stats.total.skills": {
       "zh": "技能总数",
       "en": "Skills",
-      "ja": "Skills",
+      "ja": "スキル数",
       "es": "Skills",
       "fr": "Skills",
       "de": "Skills",
       "pt": "Skills",
-      "ru": "Skills"
+      "ru": "Навыки"
     },
     "stats.total.attention": {
       "zh": "需要关注",
       "en": "Needs attention",
-      "ja": "Needs attention",
-      "es": "Needs attention",
-      "fr": "Needs attention",
-      "de": "Needs attention",
-      "pt": "Needs attention",
-      "ru": "Needs attention"
+      "ja": "要対応",
+      "es": "Requieren atención",
+      "fr": "À traiter",
+      "de": "Aufmerksamkeit",
+      "pt": "Precisam de atenção",
+      "ru": "Требуют внимания"
     },
     "stats.total.body": {
       "zh": "正文总量",
       "en": "Total body",
-      "ja": "Total body",
-      "es": "Total body",
-      "fr": "Total body",
-      "de": "Total body",
-      "pt": "Total body",
-      "ru": "Total body"
+      "ja": "本文合計",
+      "es": "Texto total",
+      "fr": "Corps total",
+      "de": "Text gesamt",
+      "pt": "Corpo total",
+      "ru": "Всего текста"
     },
     "stats.total.success": {
       "zh": "整理成功",
       "en": "Organized",
-      "ja": "Organized",
-      "es": "Organized",
-      "fr": "Organized",
-      "de": "Organized",
-      "pt": "Organized",
-      "ru": "Organized"
+      "ja": "整理済み",
+      "es": "Organizadas",
+      "fr": "Organisées",
+      "de": "Aufgeräumt",
+      "pt": "Organizadas",
+      "ru": "Упорядочено"
     },
     "stats.search": {
       "zh": "按名字或描述筛选",
       "en": "Filter by name or description",
-      "ja": "Filter by name or description",
-      "es": "Filter by name or description",
-      "fr": "Filter by name or description",
-      "de": "Filter by name or description",
-      "pt": "Filter by name or description",
-      "ru": "Filter by name or description"
+      "ja": "名前または説明で絞り込む",
+      "es": "Filtrar por nombre o descripción",
+      "fr": "Filtrer par nom ou description",
+      "de": "Nach Name oder Beschreibung filtern",
+      "pt": "Filtrar por nome ou descrição",
+      "ru": "Фильтр по имени или описанию"
     },
     "stats.filter.all": {
       "zh": "全部",
       "en": "All",
-      "ja": "All",
-      "es": "All",
-      "fr": "All",
-      "de": "All",
-      "pt": "All",
-      "ru": "All"
+      "ja": "すべて",
+      "es": "Todo",
+      "fr": "Tout",
+      "de": "Alle",
+      "pt": "Tudo",
+      "ru": "Все"
     },
     "stats.filter.attention": {
       "zh": "需要整理",
       "en": "Needs work",
-      "ja": "Needs work",
-      "es": "Needs work",
-      "fr": "Needs work",
-      "de": "Needs work",
-      "pt": "Needs work",
-      "ru": "Needs work"
+      "ja": "要整理",
+      "es": "Por ordenar",
+      "fr": "À ranger",
+      "de": "Aufzuräumen",
+      "pt": "A organizar",
+      "ru": "Нужно упорядочить"
     },
     "stats.filter.recent": {
       "zh": "最近使用",
       "en": "Recent",
-      "ja": "Recent",
-      "es": "Recent",
-      "fr": "Recent",
-      "de": "Recent",
-      "pt": "Recent",
-      "ru": "Recent"
+      "ja": "最近使用",
+      "es": "Recientes",
+      "fr": "Récents",
+      "de": "Kürzlich",
+      "pt": "Recentes",
+      "ru": "Недавние"
     },
     "stats.tableTitle": {
       "zh": "全部技能",
       "en": "All skills",
-      "ja": "All skills",
-      "es": "All skills",
-      "fr": "All skills",
-      "de": "All skills",
-      "pt": "All skills",
-      "ru": "All skills"
+      "ja": "すべてのスキル",
+      "es": "Todas las skills",
+      "fr": "Toutes les skills",
+      "de": "Alle Skills",
+      "pt": "Todas as skills",
+      "ru": "Все навыки"
     },
     "stats.tableHint": {
       "zh": "点技能名进入整理页 · 点列名排序",
       "en": "Open a skill by name · click a column to sort",
-      "ja": "Open a skill by name · click a column to sort",
-      "es": "Open a skill by name · click a column to sort",
-      "fr": "Open a skill by name · click a column to sort",
-      "de": "Open a skill by name · click a column to sort",
-      "pt": "Open a skill by name · click a column to sort",
-      "ru": "Open a skill by name · click a column to sort"
+      "ja": "スキル名で整理ページを開く・列名で並べ替え",
+      "es": "Abre una skill por su nombre · ordena por columna",
+      "fr": "Ouvrir une skill par son nom · trier par colonne",
+      "de": "Skill per Namen öffnen · nach Spalte sortieren",
+      "pt": "Abra uma skill pelo nome · ordene por coluna",
+      "ru": "Открыть навык по имени · сортировать по столбцу"
     },
     "stats.empty": {
       "zh": "还没有技能历史",
       "en": "No skill history yet",
-      "ja": "No skill history yet",
-      "es": "No skill history yet",
-      "fr": "No skill history yet",
-      "de": "No skill history yet",
-      "pt": "No skill history yet",
-      "ru": "No skill history yet"
+      "ja": "スキル履歴はまだありません",
+      "es": "Aún no hay historial",
+      "fr": "Aucun historique",
+      "de": "Noch keine Skill-Historie",
+      "pt": "Ainda não há histórico",
+      "ru": "История навыков пока пуста"
     },
     "stats.emptyHint": {
       "zh": "先去技能库看看",
       "en": "Open the skill library first",
-      "ja": "Open the skill library first",
-      "es": "Open the skill library first",
-      "fr": "Open the skill library first",
-      "de": "Open the skill library first",
-      "pt": "Open the skill library first",
-      "ru": "Open the skill library first"
+      "ja": "先にスキルライブラリを開いてください",
+      "es": "Abre primero la biblioteca",
+      "fr": "Ouvrez d’abord la bibliothèque",
+      "de": "Zuerst die Skill-Bibliothek öffnen",
+      "pt": "Abra primeiro a biblioteca",
+      "ru": "Сначала откройте библиотеку"
     },
     "stats.failed": {
       "zh": "数据读取失败",
       "en": "Could not load stats",
-      "ja": "Could not load stats",
-      "es": "Could not load stats",
-      "fr": "Could not load stats",
-      "de": "Could not load stats",
-      "pt": "Could not load stats",
-      "ru": "Could not load stats"
+      "ja": "データを読み込めませんでした",
+      "es": "No se pudieron cargar los datos",
+      "fr": "Impossible de charger les données",
+      "de": "Daten konnten nicht geladen werden",
+      "pt": "Não foi possível carregar",
+      "ru": "Не удалось загрузить данные"
     },
     "stats.col.skill": {
       "zh": "技能",
       "en": "Skill",
-      "ja": "Skill",
+      "ja": "スキル",
       "es": "Skill",
       "fr": "Skill",
       "de": "Skill",
       "pt": "Skill",
-      "ru": "Skill"
+      "ru": "Навык"
     },
     "stats.col.status": {
       "zh": "状态",
       "en": "Status",
-      "ja": "Status",
-      "es": "Status",
-      "fr": "Status",
+      "ja": "状態",
+      "es": "Estado",
+      "fr": "État",
       "de": "Status",
-      "pt": "Status",
-      "ru": "Status"
+      "pt": "Estado",
+      "ru": "Статус"
     },
     "stats.col.body": {
       "zh": "正文",
       "en": "Body",
-      "ja": "Body",
-      "es": "Body",
-      "fr": "Body",
-      "de": "Body",
-      "pt": "Body",
-      "ru": "Body"
+      "ja": "本文",
+      "es": "Texto",
+      "fr": "Corps",
+      "de": "Text",
+      "pt": "Corpo",
+      "ru": "Текст"
     },
     "stats.col.support": {
       "zh": "参考资料",
       "en": "References",
-      "ja": "References",
-      "es": "References",
-      "fr": "References",
-      "de": "References",
-      "pt": "References",
-      "ru": "References"
+      "ja": "参照資料",
+      "es": "Referencias",
+      "fr": "Références",
+      "de": "Referenzen",
+      "pt": "Referências",
+      "ru": "Ссылки"
     },
     "stats.col.versions": {
       "zh": "版本",
       "en": "Versions",
-      "ja": "Versions",
-      "es": "Versions",
+      "ja": "バージョン",
+      "es": "Versiones",
       "fr": "Versions",
-      "de": "Versions",
-      "pt": "Versions",
-      "ru": "Versions"
+      "de": "Versionen",
+      "pt": "Versões",
+      "ru": "Версии"
     },
     "stats.col.use": {
       "zh": "使用",
       "en": "Uses",
-      "ja": "Uses",
-      "es": "Uses",
-      "fr": "Uses",
-      "de": "Uses",
-      "pt": "Uses",
-      "ru": "Uses"
+      "ja": "使用",
+      "es": "Usos",
+      "fr": "Usages",
+      "de": "Nutzung",
+      "pt": "Usos",
+      "ru": "Использование"
     },
     "stats.col.view": {
       "zh": "查看",
       "en": "Views",
-      "ja": "Views",
-      "es": "Views",
-      "fr": "Views",
-      "de": "Views",
-      "pt": "Views",
-      "ru": "Views"
+      "ja": "閲覧",
+      "es": "Vistas",
+      "fr": "Vues",
+      "de": "Aufrufe",
+      "pt": "Visualizações",
+      "ru": "Просмотры"
     },
     "stats.col.feedback": {
       "zh": "反馈",
       "en": "Feedback",
-      "ja": "Feedback",
+      "ja": "フィードバック",
       "es": "Feedback",
-      "fr": "Feedback",
+      "fr": "Retours",
       "de": "Feedback",
       "pt": "Feedback",
-      "ru": "Feedback"
+      "ru": "Отзывы"
     },
     "stats.col.lastAt": {
       "zh": "最近改动",
       "en": "Last change",
-      "ja": "Last change",
-      "es": "Last change",
-      "fr": "Last change",
-      "de": "Last change",
-      "pt": "Last change",
-      "ru": "Last change"
+      "ja": "最終更新",
+      "es": "Último cambio",
+      "fr": "Dernier changement",
+      "de": "Letzte Änderung",
+      "pt": "Última alteração",
+      "ru": "Последнее изменение"
     },
     "stats.verdict.healthy": {
       "zh": "健康",
       "en": "Healthy",
-      "ja": "Healthy",
-      "es": "Healthy",
-      "fr": "Healthy",
-      "de": "Healthy",
-      "pt": "Healthy",
-      "ru": "Healthy"
+      "ja": "正常",
+      "es": "Saludable",
+      "fr": "Sain",
+      "de": "Gesund",
+      "pt": "Saudável",
+      "ru": "Здоров"
     },
     "stats.verdict.unknown": {
       "zh": "未知",
       "en": "Unknown",
-      "ja": "Unknown",
-      "es": "Unknown",
-      "fr": "Unknown",
-      "de": "Unknown",
-      "pt": "Unknown",
-      "ru": "Unknown"
+      "ja": "不明",
+      "es": "Desconocido",
+      "fr": "Inconnu",
+      "de": "Unbekannt",
+      "pt": "Desconhecido",
+      "ru": "Неизвестно"
     },
     "workbench.data": {
       "zh": "数据总览",
       "en": "Data overview",
-      "ja": "Data overview",
-      "es": "Data overview",
-      "fr": "Data overview",
-      "de": "Data overview",
-      "pt": "Data overview",
-      "ru": "Data overview"
+      "ja": "データ概要",
+      "es": "Resumen de datos",
+      "fr": "Vue d’ensemble",
+      "de": "Datenübersicht",
+      "pt": "Visão geral",
+      "ru": "Обзор данных"
     },
     "workbench.backToData": {
       "zh": "返回数据总览",
       "en": "Back to data",
-      "ja": "Back to data",
-      "es": "Back to data",
-      "fr": "Back to data",
-      "de": "Back to data",
-      "pt": "Back to data",
-      "ru": "Back to data"
+      "ja": "データ概要に戻る",
+      "es": "Volver al resumen",
+      "fr": "Retour au résumé",
+      "de": "Zurück zur Übersicht",
+      "pt": "Voltar ao resumo",
+      "ru": "Назад к обзору"
     }
   }
 }
