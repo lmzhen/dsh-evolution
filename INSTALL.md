@@ -59,6 +59,23 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.53.0
 
 5. 重启后运行 `/evolution doctor`，再实际写一次记忆、改一次技能。
 
+升级只操作 `all`。profile 不应直接依赖 `@lmzhen/dsh-evolution-*` 子包：点击更新时平台只替换 `all`，子包由 `all` 的精确依赖一起更新。若版本卡显示新版本但界面仍是旧版，说明 profile 是旧的混合安装（直接依赖子包或复制过 `node_modules`）；退出宿主后按下节修复。
+
+### 修复旧的混合安装
+
+先退出宿主并备份 `$DSH_HOME`，再执行：
+
+```bash
+# 使用 DSH 桌面应用内置 pnpm 的路径（或 PATH 里的 pnpm）
+node packages/scripts/install-layered.mjs --repair \
+  --profile desktop --home "$DSH_HOME" \
+  --pnpm "$DSH_DESKTOP_PNPM"
+```
+
+`--version` 可省略，默认使用已安装的 `all` 版本。桌面应用的内置 pnpm 在 `<安装目录>\resources\runtime\primary-runtime\dependencies\pnpm\bin\pnpm.cjs`；也可以把 `DSH_DESKTOP_PNPM` 设为该路径，或让 PATH 里有 pnpm。命令会保留 `all` 一行，删除其它家族直接依赖，备份旧 `node_modules`，重新用 pnpm 安装，并验证 20 个包同版本。失败会自动恢复。修复完成后重启宿主。
+
+`install-layered` 的普通安装会复制源码/离线包，只用于开发或离线场景；这种 profile 不支持 GUI 增量升级，需要重新执行安装器或先 `--repair` 转为 pnpm 管理。
+
 ## 卸载
 
 ```bash
@@ -77,7 +94,7 @@ node packages/scripts/build-lib.mjs
 node packages/scripts/install-layered.mjs --profile web --mode all --home "$DSH_HOME"
 ```
 
-默认源码 scope 下 installer 使用 `@deepseek-ai/dsh-evolution-all`；设置页对产品 scope 与源码 scope 都适用。安装器完整参数以 `node packages/scripts/install-layered.mjs --help` 为准。
+默认源码 scope 下 installer 使用 `@deepseek-ai/dsh-evolution-all`；设置页对产品 scope 与源码 scope 都适用。安装器完整参数以 `node packages/scripts/install-layered.mjs --help` 为准。这条路径会把包复制进 profile，属于开发/离线安装；它不支持平台 GUI 的增量升级。需要点击升级时，用 `dsh plugin add` 安装，或先跑 `--repair` 把旧 profile 转成 pnpm 管理。
 
 ## 安装问题
 

@@ -12,8 +12,9 @@
  *
  * This installer targets DSH source/debug layouts: it copies the evolution
  * packages into the profile's node_modules and writes the profile manifest.
- * For a production install, prefer `dsh plugin add` against the published
- * bundle package.
+ * It is the source/offline path and does NOT support the platform's GUI bundle
+ * update; for a production install use `dsh plugin add` against the published
+ * bundle, or run `--repair` to convert a copied/mixed profile to pnpm.
  */
 
 import { DIST_SOURCE_ROOT, EVOLUTION_SCOPE, PACKAGES_DIR, STAGING_DIR, familyVersion, packageSourceRoot } from './install/source-tree.mjs'
@@ -415,13 +416,174 @@ async function installBundlePackage(profileDir, bundleName) {
   // D-3 (v18): a mounted bundle row MUST also be pinned in `dependencies`
   // (the repo's own verify-profile-bundles guard treats a row without a
   // dependency as a phantom row, and a later pnpm install would prune the
-  // hand-copied packages). P2-22 (v19): the range comes from the family.
+  // hand-copied packages). Pin exactly: the platform updates this one bundle,
+  // so a range here could resolve a different family later.
   const version = familyVersion()
   manifest.dependencies ??= {}
   const addedDependency = !Object.prototype.hasOwnProperty.call(manifest.dependencies, bundleName)
-  manifest.dependencies[bundleName] = /^\d+\.\d+\.\d+/.test(version) ? `^${version}` : '*'
+  manifest.dependencies[bundleName] = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) ? version : '*'
   await writeManifestAtomic(join(profileDir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n')
   return { addedDependency, dependencyRange: manifest.dependencies[bundleName] }
+}
+
+/** The package tail the family rules key on (`@scope/dsh-evolution-ui` -> dsh-evolution-ui). */
+function packageTail(name) {
+  return name.slice(name.lastIndexOf('/') + 1)
+}
+
+/** Whether a dependency name is one of the family's implementation packages. */
+function isFamilyPackage(name) {
+  const tail = packageTail(name)
+  return EVOLUTION_PREFIXES.some(prefix => tail.startsWith(prefix))
+}
+
+function isAllPackage(name) {
+  return packageTail(name) === 'dsh-evolution-all'
+}
+
+/** Read one package's installed version from a profile, or undefined when absent/unreadable. */
+function installedPackageVersion(profileDir, name) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(profileDir, 'node_modules', name, 'package.json'), 'utf8'))
+    return typeof manifest.version === 'string' ? manifest.version : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The pnpm invocation for a profile. A `.js/.mjs/.cjs` path runs through the
+ * current Node binary; a command name or `.cmd` runs through the shell on
+ * Windows, where spawning a batch file directly is rejected.
+ * @param command - pnpm executable, command name, or a JS entry point.
+ * @returns The file and argument prefix to execute.
+ */
+function pnpmInvocation(command) {
+  if (/\.(?:cjs|mjs|js)$/i.test(command)) return { file: process.execPath, args: [command, 'install'], shell: false }
+  return { file: command, args: ['install'], shell: process.platform === 'win32' }
+}
+
+/**
+ * Repair a profile that predates the single-bundle install contract.
+ *
+ * The profile is the product's only mutable install surface. A legacy copy
+ * install pinned every family package directly and copied packages into
+ * `node_modules`; a platform bundle update then leaves those siblings stale.
+ * This repair keeps the `all` row, removes only family direct dependencies,
+ * backs up the old `node_modules` by rename, reinstalls through pnpm, verifies
+ * every family package at the target version, and restores the backup when any
+ * step fails.
+ *
+ * @param options - profile/home, optional target version and pnpm executable.
+ * @returns A summary of what changed; no writes in dry-run.
+ */
+export async function repairProfile(options = {}) {
+  const home = options.home ?? resolveHome(options.env)
+  const profile = options.profile ?? 'web'
+  const dryRun = options.dryRun === true
+  const profileDir = profileDirectory(home, profile)
+  const manifestPath = join(profileDir, 'package.json')
+  if (!existsSync(manifestPath)) throw new Error(`install-layered: profile "${profile}" has no package.json at ${manifestPath}`)
+  const originalManifest = await readFile(manifestPath, 'utf8')
+  const manifest = JSON.parse(originalManifest)
+  const bundles = Array.isArray(manifest?.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : []
+  const allBundle = bundles.find(name => typeof name === 'string' && isAllPackage(name))
+  if (allBundle === undefined) {
+    throw new Error(`install-layered: profile "${profile}" does not mount an evolution-all bundle; repair only converts an all install`)
+  }
+  const competing = bundles.filter(name => typeof name === 'string' && isFamilyPackage(name) && !isAllPackage(name))
+  if (competing.length > 0 && options.force !== true) {
+    throw new Error(`install-layered: profile "${profile}" also mounts ${competing.join(', ')}; remove the competing family bundle first or pass --force`)
+  }
+  const dependencies = manifest.dependencies
+  if (dependencies === null || typeof dependencies !== 'object' || Array.isArray(dependencies)) {
+    throw new Error(`install-layered: profile "${profile}" has no dependency map to repair`)
+  }
+  const familyDirect = Object.keys(dependencies).filter(name => isFamilyPackage(name) && !isAllPackage(name))
+  const installedAll = installedPackageVersion(profileDir, allBundle)
+  const targetVersion = options.version ?? installedAll ?? familyVersion()
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(targetVersion)) {
+    throw new Error(`install-layered: cannot repair to "${targetVersion}"; pass --version with a published family version`)
+  }
+  const plan = {
+    profile, profileDir, allBundle, targetVersion, familyDirect,
+    competing, hadNodeModules: existsSync(join(profileDir, 'node_modules')),
+  }
+  if (dryRun) return { ...plan, changed: false }
+  const pnpm = options.pnpm ?? process.env.DSH_PNPM ?? 'pnpm'
+  const invocation = pnpmInvocation(pnpm)
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const backupDir = join(profileDir, `.evolution-repair-backup-${stamp}`)
+  await mkdir(backupDir, { recursive: true })
+  await writeFile(join(backupDir, 'package.json'), originalManifest)
+  const lockPath = join(profileDir, 'pnpm-lock.yaml')
+  const journalPath = join(profileDir, INSTALL_JOURNAL)
+  if (existsSync(lockPath)) await writeFile(join(backupDir, 'pnpm-lock.yaml'), await readFile(lockPath, 'utf8'))
+  if (existsSync(journalPath)) await writeFile(join(backupDir, INSTALL_JOURNAL), await readFile(journalPath, 'utf8'))
+  const nodeModulesPath = join(profileDir, 'node_modules')
+  let movedNodeModules = false
+  let installed = false
+  try {
+    if (plan.hadNodeModules) {
+      await rename(nodeModulesPath, join(backupDir, 'node_modules'))
+      movedNodeModules = true
+    }
+    for (const name of familyDirect) delete dependencies[name]
+    dependencies[allBundle] = targetVersion
+    manifest.dsh ??= {}
+    manifest.dsh.profile ??= { bundles: [] }
+    manifest.dsh.profile.bundles = [
+      ...bundles.filter(name => typeof name === 'string' && !isFamilyPackage(name)),
+      allBundle,
+    ]
+    await writeManifestAtomic(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
+    await writeInstallJournal(profileDir, {
+      version: 2,
+      mode: 'pnpm-bundle',
+      scope: EVOLUTION_SCOPE,
+      bundle: allBundle,
+      dependencyAdded: true,
+      dependencyRange: targetVersion,
+      copied: [],
+      agentPreset: false,
+      agentPresetRows: [],
+      at: new Date().toISOString(),
+    })
+    execFileSync(invocation.file, invocation.args, {
+      cwd: profileDir,
+      stdio: 'inherit',
+      shell: invocation.shell,
+      env: { ...process.env, DSH_EVOLUTION_REPAIR: '1' },
+    })
+    installed = true
+    const allManifest = JSON.parse(await readFile(join(nodeModulesPath, allBundle, 'package.json'), 'utf8'))
+    const required = [allBundle, ...Object.keys(allManifest.dependencies ?? {}).filter(isFamilyPackage)]
+    const mismatched = []
+    for (const name of required) {
+      const version = installedPackageVersion(profileDir, name)
+      if (version !== targetVersion) mismatched.push(`${name}=${version ?? 'missing'}`)
+    }
+    if (mismatched.length > 0) {
+      throw new Error(`install-layered: repair installed a mixed family: ${mismatched.join(', ')} (expected ${targetVersion})`)
+    }
+    await rm(backupDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    return { ...plan, changed: true, installed, removedDependencies: familyDirect }
+  } catch (error) {
+    // A failed pnpm run can leave a partial node_modules; remove it before
+    // restoring the exact pre-repair tree. The manifest/lock are restored from
+    // the byte-for-byte backups written before any rename.
+    try {
+      if (existsSync(nodeModulesPath)) await rm(nodeModulesPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+      if (movedNodeModules && existsSync(join(backupDir, 'node_modules'))) await rename(join(backupDir, 'node_modules'), nodeModulesPath)
+      await writeFile(manifestPath, originalManifest)
+      if (existsSync(join(backupDir, 'pnpm-lock.yaml'))) await writeFile(lockPath, await readFile(join(backupDir, 'pnpm-lock.yaml'), 'utf8'))
+      if (existsSync(join(backupDir, INSTALL_JOURNAL))) await writeFile(journalPath, await readFile(join(backupDir, INSTALL_JOURNAL), 'utf8'))
+      await rm(backupDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    } catch (restoreError) {
+      throw new Error(`install-layered: repair failed (${error instanceof Error ? error.message : String(error)}) and restore also failed (${restoreError instanceof Error ? restoreError.message : String(restoreError)}); backup is ${backupDir}`)
+    }
+    throw error
+  }
 }
 
 /** P1-3 (v19): the install journal. Every profile-level write the installer
@@ -786,6 +948,10 @@ export async function install(options = {}) {
   if (existsSync(manifestPath)) {
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
     const existing = Array.isArray(manifest.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : []
+    const directSiblings = Object.keys(manifest.dependencies ?? {}).filter(name => isFamilyPackage(name) && !isAllPackage(name))
+    if (mode === 'all' && directSiblings.length > 0) {
+      throw new Error(`install-layered: profile "${profile}" already pins family implementation packages directly (${directSiblings.join(', ')}). Install-layered would create another mixed family. Run --repair first.`)
+    }
     if (existing.some(entry => typeof entry === 'string' && (entry === other || entry.endsWith(`/${otherTail}`)))) {
       throw new Error(`install-layered: profile "${profile}" already carries the ${other} bundle; host and the legacy preset are mutually exclusive (E-33). Uninstall it first.`)
     }
@@ -801,6 +967,7 @@ export async function install(options = {}) {
     const dependencyInfo = await installBundlePackage(profileDir, bundleName)
     await writeInstallJournal(profileDir, {
       version: 1,
+      mode: 'source-copy',
       scope: EVOLUTION_SCOPE,
       bundle: result.bundle,
       dependencyAdded: dependencyInfo.addedDependency === true,
@@ -825,6 +992,9 @@ export const INSTALL_FLAGS = [
   { flag: '--from-dist', value: '<dir>', summary: 'install the packed tarballs from a prepare-release dist directory (packed-install guard; no build step needed)' },
   { flag: '--dry-run', value: '', summary: 'report what would change and write nothing' },
   { flag: '--force', value: '', summary: 'proceed past a conflicting install form' },
+  { flag: '--repair', value: '', summary: 'convert a mixed family profile to a single pnpm-managed all bundle' },
+  { flag: '--version', value: '<x.y.z>', summary: 'repair-only: target family version (default: the installed all version)' },
+  { flag: '--pnpm', value: '<path>', summary: 'repair-only: pnpm executable or JS entry point (default: DSH_PNPM or pnpm on PATH)' },
   { flag: '--uninstall', value: '', summary: 'remove a legacy install and its preset rows' },
   { flag: '--help', value: '', summary: 'print this table and exit' },
 ]
@@ -876,6 +1046,9 @@ function parseArgs(argv) {
     else if (arg === '--from-dist') next()
     else if (arg === '--dry-run') options.dryRun = true
     else if (arg === '--force') options.force = true
+    else if (arg === '--repair') options.repair = true
+    else if (arg === '--version') options.version = next()
+    else if (arg === '--pnpm') options.pnpm = next()
     else if (arg === '--uninstall') options.uninstall = true
     else if (arg === '--help') options.help = true
     else throw new Error(`unknown argument ${arg}`)
@@ -907,6 +1080,15 @@ if (isMain) {
     // and threw, so the flag table had no single home to diff against INSTALL.md.
     if (options.help) {
       console.log(usageText())
+    } else if (options.repair) {
+      const result = await repairProfile(options)
+      console.log(`repair profile: ${result.profile} (${result.profileDir})`)
+      console.log(`bundle:         ${result.allBundle}`)
+      console.log(`target:         ${result.targetVersion}`)
+      console.log(`direct family:  ${result.familyDirect.length} removed`)
+      if (result.familyDirect.length > 0) console.log(`removed:        ${result.familyDirect.join(', ')}`)
+      if (options.dryRun) console.log('dry-run:  no files were written')
+      else console.log('repair:   family is now a single pnpm-managed all bundle')
     } else if (options.uninstall) {
       const result = await uninstall(options)
       console.log(`uninstall mode:     ${result.mode}`)
@@ -928,6 +1110,7 @@ if (isMain) {
       console.log(`profile:  ${result.profile} (${result.profileDir})`)
       if (result.bundle) console.log(`bundle:   ${result.bundle}`)
       console.log(`copied:   ${result.copied.length} evolution packages`)
+      console.log('note:     source/offline copy — GUI bundle updates are not supported; use dsh plugin add for an updatable install')
       if (result.missingEntrypoints.length > 0) {
         console.log(`unbuilt:  ${result.missingEntrypoints.length} packages lack lib/index.js — build them first, or boot the profile with a TS loader`)
       }

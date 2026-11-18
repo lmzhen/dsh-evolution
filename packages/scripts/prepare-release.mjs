@@ -3,7 +3,8 @@
  * Publish preparation for the evolution package family.
  *
  * Packs every package from a pristine copy with publish-ready manifests:
- *   - workspace:^ is converted to real semver ranges
+ *   - workspace:^ is converted to real semver ranges; family production
+ *     dependencies are pinned exactly so one `all` update carries the whole family
  *   - --scope renames our packages, YAML rows, repository metadata and
  *     removes unpublished ./src/* export shims
  *   - --version pins the release version. The platform line (version/floor/peers/engines/
@@ -156,8 +157,8 @@ function scopedPackageName(name) {
   return `${scope}/${slash >= 0 ? name.slice(slash + 1) : name}`
 }
 
-function releaseSpec(name, ourNames, protocol = '^') {
-  if (ourNames.has(name)) return `${protocol === '~' ? '~' : '^'}${releaseVersion}`
+function releaseSpec(name, ourNames, protocol = '^', exactFamily = false) {
+  if (ourNames.has(name)) return exactFamily ? releaseVersion : `${protocol === '~' ? '~' : '^'}${releaseVersion}`
   const vendoredRange = vendoredRangeFor(name)
   if (vendoredRange !== undefined) return vendoredRange
   // Platform packages range against the published upstream version, NOT the
@@ -183,6 +184,10 @@ function rewritePackage(pkg, ourNames, sourceDir) {
     pkg.dsh.resolverDependencies = pkg.dsh.resolverDependencies.map(name => (scope && ourNames.has(name)) ? scopedPackageName(name) : name)
   }
   for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
+    // A bundle's install graph is its production dependencies. Pin family
+    // members exactly there so updating `all` pulls every sibling to the same
+    // version; peers/dev deps keep their declared compatibility range.
+    const exactFamily = section === 'dependencies' || section === 'optionalDependencies'
     for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
       let rewritten = name
       if (scope && ourNames.has(name)) rewritten = scopedPackageName(name)
@@ -195,7 +200,10 @@ function rewritePackage(pkg, ourNames, sourceDir) {
         // platform deps.
         const match = WORKSPACE_SPEC_RE.exec(spec)
         if (!match) throw new Error(`prepare-release: ${name} uses unsupported protocol "${spec}" — only workspace:^ / workspace:~ / workspace:* are rewritten; refusing to ship the literal`)
-        pkg[section][name] = releaseSpec(name, ourNames, match[1])
+        pkg[section][name] = releaseSpec(name, ourNames, match[1], exactFamily)
+        if (exactFamily && ourNames.has(name) && pkg[section][name] !== releaseVersion) {
+          throw new Error(`prepare-release: family dependency ${name} in ${section} must be pinned exactly to ${releaseVersion}; got ${String(pkg[section][name])}`)
+        }
       }
       if (rewritten !== name) {
         pkg[section][rewritten] = pkg[section][name]

@@ -294,14 +294,9 @@ describe('layered installer', () => {
       '@deepseek-ai/dsh-evolution-host',
     ])
     // D-3: the mounted bundle is pinned in dependencies, not only in bundles.
-    // P2-22 (v19): the range must come from the FAMILY package — an overlay
-    // checkout used to pin the host repo's root version (0.1.x) here, so the
-    // assertion stays VERSION-AGNOSTIC: any caret range on the family version
-    // is correct, and hardcoding a minor (`^0.3.`) broke on the 0.4.0 bump.
-    // A PRERELEASE family version pins as `^0.17.0-rc.1` (the installer's version regex accepts the
-    // suffix, and node-semver's `^` on a prerelease still admits that version's stable release).
-    // The stable-only pattern this used to assert failed the moment the family shipped an rc.
-    expect(manifest.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/)
+    // The single-bundle update contract requires an EXACT family version here:
+    // a range would let a platform update keep older implementation packages.
+    expect(manifest.dependencies?.['@deepseek-ai/dsh-evolution-host']).toBe(await familyVersion())
   }, 60_000)
 
   it('D-4 (v18): a profile name with no shipped template seeds DEFAULT_PROFILE_BUNDLES', async () => {
@@ -478,7 +473,7 @@ describe('layered installer', () => {
       dependencies?: Record<string, string>
       dsh?: { profile?: { bundles?: string[] } }
     }
-    expect(before.dependencies?.['@deepseek-ai/dsh-evolution-host']).toMatch(/^\^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/)
+    expect(before.dependencies?.['@deepseek-ai/dsh-evolution-host']).toBe(await familyVersion())
     expect(before.dsh?.profile?.bundles).toContain('@deepseek-ai/dsh-evolution-host')
     // P1-3: the journal records what the installer wrote.
     const journalPath = join(home, 'profiles', 'evo-test', '.evolution-install.json')
@@ -495,6 +490,87 @@ describe('layered installer', () => {
     expect(after.dsh?.profile?.bundles ?? []).not.toContain('@deepseek-ai/dsh-evolution-host')
     expect(existsSync(journalPath)).toBe(false)
   }, 60_000)
+
+  it('repair dry-run plans a single-bundle profile without writing', async () => {
+    const home = await tempRoot('dsh-installer-repair-')
+    const profileDir = join(home, 'profiles', 'evo-test')
+    const allDir = join(profileDir, 'node_modules/@lmzhen/dsh-evolution-all')
+    await mkdir(allDir, { recursive: true })
+    await writeFile(join(allDir, 'package.json'), JSON.stringify({
+      name: '@lmzhen/dsh-evolution-all',
+      version: '0.53.0',
+      dependencies: {
+        '@lmzhen/dsh-evolution-core': '0.53.0',
+        '@lmzhen/dsh-evolution-ui': '0.53.0',
+      },
+    }))
+    const manifestPath = join(profileDir, 'package.json')
+    const original = JSON.stringify({
+      name: 'dsh-profile-evo-test',
+      private: true,
+      dependencies: {
+        '@lmzhen/dsh-evolution-all': '0.53.0',
+        '@lmzhen/dsh-evolution-core': '0.51.1',
+        '@lmzhen/dsh-evolution-ui': '0.51.1',
+      },
+      dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@lmzhen/dsh-evolution-all'] } },
+    }, null, 2) + '\n'
+    await writeFile(manifestPath, original)
+    const result = await callInstaller(`return await installer.repairProfile({
+      home: ${JSON.stringify(home)}, profile: 'evo-test', dryRun: true, version: '0.53.0',
+    })`) as { familyDirect?: string[]; targetVersion?: string; changed?: boolean }
+    expect(result.changed).toBe(false)
+    expect(result.targetVersion).toBe('0.53.0')
+    expect(result.familyDirect?.sort()).toEqual([
+      '@lmzhen/dsh-evolution-core',
+      '@lmzhen/dsh-evolution-ui',
+    ])
+    expect(await readFile(manifestPath, 'utf8')).toBe(original)
+  }, 30_000)
+
+  it('repair refuses a profile without an evolution-all bundle', async () => {
+    const home = await tempRoot('dsh-installer-repair-none-')
+    const profileDir = join(home, 'profiles', 'evo-test')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
+      dependencies: { '@deepseek-ai/dsh-evolution-host': '0.53.0' },
+      dsh: { profile: { bundles: ['@deepseek-ai/dsh-evolution-host'] } },
+    }))
+    await expect(callInstaller(`return await installer.repairProfile({
+      home: ${JSON.stringify(home)}, profile: 'evo-test', dryRun: true, version: '0.53.0',
+    })`)).rejects.toThrow(/does not mount an evolution-all bundle/)
+  }, 30_000)
+
+  it('repair restores the manifest and node_modules when pnpm fails', async () => {
+    const home = await tempRoot('dsh-installer-repair-fail-')
+    const profileDir = join(home, 'profiles', 'evo-test')
+    const allDir = join(profileDir, 'node_modules/@lmzhen/dsh-evolution-all')
+    await mkdir(allDir, { recursive: true })
+    await writeFile(join(allDir, 'package.json'), JSON.stringify({
+      name: '@lmzhen/dsh-evolution-all',
+      version: '0.53.0',
+      dependencies: {},
+    }))
+    await mkdir(join(profileDir, 'node_modules/@lmzhen/dsh-evolution-ui'), { recursive: true })
+    await writeFile(join(profileDir, 'node_modules/@lmzhen/dsh-evolution-ui/marker'), 'old')
+    const manifestPath = join(profileDir, 'package.json')
+    const original = JSON.stringify({
+      name: 'dsh-profile-evo-test',
+      private: true,
+      dependencies: {
+        '@lmzhen/dsh-evolution-all': '0.53.0',
+        '@lmzhen/dsh-evolution-ui': '0.51.1',
+      },
+      dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-all'] } },
+    }, null, 2) + '\n'
+    await writeFile(manifestPath, original)
+    await expect(callInstaller(`return await installer.repairProfile({
+      home: ${JSON.stringify(home)}, profile: 'evo-test', version: '0.53.0',
+      pnpm: 'definitely-not-a-real-pnpm-command',
+    })`)).rejects.toThrow()
+    expect(await readFile(manifestPath, 'utf8')).toBe(original)
+    expect(await readFile(join(profileDir, 'node_modules/@lmzhen/dsh-evolution-ui/marker'), 'utf8')).toBe('old')
+  }, 30_000)
 
 })
 

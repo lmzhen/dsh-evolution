@@ -44,6 +44,8 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 
 桌面 GUI 将 `--profile web` 改为 `--profile desktop`。安装后可让 Agent 记住一条项目事实，再开新会话确认记忆已注入；`doctor` 用于检查安装形态和服务状态，不能替代实际读写验证。
 
+profile 只直接依赖 `@lmzhen/dsh-evolution-all`，不要把家族子包逐个加进依赖。`all` 会把子包锁到自己的精确版本，平台点一次更新就能整族升级；直接依赖子包会留在旧版，出现版本卡是新的、界面还是旧的。已经是这种混合安装的 profile，按 [INSTALL.md](INSTALL.md#修复旧的混合安装) 做一次修复。
+
 完整源码布局的安装结果为 20 个包；发布清单共 20 个包，agent preset 单独计算。0.48 只保留 `all`/`host` 两种安装形态；旧的 one-click preset 和分层预设安装已移除，模式仅保留一个版本的卸载入口。
 
 ## 安装形态

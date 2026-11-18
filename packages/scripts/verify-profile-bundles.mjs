@@ -12,24 +12,31 @@
  *   1. evolution 捆绑（all / host / preset，scope-agnostic tail 匹配）在
  *      `dsh.profile.bundles` 中至多 1 个——多个 = 双挂载，启动必炸；
  *   2. bundles 里的 evolution 捆绑行必须同时是 `dependencies` 的显式声明
- *      （幽灵行：bundle 在装、deps 未 pin——loader 解析不到包也是启动失败）。
+ *      （幽灵行：bundle 在装、deps 未 pin——loader 解析不到包也是启动失败）；
+ *   3. profile 不得直接依赖家族实现包（唯一安装单元是 bundle；直依子包会让
+ *      平台只更新 bundle 时留下旧子包，界面加载旧客户端）。
  *
  * 用法（双布局：dev `packages/evolution/scripts/…`、mirror `packages/scripts/…`）：
  *   node verify-profile-bundles.mjs [profile-dir]
  *     profile-dir 默认 ~/.dsh/profiles/web（DSH_HOME 下 profiles/web）。
  *     profile-dir 下必须存在 package.json（vacant guard：空检 = 不通过）。
  *   node verify-profile-bundles.mjs --self-test
- *     在临时目录里造 4 个夹具 profile，判定四个方向（合规 0／双行 1／幽灵行 1／
- *     无清单 2）。门禁用这一形态：此前门禁不带参数，判的是**跑门禁那台机器**的
+ *     在临时目录里造 5 个夹具 profile，判定五个方向（合规 0／双行 1／幽灵行 1／
+ *     直依子包 1／无清单 2）。门禁用这一形态：此前门禁不带参数，判的是**跑门禁那台机器**的
  *     `~/.dsh/profiles/web`——本机恰好存在才通过，换机器就变成 vacant guard 的
  *     exit 2，判的根本不是仓库内容。
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
-import { EVOLUTION_BUNDLE_TAILS as EVOLUTION_BUNDLES } from './lib-family-packages.mjs'
+import { EVOLUTION_BUNDLE_TAILS as EVOLUTION_BUNDLES, EVOLUTION_PREFIXES } from './lib-family-packages.mjs'
 
 const tail = (name) => name.slice(name.lastIndexOf('/') + 1)
+
+function isFamilyPackage(name) {
+  const nameTail = tail(name)
+  return EVOLUTION_PREFIXES.some(prefix => nameTail.startsWith(prefix))
+}
 
 /**
  * Judge one profile directory.
@@ -68,6 +75,19 @@ function checkProfile(profileDir) {
     }
   }
 
+  // R3: the bundle is the single install unit. Direct family siblings make a
+  // platform bundle update leave those siblings behind: the version card moves
+  // while the loader still resolves the old client.
+  const directSiblings = Object.keys(dependencies).filter(name => isFamilyPackage(name) && !EVOLUTION_BUNDLES.some(b => tail(name) === b))
+  if (directSiblings.length > 0) {
+    return {
+      code: 1,
+      output: `verify-profile-bundles: profile pins family implementation packages directly (${directSiblings.join(', ')}) — `
+        + 'install only the evolution bundle; its exact dependencies carry the family. Remove the direct siblings '
+        + '(or run install-layered --repair), then reinstall the bundle, or a GUI update will load a mixed family.',
+    }
+  }
+
   return { code: 0, output: `verify-profile-bundles: OK — ${profileDir} carries ${evolutionRows.length} evolution bundle (${evolutionRows[0] ?? 'none'}), no mutual-exclusion or phantom-row issue` }
 }
 
@@ -98,22 +118,25 @@ function selfTest() {
     const compliant = join(root, 'compliant')
     const doubled = join(root, 'doubled')
     const phantom = join(root, 'phantom')
+    const siblings = join(root, 'siblings')
     const [first, second] = EVOLUTION_BUNDLES
     const scoped = name => `@lmzhen/${name}`
     writeFixture(compliant, [scoped(first)], [scoped(first)])
     writeFixture(doubled, [scoped(first), scoped(second)], [scoped(first), scoped(second)])
     writeFixture(phantom, [scoped(first)], [])
+    writeFixture(siblings, [scoped(first)], [scoped(first), '@lmzhen/dsh-evolution-ui'])
     const cases = [
       { label: 'one pinned evolution bundle', dir: compliant, code: 0 },
       { label: 'two evolution bundle rows', dir: doubled, code: 1 },
       { label: 'mounted but unpinned', dir: phantom, code: 1 },
+      { label: 'direct family sibling', dir: siblings, code: 1 },
       { label: 'no manifest', dir: join(root, 'missing'), code: 2 },
     ]
     const wrong = cases.filter(item => checkProfile(item.dir).code !== item.code)
     if (wrong.length > 0) {
       return { code: 1, output: `verify-profile-bundles --self-test: ${wrong.map(item => `${item.label} expected ${item.code}`).join('; ')}` }
     }
-    return { code: 0, output: `verify-profile-bundles --self-test: OK — ${cases.length} fixture(s) judged as expected (compliant 0, two rows 1, phantom row 1, vacant 2)` }
+    return { code: 0, output: `verify-profile-bundles --self-test: OK — ${cases.length} fixture(s) judged as expected (compliant 0, two rows 1, phantom row 1, direct sibling 1, vacant 2)` }
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

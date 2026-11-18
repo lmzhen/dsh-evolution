@@ -1,3 +1,16 @@
+## 0.54.0 (2026-11-18) — 单 bundle 安装与整族点击升级
+
+> **范围**：① `@lmzhen/dsh-evolution-all` 的家族生产依赖发布为精确版本，profile 只安装/直接依赖这一个 bundle，平台点击更新 `all` 时由 pnpm 把 20 个包一起更新；② `install-layered` 的 profile 依赖改为精确版本；③ 新增 `install-layered --repair`，把旧的“all + 直接子包 + 复制 node_modules”混合 profile 一次性迁成 pnpm 单 bundle，失败恢复 manifest/lock/journal/node_modules；④ 安装器遇到 profile 直依家族子包时拒绝继续，源码/离线复制安装明确不支持 GUI 增量升级；⑤ `evolution-core-runtime` 启动时检查 all 与实现包版本，混合安装输出明确告警；⑥ `verify-profile-bundles` 新增直依子包检测；⑦ README/INSTALL 增加单 bundle 与修复说明。
+>
+> **行为变更**：
+> - 安装/升级只操作 `@lmzhen/dsh-evolution-all`；不要再把 `@lmzhen/dsh-evolution-*` 子包写进 profile 的 `dependencies`。
+> - `dsh plugin add/update` 仍是产品安装通道；`install-layered` 的复制安装只用于开发/离线，不支持平台 GUI 增量升级。
+> - 旧的混合 profile 需要运行一次 `install-layered --repair`（或按 INSTALL 手工迁移）后重启。
+>
+> **不迁移**：没有磁盘数据格式变化；修复只清理 profile 安装面，不动记忆、技能、报告、审批历史或用户 patch。
+>
+> **验证（本地，发布前）**：发布 tarball 的 all 家族依赖全部精确为 0.54.0；`audit-release-tarballs` 20/20；临时混合 profile（0.53 夹具）repair 后 20 包全部同版本；installer 30/30、coherence 4/4；启动一致性告警；详细证据在发布报告中补齐。 CI/DESKTOP 真机验收与独立复核在发布准备阶段补齐。
+
 ## 0.53.0 (2026-11-18) — 技能整理 C 端重构、单一状态源与响应式
 
 > **范围**：① 技能整理统一命名/入口；host 统计新增 `lastChangedAt` / `lastActivityAt` / `recentlyUsed` / `needsAttention`，“最近使用”改为真实使用时间窗口，不再按版本时间；② `SkillStatsSnapshot` 拆分 `global`（全库 totals/counts/governance），技能详情不再显示全库整理次数/治理；③ WorkbenchStore 接管 selected/origin/query/filter/sort，删除 `focusRevision`，数据表与列表共享同一选中状态；④ 打开详情自动滚入选中项；窄屏单页列表↔详情，返回后焦点回原技能；⑤ 容器三档 wide/medium/narrow：medium 数据表隐藏低优先列，narrow 卡片 + 排序选择；⑥ 详情/列表密度、选中态、报错说明历史、统计活动、正文单位、窗口说明、legacy summary 文案；⑦ 待我确认/合并建议默认 C 端任务面，复制命令与运行设置收进“高级”；⑧ 技能操作 label/surface 元数据进 core，成功计数按用户词展示。

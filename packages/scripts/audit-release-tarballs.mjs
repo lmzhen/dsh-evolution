@@ -6,7 +6,8 @@
  * can pack them (`publish-scoped.mjs --dry-run`), and neither of those opens a tarball. This looks
  * inside every one of them: scoped identity, that each entry a consumer resolves (main / types /
  * exports) exists in the payload, that the scoped release dropped the ./src/* shim, that the
- * platform ranges are exactly the floor, that no @deepseek-ai/dsh-evolution- name literal survived
+ * platform ranges are exactly the floor, that family install dependencies are pinned exactly
+ * (the single-bundle update contract), that no @deepseek-ai/dsh-evolution- name literal survived
  * the rescope, that each browser half carries lib/client.js plus its dsh.client declaration, and
  * that no test / node_modules / tarball residue rode along.
  *
@@ -123,14 +124,19 @@ for (const tarball of tarballs) {
       }
     }
 
-    for (const section of ['dependencies', 'peerDependencies']) {
+    // Family install dependencies MUST be exact: `all` is the single install
+    // unit, and a range would let a future `all` keep older siblings. Peers
+    // stay ranges because they describe compatibility, not the installed graph.
+    for (const section of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
       for (const [name, range] of Object.entries(manifest[section] ?? {})) {
         if (name.startsWith('@deepseek-ai/dsh-') && expectedPlatformRange !== undefined && range !== expectedPlatformRange) {
           problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ' + expectedPlatformRange + ')')
         }
-        const exactEnginePin = name.endsWith('/dsh-evolution-merge-engine') && range === expectedVersion
-        if (name.startsWith('@lmzhen/') && expectedVersion !== undefined && range !== '^' + expectedVersion && !exactEnginePin) {
-          problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ^' + expectedVersion + ' or exact engine pin)')
+        if (name.startsWith('@lmzhen/') && expectedVersion !== undefined) {
+          const expectedFamilyRange = section === 'peerDependencies' ? '^' + expectedVersion : expectedVersion
+          if (range !== expectedFamilyRange) {
+            problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ' + expectedFamilyRange + ' for the family)')
+          }
         }
       }
     }

@@ -4,6 +4,7 @@
  * register units themselves.
  */
 import type { Context } from '@deepseek-ai/cordis'
+import { warnIfFamilyMixed } from './coherence.ts'
 import { EvolutionLlm } from './llm.ts'
 import { EvolutionPlatform } from './platform.ts'
 import { EvolutionProjections } from './projections.ts'
@@ -17,4 +18,5 @@ export async function apply(ctx: Context): Promise<void> {
   await ctx.plugin(EvolutionPlatform)
   await ctx.plugin(EvolutionProjections)
   await ctx.plugin(EvolutionLlm)
+  warnIfFamilyMixed(ctx)
 }

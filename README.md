@@ -50,6 +50,8 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 
 Install and upgrade through `dsh plugin add` only: the platform forwards add/remove to pnpm (the desktop app ships its own pnpm). Do not run `npm install` by hand — it leaves a `package-lock.json` and a flat `node_modules` inside the profile, and the plugin page's update button (pnpm) then fights with it. If that already happened, close DSH, delete `profiles/<profile>/package-lock.json`, run the pnpm `add` again in the profile directory, and restart.
 
+Install only `@lmzhen/dsh-evolution-all`, never the family's implementation packages as separate profile dependencies. The bundle pins those packages to its exact version, so one platform update moves the whole family; a directly pinned sibling stays behind and the old client loads under a new version card. A profile that already has this mixed shape needs the one-time repair in [INSTALL.md](INSTALL.md#修复旧的混合安装).
+
 For the desktop GUI, replace `--profile web` with `--profile desktop`. After installation, ask the agent to remember a project fact and open a new session to verify that it is injected. `doctor` checks the installation form and service state; it does not replace an actual read/write check.
 
 The full source layout reports<!-- gen:install-counts --> 20 packages installed (the published list is 20; the agent preset is separate)<!-- /gen:install-counts -->.
