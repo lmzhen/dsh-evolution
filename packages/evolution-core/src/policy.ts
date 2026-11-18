@@ -60,6 +60,9 @@ export interface PolicySnapshot {
   curatorModel: string
   memoryChars: number
   userChars: number
+  /** Optional judged token budgets; absent keeps the legacy char budgets in force. */
+  memoryTokens?: number
+  userTokens?: number
   skillContentChars: number
   curatorIntervalHours: number
   staleAfterDays: number
@@ -82,6 +85,8 @@ export interface Config {
   curatorModel?: string
   memoryChars?: number
   userChars?: number
+  memoryTokens?: number
+  userTokens?: number
   skillContentChars?: number
   curatorIntervalHours?: number
   staleAfterDays?: number
@@ -112,6 +117,8 @@ export const Config: Schema<Config> = z.object({
   curatorModel: z.string().default(DEFAULT_CURATOR_MODEL),
   memoryChars: z.number().min(1).default(DEFAULT_MEMORY_CHAR_LIMIT),
   userChars: z.number().min(1).default(DEFAULT_USER_CHAR_LIMIT),
+  memoryTokens: z.number().min(1),
+  userTokens: z.number().min(1),
   skillContentChars: z.number().min(1).default(DEFAULT_SKILL_CONTENT_CHARS),
   curatorIntervalHours: z.number().min(1).default(DEFAULT_CURATOR_INTERVAL_HOURS),
   staleAfterDays: z.number().min(1).default(DEFAULT_STALE_AFTER_DAYS),
@@ -156,6 +163,8 @@ export class EvolutionPolicy extends Service {
       if (value !== undefined && result !== value) clamped.push(name)
       return result
     }
+    const memoryChars = field('memoryChars', config.memoryChars, DEFAULT_MEMORY_CHAR_LIMIT)
+    const userChars = field('userChars', config.userChars, DEFAULT_USER_CHAR_LIMIT)
     this.snapshot = Object.freeze({
       version: 1 as const,
       reviewMemoryInterval: field('reviewMemoryInterval', config.reviewMemoryInterval, DEFAULT_REVIEW_MEMORY_INTERVAL),
@@ -175,8 +184,10 @@ export class EvolutionPolicy extends Service {
         return config.reviewMode === 'aux' ? 'aux' : 'inject'
       })(),
       curatorModel: config.curatorModel ?? DEFAULT_CURATOR_MODEL,
-      memoryChars: field('memoryChars', config.memoryChars, DEFAULT_MEMORY_CHAR_LIMIT),
-      userChars: field('userChars', config.userChars, DEFAULT_USER_CHAR_LIMIT),
+      memoryChars,
+      userChars,
+      ...(config.memoryTokens === undefined ? {} : { memoryTokens: field('memoryTokens', config.memoryTokens, 1) }),
+      ...(config.userTokens === undefined ? {} : { userTokens: field('userTokens', config.userTokens, 1) }),
       skillContentChars: field('skillContentChars', config.skillContentChars, DEFAULT_SKILL_CONTENT_CHARS),
       curatorIntervalHours: field('curatorIntervalHours', config.curatorIntervalHours, DEFAULT_CURATOR_INTERVAL_HOURS),
       staleAfterDays: field('staleAfterDays', config.staleAfterDays, DEFAULT_STALE_AFTER_DAYS),

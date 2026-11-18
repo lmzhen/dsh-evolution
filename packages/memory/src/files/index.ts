@@ -111,10 +111,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // (row order is not something this plugin can force — doctor compares the two
   // surfaces again at run time and flags a disagreement, including the
   // order-induced one).
-  const policyBudget = (): { memory: number | undefined; user: number | undefined } => {
-    const policy = ctx.get('evolutionPolicy') as { get?: () => { memoryChars?: number; userChars?: number } } | undefined
-    const snapshot = policy?.get?.()
-    return { memory: snapshot?.memoryChars, user: snapshot?.userChars }
+  const policySnapshot = (): { memoryChars?: number; userChars?: number; memoryTokens?: number; userTokens?: number } | undefined => {
+    const policy = ctx.get('evolutionPolicy') as { get?: () => { memoryChars?: number; userChars?: number; memoryTokens?: number; userTokens?: number } } | undefined
+    return policy?.get?.()
+  }
+  const policyTokens = (): { memory: number | undefined; user: number | undefined } => {
+    const snapshot = policySnapshot()
+    return { memory: snapshot?.memoryTokens, user: snapshot?.userTokens }
   }
   const DEFAULTS = { memoryChars: DEFAULT_MEMORY_CHAR_LIMIT, userChars: DEFAULT_USER_CHAR_LIMIT } as const
   /**
@@ -127,6 +130,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   /** The explicitly configured opt-in token budget, if any. */
   const canonicalTokenBudget = (id: 'memoryTokens' | 'userTokens'): number | undefined =>
     unwrapLive(id === 'memoryTokens' ? rawConfig.memoryTokens : rawConfig.userTokens)
+  /**
+   * The token budget the store should use. A row-level char value is an explicit
+   * legacy override and keeps char mode; otherwise the row token value wins over
+   * the policy token value, which wins over the package default.
+   */
+  const effectiveTokenLimit = (id: 'memoryTokens' | 'userTokens'): number | undefined => {
+    const rowToken = canonicalTokenBudget(id)
+    if (rowToken !== undefined) return rowToken
+    const rowChar = canonicalBudget(id === 'memoryTokens' ? 'memoryChars' : 'userChars')
+    if (rowChar !== undefined) return undefined
+    const policy = policyTokens()
+    return id === 'memoryTokens' ? policy.memory : policy.user
+  }
   /**
    * Whether the OPERATOR set this budget on THIS ROW (G0/S0.4 + G1). The canonical
    * key answers through its live reference — a user-layer value arrives the same
@@ -144,8 +160,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const budget = (id: 'memoryChars' | 'userChars'): number => {
     const explicit = canonicalBudget(id)
     if (explicit !== undefined) return explicit
-    const policy = policyBudget()
-    return (id === 'memoryChars' ? policy.memory : policy.user) ?? DEFAULTS[id]
+    const policy = policySnapshot()
+    return (id === 'memoryChars' ? policy?.memoryChars : policy?.userChars) ?? DEFAULTS[id]
   }
   // One resolved number feeds the store, the budget view and doctor.
   const memoryChars = (): number => floorLimit(field('memoryChars', budget('memoryChars'), DEFAULT_MEMORY_CHAR_LIMIT))
@@ -155,12 +171,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // The one disagreement this plugin can see at load: an EXPLICIT row value that
   // contradicts the mounted policy. Doctor re-checks the same pair at run time (it
   // can see the policy mount that happened after this row).
-  const policyAtMount = policyBudget()
-  if (explicitBudget('memoryChars') && policyAtMount.memory !== undefined && memoryChars() !== policyAtMount.memory) {
-    ctx.logger.warn(`memory-files: the row's memoryChars=${memoryChars()} contradicts evolution-policy memoryChars=${policyAtMount.memory} — the store enforces the row value while the review plans against the policy value; align them or leave the row unset`)
+  const policyAtMount = policySnapshot()
+  if (explicitBudget('memoryChars') && policyAtMount?.memoryChars !== undefined && memoryChars() !== policyAtMount.memoryChars) {
+    ctx.logger.warn(`memory-files: the row's memoryChars=${memoryChars()} contradicts evolution-policy memoryChars=${policyAtMount.memoryChars} — the store enforces the row value while the review plans against the policy value; align them or leave the row unset`)
   }
-  if (explicitBudget('userChars') && policyAtMount.user !== undefined && userChars() !== policyAtMount.user) {
-    ctx.logger.warn(`memory-files: the row's userChars=${userChars()} contradicts evolution-policy userChars=${policyAtMount.user} — same divergence as memoryChars`)
+  if (explicitBudget('userChars') && policyAtMount?.userChars !== undefined && userChars() !== policyAtMount.userChars) {
+    ctx.logger.warn(`memory-files: the row's userChars=${userChars()} contradicts evolution-policy userChars=${policyAtMount.userChars} — same divergence as memoryChars`)
   }
   // The IO provider is resolved lazily so `memory-files` does not depend on
   // row order: the first write happens only after the preset has fully mounted.
@@ -198,8 +214,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * @returns the current store, rebuilt when a resolved limit changed.
    */
   const currentStore = (): MemoryStore => {
-    const memoryTokenLimit = canonicalTokenBudget('memoryTokens')
-    const userTokenLimit = canonicalTokenBudget('userTokens')
+    const memoryTokenLimit = effectiveTokenLimit('memoryTokens')
+    const userTokenLimit = effectiveTokenLimit('userTokens')
     const options: Pick<MemoryStoreOptions, 'memoryCharLimit' | 'userCharLimit' | 'memoryTokenLimit' | 'userTokenLimit' | 'addDatePrefix' | 'maxConsolidationFailures'> = {
       memoryCharLimit: memoryChars(),
       userCharLimit: userChars(),
@@ -264,7 +280,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const limitSource = (id: 'memoryChars' | 'userChars'): string => {
     if (userSetKeys(ctx, paramRowId('memory-files')).has(id)) return 'user'
     if (explicitBudget(id)) return 'config'
-    return (id === 'memoryChars' ? policyBudget().memory : policyBudget().user) === undefined ? 'default' : 'policy'
+    const policy = policySnapshot()
+    return (id === 'memoryChars' ? policy?.memoryChars : policy?.userChars) === undefined ? 'default' : 'policy'
   }
   // S2-12③: publish the EFFECTIVE budget so doctor can compare the two surfaces
   // at run time (the same one-writer/one-reader contract as evolutionFeedback /
@@ -274,20 +291,29 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.provide('evolutionMemoryBudget', {
     get memoryChars(): number { return memoryChars() },
     get userChars(): number { return userChars() },
-    get memoryTokens(): number | undefined { return canonicalTokenBudget('memoryTokens') },
-    get userTokens(): number | undefined { return canonicalTokenBudget('userTokens') },
+    get memoryTokens(): number | undefined { return effectiveTokenLimit('memoryTokens') },
+    get userTokens(): number | undefined { return effectiveTokenLimit('userTokens') },
     get memorySource(): string { return limitSource('memoryChars') },
     get userSource(): string { return limitSource('userChars') },
     get memoryTokenSource(): string {
-      if (canonicalTokenBudget('memoryTokens') === undefined) return 'unset'
-      return userSetKeys(ctx, paramRowId('memory-files')).has('memoryTokens') ? 'user' : 'config'
+      if (userSetKeys(ctx, paramRowId('memory-files')).has('memoryTokens')) return 'user'
+      if (canonicalTokenBudget('memoryTokens') !== undefined) return 'config'
+      const rowChar = canonicalBudget('memoryChars')
+      if (rowChar !== undefined) return 'legacy-char'
+      return policySnapshot()?.memoryTokens === undefined && policySnapshot()?.memoryChars === undefined ? 'default' : 'policy'
     },
     get userTokenSource(): string {
-      if (canonicalTokenBudget('userTokens') === undefined) return 'unset'
-      return userSetKeys(ctx, paramRowId('memory-files')).has('userTokens') ? 'user' : 'config'
+      if (userSetKeys(ctx, paramRowId('memory-files')).has('userTokens')) return 'user'
+      if (canonicalTokenBudget('userTokens') !== undefined) return 'config'
+      const rowChar = canonicalBudget('userChars')
+      if (rowChar !== undefined) return 'legacy-char'
+      return policySnapshot()?.userTokens === undefined && policySnapshot()?.userChars === undefined ? 'default' : 'policy'
     },
-    get policyMemoryChars(): number | undefined { return policyBudget().memory },
-    get policyUserChars(): number | undefined { return policyBudget().user },
+    get policyMemoryChars(): number | undefined { return policySnapshot()?.memoryChars },
+    get policyUserChars(): number | undefined { return policySnapshot()?.userChars },
+    get policyMemoryTokens(): number | undefined { return policyTokens().memory },
+    get policyUserTokens(): number | undefined { return policyTokens().user },
   })
   ctx.effect(() => ctx.memory.registerProvider(provider), 'memory-files.provider')
 }
+

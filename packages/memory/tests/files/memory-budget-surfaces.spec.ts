@@ -27,7 +27,7 @@ interface Budget {
   userSource: string
 }
 
-async function context(policy?: { memoryChars: number; userChars: number }) {
+async function context(policy?: { memoryChars: number; userChars: number; memoryTokens?: number; userTokens?: number }) {
   const ctx = new Context()
   await ctx.plugin(MemoryRegistry)
   await ctx.plugin(EvolutionIoRegistry)
@@ -68,6 +68,16 @@ describe('memory budget surfaces (S2-12③)', () => {
     const budget = budgetOf(ctx)
     expect(budget.memorySource).toBe('default')
     expect(budget.memoryChars).toBe(2200)
+  })
+
+  it('a policy token budget reaches the store when the row has no explicit budget', async () => {
+    const ctx = await context({ memoryChars: 4000, userChars: 900, memoryTokens: 10 })
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-policy-token-') })
+    const budget = budgetOf(ctx) as unknown as Budget & { memoryTokens?: number; policyMemoryTokens?: number }
+    expect(budget.memoryTokens).toBe(10)
+    expect(budget.policyMemoryTokens).toBe(10)
+    const first = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: '中'.repeat(10) }])
+    expect(first).toMatchObject({ ok: true, tokens: 10, tokenLimit: 10 })
   })
 
   it('an opt-in token budget is used by the store and published on the budget surface', async () => {
