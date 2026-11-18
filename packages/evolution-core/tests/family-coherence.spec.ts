@@ -11,12 +11,16 @@ async function profileWith(versions: Record<string, string>): Promise<string> {
   const installed = {
     '@lmzhen/dsh-evolution-core': '0.53.0',
     '@lmzhen/dsh-evolution-ui': '0.53.0',
+    '@lmzhen/dsh-evolution-client-kit': '0.53.0',
     ...versions,
   }
   for (const [name, version] of Object.entries(installed)) {
     const dir = join(root, 'node_modules', name)
     await mkdir(dir, { recursive: true })
-    await writeFile(join(dir, 'package.json'), JSON.stringify({ name, version }))
+    const manifest = name === '@lmzhen/dsh-evolution-ui'
+      ? { name, version, dependencies: { '@lmzhen/dsh-evolution-client-kit': '0.53.0' } }
+      : { name, version }
+    await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
   }
   const allDir = join(root, 'node_modules', '@lmzhen/dsh-evolution-all')
   await mkdir(allDir, { recursive: true })
@@ -55,6 +59,14 @@ describe('family coherence', () => {
     const coherence = checkFamilyCoherence(root)
     expect(coherence?.mismatched).toEqual([
       { name: '@lmzhen/dsh-evolution-ui' },
+    ])
+  })
+
+  it('names an old implementation package reached through another dependency', async () => {
+    const root = await profileWith({ '@lmzhen/dsh-evolution-client-kit': '0.51.1' })
+    const coherence = checkFamilyCoherence(root)
+    expect(coherence?.mismatched).toEqual([
+      { name: '@lmzhen/dsh-evolution-client-kit', version: '0.51.1' },
     ])
   })
 

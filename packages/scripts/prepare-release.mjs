@@ -201,9 +201,12 @@ function rewritePackage(pkg, ourNames, sourceDir) {
         const match = WORKSPACE_SPEC_RE.exec(spec)
         if (!match) throw new Error(`prepare-release: ${name} uses unsupported protocol "${spec}" — only workspace:^ / workspace:~ / workspace:* are rewritten; refusing to ship the literal`)
         pkg[section][name] = releaseSpec(name, ourNames, match[1], exactFamily)
-        if (exactFamily && ourNames.has(name) && pkg[section][name] !== releaseVersion) {
-          throw new Error(`prepare-release: family dependency ${name} in ${section} must be pinned exactly to ${releaseVersion}; got ${String(pkg[section][name])}`)
-        }
+      }
+      // The exact-pin contract is judged on the FINAL spec, not only on the
+      // workspace branch: a family dependency already written as ^/~/exact in
+      // source must not bypass the single-bundle upgrade guarantee.
+      if (exactFamily && ourNames.has(name) && pkg[section][name] !== releaseVersion) {
+        throw new Error(`prepare-release: family dependency ${name} in ${section} must be pinned exactly to ${releaseVersion}; got ${String(pkg[section][name])}`)
       }
       if (rewritten !== name) {
         pkg[section][rewritten] = pkg[section][name]

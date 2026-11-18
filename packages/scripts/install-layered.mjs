@@ -441,6 +441,50 @@ function isAllPackage(name) {
   return packageTail(name) === 'dsh-evolution-all'
 }
 
+/** The all/host/preset bundle rows are install units, not implementation packages. */
+function isFamilyBundle(name) {
+  return EVOLUTION_BUNDLE_TAILS.some(bundle => packageTail(name) === bundle)
+}
+
+/**
+ * The installed family implementations reachable from the `all` bundle.
+ * A mixed profile can hide a stale package one hop down (client-kit through
+ * evolution-ui, merge-engine through merge); validating only the bundle's
+ * direct dependencies would pass while the old client still loads.
+ * @param profileDir - the profile whose node_modules holds the install.
+ * @param allName - the installed bundle package name.
+ * @returns Every reachable family implementation name, or undefined when the bundle manifest is unreadable.
+ */
+function installedFamilyClosure(profileDir, allName) {
+  const read = (name) => {
+    try {
+      return JSON.parse(readFileSync(join(profileDir, 'node_modules', name, 'package.json'), 'utf8'))
+    } catch {
+      return undefined
+    }
+  }
+  const all = read(allName)
+  if (all === undefined) return undefined
+  const visited = new Set()
+  const names = []
+  const queue = Object.keys(all.dependencies ?? {}).filter(name => isFamilyPackage(name) && name !== allName)
+  while (queue.length > 0) {
+    const name = queue.shift()
+    if (name === undefined || visited.has(name)) continue
+    visited.add(name)
+    names.push(name)
+    const manifest = read(name)
+    if (manifest === undefined) continue
+    for (const child of [
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.optionalDependencies ?? {}),
+    ]) {
+      if (isFamilyPackage(child) && child !== allName && !visited.has(child)) queue.push(child)
+    }
+  }
+  return names
+}
+
 /** Read one package's installed version from a profile, or undefined when absent/unreadable. */
 function installedPackageVersion(profileDir, name) {
   try {
@@ -510,7 +554,7 @@ export async function repairProfile(options = {}) {
     competing, hadNodeModules: existsSync(join(profileDir, 'node_modules')),
   }
   if (dryRun) return { ...plan, changed: false }
-  const pnpm = options.pnpm ?? process.env.DSH_PNPM ?? 'pnpm'
+  const pnpm = (options.pnpm?.trim()) || process.env.DSH_PNPM?.trim() || process.env.DSH_DESKTOP_PNPM?.trim() || 'pnpm'
   const invocation = pnpmInvocation(pnpm)
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const backupDir = join(profileDir, `.evolution-repair-backup-${stamp}`)
@@ -518,8 +562,9 @@ export async function repairProfile(options = {}) {
   await writeFile(join(backupDir, 'package.json'), originalManifest)
   const lockPath = join(profileDir, 'pnpm-lock.yaml')
   const journalPath = join(profileDir, INSTALL_JOURNAL)
+  const hadJournal = existsSync(journalPath)
   if (existsSync(lockPath)) await writeFile(join(backupDir, 'pnpm-lock.yaml'), await readFile(lockPath, 'utf8'))
-  if (existsSync(journalPath)) await writeFile(join(backupDir, INSTALL_JOURNAL), await readFile(journalPath, 'utf8'))
+  if (hadJournal) await writeFile(join(backupDir, INSTALL_JOURNAL), await readFile(journalPath, 'utf8'))
   const nodeModulesPath = join(profileDir, 'node_modules')
   let movedNodeModules = false
   let installed = false
@@ -556,8 +601,9 @@ export async function repairProfile(options = {}) {
       env: { ...process.env, DSH_EVOLUTION_REPAIR: '1' },
     })
     installed = true
-    const allManifest = JSON.parse(await readFile(join(nodeModulesPath, allBundle, 'package.json'), 'utf8'))
-    const required = [allBundle, ...Object.keys(allManifest.dependencies ?? {}).filter(isFamilyPackage)]
+    const closure = installedFamilyClosure(profileDir, allBundle)
+    if (closure === undefined) throw new Error(`install-layered: repaired profile has no readable ${allBundle} manifest`)
+    const required = [allBundle, ...closure]
     const mismatched = []
     for (const name of required) {
       const version = installedPackageVersion(profileDir, name)
@@ -566,23 +612,39 @@ export async function repairProfile(options = {}) {
     if (mismatched.length > 0) {
       throw new Error(`install-layered: repair installed a mixed family: ${mismatched.join(', ')} (expected ${targetVersion})`)
     }
-    await rm(backupDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    return { ...plan, changed: true, installed, removedDependencies: familyDirect }
   } catch (error) {
     // A failed pnpm run can leave a partial node_modules; remove it before
     // restoring the exact pre-repair tree. The manifest/lock are restored from
-    // the byte-for-byte backups written before any rename.
+    // the byte-for-byte backups written before any rename. A profile that had
+    // no journal must not be left with the repair's journal after a rollback.
     try {
       if (existsSync(nodeModulesPath)) await rm(nodeModulesPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
       if (movedNodeModules && existsSync(join(backupDir, 'node_modules'))) await rename(join(backupDir, 'node_modules'), nodeModulesPath)
       await writeFile(manifestPath, originalManifest)
       if (existsSync(join(backupDir, 'pnpm-lock.yaml'))) await writeFile(lockPath, await readFile(join(backupDir, 'pnpm-lock.yaml'), 'utf8'))
-      if (existsSync(join(backupDir, INSTALL_JOURNAL))) await writeFile(journalPath, await readFile(join(backupDir, INSTALL_JOURNAL), 'utf8'))
+      if (hadJournal) {
+        await writeFile(journalPath, await readFile(join(backupDir, INSTALL_JOURNAL), 'utf8'))
+      } else {
+        await rm(journalPath, { force: true })
+      }
       await rm(backupDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     } catch (restoreError) {
       throw new Error(`install-layered: repair failed (${error instanceof Error ? error.message : String(error)}) and restore also failed (${restoreError instanceof Error ? restoreError.message : String(restoreError)}); backup is ${backupDir}`)
     }
     throw error
+  }
+  // The install is verified. Backup cleanup is not part of the transaction:
+  // a Windows file-lock failure here must not delete the new tree and attempt
+  // to restore a partially deleted old one.
+  let cleanupError
+  try {
+    await rm(backupDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  } catch (error) {
+    cleanupError = error instanceof Error ? error.message : String(error)
+  }
+  return {
+    ...plan, changed: true, installed, removedDependencies: familyDirect,
+    ...(cleanupError === undefined ? {} : { backupDir, cleanupError }),
   }
 }
 
@@ -948,7 +1010,7 @@ export async function install(options = {}) {
   if (existsSync(manifestPath)) {
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
     const existing = Array.isArray(manifest.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : []
-    const directSiblings = Object.keys(manifest.dependencies ?? {}).filter(name => isFamilyPackage(name) && !isAllPackage(name))
+    const directSiblings = Object.keys(manifest.dependencies ?? {}).filter(name => isFamilyPackage(name) && !isFamilyBundle(name))
     if (mode === 'all' && directSiblings.length > 0) {
       throw new Error(`install-layered: profile "${profile}" already pins family implementation packages directly (${directSiblings.join(', ')}). Install-layered would create another mixed family. Run --repair first.`)
     }

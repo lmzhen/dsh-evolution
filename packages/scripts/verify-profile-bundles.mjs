@@ -78,7 +78,10 @@ function checkProfile(profileDir) {
   // R3: the bundle is the single install unit. Direct family siblings make a
   // platform bundle update leave those siblings behind: the version card moves
   // while the loader still resolves the old client.
-  const directSiblings = Object.keys(dependencies).filter(name => isFamilyPackage(name) && !EVOLUTION_BUNDLES.some(b => tail(name) === b))
+  const directSiblings = [...new Set([
+    ...Object.keys(dependencies),
+    ...Object.keys(manifest?.optionalDependencies ?? {}),
+  ])].filter(name => isFamilyPackage(name) && !EVOLUTION_BUNDLES.some(b => tail(name) === b))
   if (directSiblings.length > 0) {
     return {
       code: 1,

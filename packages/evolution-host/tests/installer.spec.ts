@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -541,6 +541,74 @@ describe('layered installer', () => {
     })`)).rejects.toThrow(/does not mount an evolution-all bundle/)
   }, 30_000)
 
+  it('repair succeeds through pnpm and validates the transitive family closure', async () => {
+    const home = await tempRoot('dsh-installer-repair-success-')
+    const profileDir = join(home, 'profiles', 'evo-test')
+    const allDir = join(profileDir, 'node_modules/@lmzhen/dsh-evolution-all')
+    await mkdir(allDir, { recursive: true })
+    await writeFile(join(allDir, 'package.json'), JSON.stringify({
+      name: '@lmzhen/dsh-evolution-all',
+      version: '0.53.0',
+      dependencies: {
+        '@lmzhen/dsh-evolution-core': '0.53.0',
+        '@lmzhen/dsh-evolution-ui': '0.53.0',
+      },
+    }))
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
+      name: 'dsh-profile-evo-test',
+      private: true,
+      dependencies: {
+        '@lmzhen/dsh-evolution-all': '0.53.0',
+        '@lmzhen/dsh-evolution-ui': '0.51.1',
+      },
+      dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@lmzhen/dsh-evolution-all'] } },
+    }, null, 2) + '\n')
+    const fakePnpm = join(home, 'fake-pnpm.mjs')
+    await writeFile(fakePnpm, [
+      "import { mkdir, readFile, writeFile } from 'node:fs/promises'",
+      "import { join } from 'node:path'",
+      "const root = process.cwd()",
+      "const target = '0.53.0'",
+      "const packages = {",
+      "  '@lmzhen/dsh-evolution-all': { '@lmzhen/dsh-evolution-core': target, '@lmzhen/dsh-evolution-ui': target },",
+      "  '@lmzhen/dsh-evolution-core': {},",
+      "  '@lmzhen/dsh-evolution-ui': { '@lmzhen/dsh-evolution-client-kit': target },",
+      "  '@lmzhen/dsh-evolution-client-kit': {},",
+      "}",
+      "for (const [name, deps] of Object.entries(packages)) {",
+      "  const dir = join(root, 'node_modules', name)",
+      "  await mkdir(dir, { recursive: true })",
+      "  await writeFile(join(dir, 'package.json'), JSON.stringify({ name, version: target, dependencies: deps }))",
+      "}",
+      "await readFile(join(root, 'package.json'), 'utf8')",
+    ].join('\n'))
+    const result = await callInstaller(`return await installer.repairProfile({
+      home: ${JSON.stringify(home)}, profile: 'evo-test', version: '0.53.0',
+      pnpm: ${JSON.stringify(fakePnpm)},
+    })`) as { installed?: boolean; familyDirect?: string[]; cleanupError?: string }
+    expect(result.installed).toBe(true)
+    expect(result.cleanupError).toBeUndefined()
+    const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>
+      dsh?: { profile?: { bundles?: string[] } }
+    }
+    expect(Object.keys(manifest.dependencies ?? {})).toEqual(['@lmzhen/dsh-evolution-all'])
+    expect(manifest.dsh?.profile?.bundles).toContain('@lmzhen/dsh-evolution-all')
+    const journal = JSON.parse(await readFile(join(profileDir, '.evolution-install.json'), 'utf8')) as { mode?: string; version?: number }
+    expect(journal.mode).toBe('pnpm-bundle')
+    expect(journal.version).toBe(2)
+    for (const name of [
+      '@lmzhen/dsh-evolution-all',
+      '@lmzhen/dsh-evolution-core',
+      '@lmzhen/dsh-evolution-ui',
+      '@lmzhen/dsh-evolution-client-kit',
+    ]) {
+      expect(JSON.parse(await readFile(join(profileDir, 'node_modules', name, 'package.json'), 'utf8')).version).toBe('0.53.0')
+    }
+    const leftovers = (await readdir(profileDir)).filter(name => name.startsWith('.evolution-repair-backup-'))
+    expect(leftovers).toEqual([])
+  }, 30_000)
+
   it('repair restores the manifest and node_modules when pnpm fails', async () => {
     const home = await tempRoot('dsh-installer-repair-fail-')
     const profileDir = join(home, 'profiles', 'evo-test')
@@ -569,6 +637,7 @@ describe('layered installer', () => {
       pnpm: 'definitely-not-a-real-pnpm-command',
     })`)).rejects.toThrow()
     expect(await readFile(manifestPath, 'utf8')).toBe(original)
+    expect(existsSync(join(profileDir, '.evolution-install.json'))).toBe(false)
     expect(await readFile(join(profileDir, 'node_modules/@lmzhen/dsh-evolution-ui/marker'), 'utf8')).toBe('old')
   }, 30_000)
 

@@ -71,16 +71,32 @@ export function checkFamilyCoherence(profileDir: string): FamilyCoherence | unde
   }
   if (typeof all.version !== 'string') return undefined
   const components: FamilyComponent[] = []
-  for (const name of Object.keys(all.dependencies ?? {})) {
-    if (!isFamilyPackage(name)) continue
+  const visited = new Set<string>()
+  const queue = Object.keys(all.dependencies ?? {}).filter(isFamilyPackage)
+  while (queue.length > 0) {
+    const name = queue.shift()
+    if (name === undefined || visited.has(name)) continue
+    visited.add(name)
     const manifestPath = resolveManifest(name)
     if (manifestPath === undefined) {
       components.push({ name })
       continue
     }
     try {
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { version?: unknown }
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+        version?: unknown
+        dependencies?: Record<string, string>
+        optionalDependencies?: Record<string, string>
+      }
       components.push({ name, ...(typeof manifest.version === 'string' ? { version: manifest.version } : {}) })
+      // The family is a dependency graph, not only the bundle's direct list:
+      // client-kit arrives through evolution-ui, merge-engine through merge.
+      for (const child of [
+        ...Object.keys(manifest.dependencies ?? {}),
+        ...Object.keys(manifest.optionalDependencies ?? {}),
+      ]) {
+        if (isFamilyPackage(child) && !visited.has(child)) queue.push(child)
+      }
     } catch {
       components.push({ name })
     }

@@ -132,10 +132,16 @@ for (const tarball of tarballs) {
         if (name.startsWith('@deepseek-ai/dsh-') && expectedPlatformRange !== undefined && range !== expectedPlatformRange) {
           problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ' + expectedPlatformRange + ')')
         }
-        if (name.startsWith('@lmzhen/') && expectedVersion !== undefined) {
-          const expectedFamilyRange = section === 'peerDependencies' ? '^' + expectedVersion : expectedVersion
-          if (range !== expectedFamilyRange) {
-            problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ' + expectedFamilyRange + ' for the family)')
+        if (name.startsWith('@lmzhen/')) {
+          if (expectedVersion === undefined) {
+            problems.push(short + ': ' + section + '.' + name + ' is a family dependency but --version was not supplied; exact-range audit is unavailable')
+            continue
+          }
+          const expectedFamilyRange = section === 'peerDependencies'
+            ? [expectedVersion, '^' + expectedVersion, '~' + expectedVersion]
+            : [expectedVersion]
+          if (!expectedFamilyRange.includes(range)) {
+            problems.push(short + ': ' + section + '.' + name + ' = ' + String(range) + ' (expected ' + expectedFamilyRange.join(' or ') + ' for the family)')
           }
         }
       }

@@ -54,7 +54,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-host
 4. 升级家族 bundle：
 
 ```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.53.0
+dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.54.0
 ```
 
 5. 重启后运行 `/evolution doctor`，再实际写一次记忆、改一次技能。
@@ -72,7 +72,9 @@ node packages/scripts/install-layered.mjs --repair \
   --pnpm "$DSH_DESKTOP_PNPM"
 ```
 
-`--version` 可省略，默认使用已安装的 `all` 版本。桌面应用的内置 pnpm 在 `<安装目录>\resources\runtime\primary-runtime\dependencies\pnpm\bin\pnpm.cjs`；也可以把 `DSH_DESKTOP_PNPM` 设为该路径，或让 PATH 里有 pnpm。命令会保留 `all` 一行，删除其它家族直接依赖，备份旧 `node_modules`，重新用 pnpm 安装，并验证 20 个包同版本。失败会自动恢复。修复完成后重启宿主。
+`--version` 可省略，默认使用已安装的 `all` 版本。桌面应用的内置 pnpm 在 `<安装目录>\resources\runtime\primary-runtime\dependencies\pnpm\bin\pnpm.cjs`；也可以把 `DSH_DESKTOP_PNPM` 设为该路径，或让 PATH 里有 pnpm；如果这些都没有设置，删掉 `--pnpm` 参数即可回退到 PATH。命令会保留 `all` 一行，删除其它家族直接依赖，备份旧 `node_modules`，重新用 pnpm 安装，并验证 20 个包同版本。失败会自动恢复。修复完成后重启宿主。
+
+修复脚本位于源码 checkout；只通过 `dsh plugin add` 安装、没有源码树的用户，可用同版本的源码目录运行它，或按上面的 profile 依赖规则手工移除子包后重装 `all`。
 
 `install-layered` 的普通安装会复制源码/离线包，只用于开发或离线场景；这种 profile 不支持 GUI 增量升级，需要重新执行安装器或先 `--repair` 转为 pnpm 管理。
 
