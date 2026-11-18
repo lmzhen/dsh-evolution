@@ -690,6 +690,9 @@ it('authoringFeedback reports the 60-char bar and colon rule without changing va
   const long = authoringFeedback({ description: 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories.' })
   expect(long.over60).toBe(true)
   expect(long.lines[0]).toContain('超过 60 字符的作者规范上限')
+  const combining = authoringFeedback({ description: 'e\u0301'.repeat(60) })
+  expect(combining.descriptionChars).toBe(60)
+  expect(combining.over60).toBe(false)
   // Colon rule: flagged for double-quote wrapping.
   const colon = authoringFeedback({ description: 'Search: arXiv papers by keyword.' })
   expect(colon.hasColon).toBe(true)

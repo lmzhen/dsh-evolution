@@ -7,7 +7,7 @@
  * probe result can never disagree with the facts block. No IO, no writes.
  */
 
-import { computeDedupGroups, computePrefixClusters, duplicateHeadings, missingSupportPointers, narrowNameMatches, overlongLines, retirementReport, type DriftSkillSnapshot } from '@deepseek-ai/dsh-evolution-core'
+import { computeDedupGroups, computePrefixClusters, duplicateHeadings, graphemeCount, missingSupportPointers, narrowNameMatches, overlongLines, retirementReport, truncateGraphemes, type DriftSkillSnapshot } from '@deepseek-ai/dsh-evolution-core'
 import { HEALTH_STAMP_RE, MIN_STAMP_BODY_CHARS } from '@deepseek-ai/dsh-evolution-core/skills'
 
 export const PROBE_SIGNALS: ReadonlyArray<string> = [
@@ -164,10 +164,10 @@ export function computeProbe(
       if (desc === undefined) return result(signal, ['description=missing'], target)
       // 0.3.11: the description text is the only way to exercise the §5-B5
       // nature triage on a skill the auditor cannot read — truncate at 160
-      // chars with an explicit marker (truncated judgment must stay ≤0.4).
-      const truncated = desc.length > 160
-      const text = truncated ? `${desc.slice(0, 160)}…(truncated: ${desc.length} total)` : desc
-      return result(signal, [`description=${desc.length} chars`, `desc-text: ${text}`], target)
+      // graphemes with an explicit marker (truncated judgment must stay ≤0.4).
+      const length = graphemeCount(desc)
+      const text = length > 160 ? `${truncateGraphemes(desc, 160, '')}…(truncated: ${length} total)` : desc
+      return result(signal, [`description=${length} chars`, `desc-text: ${text}`], target)
     }
     case 'quality_low': {
       const quality = snapshot.quality

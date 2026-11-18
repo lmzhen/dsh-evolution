@@ -186,6 +186,7 @@ describe('S1.8 (v37 P1-14 / P2-3): LF and CRLF bodies agree', () => {
     const over = 'x'.repeat(DRIFT_MAX_LINE_CHARS + 1)
     expect(overlongLines(`${over}\n`)).toEqual([{ lineNo: 1, chars: DRIFT_MAX_LINE_CHARS + 1 }])
     expect(overlongLines(`${over}\r\n`)).toEqual([{ lineNo: 1, chars: DRIFT_MAX_LINE_CHARS + 1 }])
+    expect(overlongLines(`${'😀'.repeat(DRIFT_MAX_LINE_CHARS + 1)}\n`)).toEqual([{ lineNo: 1, chars: DRIFT_MAX_LINE_CHARS + 1 }])
   })
 })
 

@@ -31,6 +31,7 @@ import { join } from 'node:path'
 import { transactIo, type EvolutionIoLike } from './io.ts'
 import { isPresent, isUnknown, probeText } from './probe.ts'
 import { contentHash } from './mutations.ts'
+import { graphemeCount, truncateGraphemes } from './text-metrics.ts'
 
 /** Root-level history directory. Dot-prefixed so skill discovery skips it. */
 export const HISTORY_DIR = '.history'
@@ -51,12 +52,12 @@ export interface ChangeSummary {
   source: SummarySource
 }
 
-/** Default hard cap for a change summary, counted in Unicode code points. */
+/** Default hard cap for a change summary, counted in grapheme clusters. */
 export const DEFAULT_SKILL_WRITE_SUMMARY_CHARS = 50
 
-/** Count a summary the same way the write gate does (code points, not UTF-16 units). */
+/** Count a summary the same way the write gate does (graphemes, not UTF-16 units). */
 export function summaryChars(text: string): number {
-  return [...text].length
+  return graphemeCount(text)
 }
 
 /** Normalize a model-supplied summary: single line, trimmed, non-empty, within the hard cap. */
@@ -75,8 +76,7 @@ export function normalizeChangeSummary(
 /** Clip a host-generated summary to the same hard cap; host facts are not rejected. */
 export function clipChangeSummary(text: string, cap = DEFAULT_SKILL_WRITE_SUMMARY_CHARS): string {
   const line = text.replace(/\s+/g, ' ').trim()
-  const chars = [...line]
-  return chars.length <= cap ? line : chars.slice(0, Math.max(1, cap - 1)).join('') + '…'
+  return truncateGraphemes(line, cap)
 }
 
 /** G3b: one unit's head. Exactly one of the two forms is present (they never coexist). */

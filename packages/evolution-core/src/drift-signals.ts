@@ -16,6 +16,7 @@ import { computeDedupGroups, computePrefixClusters, LOW_QUALITY_THRESHOLD } from
 import { AUTHORING_DESCRIPTION_BAR, DEFAULT_STALE_AFTER_DAYS, MAX_SKILL_CONTENT_CHARS } from './constants.ts'
 import { isFileShapedPath, scanBodyHooks, type CitationReport } from './citations.ts'
 import { tokenLineFor, type BodyCost } from './cost.ts'
+import { graphemeCount } from './text-metrics.ts'
 
 /** One skill's library state; the assembler (not this module) reads IO. */
 export interface DriftSkillSnapshot {
@@ -199,16 +200,17 @@ export function duplicateHeadings(body: string): Array<{ heading: string; count:
     .map(([heading, count]) => ({ heading, count }))
 }
 
-/** Physical lines over `max` characters: `{ lineNo, chars }`, 1-based line numbers. */
+/** Physical lines over `max` graphemes: `{ lineNo, chars }`, 1-based line numbers. */
 export function overlongLines(body: string, max = DRIFT_MAX_LINE_CHARS): Array<{ lineNo: number; chars: number }> {
   const out: Array<{ lineNo: number; chars: number }> = []
   const lines = body.split('\n')
   for (let index = 0; index < lines.length; index += 1) {
     // S1.8 (v37 P2-3): the CR is a line terminator, not a visible character — a
-    // 1500-character CRLF line used to report 1501 and send the model after a
+    // 1500-grapheme CRLF line used to report 1501 and send the model after a
     // line that already complies.
     const raw = lines[index] ?? ''
-    const length = raw.endsWith('\r') ? raw.length - 1 : raw.length
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+    const length = graphemeCount(line)
     if (length > max) out.push({ lineNo: index + 1, chars: length })
   }
   return out
@@ -364,6 +366,7 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
     )
 
     const description = snapshot.description
+    const descriptionLength = description === undefined ? 0 : graphemeCount(description)
     signals.push(
       description === undefined
         // C-21 (v10 audit): the threshold renders from the constant like the
@@ -372,8 +375,8 @@ export function computeDriftSignals(snapshots: ReadonlyArray<DriftSkillSnapshot>
         ? sig('description_chars', 'unknown', 'missing', `${AUTHORING_DESCRIPTION_BAR}`)
         : sig(
           'description_chars',
-          description.length > AUTHORING_DESCRIPTION_BAR ? 'over' : 'pass',
-          `${description.length}`,
+          descriptionLength > AUTHORING_DESCRIPTION_BAR ? 'over' : 'pass',
+          `${descriptionLength}`,
           `${AUTHORING_DESCRIPTION_BAR}`,
         ),
     )

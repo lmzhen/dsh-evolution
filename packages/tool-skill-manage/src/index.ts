@@ -20,7 +20,7 @@
 
 import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
-import { currentReviewContext, skillWriteGateContext, protectedSkillNamesOf, authorityFrom } from '@deepseek-ai/dsh-evolution-core'
+import { currentReviewContext, skillWriteGateContext, protectedSkillNamesOf, authorityFrom, compareTextBudget, TEXT_BUDGETS } from '@deepseek-ai/dsh-evolution-core'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool, registerEvolutionTool, skillsPort, type SystemPromptPort } from '@deepseek-ai/dsh-evolution-core/platform'
@@ -913,7 +913,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return { ok: false, message: 'rating 已移除：feedback 只记录负向报错，不支持正反馈。', skills: [] }
       }
       const note = typeof args.note === 'string' ? args.note.trim() : ''
-      if ([...note].length > 20) return { ok: false, message: `报错说明为 ${[...note].length} 个字符，超过 20 上限。`, skills: [] }
+      const noteLength = compareTextBudget(note, TEXT_BUDGETS.feedbackNote).value
+      if (noteLength > TEXT_BUDGETS.feedbackNote.limit) return { ok: false, message: `报错说明为 ${noteLength} 个字符，超过 ${TEXT_BUDGETS.feedbackNote.limit} 上限。`, skills: [] }
       service.record(name, 'negative', note === '' ? args.problem : note, 'skill')
       return { ok: true, message: `已记录对「${name}」的报错反馈。`, skills: [] }
     }

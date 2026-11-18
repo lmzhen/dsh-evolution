@@ -26,6 +26,7 @@ import { AUTHORING_DESCRIPTION_BAR, CONTENT_SPLIT_HINT, SKILL_NAME_RE } from './
 import { isRecord } from './guards.ts'
 import { DEFAULT_SKILL_LIMITS } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
+import { graphemeCount, measureUnit, truncateGraphemes } from './text-metrics.ts'
 
 export interface Frontmatter {
   name?: string
@@ -589,14 +590,14 @@ export function skillMdOnDisk(content: string): string {
 
 /** Whether `content` would exceed `limit` once written. */
 export function exceedsContentLimit(content: string, limit: number): boolean {
-  return skillMdOnDisk(content).length > limit
+  return measureUnit(skillMdOnDisk(content), 'codePoints') > limit
 }
 
 /** S1.2: the repair path — a write that makes an already-over-limit file smaller.
  * Only a NET SHRINK is exempt; an equal or larger write stays refused. */
 export function shrinksOverLimit(next: string, current: string | null | undefined, limit: number): boolean {
   if (current === null || current === undefined || !exceedsContentLimit(current, limit)) return false
-  return skillMdOnDisk(next).length < skillMdOnDisk(current).length
+  return measureUnit(skillMdOnDisk(next), 'codePoints') < measureUnit(skillMdOnDisk(current), 'codePoints')
 }
 
 export interface FrontmatterRepair {
@@ -626,7 +627,9 @@ export function ensureSkillFrontmatter(content: string, name: string, descriptio
   const heading = /^#{1,6}\s+(.+?)\s*$/m.exec(body)?.[1]
   const firstLine = body.split(/\r?\n/).map(line => line.trim()).find(line => line !== '' && !line.startsWith('#')) ?? ''
   const source = (description?.trim() || heading || firstLine || name).replace(/\s+/g, ' ').trim()
-  const clipped = source.length > AUTHORING_DESCRIPTION_BAR - 2 ? source.slice(0, AUTHORING_DESCRIPTION_BAR - 3) + '…' : source
+  const clipped = graphemeCount(source) > AUTHORING_DESCRIPTION_BAR - 2
+    ? truncateGraphemes(source, AUTHORING_DESCRIPTION_BAR - 2)
+    : source
   const summary = /[.。！？!?]$/.test(clipped) ? clipped : clipped + '.'
   const encoded = yamlPlainScalarNeedsQuotes(summary) ? JSON.stringify(summary) : summary
   const header = ['---', `name: ${name}`, `description: ${encoded}`, 'version: 0.1.0', 'author: Hermes', '---', ''].join('\n')
@@ -662,7 +665,7 @@ export function validateFrontmatter(
   if (expectedName && parsed.frontmatter.name !== expectedName) return `Frontmatter 里的 name「${parsed.frontmatter.name}」与目标技能「${expectedName}」不一致。`
   if (!parsed.frontmatter.description) return 'Frontmatter 必须包含 description 字段。'
   const description = parsed.frontmatter.description
-  if (description.length > limits.maxDescriptionLength) return `description 超过 ${limits.maxDescriptionLength} 个字符。`
+  if (graphemeCount(description) > limits.maxDescriptionLength) return `description 超过 ${limits.maxDescriptionLength} 个字符。`
   // S1.2: the limit is judged on the bytes that will land on disk, and a NET
   // SHRINK of an already-over-limit file is allowed (the repair path).
   if (exceedsContentLimit(content, limits.maxSkillContentChars) && !shrinksOverLimit(content, current, limits.maxSkillContentChars)) {
@@ -695,14 +698,15 @@ export interface AuthoringFeedback {
  */
 export function authoringFeedback(frontmatter: Frontmatter): AuthoringFeedback {
   const description = frontmatter.description ?? ''
-  const over60 = description.length > AUTHORING_DESCRIPTION_BAR
+  const descriptionLength = graphemeCount(description)
+  const over60 = descriptionLength > AUTHORING_DESCRIPTION_BAR
   const hasColon = description.includes(':')
   const lines: string[] = []
   lines.push(over60
-    ? `描述为 ${description.length}/60 个字符 —— 超过 60 字符的作者规范上限（Hermes 标准；技能目录会按平台配置的上限截断）。`
-    : `描述为 ${description.length}/60 个字符 —— 在作者规范上限之内。`)
+    ? `描述为 ${descriptionLength}/60 个字符 —— 超过 60 字符的作者规范上限（Hermes 标准；技能目录会按平台配置的上限截断）。`
+    : `描述为 ${descriptionLength}/60 个字符 —— 在作者规范上限之内。`)
   if (hasColon) lines.push('描述里含冒号 —— 请用双引号把整个取值包起来。')
-  return { descriptionChars: description.length, over60, hasColon, lines }
+  return { descriptionChars: descriptionLength, over60, hasColon, lines }
 }
 
 /** A1-15 (v18) / P2-2 (v19): the io layer marks an error `committed: true` when

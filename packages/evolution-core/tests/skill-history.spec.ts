@@ -21,9 +21,11 @@ const skill = (name: string, body = 'Body.'): string => `---\nname: ${name}\ndes
 const entry = (v: number, hash: string, action = 'update'): SkillVersion => ({ v, at: `2026-09-27T00:00:0${v}Z`, action, hash, chars: 10 })
 
 describe('change summary normalization', () => {
-  it('counts Unicode code points and rejects over-limit or multiline model text', () => {
+  it('counts grapheme clusters and rejects over-limit or multiline model text', () => {
     expect(normalizeChangeSummary('  moved two sections  ')).toEqual({ ok: true, text: 'moved two sections' })
     expect(normalizeChangeSummary('😀'.repeat(DEFAULT_SKILL_WRITE_SUMMARY_CHARS + 1))).toMatchObject({ ok: false, reason: 'length' })
+    expect(normalizeChangeSummary('e\u0301'.repeat(DEFAULT_SKILL_WRITE_SUMMARY_CHARS))).toMatchObject({ ok: true })
+    expect(normalizeChangeSummary('e\u0301'.repeat(DEFAULT_SKILL_WRITE_SUMMARY_CHARS + 1))).toMatchObject({ ok: false, reason: 'length' })
     expect(normalizeChangeSummary('a\nb')).toMatchObject({ ok: false, reason: 'multiline' })
     expect(normalizeChangeSummary('')).toMatchObject({ ok: false, reason: 'missing' })
   })

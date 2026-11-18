@@ -11,6 +11,7 @@
 import { expect, it } from 'vitest'
 import { CONTENT_SPLIT_HINT, DEFAULT_SKILL_LIMITS } from '@deepseek-ai/dsh-evolution-core'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
+import { exceedsContentLimit } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fakeIo } from '../../test-support/fake-io.ts'
 
 const LIMIT = 300
@@ -75,5 +76,11 @@ it('V1: both size refusals share one split hint that names the destination dirs'
   const patched = await lib.patch('small-skill', 'x'.repeat(20), 'x'.repeat(200))
   expect(patched.ok).toBe(false)
   expect(patched.message).toContain(CONTENT_SPLIT_HINT)
+})
+
+it('counts the content cap in code points so an emoji is not double-counted', () => {
+  const limit = 100_000
+  expect(exceedsContentLimit('😀'.repeat(limit - 1), limit)).toBe(false)
+  expect(exceedsContentLimit('😀'.repeat(limit), limit)).toBe(true)
 })
 

@@ -47,6 +47,7 @@ import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFE
 import type { SkillLimits } from './limits.ts'
 import { applyReferenceRewrite, describeReferenceRewrite, planReferenceRewrite, planRehoming } from './reference-rewrite.ts'
 import { exceedsContentLimit, frontmatterBlock, normalizeFrontmatter, parseFrontmatter, shrinksOverLimit, validateFrontmatter } from './frontmatter.ts'
+import { measureUnit } from './text-metrics.ts'
 import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPatch } from './fuzzy-match.ts'
 import { makeSerialQueue } from './serial.ts'
 import { supportRefs } from './support-refs.ts'
@@ -1279,7 +1280,7 @@ export class SkillLibrary {
    */
   private badName(name: string, opts: { allowReserved?: boolean } = {}): string | null {
     const normalized = name.trim()
-    if (!SKILL_NAME_RE.test(normalized) || normalized.length > this.limits.maxNameLength) {
+    if (!SKILL_NAME_RE.test(normalized) || measureUnit(normalized, 'codePoints') > this.limits.maxNameLength) {
       return `技能名「${normalized}」不合法：请只用小写字母、数字和连字符（不超过 ${this.limits.maxNameLength} 个）。`
     }
     // P2-11 (v15): win32 reserves these stems for ANY directory component —

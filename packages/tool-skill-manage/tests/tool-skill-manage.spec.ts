@@ -1279,6 +1279,16 @@ it('limits the optional negative report note to 20 characters', async () => {
     })
     expect(noted.isError).toBe(false)
     expect(calls[0]).toEqual(['boundary-skill', 'negative', 'trigger misses', 'skill'])
+
+    const combining = await executeOne(ctx, {
+      callId: ToolCallId(`feedback-combining-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: { action: 'feedback', name: 'boundary-skill', note: 'e\u0301'.repeat(20) },
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    expect(combining.isError).toBe(false)
+    expect(calls[1]).toEqual(['boundary-skill', 'negative', 'e\u0301'.repeat(20), 'skill'])
   } finally {
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
