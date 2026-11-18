@@ -49,9 +49,9 @@ Preset bases and preconditions are single-sourced in [evolution-agent/README.md]
 
 ## Installer flags
 
-`install-layered.mjs` accepts: `--mode`, `--profile`, `--base`, `--home`, `--from-dist`, `--dry-run`, `--force`, `--uninstall`, `--help`.
+`install-layered.mjs` accepts: `--mode`, `--profile`, `--base`, `--home`, `--from-dist`, `--dry-run`, `--force`, `--repair`, `--version`, `--pnpm`, `--uninstall`, `--help`.
 
-`--mode all` is the product install; `--mode host` is the advanced infrastructure plane. `--base` narrows legacy preset-row removal during `--uninstall`; `--dry-run` reports changes without writing. `--from-dist <dir>` installs the packed release tarballs (`prepare-release` output) instead of the source tree; the CI packed-install guard uses it. Legacy agent/layered/oneclick values are accepted only by `--uninstall` and are not product choices.
+`--mode all` is the product install; `--mode host` is the advanced infrastructure plane. `--base` narrows legacy preset-row removal during `--uninstall`; `--dry-run` reports changes without writing. `--from-dist <dir>` installs the packed release tarballs (`prepare-release` output) instead of the source tree; the CI packed-install guard uses it. `--repair` converts a legacy copy/direct-sibling profile to a single pnpm-managed `all` bundle; `--version` and `--pnpm` configure that repair (target version and pnpm executable). Legacy agent/layered/oneclick values are accepted only by `--uninstall` and are not product choices.
 
 ## Merge control axes
 
