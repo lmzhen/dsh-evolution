@@ -326,14 +326,14 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
                 state: row.state,
               }),
               face.t('governance.separator'),
-              localTime(new Date(row.startedAt).toISOString())))),
-          counts === null || counts.offload + counts.condense + counts.extract === 0
-            ? null
-            : createElement('p', { className: 'evo-hist-hint' }, face.format('governance.counts', {
-              offload: counts.offload,
-              condense: counts.condense,
-              extract: counts.extract,
-            }))),
+              localTime(new Date(row.startedAt).toISOString()))))),
+      counts === null
+        ? null
+        : createElement('p', { className: 'evo-hist-hint' }, face.format('governance.counts', {
+          offload: counts.offload,
+          condense: counts.condense,
+          extract: counts.extract,
+        })),
       failure === undefined ? null : createElement('div', { className: 'evo-hist-failure' }, failureBlock(face.t, failure)),
       // The explanation is for the screen that has nothing else on it (W12): a reader who can see
       // versions does not need to be told what a version is.

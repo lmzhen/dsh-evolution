@@ -54,7 +54,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-host
 4. 升级家族 bundle：
 
 ```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.51.0
+dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.51.1
 ```
 
 5. 重启后运行 `/evolution doctor`，再实际写一次记忆、改一次技能。

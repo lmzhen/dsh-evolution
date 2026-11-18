@@ -84,6 +84,13 @@ it('P1-12: a failed read renders the shared failure sentence and the command fal
   expect(document.body.textContent).not.toContain('fallbackHint')
 })
 
+it('shows successful counts even when there is no recent governance run', async () => {
+  render(createElement(SkillHistoryPanel, makeFace({
+    loadHealth: async () => ({ rows: [], governance: [], counts: { offload: 0, condense: 0, extract: 1 } }),
+  })))
+  await waitFor(() => { expect(document.body.textContent).toContain('governance.counts(0,0,1)') })
+})
+
 describe('skill-history panel: the state machine a renderer can see', () => {
   it('keeps the curator\'s sentence while the rows are read again', async () => {
     const reads: Array<Deferred<VersionsPayload>> = []

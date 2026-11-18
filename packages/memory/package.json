@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-memory",
   "description": "Memory provider registry for self-evolution",
-  "version": "0.51.0",
+  "version": "0.51.1",
   "publishConfig": {
     "access": "public"
   },
@@ -48,4 +48,5 @@
     "@deepseek-ai/cordis": "workspace:^"
   }
 }
+
 

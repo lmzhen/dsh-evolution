@@ -1,3 +1,9 @@
+## 0.51.1 (2026-11-18) — 面板成功次数在无治理记录时可见
+
+> **修复**：技能历史面板把「成功次数」渲染在「最近治理」的条件块内；最近治理为空时，即使有 extract/offload/condense 成功计数也不会显示。现在成功次数独立渲染，计数为 0 时也显示，便于确认统计链路正常。
+>
+> **验证**：UI 回归 10/10；0.51.1 真机安装验收。
+
 ## 0.51.0 (2026-11-17) — 技能治理：summary、复盘快照、offload/condense、统一面板
 
 > **范围**：① 技能历史写入摘要（`SkillVersion.summary` + `summarySource`，按动作分档）；② review aux 在长 goal loop 中用**阈值回合结束位置的冻结前缀快照**运行，不再要求 live idle；③ `/evolution review [memory|skill|combined]` 手动前台复盘；④ `/evolution offload` 为薄 subagent（模型通道），实际搬运仍走 `restructure`（工具通道）；⑤ `/evolution condense` 为 governance 子智能体，逐章节小改；⑥ `restructure` 支持 `--start/--end` 连续行子块；⑦ 技能历史面板三 tab（技能/待批/合并）+ 健康 chip + 最近治理 + 成功次数；`skillHistory.health` 聚合 route；⑧ `/evolution extract <source>` source-only proposal、`--proposal` 二次 apply。

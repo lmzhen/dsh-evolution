@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-tool-skill-manage",
   "description": "Model-facing skill_manage tool",
-  "version": "0.51.0",
+  "version": "0.51.1",
   "publishConfig": {
     "access": "public"
   },
@@ -48,4 +48,5 @@
     "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^"
   }
 }
+
 
