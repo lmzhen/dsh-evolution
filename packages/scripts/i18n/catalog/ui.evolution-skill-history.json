@@ -1113,44 +1113,44 @@
       "ru": "Здоровье"
     },
     "workbench.history": {
-      "zh": "技能历史",
-      "en": "Skill history",
-      "ja": "スキル履歴",
-      "es": "Historial de skills",
-      "fr": "Historique des skills",
-      "de": "Skill-Historie",
-      "pt": "Histórico de skills",
-      "ru": "История навыков"
+      "zh": "技能",
+      "en": "Skills",
+      "ja": "Skills",
+      "es": "Skills",
+      "fr": "Skills",
+      "de": "Skills",
+      "pt": "Skills",
+      "ru": "Skills"
     },
     "workbench.merge": {
-      "zh": "合并",
-      "en": "Merge",
-      "ja": "マージ",
-      "es": "Merge",
-      "fr": "Fusion",
-      "de": "Merge",
-      "pt": "Merge",
-      "ru": "Объединение"
+      "zh": "合并建议",
+      "en": "Merge suggestions",
+      "ja": "Merge suggestions",
+      "es": "Merge suggestions",
+      "fr": "Merge suggestions",
+      "de": "Merge suggestions",
+      "pt": "Merge suggestions",
+      "ru": "Merge suggestions"
     },
     "workbench.pending": {
-      "zh": "待批",
-      "en": "Pending",
-      "ja": "承認待ち",
-      "es": "Pendientes",
-      "fr": "En attente",
-      "de": "Offen",
-      "pt": "Pendentes",
-      "ru": "На одобрении"
+      "zh": "待我确认",
+      "en": "Needs review",
+      "ja": "Needs review",
+      "es": "Needs review",
+      "fr": "Needs review",
+      "de": "Needs review",
+      "pt": "Needs review",
+      "ru": "Needs review"
     },
     "workbench.title": {
-      "zh": "自进化",
-      "en": "Self-evolution",
-      "ja": "自己進化",
-      "es": "Evolución",
-      "fr": "Auto-évolution",
-      "de": "Selbstevolution",
-      "pt": "Autoevolução",
-      "ru": "Самоэволюция"
+      "zh": "技能整理",
+      "en": "Skill organization",
+      "ja": "Skill organization",
+      "es": "Skill organization",
+      "fr": "Skill organization",
+      "de": "Skill organization",
+      "pt": "Skill organization",
+      "ru": "Skill organization"
     },
     "stats.eyebrow": {
       "zh": "技能库",
