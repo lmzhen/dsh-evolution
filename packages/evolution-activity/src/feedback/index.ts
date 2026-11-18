@@ -477,8 +477,8 @@ export class EvolutionFeedback {
         if (!Number.isFinite(at) || at < since) continue
         const current = out.get(event.target) ?? { positive: 0, negative: 0, notes: [] }
         const negative = current.negative + (event.rating === 'negative' ? 1 : 0)
-        const note = event.rating === 'negative' && typeof event.note === 'string' && event.note !== ''
-          ? [...current.notes, { at: event.at, note: event.note }].slice(-MAX_FEEDBACK_NOTES)
+        const note = event.rating === 'negative' && typeof event.note === 'string' && event.note !== '' && event.note !== 'unspecified'
+          ? [{ at: event.at, note: event.note }, ...current.notes].slice(0, MAX_FEEDBACK_NOTES)
           : current.notes
         out.set(event.target, {
           positive: current.positive + (event.rating === 'positive' ? 1 : 0),

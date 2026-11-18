@@ -154,7 +154,9 @@ describe('history workbench', () => {
     fireEvent.click(document.querySelector('.evo-workbench-back')!)
     await waitFor(() => { expect(document.getElementById('evo-workbench-tab-data')?.getAttribute('aria-selected')).toBe('true') })
     expect(document.querySelector('.evo-stats-skill-name')?.textContent).toContain('alpha')
-    expect(loadStats).toHaveBeenCalledTimes(1)
+    // Opening a skill invalidates the shared snapshot so its report note history is fresh; the
+    // data table itself stays mounted (one more read, not a remount).
+    expect(loadStats).toHaveBeenCalledTimes(2)
     view.unmount()
   })
 })

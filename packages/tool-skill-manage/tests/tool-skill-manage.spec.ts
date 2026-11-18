@@ -1228,6 +1228,16 @@ it('limits the optional negative report note to 20 characters', async () => {
   const calls: unknown[][] = []
   ctx.provide('evolutionFeedback', { record: (...args: unknown[]) => { calls.push(args) } })
   try {
+    const oldRating = await executeOne(ctx, {
+      callId: ToolCallId(`feedback-rating-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: { action: 'feedback', name: 'boundary-skill', rating: 'positive', note: 'ok' },
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    expect((oldRating.value as { message?: string } | undefined)?.message ?? '').toContain('不支持正反馈')
+    expect(calls).toHaveLength(0)
+
     const tooLong = await executeOne(ctx, {
       callId: ToolCallId(`feedback-long-${Math.random()}`),
       name: 'skill_manage',

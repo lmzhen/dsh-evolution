@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Note des retours",
-    "description": "Transforme les notes des skills en score de qualité ; une autre source doit fournir ces notes."
+    "title": "Journal d’erreurs",
+    "description": "Rassemble les notes d’erreur des compétences pour la page d’organisation."
   }
 }

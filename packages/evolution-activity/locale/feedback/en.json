@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Feedback scoring",
-    "description": "Turns skill ratings into a quality score; needs another source to supply the ratings."
+    "title": "Error reports",
+    "description": "Collects negative report notes for the skill page."
   }
 }

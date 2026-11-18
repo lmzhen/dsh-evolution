@@ -92,6 +92,7 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
   const [counts, setCounts] = useState<HealthPayload['counts']>(null)
   const [healthByName, setHealthByName] = useState<ReadonlyMap<string, HealthPayload['rows'][number]>>(new Map())
   const [errorNotes, setErrorNotes] = useState<ReadonlyMap<string, readonly SkillErrorNote[]>>(new Map())
+  const [statsEpoch, setStatsEpoch] = useState(0)
   // Every rows read takes a ticket, and only the newest one may write state. Without it a slow reply
   // for skill A lands while B is open: B would show A's rows, and B's restore buttons would post A's
   // version number at B's name — a write against the wrong skill.
@@ -187,17 +188,25 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
       setNoteText(undefined)
       setNoteError(false)
     }
+    // A report may have landed since the data page mounted; opening a skill must not show its stale
+    // stats snapshot (notably the error-note history).
+    face.invalidateStats?.()
+    setStatsEpoch(epoch => epoch + 1)
     showVersions(name)
   }
 
   /** What the refresh control does: both reads again, and the sentence stays. */
   const refresh = (): void => {
+    face.invalidateStats?.()
+    setStatsEpoch(epoch => epoch + 1)
     reloadSkills()
     if (selected !== undefined) showVersions(selected, failed, true)
   }
 
   useEffect(() => {
     if (face.focusSkill === undefined || face.focusSkill === '') return
+    face.invalidateStats?.()
+    setStatsEpoch(epoch => epoch + 1)
     showVersions(face.focusSkill)
   }, [face.focusSkill, face.focusRevision])
 
@@ -295,7 +304,7 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
         : loadGovernance!().then((rows) => { if (live) setGovernance(rows) })
     void read?.catch(() => { /* the aggregate read is optional */ })
     return () => { live = false }
-  }, [face.loadStats, face.loadHealth, face.loadGovernance])
+  }, [face.loadStats, face.loadHealth, face.loadGovernance, statsEpoch])
 
   const needle = query.trim().toLowerCase()
   const visible = useMemo(() => needle === ''

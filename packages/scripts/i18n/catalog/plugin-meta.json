@@ -203,24 +203,24 @@
       "pt": "Limpeza de skills"
     },
     "evolution-feedback.description": {
-      "zh": "把技能收到的评分算成一个质量分；评分得由别的地方提供。",
-      "en": "Turns skill ratings into a quality score; needs another source to supply the ratings.",
-      "ja": "スキルの評価を品質スコアに変えるが、評価を渡してくれる機能が別に要る。",
-      "es": "Convierte en nota de calidad las valoraciones de skills que aporta otra fuente.",
-      "fr": "Transforme les notes des skills en score de qualité ; une autre source doit fournir ces notes.",
-      "de": "Macht aus Bewertungen einen Qualitätswert; die Bewertungen muss eine andere Quelle liefern.",
-      "ru": "Превращает оценки навыков в общий балл качества; ставить оценки должен другой источник.",
-      "pt": "Dá uma nota de qualidade às skills a partir de avaliações que vêm de outra fonte."
+      "zh": "汇总技能运行中的报错说明，供整理页查看。",
+      "en": "Collects negative report notes for the skill page.",
+      "ja": "スキル実行中のエラー説明を集め、整理ページで表示します。",
+      "es": "Reúne las notas de error de las skills para verlas en la página de organización.",
+      "fr": "Rassemble les notes d’erreur des compétences pour la page d’organisation.",
+      "de": "Sammelt Fehlernotizen der Skills für die Aufräumseite.",
+      "ru": "Собирает заметки об ошибках навыков для страницы управления.",
+      "pt": "Reúne as notas de erro das skills para a página de organização."
     },
     "evolution-feedback.title": {
-      "zh": "反馈评分",
-      "en": "Feedback scoring",
-      "ja": "評価の点数化",
-      "es": "Nota de calidad",
-      "fr": "Note des retours",
-      "de": "Qualitätswert",
-      "ru": "Оценка отзывов",
-      "pt": "Nota de qualidade"
+      "zh": "报错记录",
+      "en": "Error reports",
+      "ja": "エラー記録",
+      "es": "Registro de errores",
+      "fr": "Journal d’erreurs",
+      "de": "Fehlerberichte",
+      "ru": "Записи ошибок",
+      "pt": "Registro de erros"
     },
     "evolution-host.description": {
       "zh": "更轻的装法：只在后台自动跑，不带记忆、不改技能；它得单独用。",

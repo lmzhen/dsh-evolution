@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Qualitätswert",
-    "description": "Macht aus Bewertungen einen Qualitätswert; die Bewertungen muss eine andere Quelle liefern."
+    "title": "Fehlerberichte",
+    "description": "Sammelt Fehlernotizen der Skills für die Aufräumseite."
   }
 }

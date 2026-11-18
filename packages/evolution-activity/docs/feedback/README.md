@@ -1,6 +1,6 @@
 # @lmzhen/dsh-evolution-feedback
 
-Feedback aggregation service for skill and session ratings. The family currently has no in-family producer: an embedding host must call `record(target, rating, note?, kind?)` with a real target and a `positive` or `negative` rating.
+Error-report aggregation service for skills. The in-family producer is the `skill_manage` feedback action, which records a negative report with an optional short note; the skill page shows the recent note history.
 
 Skill feedback writes the feedback-owned `feedback_score` and `feedback_warn` fields on the usage record. Curator lifecycle decisions read their union with the curator-owned quality warning; session feedback does not feed that skill-quality channel.
 
@@ -10,4 +10,5 @@ Skill feedback writes the feedback-owned `feedback_score` and `feedback_warn` fi
 
 `qualityWarnThreshold` defaults to -0.25 and accepts values from -1 to 1. `path` overrides only the boot-cache location; it does not relocate the event log.
 
-There is no built-in command or panel. Without an external producer, installing this package alone does not create feedback data.
+Reports are shown in the skill workbench; there is no separate feedback panel.
+

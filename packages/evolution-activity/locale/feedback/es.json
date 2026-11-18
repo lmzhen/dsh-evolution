@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Nota de calidad",
-    "description": "Convierte en nota de calidad las valoraciones de skills que aporta otra fuente."
+    "title": "Registro de errores",
+    "description": "Reúne las notas de error de las skills para verlas en la página de organización."
   }
 }

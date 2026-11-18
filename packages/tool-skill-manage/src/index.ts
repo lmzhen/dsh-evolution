@@ -903,9 +903,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (action === 'feedback') {
       const service = ctx.get('evolutionFeedback') as { record?: (target: string, rating: 'negative', note?: string, kind?: 'skill') => void } | undefined
       if (service?.record === undefined) return { ok: false, message: '反馈服务未挂载，未记录。', skills: [] }
+      // The old `rating` field is intentionally gone. The platform parameter schema is
+      // implicit-open, so an old prompt could still pass it; refuse instead of silently recording
+      // a positive request as a negative report.
+      if ((args as { rating?: unknown }).rating !== undefined) {
+        return { ok: false, message: 'rating 已移除：feedback 只记录负向报错，不支持正反馈。', skills: [] }
+      }
       const note = typeof args.note === 'string' ? args.note.trim() : ''
       if ([...note].length > 20) return { ok: false, message: `报错说明为 ${[...note].length} 个字符，超过 20 上限。`, skills: [] }
-      service.record(name, 'negative', note === '' ? args.problem ?? 'unspecified' : note, 'skill')
+      service.record(name, 'negative', note === '' ? args.problem : note, 'skill')
       return { ok: true, message: `已记录对「${name}」的报错反馈。`, skills: [] }
     }
     // The write-admission sequence, EXECUTION point (design §3): the gates whose verdict can

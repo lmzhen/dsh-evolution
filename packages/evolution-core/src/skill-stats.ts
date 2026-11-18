@@ -60,7 +60,7 @@ export interface SkillStatsRow {
   readonly negativeFeedback30d: number | null
   /** negativeFeedback30d / loads30d; null when loads30d is null or zero (no denominator). */
   readonly feedbackRate30d: number | null
-  /** Negative-report notes in the window, newest last; null when the window was not measured. */
+  /** Negative-report notes in the window, newest first; null when the window was not measured. */
   readonly errorNotes: readonly SkillErrorNote[] | null
 }
 

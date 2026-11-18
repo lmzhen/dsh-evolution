@@ -24,6 +24,8 @@ export interface PanelFace extends Copy {
   readonly loadGovernance?: () => Promise<readonly GovernanceRow[]>
   readonly loadHealth?: () => Promise<HealthPayload>
   readonly loadStats?: () => Promise<SkillStatsSnapshot>
+  /** Drop the workbench's shared stats cache; the panel refresh calls this before re-reading. */
+  readonly invalidateStats?: () => void
   readonly loadDiff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly loadBody: (name: string, v: number) => Promise<VersionBodyRow>
   readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>

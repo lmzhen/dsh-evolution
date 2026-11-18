@@ -38,7 +38,7 @@ export type { WorkbenchView } from './WorkbenchStore.ts'
  * @param loader - the stats read, when the host provides one.
  * @returns the shared loader, or undefined when the host has no stats read.
  */
-function useSharedStats(loader: (() => Promise<SkillStatsSnapshot>) | undefined): (() => Promise<SkillStatsSnapshot>) | undefined {
+function useSharedStats(loader: (() => Promise<SkillStatsSnapshot>) | undefined): { load: () => Promise<SkillStatsSnapshot>; invalidate: () => void } | undefined {
   const cache = useRef<{ readonly promise: Promise<SkillStatsSnapshot> } | null>(null)
   const load = useMemo<() => Promise<SkillStatsSnapshot>>(() => () => {
     if (loader === undefined) return Promise.reject(new Error('stats loader missing'))
@@ -49,7 +49,8 @@ function useSharedStats(loader: (() => Promise<SkillStatsSnapshot>) | undefined)
     promise.catch(() => { if (cache.current?.promise === promise) cache.current = null })
     return promise
   }, [loader])
-  return loader === undefined ? undefined : load
+  const invalidate = useMemo(() => () => { cache.current = null }, [])
+  return loader === undefined ? undefined : { load, invalidate }
 }
 
 
@@ -68,8 +69,10 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
   const openHistory = (skill: string | undefined, origin?: 'data'): void => { props.store.openHistory(skill, origin) }
   const hasMerge = props.hasView?.('merge') ?? true
   const hasData = props.stats !== undefined
-  const loadSharedStats = useSharedStats(props.stats?.loadStats)
-  const history = loadSharedStats === undefined ? props.history : { ...props.history, loadStats: loadSharedStats }
+  const sharedStats = useSharedStats(props.stats?.loadStats)
+  const history = sharedStats === undefined
+    ? props.history
+    : { ...props.history, loadStats: sharedStats.load, invalidateStats: sharedStats.invalidate }
   // Mount the data view on first visit and keep it mounted afterwards: its search/sort/scroll survive a
   // trip into a skill, while a host that never opens "Data overview" pays no stats read.
   const [dataMounted, setDataMounted] = useState(view === 'data')
@@ -130,7 +133,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
         ? createElement('div', { hidden: view !== 'data', className: 'evo-workbench-feature evo-workbench-data' },
           createElement(StatsPage, {
             ...props.stats!,
-            loadStats: loadSharedStats ?? props.stats!.loadStats,
+            loadStats: sharedStats?.load ?? props.stats!.loadStats,
             openSkill: (name: string) => { openHistory(name, 'data') },
             onOrganize: () => { openHistory(undefined) },
           }))
