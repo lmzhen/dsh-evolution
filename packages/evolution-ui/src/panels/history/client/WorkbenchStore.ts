@@ -1,5 +1,5 @@
 /** Registration-owned workbench navigation state. No module-level singleton. */
-export type WorkbenchView = 'history' | 'pending' | 'merge' | 'health' | 'diagnostics'
+export type WorkbenchView = 'history' | 'data' | 'pending' | 'merge' | 'health' | 'diagnostics'
 
 /** Read-only task counts supplied by the host; absent means "do not choose a landing". */
 export interface WorkbenchTaskCounts {
@@ -13,6 +13,8 @@ export interface WorkbenchState {
   readonly focusRevision: number
   /** True only after a user chose a view; refresh/default landing must not overwrite it. */
   readonly explicitView?: boolean
+  /** Set when the detail page was opened from the data table; the detail page can go back. */
+  readonly origin?: 'data'
 }
 
 export interface WorkbenchStore {
@@ -22,7 +24,9 @@ export interface WorkbenchStore {
   setView(view: WorkbenchView): void
   /** The default landing: only applies while the user has not chosen a view. */
   setDefaultView(view: WorkbenchView): void
-  openHistory(skill?: string): void
+  openHistory(skill?: string, origin?: 'data'): void
+  /** Return from a detail opened by the data table; the table stays mounted and keeps its state. */
+  backToData(): void
   clearSelection(): void
 }
 
@@ -51,9 +55,30 @@ export function createWorkbenchStore(initial: WorkbenchState = { view: 'history'
       listeners.add(listener)
       return () => { listeners.delete(listener) }
     },
-    setView(view) { if (state.view !== view || state.explicitView !== true) emit({ ...state, view, explicitView: true }) },
+    setView(view) {
+      if (state.view !== view || state.explicitView !== true) {
+        const { origin: _origin, ...rest } = state
+        emit(view === 'history'
+          ? { ...rest, view, explicitView: true, ...(state.origin === undefined ? {} : { origin: state.origin }) }
+          : { ...rest, view, explicitView: true })
+      }
+    },
     setDefaultView(view) { if (state.explicitView !== true && state.view !== view) emit({ ...state, view, explicitView: false }) },
-    openHistory(skill) { emit({ view: 'history', ...(skill === undefined ? {} : { selectedSkill: skill }), focusRevision: state.focusRevision + 1, explicitView: true }) },
+    openHistory(skill, origin) {
+      const { origin: _oldOrigin, ...rest } = state
+      emit({
+        ...rest,
+        view: 'history',
+        ...(skill === undefined ? {} : { selectedSkill: skill }),
+        ...(origin === undefined ? {} : { origin }),
+        focusRevision: state.focusRevision + 1,
+        explicitView: true,
+      })
+    },
+    backToData() {
+      const { origin: _origin, ...rest } = state
+      emit({ ...rest, view: 'data', focusRevision: state.focusRevision + 1, explicitView: true })
+    },
     clearSelection() { const { selectedSkill: _selected, ...rest } = state; emit({ ...rest, focusRevision: state.focusRevision + 1 }) },
   }
 }

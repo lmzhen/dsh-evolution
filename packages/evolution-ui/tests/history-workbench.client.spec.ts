@@ -121,4 +121,38 @@ describe('history workbench', () => {
     expect(document.getElementById('evo-workbench-tab-pending')?.getAttribute('aria-selected')).toBe('true')
     second.unmount()
   })
+
+  it('opens the data overview, navigates a name into history and returns with the table kept mounted', async () => {
+    const loadStats = vi.fn(async () => ({
+      rows: [{
+        name: 'alpha',
+        description: 'alpha desc',
+        versions: 2,
+        lastAt: '2026-01-01T00:00:00.000Z',
+        health: { verdict: 'warn', bodyChars: 12, bodyTokens: null, supportFiles: 1, stampDensityPerKb: null, churnPatches: null, churnReads: null, hardCapHits: null, findings: 0 },
+        usage: { useCount: 0, viewCount: 3, patchCount: 1, lastUsedAt: null, lastViewedAt: null, lastPatchedAt: null, state: 'active', pinned: false },
+        feedback: 0,
+      }],
+      totals: { skills: 1, needsAttention: 1, bodyChars: 12, supportFiles: 1, successes: { offload: 0, condense: 0, extract: 1 } },
+      counts: { offload: 0, condense: 0, extract: 1 },
+      generatedAt: '2026-01-01T00:00:00.000Z',
+    }))
+    const view = render(h(WorkbenchPage, {
+      t: (key: string) => key,
+      store: createWorkbenchStore(),
+      history: face(),
+      pending: pendingFace(),
+      stats: { t: (key: string) => key, loadStats, openSkill: () => {}, onOrganize: () => {} },
+    }))
+    fireEvent.click(document.getElementById('evo-workbench-tab-data')!)
+    await waitFor(() => { expect(document.getElementById('evo-workbench-tab-data')?.getAttribute('aria-selected')).toBe('true') })
+    await waitFor(() => { expect(document.querySelector('.evo-stats-skill-name')?.textContent).toBe('alpha') })
+    fireEvent.click(document.querySelector('.evo-stats-skill-name')!)
+    await waitFor(() => { expect(document.getElementById('evo-workbench-tab-history')?.getAttribute('aria-selected')).toBe('true') })
+    expect(document.querySelector('.evo-workbench-back')).not.toBeNull()
+    fireEvent.click(document.querySelector('.evo-workbench-back')!)
+    await waitFor(() => { expect(document.getElementById('evo-workbench-tab-data')?.getAttribute('aria-selected')).toBe('true') })
+    expect(document.querySelector('.evo-stats-skill-name')?.textContent).toBe('alpha')
+    view.unmount()
+  })
 })

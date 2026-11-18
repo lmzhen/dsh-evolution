@@ -54,6 +54,7 @@ export function apply(ctx: ClientContext): void {
     loadSkills: api.skills,
     loadVersions: api.versions,
     loadHealth: api.health,
+    loadStats: api.stats,
     loadDiff: api.diff,
     loadBody: api.body,
     undo: api.undo,
@@ -87,7 +88,15 @@ export function apply(ctx: ClientContext): void {
     styles: { css: CSS + WORKBENCH_CSS + PAGE_SURFACE_CSS, tagId: CSS_TAG_ID },
     icon: WorkbenchIcon,
     component: WorkbenchPage as unknown as (props: never) => ReactNode,
-    body: (t): WorkbenchFace => ({ t, store: workbenchStore, history: historyFace(t), pending: pendingFace(), hasView, loadTaskCounts }),
+    body: (t): WorkbenchFace => ({
+      t,
+      store: workbenchStore,
+      history: historyFace(t),
+      pending: pendingFace(),
+      stats: { t, loadStats: api.stats, openSkill: () => {}, onOrganize: () => {} },
+      hasView,
+      loadTaskCounts,
+    }),
     children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },
   })
 }

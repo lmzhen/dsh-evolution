@@ -9,6 +9,8 @@
 import { ROUTES } from '@lmzhen/dsh-evolution-client-kit/generated/routes'
 import { failureMessage, requestJson } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
+import type { SkillStatsSnapshot } from '@deepseek-ai/dsh-evolution-core/skills'
+import { parseSkillStats } from './stats-api.ts'
 
 /** Route paths: the generated mirror of the host's HOST_ROUTES (one declaration in core). */
 export const HOST_ROUTES = ROUTES['skill-history']
@@ -160,6 +162,7 @@ export interface SkillHistoryApi {
   readonly skills: () => Promise<readonly SkillRow[]>
   readonly versions: (name: string) => Promise<VersionsPayload>
   readonly health: () => Promise<HealthPayload>
+  readonly stats: () => Promise<SkillStatsSnapshot>
   readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>
   readonly diff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly body: (name: string, v: number) => Promise<VersionBodyRow>
@@ -231,6 +234,7 @@ export function createSkillHistoryApi(fetchImpl: typeof fetch = fetch): SkillHis
         : null
       return { rows, governance, counts }
     },
+    stats: async () => parseSkillStats(await request(HOST_ROUTES.stats)),
     diff: async (name: string, v: number) => await request(HOST_ROUTES.diff + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionDiffRow,
     body: async (name: string, v: number) => await request(HOST_ROUTES.body + '?name=' + encodeURIComponent(name) + '&v=' + String(v)) as VersionBodyRow,
     undo: async (name: string, v?: number, unitId?: string) => {

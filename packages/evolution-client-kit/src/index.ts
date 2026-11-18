@@ -11,6 +11,7 @@ export { DecisionFrame, type DecisionFrameProps } from './presentation/decision-
 export { TaskBanner, type TaskBannerProps } from './presentation/task-banner.ts'
 export { EmptyState, type EmptyStateProps } from './presentation/empty-state.ts'
 export { RESPONSIVE_TABLE_CSS } from './presentation/table.ts'
+export { DataTable, DATA_TABLE_CSS, type DataTableColumn, type DataTableProps, type DataTableSort } from './data-table.ts'
 export { PLATFORM_MENU, renderPlatformMenu, menuPrimitivesFrom, type RowMenuAction, type MenuPrimitives, type MenuSurfaceComponent, type MenuItemButtonComponent } from './presentation/action-menu.ts'
 export type { PresentationTone, PresentationAction, DecisionFact, DecisionModel } from './presentation/types.ts'
 export { ROUTES } from './generated/routes.generated.ts'

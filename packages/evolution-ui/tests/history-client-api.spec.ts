@@ -57,6 +57,38 @@ describe('skill-history client api', () => {
     expect(stub.calls[1]?.init?.body).toBe(JSON.stringify({ name: 'a', v: 3 }))
   })
 
+  it('reads the stats snapshot and preserves measured zeroes versus missing facts', async () => {
+    const stub = stubFetch({
+      ok: true,
+      body: {
+        ok: true,
+        data: {
+          rows: [{
+            name: 'a',
+            description: 'alpha',
+            versions: 0,
+            lastAt: null,
+            health: { verdict: 'warn', bodyChars: 0, bodyTokens: null, supportFiles: 0, findings: [] },
+            usage: { useCount: 0, viewCount: null, patchCount: 1 },
+            feedback: 0,
+          }, { description: 'no name' }],
+          totals: { skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0, successes: { offload: 0, condense: 0, extract: 1 } },
+          counts: { offload: 0, condense: 0, extract: 1 },
+          generatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
+    })
+    const api = createSkillHistoryApi(stub.fetch)
+    const stats = await api.stats()
+    expect(stub.calls[0]?.path).toBe(HOST_ROUTES.stats)
+    expect(stats.rows).toHaveLength(1)
+    expect(stats.rows[0]).toMatchObject({ name: 'a', versions: 0, feedback: 0 })
+    expect(stats.rows[0]?.health).toMatchObject({ bodyChars: 0, bodyTokens: null, supportFiles: 0 })
+    expect(stats.rows[0]?.usage).toMatchObject({ useCount: 0, viewCount: null, patchCount: 1 })
+    expect(stats.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0 })
+    expect(stats.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
+  })
+
   it('surfaces a business refusal verbatim and never as a silent empty result', async () => {
     const stub = stubFetch({ ok: true, body: { ok: false, code: 'undo-refused', message: 'Version v3 of "a" 存的是支撑文件的字节\'s bytes' } })
     const api = createSkillHistoryApi(stub.fetch)

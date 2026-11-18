@@ -14,6 +14,7 @@ import { emptyState, groupHeading, localTime, notice, panelHead, searchField, sk
 import { DiffBody, PreviewBody, type BodyState, type DiffState } from './document.ts'
 import { historyViewModel } from './history-presentation.ts'
 import { SkillHistoryRefusal, type GovernanceRow, type HealthPayload, type SkillRow, type VersionBodyRow, type VersionDiffRow, type VersionsPayload, type VersionRow } from './api.ts'
+import type { SkillStatsSnapshot } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { fillTemplate } from '@lmzhen/dsh-evolution-client-kit'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
@@ -28,6 +29,7 @@ export interface PanelFace extends Copy {
   readonly loadVersions: (name: string) => Promise<VersionsPayload>
   readonly loadGovernance?: () => Promise<readonly GovernanceRow[]>
   readonly loadHealth?: () => Promise<HealthPayload>
+  readonly loadStats?: () => Promise<SkillStatsSnapshot>
   readonly loadDiff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly loadBody: (name: string, v: number) => Promise<VersionBodyRow>
   readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>

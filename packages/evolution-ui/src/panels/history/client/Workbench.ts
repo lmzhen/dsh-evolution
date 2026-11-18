@@ -8,6 +8,7 @@ import { PAGE_SURFACE_CLASS } from '@lmzhen/dsh-evolution-client-kit'
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
 import { PendingCard, type PendingCardFace } from '../../settings/PendingCard.ts'
+import { StatsPage, STATS_CSS, type StatsFace } from './StatsPage.ts'
 import { resolveDefaultView, type WorkbenchStore, type WorkbenchTaskCounts, type WorkbenchView } from './WorkbenchStore.ts'
 
 /** Stable page id used by the sidebar row, the page slot key, and navigation params. */
@@ -19,6 +20,8 @@ export interface WorkbenchFace {
   readonly store: WorkbenchStore
   readonly history: PanelFace
   readonly pending: PendingCardFace
+  /** The data overview view; absent in older test hosts that do not mount the stats page. */
+  readonly stats?: StatsFace
   /** Whether a feature view is actually mounted (merge is optional). */
   readonly hasView?: (view: 'merge') => boolean
   /** Read-only task counts for the first landing; absent keeps history. */
@@ -40,11 +43,13 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
   const view = state.view
   const selectedSkill = state.selectedSkill
   const focusRevision = state.focusRevision
-  const openHistory = (skill: string | undefined): void => { props.store.openHistory(skill) }
+  const openHistory = (skill: string | undefined, origin?: 'data'): void => { props.store.openHistory(skill, origin) }
   const hasMerge = props.hasView?.('merge') ?? true
+  const hasData = props.stats !== undefined
   useEffect(() => {
     if (view === 'merge' && !hasMerge) props.store.setDefaultView('history')
-  }, [view, hasMerge, props.store])
+    if (view === 'data' && !hasData) props.store.setDefaultView('history')
+  }, [view, hasMerge, hasData, props.store])
   useEffect(() => {
     const load = props.loadTaskCounts
     if (load === undefined || state.explicitView === true) return
@@ -55,8 +60,8 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
     return () => { live = false }
   }, [props.loadTaskCounts, state.explicitView, hasMerge, props.store])
   // Keyboard order contains only tabs that actually rendered; a hidden view has no button to land on.
-  const viewOrder: readonly WorkbenchView[] = (['history', 'pending', 'merge'] as const)
-    .filter(value => value !== 'merge' || hasMerge)
+  const viewOrder: readonly WorkbenchView[] = (['history', 'data', 'pending', 'merge'] as const)
+    .filter(value => (value !== 'merge' || hasMerge) && (value !== 'data' || hasData))
   const onTabKey = (event: { key: string; preventDefault: () => void }, current: WorkbenchView): void => {
     const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
     if (delta === 0 && event.key !== 'Home' && event.key !== 'End') return
@@ -71,16 +76,34 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
       createElement('h1', { className: 'evo-workbench-title', 'data-view': view }, props.t('workbench.title')),
       createElement('div', { className: 'evo-workbench-tabs', role: 'tablist', 'aria-label': props.t('entry.label') },
         createElement('button', { id: 'evo-workbench-tab-history', type: 'button', role: 'tab', tabIndex: view === 'history' ? 0 : -1, 'aria-selected': view === 'history' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'history' ? 'true' : undefined, onClick: () => { props.store.setView('history') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'history') } }, props.t('workbench.history')),
+        !hasData ? null : createElement('button', { id: 'evo-workbench-tab-data', type: 'button', role: 'tab', tabIndex: view === 'data' ? 0 : -1, 'aria-selected': view === 'data' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'data' ? 'true' : undefined, onClick: () => { props.store.setView('data') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'data') } }, props.t('workbench.data')),
         createElement('button', { id: 'evo-workbench-tab-pending', type: 'button', role: 'tab', tabIndex: view === 'pending' ? 0 : -1, 'aria-selected': view === 'pending' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'pending' ? 'true' : undefined, onClick: () => { props.store.setView('pending') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'pending') } }, props.t('workbench.pending')),
         !hasMerge ? null : createElement('button', { id: 'evo-workbench-tab-merge', type: 'button', role: 'tab', tabIndex: view === 'merge' ? 0 : -1, 'aria-selected': view === 'merge' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'merge' ? 'true' : undefined, onClick: () => { props.store.setView('merge') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'merge') } }, props.t('workbench.merge')),
       ),
     ),
     createElement('div', { className: 'evo-workbench-body', id: 'evo-workbench-panel', role: 'tabpanel' },
       view === 'history'
-        ? createElement(SkillHistoryPanel, { ...props.history, focusSkill: selectedSkill, focusRevision })
+        ? createElement('div', { className: 'evo-workbench-history-stack' },
+          state.origin === 'data'
+            ? createElement('div', { className: 'evo-workbench-backbar' },
+              createElement('button', {
+                type: 'button',
+                className: 'evo-workbench-back',
+                onClick: () => { props.store.backToData() },
+              }, '← ' + props.t('workbench.backToData')))
+            : null,
+          createElement(SkillHistoryPanel, { ...props.history, focusSkill: selectedSkill, focusRevision }))
         : view === 'pending'
           ? createElement(PendingCard, { ...props.pending, onHistory: () => { openHistory(undefined) } })
           : null,
+      hasData
+        ? createElement('div', { hidden: view !== 'data', className: 'evo-workbench-feature evo-workbench-data' },
+          createElement(StatsPage, {
+            ...props.stats!,
+            openSkill: (name: string) => { openHistory(name, 'data') },
+            onOrganize: () => { openHistory(undefined) },
+          }))
+        : null,
       // The feature list stays mounted while another view is active; each view hides itself.
       createElement('div', { hidden: view !== 'merge', className: 'evo-workbench-feature' },
         props.renderSlot?.('evolution.workbench.view', { activeView: view, openHistory }) ?? null),
@@ -99,6 +122,7 @@ export function WorkbenchIcon(props: { size?: number; active?: boolean }): React
 /** Workbench shell and sidebar row; colours come from the platform tokens. */
 export const WORKBENCH_CSS = [
   tokenVars('.evo-workbench'),
+  STATS_CSS,
   // Skins make the base/layer tokens translucent. The platform's overlay token stays readable over
   // a photograph; use it for the family content surface without changing the shell.
   // Skin tokens are alpha. Repeat the same base token into the page layer (never overlay) so the
@@ -112,6 +136,13 @@ export const WORKBENCH_CSS = [
   '.evo-workbench-tabs button:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '.evo-workbench-title{margin:0;font-size:var(--evo-type-lg);font-weight:600;line-height:var(--evo-leading-base)}',
   '.evo-workbench-body{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}',
+  '.evo-workbench-history-stack{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}',
+  '.evo-workbench-history-stack>.evo-hist-frame{flex:1;min-height:0}',
+  '.evo-workbench-backbar{flex:0 0 auto;display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid var(--dsw-alias-border-l2)}',
+  '.evo-workbench-back{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
+  '.evo-workbench-back:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+  '.evo-workbench-back:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
+  '.evo-workbench-data{flex:1;min-width:0;min-height:0}',
   '.evo-workbench-feature{display:flex;flex:1;min-width:0;min-height:0}',
   '.evo-workbench-feature[hidden]{display:none}',
   '.evo-workbench-feature>*{flex:1;min-width:0}',
