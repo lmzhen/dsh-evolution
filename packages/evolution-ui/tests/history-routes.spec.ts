@@ -76,8 +76,9 @@ describe('skill-history routes: the stats snapshot', () => {
         name: 'missing-health',
         dims: { bodyChars: 7 },
       }],
-      getUsage: async () => new Map([['panel-skill', { use_count: 0, view_count: 2, patch_count: 1, last_used_at: '2026-01-01T00:00:00.000Z', last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false }]]),
+      getUsage: async () => new Map([['panel-skill', { use_count: 0, view_count: 2, view_days: { [new Date().toISOString().slice(0, 10)]: 2 }, patch_count: 1, last_used_at: '2026-01-01T00:00:00.000Z', last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false }]]),
       getFeedback: names => Object.fromEntries(names.map(name => [name, 0])),
+      getFeedbackWindow: async () => new Map([['panel-skill', { positive: 1, negative: 1 }]]),
       getCounts: async () => ({ offload: 0, condense: 0, extract: 1 }),
       getGovernance: async () => [{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }],
     }, audit))
@@ -88,8 +89,10 @@ describe('skill-history routes: the stats snapshot', () => {
           name: string
           versions: number
           health: { verdict: string; bodyChars: number | null; supportFiles: number | null } | null
-          usage: { useCount: number | null; viewCount: number | null } | null
+          usage: { useCount: number | null; viewCount: number | null; viewCount30d: number | null } | null
           feedback: number | null
+          feedback30d: number | null
+          feedbackRate30d: number | null
         }>
         totals: { skills: number; needsAttention: number; bodyChars: number | null; supportFiles: number | null }
         counts: { offload: number; condense: number; extract: number } | null
@@ -105,6 +108,9 @@ describe('skill-history routes: the stats snapshot', () => {
     expect(row.health).toMatchObject({ verdict: 'warn', bodyChars: 0, supportFiles: 0 })
     expect(row.usage).toMatchObject({ useCount: 0, viewCount: 2 })
     expect(row.feedback).toBe(0)
+    expect(row.usage?.viewCount30d).toBe(2)
+    expect(row.feedback30d).toBe(2)
+    expect(row.feedbackRate30d).toBe(1)
     expect(stats.body.data.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
     expect(stats.body.data.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
     expect(stats.body.data.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }])

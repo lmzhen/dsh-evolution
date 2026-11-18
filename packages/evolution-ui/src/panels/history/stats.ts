@@ -19,7 +19,7 @@ import type {
   SkillUsageFacts,
 } from '@deepseek-ai/dsh-evolution-core/skills'
 import { computeSkillStatsTotals } from '@deepseek-ai/dsh-evolution-core/skills'
-import { isRecord } from '@deepseek-ai/dsh-evolution-core'
+import { isRecord, normalizeUsageRecord, recentViewCount } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorFace, RouteServices } from './routes.ts'
 
 /** The index fields the table needs; listVersions is read once per skill. */
@@ -89,6 +89,7 @@ function usageOf(value: unknown): SkillUsageFacts | null {
   return {
     useCount: numberOrNull(source.use_count),
     viewCount: numberOrNull(source.view_count),
+    viewCount30d: recentViewCount(normalizeUsageRecord(source), 30),
     patchCount: numberOrNull(source.patch_count),
     lastUsedAt: stringOrNull(source.last_used_at),
     lastViewedAt: stringOrNull(source.last_viewed_at),
@@ -112,6 +113,23 @@ function feedbackOf(value: unknown, name: string): number | null {
   const source = objectOf(value)
   const score = source?.[name]
   return numberOrNull(score)
+}
+
+/** Normalize the optional rolling feedback read; null means the service did not answer. */
+function feedbackWindowOf(value: unknown): Map<string, { positive: number; negative: number }> | null {
+  if (value === null || value === undefined) return null
+  const entries: Iterable<[string, unknown]> = value instanceof Map
+    ? value.entries() as Iterable<[string, unknown]>
+    : isRecord(value) ? Object.entries(value) : []
+  const out = new Map<string, { positive: number; negative: number }>()
+  for (const [name, raw] of entries) {
+    const source = objectOf(raw)
+    const positive = numberOrNull(source?.positive)
+    const negative = numberOrNull(source?.negative)
+    if (name === '' || positive === null || negative === null) continue
+    out.set(name, { positive, negative })
+  }
+  return out
 }
 
 /** Normalize the optional recent-governance read; a malformed row is skipped, not invented. */
@@ -154,18 +172,30 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
   const usageRead = await services.getUsage?.()
   const usageByName = usageRead instanceof Map ? usageRead as ReadonlyMap<string, unknown> : null
   const feedbackRead = services.getFeedback?.(index.map(row => row.name))
+  const feedbackWindowRead = services.getFeedbackWindow === undefined
+    ? null
+    : await services.getFeedbackWindow(30).catch(() => null)
+  const feedbackWindow = feedbackWindowOf(feedbackWindowRead)
   const counts = countsOf(await services.getCounts?.().catch(() => null) ?? null)
   const governance = governanceOf(await services.getGovernance?.().catch(() => null) ?? null)
 
-  const rows: SkillStatsRow[] = index.map(row => ({
-    name: row.name,
-    description: row.description,
-    versions: row.versions,
-    lastAt: row.lastAt,
-    health: healthByName.get(row.name) ?? null,
-    usage: usageOf(usageByName?.get(row.name)),
-    feedback: feedbackOf(feedbackRead, row.name),
-  }))
+  const rows: SkillStatsRow[] = index.map(row => {
+    const usage = usageOf(usageByName?.get(row.name))
+    const window = feedbackWindow?.get(row.name)
+    const feedback30d = window === undefined ? null : window.positive + window.negative
+    const loads30d = usage?.viewCount30d ?? null
+    return {
+      name: row.name,
+      description: row.description,
+      versions: row.versions,
+      lastAt: row.lastAt,
+      health: healthByName.get(row.name) ?? null,
+      usage,
+      feedback: feedbackOf(feedbackRead, row.name),
+      feedback30d,
+      feedbackRate30d: feedback30d !== null && loads30d !== null && loads30d > 0 ? feedback30d / loads30d : null,
+    }
+  })
 
   return {
     rows,

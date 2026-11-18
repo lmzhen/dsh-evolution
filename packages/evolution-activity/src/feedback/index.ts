@@ -42,6 +42,12 @@ export interface FeedbackRecord {
   lastNote?: string | undefined
 }
 
+/** One skill's feedback counts inside a rolling window. */
+export interface FeedbackWindowRecord {
+  readonly positive: number
+  readonly negative: number
+}
+
 export interface FeedbackState {
   skills: Record<string, FeedbackRecord>
   sessions: Record<string, FeedbackRecord>
@@ -436,6 +442,39 @@ export class EvolutionFeedback {
     const total = record.positive + record.negative
     if (total === 0) return 0
     return (record.positive - record.negative) / total
+  }
+
+  /**
+   * Fold skill feedback events inside a rolling window.
+   *
+   * The event timeline is the source of truth (the JSON cache is a boot cache), so this reads it
+   * directly; a deployment without a durable backend answers null rather than fake zeros.
+   * @param days - window length in days (default 30).
+   * @param now - reference instant in epoch milliseconds (default now).
+   * @returns per-skill positive/negative counts, or null when the durable read is unavailable.
+   */
+  async recent(days = 30, now = Date.now()): Promise<Map<string, FeedbackWindowRecord> | null> {
+    const io = this.io
+    const eventsPath = this.eventsPath
+    if (io === undefined || eventsPath === undefined) return null
+    try {
+      const { events } = await readEvolutionTimeline(io, eventsPath)
+      const since = now - days * 86_400_000
+      const out = new Map<string, FeedbackWindowRecord>()
+      for (const event of events) {
+        if (event.type !== 'feedback' || event.kind !== 'skill' || event.target === undefined || event.rating === undefined) continue
+        const at = Date.parse(event.at)
+        if (!Number.isFinite(at) || at < since) continue
+        const current = out.get(event.target) ?? { positive: 0, negative: 0 }
+        out.set(event.target, {
+          positive: current.positive + (event.rating === 'positive' ? 1 : 0),
+          negative: current.negative + (event.rating === 'negative' ? 1 : 0),
+        })
+      }
+      return out
+    } catch {
+      return null
+    }
   }
 
   /**

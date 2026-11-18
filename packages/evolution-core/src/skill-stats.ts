@@ -28,6 +28,8 @@ export interface SkillHealthFacts {
 export interface SkillUsageFacts {
   readonly useCount: number | null
   readonly viewCount: number | null
+  /** Loads inside the last 30 days; null when the record predates per-day buckets. */
+  readonly viewCount30d: number | null
   readonly patchCount: number | null
   readonly lastUsedAt: string | null
   readonly lastViewedAt: string | null
@@ -46,6 +48,10 @@ export interface SkillStatsRow {
   readonly health: SkillHealthFacts | null
   readonly usage: SkillUsageFacts | null
   readonly feedback: number | null
+  /** Feedback events inside the last 30 days; null means the rolling window was not measured. */
+  readonly feedback30d: number | null
+  /** feedback30d / loads30d; null when loads30d is null or zero (no denominator). */
+  readonly feedbackRate30d: number | null
 }
 
 /** Successful operation counts, as the panel's aggregate read reports them. */
@@ -92,7 +98,10 @@ export type SkillStatsSortKey =
   | 'versions'
   | 'useCount'
   | 'viewCount'
+  | 'viewCount30d'
   | 'feedback'
+  | 'feedback30d'
+  | 'feedbackRate30d'
   | 'lastAt'
 
 export type SortDirection = 'asc' | 'desc'
@@ -131,7 +140,10 @@ export function sortValue(row: SkillStatsRow, key: SkillStatsSortKey): string | 
     case 'versions': return row.versions
     case 'useCount': return row.usage?.useCount ?? null
     case 'viewCount': return row.usage?.viewCount ?? null
+    case 'viewCount30d': return row.usage?.viewCount30d ?? null
     case 'feedback': return row.feedback
+    case 'feedback30d': return row.feedback30d
+    case 'feedbackRate30d': return row.feedbackRate30d
     case 'lastAt': return row.lastAt === null ? null : Date.parse(row.lastAt)
   }
 }

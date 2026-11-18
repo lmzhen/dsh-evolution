@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { bumpSupportRead, emptyRecord, foldCuratorFields, getRecord, idleDays, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
+import { bumpSupportRead, bumpView, emptyRecord, foldCuratorFields, getRecord, idleDays, loadSuppressedNames, loadUsage, mutateUsage, nodeEvolutionIo, normalizeUsageRecord, recentViewCount, updateSuppressedNames, usageFile } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 describe('support-file demand (design §5.5)', () => {
   it('bumps a per-path counter, creates the map on first evidence only, and moves the read clock', () => {
@@ -398,6 +398,23 @@ describe('idleDays (design §5.6)', () => {
   it('counts an unparseable anchor as zero days instead of NaN', () => {
     const broken = { ...emptyRecord(), created_at: 'not-a-date' }
     expect(idleDays(broken, now)).toBe(0)
+  })
+})
+
+describe('rolling view buckets', () => {
+  it('keeps a 30-day window and prunes beyond the 60-day retention', () => {
+    const map = new Map([['demo', emptyRecord()]])
+    bumpView(map, 'demo', new Date('2026-07-01T00:00:00.000Z'))
+    bumpView(map, 'demo', new Date('2026-09-01T00:00:00.000Z'))
+    bumpView(map, 'demo', new Date('2026-09-02T00:00:00.000Z'))
+    expect(map.get('demo')?.view_days).toEqual({ '2026-09-01': 1, '2026-09-02': 1 })
+    expect(recentViewCount(map.get('demo')!, 30, new Date('2026-09-16T00:00:00.000Z'))).toBe(2)
+  })
+
+  it('distinguishes a legacy record (no buckets) from a measured empty window', () => {
+    expect(recentViewCount(emptyRecord(), 30)).toBeNull()
+    const measured = { ...emptyRecord(), view_days: {} }
+    expect(recentViewCount(measured, 30)).toBe(0)
   })
 })
 

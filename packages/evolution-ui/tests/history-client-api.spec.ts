@@ -69,8 +69,10 @@ describe('skill-history client api', () => {
             versions: 0,
             lastAt: null,
             health: { verdict: 'warn', bodyChars: 0, bodyTokens: null, supportFiles: 0, findings: [] },
-            usage: { useCount: 0, viewCount: null, patchCount: 1 },
+            usage: { useCount: 0, viewCount: null, viewCount30d: 0, patchCount: 1 },
             feedback: 0,
+            feedback30d: 0,
+            feedbackRate30d: null,
           }, { description: 'no name' }],
           totals: { skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0, successes: { offload: 0, condense: 0, extract: 1 } },
           counts: { offload: 0, condense: 0, extract: 1 },
@@ -85,7 +87,8 @@ describe('skill-history client api', () => {
     expect(stats.rows).toHaveLength(1)
     expect(stats.rows[0]).toMatchObject({ name: 'a', versions: 0, feedback: 0 })
     expect(stats.rows[0]?.health).toMatchObject({ bodyChars: 0, bodyTokens: null, supportFiles: 0 })
-    expect(stats.rows[0]?.usage).toMatchObject({ useCount: 0, viewCount: null, patchCount: 1 })
+    expect(stats.rows[0]?.usage).toMatchObject({ useCount: 0, viewCount: null, viewCount30d: 0, patchCount: 1 })
+    expect(stats.rows[0]).toMatchObject({ feedback30d: 0, feedbackRate30d: null })
     expect(stats.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0 })
     expect(stats.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
     expect(stats.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'a', mode: 'offload', resultRef: null }])

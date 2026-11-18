@@ -47,6 +47,8 @@ export interface RouteServices {
   readonly getUsage?: () => Promise<unknown>
   /** Per-skill feedback scores; absent or malformed stays null. */
   readonly getFeedback?: (names: readonly string[]) => unknown
+  /** Per-skill feedback counts inside a rolling window; absent stays null. */
+  readonly getFeedbackWindow?: (days: number) => Promise<unknown>
   /** Recent governance runs (bounded, newest first); absent stays null. */
   readonly getGovernance?: () => Promise<unknown>
   /** Successful operation counts; absent or malformed stays null. */

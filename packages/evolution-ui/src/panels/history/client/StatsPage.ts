@@ -31,8 +31,13 @@ const FILTERS: readonly { readonly id: SkillStatsFilter; readonly key: string }[
   { id: 'recent', key: 'stats.filter.recent' },
 ]
 
-function numberText(value: number | null): string {
-  return value === null ? '—' : value.toLocaleString()
+function numberText(value: number | null | undefined): string {
+  return value === null || value === undefined ? '—' : value.toLocaleString()
+}
+
+/** A ratio is shown as a percentage; an absent denominator keeps the explicit dash. */
+function rateText(value: number | null | undefined): string {
+  return value === null || value === undefined ? '-' : (value * 100).toFixed(0) + '%'
 }
 
 function lastAtText(value: string | null): string {
@@ -113,7 +118,9 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
     { key: 'supportFiles', label: face.t('stats.col.support'), align: 'right', sortable: true, render: row => numberText(row.health?.supportFiles ?? null) },
     { key: 'versions', label: face.t('stats.col.versions'), align: 'right', sortable: true, render: row => numberText(row.versions) },
     { key: 'viewCount', label: face.t('stats.col.loads'), align: 'right', sortable: true, render: row => numberText(row.usage?.viewCount ?? null) },
-    { key: 'feedback', label: face.t('stats.col.feedback'), align: 'right', sortable: true, render: row => numberText(row.feedback) },
+    { key: 'viewCount30d', label: face.t('stats.col.loads30d'), align: 'right', sortable: true, render: row => numberText(row.usage?.viewCount30d ?? null) },
+    { key: 'feedback30d', label: face.t('stats.col.feedback30d'), align: 'right', sortable: true, render: row => numberText(row.feedback30d) },
+    { key: 'feedbackRate30d', label: face.t('stats.col.feedbackRate'), align: 'right', sortable: true, render: row => rateText(row.feedbackRate30d) },
     { key: 'lastAt', label: face.t('stats.col.lastAt'), sortable: true, render: row => lastAtText(row.lastAt) },
   ]
 

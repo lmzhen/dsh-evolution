@@ -38,6 +38,9 @@ export interface UsageRecord {
    * record written before this field existed, and on skills whose support
    * files were never read — absence means "no evidence", never "zero demand". */
   support_reads?: Record<string, number> | undefined
+  /** Per-day load buckets (`YYYY-MM-DD` → count) for the rolling window. Absent on every record
+   * written before this field existed: absence means "window not measured", never "zero loads". */
+  view_days?: Record<string, number> | undefined
 }
 
 export type UsageMap = Map<string, UsageRecord>
@@ -119,8 +122,44 @@ export function normalizeUsageRecord(record: unknown): UsageRecord {
     feedback_score: typeof raw.feedback_score === 'number' && Number.isFinite(raw.feedback_score) ? raw.feedback_score : undefined,
     feedback_warn: typeof raw.feedback_warn === 'boolean' ? raw.feedback_warn : undefined,
     support_reads: normalizeSupportReads(raw.support_reads),
+    view_days: normalizeViewDays(raw.view_days),
   }
 }
+
+/** Rolling load buckets: keep enough days for the 30-day view plus one grace month. */
+export const VIEW_WINDOW_DAYS = 60
+
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/
+
+/** Sanitize per-day load buckets; unusable entries are dropped, never zero-filled. */
+function normalizeViewDays(value: unknown): Record<string, number> | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const out: Record<string, number> = {}
+  let kept = 0
+  for (const [key, count] of Object.entries(value as Record<string, unknown>)) {
+    if (kept >= VIEW_WINDOW_DAYS) break
+    if (!DAY_KEY.test(key)) continue
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) continue
+    out[key] = count
+    kept += 1
+  }
+  return kept === 0 ? undefined : out
+}
+
+/** Day key in UTC; the bucket is a bounded rolling window, not a calendar report. */
+function dayKey(at: Date): string {
+  return at.toISOString().slice(0, 10)
+}
+
+function pruneViewDays(days: Record<string, number>, now: Date): Record<string, number> {
+  const cutoff = new Date(now.getTime() - VIEW_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10)
+  const out: Record<string, number> = {}
+  for (const [key, count] of Object.entries(days)) {
+    if (key >= cutoff) out[key] = count
+  }
+  return out
+}
+
 
 /** Sidecar bound: a pathological path set must not grow the usage file forever. */
 export const MAX_SUPPORT_READ_PATHS = 200
@@ -368,6 +407,27 @@ export function bumpView(map: UsageMap, name: string, when = new Date()): void {
   const record = getRecord(map, name)
   record.view_count += 1
   record.last_viewed_at = when.toISOString()
+  const key = dayKey(when)
+  const days = record.view_days ?? {}
+  days[key] = (days[key] ?? 0) + 1
+  record.view_days = pruneViewDays(days, when)
+}
+
+/**
+ * Loads inside the rolling window, or null when the record predates per-day buckets.
+ * @param record - one usage record.
+ * @param days - window length in days (default 30).
+ * @param now - reference instant (default now).
+ * @returns the summed buckets, or null when this record has no bucket evidence.
+ */
+export function recentViewCount(record: UsageRecord, days = 30, now = new Date()): number | null {
+  if (record.view_days === undefined) return null
+  const cutoff = new Date(now.getTime() - days * 86_400_000).toISOString().slice(0, 10)
+  let total = 0
+  for (const [key, count] of Object.entries(record.view_days)) {
+    if (key >= cutoff) total += count
+  }
+  return total
 }
 
 export function bumpUse(map: UsageMap, name: string, when = new Date()): void {

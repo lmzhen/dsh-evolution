@@ -1471,6 +1471,36 @@
       "de": "Frühe Plugin-Version – noch keine Summary",
       "pt": "Versão inicial do plugin: ainda sem summary",
       "ru": "Ранняя версия плагина — summary пока нет"
+    },
+    "stats.col.loads30d": {
+      "zh": "近30天加载",
+      "en": "Loads 30d",
+      "ja": "30日読み込み",
+      "es": "Cargas 30d",
+      "fr": "Chargements 30j",
+      "de": "Ladevorgänge 30T",
+      "pt": "Carregamentos 30d",
+      "ru": "Загрузки 30д"
+    },
+    "stats.col.feedback30d": {
+      "zh": "近30天反馈",
+      "en": "Feedback 30d",
+      "ja": "30日フィードバック",
+      "es": "Feedback 30d",
+      "fr": "Retours 30j",
+      "de": "Feedback 30T",
+      "pt": "Feedback 30d",
+      "ru": "Отзывы 30д"
+    },
+    "stats.col.feedbackRate": {
+      "zh": "反馈率",
+      "en": "Feedback rate",
+      "ja": "フィードバック率",
+      "es": "Tasa de feedback",
+      "fr": "Taux de retours",
+      "de": "Feedback-Rate",
+      "pt": "Taxa de feedback",
+      "ru": "Доля отзывов"
     }
   }
 }

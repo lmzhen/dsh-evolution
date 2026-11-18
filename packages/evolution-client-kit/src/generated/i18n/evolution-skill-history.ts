@@ -151,7 +151,10 @@ export const dictionaries = {
     "workbench.data": "数据总览",
     "workbench.backToData": "返回数据总览",
     "stats.col.loads": "加载",
-    "row.summary.legacy": "早期插件版本，暂不存在 summary"
+    "row.summary.legacy": "早期插件版本，暂不存在 summary",
+    "stats.col.loads30d": "近30天加载",
+    "stats.col.feedback30d": "近30天反馈",
+    "stats.col.feedbackRate": "反馈率"
   },
   en: {
     "action.archive": "Archived",
@@ -300,7 +303,10 @@ export const dictionaries = {
     "workbench.data": "Data overview",
     "workbench.backToData": "Back to data",
     "stats.col.loads": "Loads",
-    "row.summary.legacy": "Early plugin version — no summary yet"
+    "row.summary.legacy": "Early plugin version — no summary yet",
+    "stats.col.loads30d": "Loads 30d",
+    "stats.col.feedback30d": "Feedback 30d",
+    "stats.col.feedbackRate": "Feedback rate"
   },
   ja: {
     "action.archive": "アーカイブ",
@@ -449,7 +455,10 @@ export const dictionaries = {
     "workbench.data": "データ概要",
     "workbench.backToData": "データ概要に戻る",
     "stats.col.loads": "読み込み",
-    "row.summary.legacy": "初期プラグインバージョンのため summary はまだありません"
+    "row.summary.legacy": "初期プラグインバージョンのため summary はまだありません",
+    "stats.col.loads30d": "30日読み込み",
+    "stats.col.feedback30d": "30日フィードバック",
+    "stats.col.feedbackRate": "フィードバック率"
   },
   es: {
     "action.archive": "archivado",
@@ -598,7 +607,10 @@ export const dictionaries = {
     "workbench.data": "Resumen de datos",
     "workbench.backToData": "Volver al resumen",
     "stats.col.loads": "Cargas",
-    "row.summary.legacy": "Versión inicial del plugin: todavía no hay summary"
+    "row.summary.legacy": "Versión inicial del plugin: todavía no hay summary",
+    "stats.col.loads30d": "Cargas 30d",
+    "stats.col.feedback30d": "Feedback 30d",
+    "stats.col.feedbackRate": "Tasa de feedback"
   },
   fr: {
     "action.archive": "archivé",
@@ -747,7 +759,10 @@ export const dictionaries = {
     "workbench.data": "Vue d’ensemble",
     "workbench.backToData": "Retour au résumé",
     "stats.col.loads": "Chargements",
-    "row.summary.legacy": "Ancienne version du plugin : pas encore de summary"
+    "row.summary.legacy": "Ancienne version du plugin : pas encore de summary",
+    "stats.col.loads30d": "Chargements 30j",
+    "stats.col.feedback30d": "Retours 30j",
+    "stats.col.feedbackRate": "Taux de retours"
   },
   de: {
     "action.archive": "archiviert",
@@ -896,7 +911,10 @@ export const dictionaries = {
     "workbench.data": "Datenübersicht",
     "workbench.backToData": "Zurück zur Übersicht",
     "stats.col.loads": "Ladevorgänge",
-    "row.summary.legacy": "Frühe Plugin-Version – noch keine Summary"
+    "row.summary.legacy": "Frühe Plugin-Version – noch keine Summary",
+    "stats.col.loads30d": "Ladevorgänge 30T",
+    "stats.col.feedback30d": "Feedback 30T",
+    "stats.col.feedbackRate": "Feedback-Rate"
   },
   ru: {
     "action.archive": "заархивировано",
@@ -1045,7 +1063,10 @@ export const dictionaries = {
     "workbench.data": "Обзор данных",
     "workbench.backToData": "Назад к обзору",
     "stats.col.loads": "Загрузки",
-    "row.summary.legacy": "Ранняя версия плагина — summary пока нет"
+    "row.summary.legacy": "Ранняя версия плагина — summary пока нет",
+    "stats.col.loads30d": "Загрузки 30д",
+    "stats.col.feedback30d": "Отзывы 30д",
+    "stats.col.feedbackRate": "Доля отзывов"
   },
   pt: {
     "action.archive": "arquivamento",
@@ -1194,7 +1215,10 @@ export const dictionaries = {
     "workbench.data": "Visão geral",
     "workbench.backToData": "Voltar ao resumo",
     "stats.col.loads": "Carregamentos",
-    "row.summary.legacy": "Versão inicial do plugin: ainda sem summary"
+    "row.summary.legacy": "Versão inicial do plugin: ainda sem summary",
+    "stats.col.loads30d": "Carregamentos 30d",
+    "stats.col.feedback30d": "Feedback 30d",
+    "stats.col.feedbackRate": "Taxa de feedback"
   },
 } as const
 

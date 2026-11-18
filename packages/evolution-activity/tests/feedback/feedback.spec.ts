@@ -37,6 +37,26 @@ describe('evolution-feedback', () => {
     expect(ctx.evolutionFeedback.score('python-testing')).toBeCloseTo(1 / 3)
   })
 
+  it('folds skill feedback inside a rolling window and returns null without a durable backend', async () => {
+    const noIo = new Context()
+    await noIo.plugin(Feedback)
+    expect(await noIo.evolutionFeedback.recent(30)).toBeNull()
+
+    await tempHome('dsh-feedback-window-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(Feedback)
+    ctx.evolutionFeedback.record('window-skill', 'positive', undefined, 'skill')
+    ctx.evolutionFeedback.record('window-skill', 'negative', undefined, 'skill')
+    ctx.evolutionFeedback.record('session-only', 'positive', undefined, 'session')
+    await ctx.evolutionFeedback.waitIdle()
+    const recent = await ctx.evolutionFeedback.recent(30)
+    expect(recent?.get('window-skill')).toEqual({ positive: 1, negative: 1 })
+    expect(recent?.has('session-only')).toBe(false)
+    await ctx.evolutionFeedback.waitIdle()
+  })
+
   it('persists across restarts and feeds feedback_warn into skill usage (P1-1, v15)', async () => {
     const home = await tempHome('dsh-feedback-')
     const ctx = new Context()

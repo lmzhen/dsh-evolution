@@ -51,6 +51,11 @@ export function apply(ctx: Context): void {
       for (const name of names) scores[name] = feedback.score(name, 'skill')
       return scores
     },
+    getFeedbackWindow: async (days) => {
+      const feedback = ctx.get('evolutionFeedback') as { recent?: (days: number) => Promise<unknown> } | undefined
+      if (typeof feedback?.recent !== 'function') return null
+      return await feedback.recent(days)
+    },
     getGovernance: async () => {
       const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
       if (ioRegistry === undefined) return null

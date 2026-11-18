@@ -57,6 +57,7 @@ function usageOf(value: unknown): SkillUsageFacts | null {
   return {
     useCount: numberOrNull(source.useCount),
     viewCount: numberOrNull(source.viewCount),
+    viewCount30d: numberOrNull(source.viewCount30d),
     patchCount: numberOrNull(source.patchCount),
     lastUsedAt: stringOrNull(source.lastUsedAt),
     lastViewedAt: stringOrNull(source.lastViewedAt),
@@ -78,6 +79,8 @@ function rowOf(value: unknown): SkillStatsRow | null {
     health: healthOf(source.health),
     usage: usageOf(source.usage),
     feedback: numberOrNull(source.feedback),
+    feedback30d: numberOrNull(source.feedback30d),
+    feedbackRate30d: numberOrNull(source.feedbackRate30d),
   }
 }
 
