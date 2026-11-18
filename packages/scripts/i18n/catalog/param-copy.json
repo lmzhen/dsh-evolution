@@ -440,24 +440,46 @@
     },
     "healthSoftBodyChars": {
       "label": {
-        "zh": "正文长度参考值",
-        "en": "Body length reference",
-        "ja": "本文の長さの目安",
-        "es": "Longitud de referencia del cuerpo",
-        "fr": "Longueur de corps de référence",
-        "de": "Richtwert Textlänge",
-        "pt": "Comprimento de referência do corpo",
-        "ru": "Ориентир по длине текста"
+        "zh": "正文长度参考（旧字符）",
+        "en": "Body length (legacy chars)",
+        "ja": "本文の長さ（旧文字数）",
+        "es": "Longitud del cuerpo (caracteres antiguo)",
+        "fr": "Longueur du corps (caractères, ancien)",
+        "de": "Textlänge (alte Zeichen)",
+        "pt": "Comprimento do corpo (caracteres antigo)",
+        "ru": "Длина текста (старые символы)"
       },
       "hint": {
-        "zh": "技能正文超过多少字符算偏长（只用于健康提示）。",
-        "en": "Chars above which a skill body is flagged as long (health hint only).",
-        "ja": "スキル本文がこの文字数を超えると「やや長い」と判定します（ヘルス表示用の目安のみ）。",
-        "es": "Caracteres a partir de los cuales el cuerpo de un skill se considera largo; solo afecta al aviso de salud.",
-        "fr": "Nombre de caractères au-delà duquel le corps d’une compétence est jugé long (simple indicateur de santé).",
-        "de": "Ab wie vielen Zeichen der Skill-Text als zu lang gilt (nur als Hinweis).",
-        "pt": "A partir de quantos caracteres o corpo de uma skill é considerado longo (apenas para o aviso de saúde).",
-        "ru": "Текст навыка длиннее этого числа символов считается длинноватым — только для подсказок в разделе «Здоровье»."
+        "zh": "旧口径：技能正文超过多少字符算偏长；设置后按 2.75 字符/token 换算。",
+        "en": "Legacy: character line above which a skill body is flagged as long; converted at 2.75 chars per token.",
+        "ja": "旧仕様：この文字数を超えると本文を「やや長い」と判定します。2.75 文字/トークンで換算します。",
+        "es": "Antiguo: caracteres a partir de los cuales el cuerpo se considera largo; se convierte a 2,75 caracteres por token.",
+        "fr": "Ancien : nombre de caractères au-delà duquel le corps est jugé long ; conversion à 2,75 caractères par token.",
+        "de": "Alt: Zeichenzahl, ab der der Text als zu lang gilt; Umrechnung mit 2,75 Zeichen pro Token.",
+        "pt": "Antigo: caracteres a partir dos quais o corpo é considerado longo; conversão de 2,75 caracteres por token.",
+        "ru": "Старый режим: символы, после которых текст считается длинноватым; пересчёт 2,75 символа на токен."
+      }
+    },
+    "healthSoftBodyTokens": {
+      "label": {
+        "zh": "正文长度参考（token）",
+        "en": "Body length (tokens)",
+        "ja": "本文の長さ（トークン）",
+        "es": "Longitud del cuerpo (tokens)",
+        "fr": "Longueur du corps (tokens)",
+        "de": "Textlänge (Token)",
+        "pt": "Comprimento do corpo (tokens)",
+        "ru": "Длина текста (токены)"
+      },
+      "hint": {
+        "zh": "技能正文超过多少估算 token 算偏长（只用于健康提示）；默认 7,273。",
+        "en": "Estimated tokens above which a skill body is flagged as long (health hint only); default 7,273.",
+        "ja": "スキル本文がこの推定トークンを超えると「やや長い」と判定します（ヘルス表示用のみ）。既定は 7,273。",
+        "es": "Tokens estimados a partir de los cuales el cuerpo se considera largo; solo afecta al aviso de salud. Por defecto, 7.273.",
+        "fr": "Tokens estimés au-delà desquels le corps est jugé long (simple indicateur de santé). Par défaut, 7 273.",
+        "de": "Geschätzte Token, ab denen der Skill-Text als zu lang gilt (nur als Hinweis). Standard: 7.273.",
+        "pt": "Tokens estimados a partir dos quais o corpo é considerado longo (apenas aviso de saúde). Padrão: 7.273.",
+        "ru": "Оценочные токены, после которых текст считается длинноватым (только подсказка здоровья). По умолчанию 7 273."
       }
     },
     "healthStampDensityPerKb": {

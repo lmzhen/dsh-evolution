@@ -39,7 +39,7 @@ token 是写入前的保守估算：`max(ceil(codePoints / 4), ceil(UTF-8 bytes 
 ## 迁移
 
 - 旧 `maxSkillContentChars` / `maxDescriptionLength` / `summaryChars` 继续作为迁移输入，显式设置时按旧语义工作。
-- 旧 `softBodyChars` 设置后只转换一次：`tokens = round(chars / 2.75)`；未设置时使用 `7,273`。
+- 旧 `softBodyChars` / `healthSoftBodyChars` 设置后只转换一次：`tokens = max(1, round(chars / 2.75))`；未设置时使用 `7,273`。新配置用 `healthSoftBodyTokens`。
 - 旧 `memoryChars` / `userChars` 在 row 上显式设置时保持字符模式；只出现在 policy 时按 2.75 字符/token 换算。新旧字段冲突由 doctor 报出。
 - 旧报告、版本记录和统计历史保留原始字符事实，不会补写成 token，也不会伪造 provider usage。
 

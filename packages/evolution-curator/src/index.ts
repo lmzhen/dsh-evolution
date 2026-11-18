@@ -35,7 +35,7 @@ import { markerEntryName } from '@deepseek-ai/dsh-evolution-core/skills'
 import { emptyRecord, loadSuppressedNames, updateSuppressedNames } from '@deepseek-ai/dsh-evolution-core'
 // G2.4/C3: the review ceiling has ONE home (core's DEFAULT_REVIEW_TIMEOUT_MS) — this package used to
 // declare its own 120_000 beside it, which the bounds gate reports as a second home of the same number.
-import { DEFAULT_CURATOR_MODEL, DEFAULT_REVIEW_TIMEOUT_MS as DEFAULT_CURATOR_REVIEW_TIMEOUT_MS, MAX_TIMER_DELAY_MS, usageObserved } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CURATOR_MODEL, DEFAULT_REVIEW_TIMEOUT_MS as DEFAULT_CURATOR_REVIEW_TIMEOUT_MS, MAX_TIMER_DELAY_MS, DEFAULT_SOFT_BODY_TOKENS, UPSTREAM_LIMIT_CHARS_PER_TOKEN, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { lintSkill } from '@deepseek-ai/dsh-evolution-core/skills'
 import { newestUnitId, planUnitUndo } from './unit-undo-plan.ts'
 import { executeUnitUndo, type UnitUndoSink } from '@deepseek-ai/dsh-evolution-core/write'
@@ -135,7 +135,9 @@ export interface Config {
   curatorReviewMaxTokens?: Volatile<number>
   /** Timeout (ms) for the optional LLM nomination pass (B-10, v18). */
   curatorReviewTimeoutMs?: Volatile<number>
-  /** Structure-health soft body limit (chars) — see DEFAULT_HEALTH_THRESHOLDS (rc.73 A1). */
+  /** Structure-health soft body limit (estimated tokens). */
+  healthSoftBodyTokens?: Volatile<number>
+  /** Deprecated character line; converted once to `healthSoftBodyTokens`. */
   healthSoftBodyChars?: Volatile<number>
   /** Structure-health stamp-density ceiling per KB — see DEFAULT_HEALTH_THRESHOLDS. */
   healthStampDensityPerKb?: Volatile<number>
@@ -165,7 +167,9 @@ export interface CuratorSettings {
   curatorReviewMaxTokens: number
   /** Wall-clock bound of the curator LLM review. */
   curatorReviewTimeoutMs: number
-  /** Body character line the health view judges against. */
+  /** Body token line the health view judges against. */
+  healthSoftBodyTokens: number
+  /** Legacy character view of the same line; not used for judgment. */
   healthSoftBodyChars: number
   /** Stamp density per KB that flags log-like content in a body. */
   healthStampDensityPerKb: number
@@ -182,11 +186,11 @@ interface CuratorPolicyFields {
 
 /** The section's numeric fields — the ones a malformed (NaN/Infinity) user value
  * must not reach a comparison as-is. */
-type CuratorLiveNumberKey = 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays' | 'minIdleHours' | 'curatorReviewMaxTokens' | 'curatorReviewTimeoutMs' | 'healthSoftBodyChars' | 'healthStampDensityPerKb' | 'healthChurnMinPatches'
+type CuratorLiveNumberKey = 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays' | 'minIdleHours' | 'curatorReviewMaxTokens' | 'curatorReviewTimeoutMs' | 'healthSoftBodyTokens' | 'healthSoftBodyChars' | 'healthStampDensityPerKb' | 'healthChurnMinPatches'
 
 type CuratorNumericKey = 'curatorIntervalHours' | 'staleAfterDays' | 'archiveAfterDays'
   | 'qualityWarnStaleAfterDays' | 'minIdleHours' | 'curatorReviewMaxTokens'
-  | 'curatorReviewTimeoutMs' | 'healthSoftBodyChars' | 'healthStampDensityPerKb'
+  | 'curatorReviewTimeoutMs' | 'healthSoftBodyTokens' | 'healthSoftBodyChars' | 'healthStampDensityPerKb'
   | 'healthChurnMinPatches'
 
 
@@ -305,7 +309,8 @@ export class EvolutionCurator extends Service {
     bootGraceSeconds: z.number().min(0).default(DEFAULT_CURATOR_BOOT_GRACE_SECONDS),
     curatorReviewMaxTokens: z.number().min(1).default(DEFAULT_CURATOR_REVIEW_MAX_TOKENS).volatile(),
     curatorReviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_CURATOR_REVIEW_TIMEOUT_MS).volatile(),
-    healthSoftBodyChars: z.number().min(1).default(AUTHORING_SPLIT_LINE_CHARS).volatile(),
+    healthSoftBodyTokens: z.number().min(1).volatile(),
+    healthSoftBodyChars: z.number().min(1).volatile(),
     healthStampDensityPerKb: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb).volatile(),
     healthChurnMinPatches: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches).volatile(),
   })
@@ -508,6 +513,22 @@ export class EvolutionCurator extends Service {
   }
 
   /**
+   * Resolve the health body line in tokens. The token field is primary; the old
+   * character field is converted only when no token value exists, so an existing
+   * deployment keeps its line without one more stored field.
+   * @returns the clamped token line.
+   */
+  private rowSoftBodyTokens(): number {
+    const token = this.rowValue('healthSoftBodyTokens')
+    const chars = this.rowValue('healthSoftBodyChars')
+    const converted = chars !== undefined && Number.isFinite(chars) && chars >= 1
+      ? Math.max(1, Math.round(chars / UPSTREAM_LIMIT_CHARS_PER_TOKEN))
+      : undefined
+    const target = token ?? converted ?? DEFAULT_SOFT_BODY_TOKENS
+    return clampOnce(this.clampedKeys, this.clampWarn, 'healthSoftBodyTokens', target, DEFAULT_SOFT_BODY_TOKENS, 1)
+  }
+
+  /**
    * One DEPLOYMENT numeric row field, clamped and warned once.
    *
    * The sibling of {@link rowNumber} for a field with no user layer (no `.volatile()`): it reads
@@ -552,6 +573,7 @@ export class EvolutionCurator extends Service {
       llmReview: this.rowBoolean('llmReview', false),
       curatorReviewMaxTokens: number('curatorReviewMaxTokens', DEFAULT_CURATOR_REVIEW_MAX_TOKENS, 1),
       curatorReviewTimeoutMs: number('curatorReviewTimeoutMs', DEFAULT_CURATOR_REVIEW_TIMEOUT_MS, 1, MAX_TIMER_DELAY_MS),
+      healthSoftBodyTokens: this.rowSoftBodyTokens(),
       healthSoftBodyChars: number('healthSoftBodyChars', AUTHORING_SPLIT_LINE_CHARS, 1),
       healthStampDensityPerKb: number('healthStampDensityPerKb', DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb, 1),
       healthChurnMinPatches: number('healthChurnMinPatches', DEFAULT_HEALTH_THRESHOLDS.churnMinPatches, 1),
@@ -600,7 +622,8 @@ export class EvolutionCurator extends Service {
       llmReview: pick('llmReview'),
       curatorReviewMaxTokens: number('curatorReviewMaxTokens', 1),
       curatorReviewTimeoutMs: number('curatorReviewTimeoutMs', 1, MAX_TIMER_DELAY_MS),
-      healthSoftBodyChars: number('healthSoftBodyChars', 1),
+      healthSoftBodyTokens: row.healthSoftBodyTokens,
+      healthSoftBodyChars: row.healthSoftBodyChars,
       healthStampDensityPerKb: number('healthStampDensityPerKb', 1),
       healthChurnMinPatches: number('healthChurnMinPatches', 1),
     }
@@ -2072,7 +2095,7 @@ export class EvolutionCurator extends Service {
   }>> {
     const settings = this.settings()
     const thresholds: SkillHealthThresholds = {
-      softBodyChars: settings.healthSoftBodyChars,
+      softBodyTokens: settings.healthSoftBodyTokens,
       stampDensityPerKb: settings.healthStampDensityPerKb,
       churnMinPatches: settings.healthChurnMinPatches,
       hardCapMinHits: DEFAULT_HEALTH_THRESHOLDS.hardCapMinHits,

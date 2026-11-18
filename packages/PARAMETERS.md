@@ -101,7 +101,8 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `llmReview` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Enable the LLM nomination pass on top of the deterministic lifecycle. |
 | `curatorReviewMaxTokens` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Token budget of the curator LLM review. |
 | `curatorReviewTimeoutMs` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Wall-clock bound of the curator LLM review. |
-| `healthSoftBodyChars` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Body character line the health view judges against. |
+| `healthSoftBodyTokens` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Estimated body token line the health view judges against. |
+| `healthSoftBodyChars` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Legacy body character line; converted once to healthSoftBodyTokens when no token value is set. |
 | `healthStampDensityPerKb` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Stamp density per KB that flags log-like content in a body. |
 | `healthChurnMinPatches` | E3 | live | cordis | evolution-curator | — | 卡：evolution-curator | Patches without a read that flag a write-ghost skill. |
 | `evolution-curator.enabled` | E2 | none | cordis | evolution-curator | — | 无（deployment） | Mount the curator plugin at all. |

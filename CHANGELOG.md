@@ -1,3 +1,13 @@
+## 未发布 — 文本口径统一（候选 0.55.0）
+
+> **范围**：① 新增 `text-metrics` / `text-budgets` 单一来源，门控显式声明 storage / display / context / quality 轴与 hard / soft / report 严重度；② 正文字符统计改走 codePoints，description / 摘要 / 反馈 note / 行宽 / 预览截断改走 graphemes，文件大小保持 bytes；③ 正文软线改为固定估算 token 预算（默认 7,273；2 倍判 needs-restructure），不再按 CJK/ASCII 字符权重折算；④ memory / user 默认预算改为 800 / 500 估算 token，旧 `memoryChars` / `userChars` 保留为字符模式迁移输入；⑤ 8 语言 UI 文案统一技能整理、待我确认、合并建议、健康状态与附带文件术语，并移除代码中硬编码的中文标点；⑥ 数据总览增加估算 token 列与总计，版本预览改 grapheme-safe 截断。
+>
+> **迁移**：旧 `maxSkillContentChars` / `maxDescriptionLength` / `summaryChars` 继续作为迁移输入；旧 `healthSoftBodyChars` 按 2.75 字符/token 转换一次；旧 `memoryChars` / `userChars` 在 row 上显式设置时保持字符模式，只在 policy 中给出时按 2.75 换算。新旧字段冲突由 doctor 报告。旧报告和版本记录保留原始字符事实，不补写 token。
+>
+> **不迁移**：磁盘数据格式不变；已有 MEMORY.md / USER.md 不重写；旧 usage / feedback 记录保持原样。
+>
+> **验证**：待发布准备阶段补齐全量 gate、真实 npm web 升级验收与独立复核；本段在发布时替换为最终版本号和证据。
+
 ## 0.54.0 (2026-11-18) — 单 bundle 安装与整族点击升级
 
 > **范围**：① `@lmzhen/dsh-evolution-all` 的家族生产依赖发布为精确版本，profile 只安装/直接依赖这一个 bundle，平台点击更新 `all` 时由 pnpm 把 20 个包一起更新；② `install-layered` 的 profile 依赖改为精确版本；③ 新增 `install-layered --repair`，把旧的“all + 直接子包 + 复制 node_modules”混合 profile 一次性迁成 pnpm 单 bundle，失败恢复 manifest/lock/journal/node_modules；④ 安装器遇到 profile 直依家族子包时拒绝继续，源码/离线复制安装明确不支持 GUI 增量升级；⑤ `evolution-core-runtime` 启动时检查 all 与实现包版本，混合安装输出明确告警；⑥ `verify-profile-bundles` 新增直依子包检测；⑦ README/INSTALL 增加单 bundle 与修复说明。
