@@ -609,6 +609,38 @@ describe('layered installer', () => {
     expect(leftovers).toEqual([])
   }, 30_000)
 
+  it('repair removes a lock written by a failed pnpm run when none existed', async () => {
+    const home = await tempRoot('dsh-installer-repair-lock-')
+    const profileDir = join(home, 'profiles', 'evo-test')
+    const allDir = join(profileDir, 'node_modules/@lmzhen/dsh-evolution-all')
+    await mkdir(allDir, { recursive: true })
+    await writeFile(join(allDir, 'package.json'), JSON.stringify({
+      name: '@lmzhen/dsh-evolution-all',
+      version: '0.53.0',
+      dependencies: {},
+    }))
+    const manifestPath = join(profileDir, 'package.json')
+    const original = JSON.stringify({
+      name: 'dsh-profile-evo-test',
+      private: true,
+      dependencies: { '@lmzhen/dsh-evolution-all': '0.53.0' },
+      dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-all'] } },
+    }, null, 2) + '\n'
+    await writeFile(manifestPath, original)
+    const fakePnpm = join(home, 'fake-pnpm-lock.mjs')
+    await writeFile(fakePnpm, [
+      "import { writeFile } from 'node:fs/promises'",
+      "await writeFile(process.cwd() + '/pnpm-lock.yaml', 'lockfileVersion: 9.0\\n')",
+      'process.exit(1)',
+    ].join('\n'))
+    await expect(callInstaller(`return await installer.repairProfile({
+      home: ${JSON.stringify(home)}, profile: 'evo-test', version: '0.53.0',
+      pnpm: ${JSON.stringify(fakePnpm)},
+    })`)).rejects.toThrow()
+    expect(await readFile(manifestPath, 'utf8')).toBe(original)
+    expect(existsSync(join(profileDir, 'pnpm-lock.yaml'))).toBe(false)
+  }, 30_000)
+
   it('repair restores the manifest and node_modules when pnpm fails', async () => {
     const home = await tempRoot('dsh-installer-repair-fail-')
     const profileDir = join(home, 'profiles', 'evo-test')

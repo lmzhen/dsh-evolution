@@ -1,25 +1,25 @@
 {
-  "note": "0.53.0 local rehearsal: S1/S2/S3 measured on web lab0530 (platform 0.2.2-rc.3, port 3112); S4 s4-hmr-double-apply spec. Final CI face must be re-read before publish.",
-  "familyVersion": "0.53.0",
+  "note": "0.54.0 local rehearsal: S1/S2/S3 measured on web lab0520 (platform 0.2.2-rc.3, port 3113); S4 s4-hmr-double-apply spec. Final CI face must be re-read before publish.",
+  "familyVersion": "0.54.0",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.3",
-      "familyVersion": "0.53.0",
-      "startedAt": "2026-11-18T10:46:35.495Z",
-      "artifactSha256": "0510a320a376717e971e378875830449cc87ec1849e916dce8383a63e615e429",
-      "inputsSha256": "4de355fde2627eb87145487148058854bfbcf26cf62cf6bac7ac3e09076e5496",
-      "commit": "cc2c5564",
+      "familyVersion": "0.54.0",
+      "startedAt": "2026-11-18T13:10:32.560Z",
+      "artifactSha256": "cf34862f4327c01819fde1c5e1f94984aa3e7227bcc86490a04f5b43723a05d3",
+      "inputsSha256": "5411b502313ec402806082be0af28910e4f46c18062e8fd8ed7d3e1cc2d2430a",
+      "commit": "45e3efed",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
         "skillHistoryRows": 45,
-        "skillHistoryBytes": 29312,
+        "skillHistoryBytes": 32213,
         "threeReadsStable": true,
         "readMs": [
-          421,
-          383,
-          457
+          271,
+          237,
+          267
         ],
         "ownerStatus": 200
       }
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.3",
-      "familyVersion": "0.53.0",
-      "startedAt": "2026-11-18T10:46:35.495Z",
-      "artifactSha256": "0510a320a376717e971e378875830449cc87ec1849e916dce8383a63e615e429",
-      "inputsSha256": "4de355fde2627eb87145487148058854bfbcf26cf62cf6bac7ac3e09076e5496",
-      "commit": "cc2c5564",
+      "familyVersion": "0.54.0",
+      "startedAt": "2026-11-18T13:10:32.560Z",
+      "artifactSha256": "cf34862f4327c01819fde1c5e1f94984aa3e7227bcc86490a04f5b43723a05d3",
+      "inputsSha256": "5411b502313ec402806082be0af28910e4f46c18062e8fd8ed7d3e1cc2d2430a",
+      "commit": "45e3efed",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -47,28 +47,28 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.3",
-      "familyVersion": "0.53.0",
-      "startedAt": "2026-11-18T10:46:35.495Z",
-      "artifactSha256": "0510a320a376717e971e378875830449cc87ec1849e916dce8383a63e615e429",
-      "inputsSha256": "4de355fde2627eb87145487148058854bfbcf26cf62cf6bac7ac3e09076e5496",
-      "commit": "cc2c5564",
+      "familyVersion": "0.54.0",
+      "startedAt": "2026-11-18T13:10:32.560Z",
+      "artifactSha256": "cf34862f4327c01819fde1c5e1f94984aa3e7227bcc86490a04f5b43723a05d3",
+      "inputsSha256": "5411b502313ec402806082be0af28910e4f46c18062e8fd8ed7d3e1cc2d2430a",
+      "commit": "45e3efed",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
-        "familyVersion": "0.53.0"
+        "familyVersion": "0.54.0"
       }
     },
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.3",
-      "familyVersion": "0.53.0",
-      "startedAt": "2026-11-18T10:46:35.495Z",
-      "artifactSha256": "0510a320a376717e971e378875830449cc87ec1849e916dce8383a63e615e429",
-      "inputsSha256": "4de355fde2627eb87145487148058854bfbcf26cf62cf6bac7ac3e09076e5496",
-      "commit": "cc2c5564",
+      "familyVersion": "0.54.0",
+      "startedAt": "2026-11-18T13:10:32.560Z",
+      "artifactSha256": "cf34862f4327c01819fde1c5e1f94984aa3e7227bcc86490a04f5b43723a05d3",
+      "inputsSha256": "5411b502313ec402806082be0af28910e4f46c18062e8fd8ed7d3e1cc2d2430a",
+      "commit": "45e3efed",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -87,7 +87,7 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on cc2c5564 (OK 52/52)"
+    "source": "verify-traceability --strict on 45e3efed (OK 52/52)"
   },
-  "generatedAt": "2026-11-18T10:46:35.498Z"
+  "generatedAt": "2026-11-18T13:10:32.562Z"
 }

@@ -14,6 +14,9 @@
  * Usage:
  *   node audit-release-tarballs.mjs <dist-dir> [--version <x.y.z>] [--platform-range <^x.y.z>]
  *
+ * A dist that carries family dependencies requires `--version`: without it the
+ * audit cannot judge the exact-pin contract and fails rather than skipping it.
+ *
  * Both optional flags come from the release workflow's own variables (RELEASE_VERSION's tag form
  * and PLATFORM_FLOOR), so the audit compares the packed bytes against the release's declared
  * contract rather than against a second copy of that contract kept here.

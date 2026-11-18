@@ -21,8 +21,8 @@
  *     profile-dir 默认 ~/.dsh/profiles/web（DSH_HOME 下 profiles/web）。
  *     profile-dir 下必须存在 package.json（vacant guard：空检 = 不通过）。
  *   node verify-profile-bundles.mjs --self-test
- *     在临时目录里造 5 个夹具 profile，判定五个方向（合规 0／双行 1／幽灵行 1／
- *     直依子包 1／无清单 2）。门禁用这一形态：此前门禁不带参数，判的是**跑门禁那台机器**的
+ *     在临时目录里造 6 个夹具 profile，判定六个方向（合规 0／双行 1／幽灵行 1／
+ *     直依子包 1／optional 直依子包 1／无清单 2）。门禁用这一形态：此前门禁不带参数，判的是**跑门禁那台机器**的
  *     `~/.dsh/profiles/web`——本机恰好存在才通过，换机器就变成 vacant guard 的
  *     exit 2，判的根本不是仓库内容。
  */
@@ -99,12 +99,13 @@ function checkProfile(profileDir) {
  * @param bundles - its `dsh.profile.bundles` rows.
  * @param dependencies - the package names to pin in `dependencies`.
  */
-function writeFixture(dir, bundles, dependencies) {
+function writeFixture(dir, bundles, dependencies, optionalDependencies = []) {
   mkdirSync(dir, { recursive: true })
   const manifest = {
     name: `dsh-profile-${basename(dir)}`,
     private: true,
     dependencies: Object.fromEntries(dependencies.map(name => [name, '1.0.0'])),
+    ...(optionalDependencies.length === 0 ? {} : { optionalDependencies: Object.fromEntries(optionalDependencies.map(name => [name, '1.0.0'])) }),
     dsh: { profile: { bundles } },
   }
   writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n')
@@ -122,24 +123,27 @@ function selfTest() {
     const doubled = join(root, 'doubled')
     const phantom = join(root, 'phantom')
     const siblings = join(root, 'siblings')
+    const optionalSibling = join(root, 'optional-sibling')
     const [first, second] = EVOLUTION_BUNDLES
     const scoped = name => `@lmzhen/${name}`
     writeFixture(compliant, [scoped(first)], [scoped(first)])
     writeFixture(doubled, [scoped(first), scoped(second)], [scoped(first), scoped(second)])
     writeFixture(phantom, [scoped(first)], [])
     writeFixture(siblings, [scoped(first)], [scoped(first), '@lmzhen/dsh-evolution-ui'])
+    writeFixture(optionalSibling, [scoped(first)], [scoped(first)], ['@lmzhen/dsh-evolution-ui'])
     const cases = [
       { label: 'one pinned evolution bundle', dir: compliant, code: 0 },
       { label: 'two evolution bundle rows', dir: doubled, code: 1 },
       { label: 'mounted but unpinned', dir: phantom, code: 1 },
       { label: 'direct family sibling', dir: siblings, code: 1 },
+      { label: 'optional family sibling', dir: optionalSibling, code: 1 },
       { label: 'no manifest', dir: join(root, 'missing'), code: 2 },
     ]
     const wrong = cases.filter(item => checkProfile(item.dir).code !== item.code)
     if (wrong.length > 0) {
       return { code: 1, output: `verify-profile-bundles --self-test: ${wrong.map(item => `${item.label} expected ${item.code}`).join('; ')}` }
     }
-    return { code: 0, output: `verify-profile-bundles --self-test: OK — ${cases.length} fixture(s) judged as expected (compliant 0, two rows 1, phantom row 1, direct sibling 1, vacant 2)` }
+    return { code: 0, output: `verify-profile-bundles --self-test: OK — ${cases.length} fixture(s) judged as expected (compliant 0, two rows 1, phantom row 1, direct sibling 1, optional sibling 1, vacant 2)` }
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

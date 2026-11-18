@@ -543,7 +543,10 @@ export async function repairProfile(options = {}) {
   if (dependencies === null || typeof dependencies !== 'object' || Array.isArray(dependencies)) {
     throw new Error(`install-layered: profile "${profile}" has no dependency map to repair`)
   }
-  const familyDirect = Object.keys(dependencies).filter(name => isFamilyPackage(name) && !isAllPackage(name))
+  const familyDirect = [...new Set([
+    ...Object.keys(dependencies),
+    ...Object.keys(manifest?.optionalDependencies ?? {}),
+  ])].filter(name => isFamilyPackage(name) && !isAllPackage(name))
   const installedAll = installedPackageVersion(profileDir, allBundle)
   const targetVersion = options.version ?? installedAll ?? familyVersion()
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(targetVersion)) {
@@ -562,8 +565,9 @@ export async function repairProfile(options = {}) {
   await writeFile(join(backupDir, 'package.json'), originalManifest)
   const lockPath = join(profileDir, 'pnpm-lock.yaml')
   const journalPath = join(profileDir, INSTALL_JOURNAL)
+  const hadLock = existsSync(lockPath)
   const hadJournal = existsSync(journalPath)
-  if (existsSync(lockPath)) await writeFile(join(backupDir, 'pnpm-lock.yaml'), await readFile(lockPath, 'utf8'))
+  if (hadLock) await writeFile(join(backupDir, 'pnpm-lock.yaml'), await readFile(lockPath, 'utf8'))
   if (hadJournal) await writeFile(join(backupDir, INSTALL_JOURNAL), await readFile(journalPath, 'utf8'))
   const nodeModulesPath = join(profileDir, 'node_modules')
   let movedNodeModules = false
@@ -573,7 +577,12 @@ export async function repairProfile(options = {}) {
       await rename(nodeModulesPath, join(backupDir, 'node_modules'))
       movedNodeModules = true
     }
-    for (const name of familyDirect) delete dependencies[name]
+    for (const name of familyDirect) {
+      delete dependencies[name]
+      if (manifest.optionalDependencies !== null && typeof manifest.optionalDependencies === 'object') {
+        delete manifest.optionalDependencies[name]
+      }
+    }
     dependencies[allBundle] = targetVersion
     manifest.dsh ??= {}
     manifest.dsh.profile ??= { bundles: [] }
@@ -621,7 +630,11 @@ export async function repairProfile(options = {}) {
       if (existsSync(nodeModulesPath)) await rm(nodeModulesPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
       if (movedNodeModules && existsSync(join(backupDir, 'node_modules'))) await rename(join(backupDir, 'node_modules'), nodeModulesPath)
       await writeFile(manifestPath, originalManifest)
-      if (existsSync(join(backupDir, 'pnpm-lock.yaml'))) await writeFile(lockPath, await readFile(join(backupDir, 'pnpm-lock.yaml'), 'utf8'))
+      if (hadLock) {
+        await writeFile(lockPath, await readFile(join(backupDir, 'pnpm-lock.yaml'), 'utf8'))
+      } else {
+        await rm(lockPath, { force: true })
+      }
       if (hadJournal) {
         await writeFile(journalPath, await readFile(join(backupDir, INSTALL_JOURNAL), 'utf8'))
       } else {
@@ -1010,7 +1023,10 @@ export async function install(options = {}) {
   if (existsSync(manifestPath)) {
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
     const existing = Array.isArray(manifest.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : []
-    const directSiblings = Object.keys(manifest.dependencies ?? {}).filter(name => isFamilyPackage(name) && !isFamilyBundle(name))
+    const directSiblings = [...new Set([
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.optionalDependencies ?? {}),
+    ])].filter(name => isFamilyPackage(name) && !isFamilyBundle(name))
     if (mode === 'all' && directSiblings.length > 0) {
       throw new Error(`install-layered: profile "${profile}" already pins family implementation packages directly (${directSiblings.join(', ')}). Install-layered would create another mixed family. Run --repair first.`)
     }
@@ -1150,7 +1166,13 @@ if (isMain) {
       console.log(`direct family:  ${result.familyDirect.length} removed`)
       if (result.familyDirect.length > 0) console.log(`removed:        ${result.familyDirect.join(', ')}`)
       if (options.dryRun) console.log('dry-run:  no files were written')
-      else console.log('repair:   family is now a single pnpm-managed all bundle')
+      else {
+        console.log('repair:   family is now a single pnpm-managed all bundle')
+        if (typeof result.cleanupError === 'string') {
+          console.warn(`repair:   installed, but the old backup could not be removed: ${result.cleanupError}`)
+          if (typeof result.backupDir === 'string') console.warn(`repair:   backup left at ${result.backupDir}`)
+        }
+      }
     } else if (options.uninstall) {
       const result = await uninstall(options)
       console.log(`uninstall mode:     ${result.mode}`)
