@@ -323,14 +323,14 @@
       "ru": "Повторить копирование"
     },
     "decide.failed": {
-      "zh": "审批请求失败",
-      "en": "The approval request failed",
-      "ja": "承認リクエストに失敗しました",
-      "es": "La solicitud de aprobación falló",
-      "fr": "La demande d’approbation a échoué",
-      "de": "Freigabe-Anfrage fehlgeschlagen",
-      "pt": "A solicitação de aprovação falhou",
-      "ru": "Запрос одобрения не выполнен"
+      "zh": "操作没有完成，请查看错误详情。",
+      "en": "That didn’t complete. Check the error details.",
+      "ja": "操作を完了できませんでした。エラーの詳細を確認してください。",
+      "es": "La operación no se completó. Consulta los detalles del error.",
+      "fr": "L’opération n’a pas abouti. Consultez les détails de l’erreur.",
+      "de": "Die Aktion wurde nicht abgeschlossen. Prüfe die Fehlerdetails.",
+      "pt": "A operação não foi concluída. Confira os detalhes do erro.",
+      "ru": "Действие не завершено. Проверьте подробности ошибки."
     },
     "decision.approve": {
       "zh": "批准",
@@ -2271,6 +2271,26 @@
       "de": "Starten Sie die Diagnose, um den Zusammenführungsstatus zu prüfen, und laden Sie dann neu.",
       "pt": "Execute o diagnóstico para verificar o estado do merge e recarregue.",
       "ru": "Запустите диагностику, чтобы проверить состояние объединения, и перезагрузите страницу."
+    },
+    "decide.approved": {
+      "zh": "已批准合并。",
+      "en": "Merge approved.",
+      "ja": "統合を承認しました。",
+      "es": "Fusión aprobada.",
+      "fr": "Fusion approuvée.",
+      "de": "Merge freigegeben.",
+      "pt": "Mesclagem aprovada.",
+      "ru": "Объединение одобрено."
+    },
+    "decide.rejected": {
+      "zh": "已拒绝合并。",
+      "en": "Merge rejected.",
+      "ja": "統合を却下しました。",
+      "es": "Fusión rechazada.",
+      "fr": "Fusion rejetée.",
+      "de": "Merge abgelehnt.",
+      "pt": "Mesclagem rejeitada.",
+      "ru": "Объединение отклонено."
     }
   }
 }

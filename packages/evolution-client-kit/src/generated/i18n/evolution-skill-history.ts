@@ -172,7 +172,10 @@ export const dictionaries = {
     "diff.removed.one": "删除 1 行",
     "row.delta.up.one": "（+1 字符）",
     "row.delta.down.one": "（-1 字符）",
-    "tooltip.bodyChars.one": "1 字符"
+    "tooltip.bodyChars.one": "1 字符",
+    "undo.success": "已回退到 v{n}",
+    "undo.successUnit": "已回退这次改动",
+    "undo.failed": "回退没有完成，请查看错误详情。"
   },
   en: {
     "action.archive": "Archived",
@@ -342,7 +345,10 @@ export const dictionaries = {
     "diff.removed.one": "1 line removed",
     "row.delta.up.one": "(+1 char)",
     "row.delta.down.one": "(-1 char)",
-    "tooltip.bodyChars.one": "1 char"
+    "tooltip.bodyChars.one": "1 char",
+    "undo.success": "Back to v{n}",
+    "undo.successUnit": "This change was reverted",
+    "undo.failed": "The revert didn’t complete. Check the error details."
   },
   ja: {
     "action.archive": "アーカイブ",
@@ -512,7 +518,10 @@ export const dictionaries = {
     "diff.removed.one": "1 行削除",
     "row.delta.up.one": "（+1 文字）",
     "row.delta.down.one": "（-1 文字）",
-    "tooltip.bodyChars.one": "1 文字"
+    "tooltip.bodyChars.one": "1 文字",
+    "undo.success": "v{n} に戻しました",
+    "undo.successUnit": "この変更を元に戻しました",
+    "undo.failed": "元に戻せませんでした。エラーの詳細を確認してください。"
   },
   es: {
     "action.archive": "archivado",
@@ -682,7 +691,10 @@ export const dictionaries = {
     "diff.removed.one": "1 línea eliminada",
     "row.delta.up.one": "(+1 carácter)",
     "row.delta.down.one": "(-1 carácter)",
-    "tooltip.bodyChars.one": "1 carácter"
+    "tooltip.bodyChars.one": "1 carácter",
+    "undo.success": "Vuelto a la v{n}",
+    "undo.successUnit": "Este cambio se ha revertido",
+    "undo.failed": "La reversión no se completó. Consulta los detalles del error."
   },
   fr: {
     "action.archive": "archivé",
@@ -852,7 +864,10 @@ export const dictionaries = {
     "diff.removed.one": "1 ligne supprimée",
     "row.delta.up.one": "(+1 caractère)",
     "row.delta.down.one": "(-1 caractère)",
-    "tooltip.bodyChars.one": "1 caractère"
+    "tooltip.bodyChars.one": "1 caractère",
+    "undo.success": "Revenu à la v{n}",
+    "undo.successUnit": "Cette modification a été annulée",
+    "undo.failed": "L’annulation n’a pas abouti. Consultez les détails de l’erreur."
   },
   de: {
     "action.archive": "archiviert",
@@ -1022,7 +1037,10 @@ export const dictionaries = {
     "diff.removed.one": "1 Zeile entfernt",
     "row.delta.up.one": "(+1 Zeichen)",
     "row.delta.down.one": "(-1 Zeichen)",
-    "tooltip.bodyChars.one": "1 Zeichen"
+    "tooltip.bodyChars.one": "1 Zeichen",
+    "undo.success": "Zurück zu v{n}",
+    "undo.successUnit": "Diese Änderung wurde rückgängig gemacht",
+    "undo.failed": "Das Rückgängigmachen ist nicht abgeschlossen. Prüfe die Fehlerdetails."
   },
   ru: {
     "action.archive": "заархивировано",
@@ -1192,7 +1210,10 @@ export const dictionaries = {
     "diff.removed.one": "Удалена 1 строка",
     "row.delta.up.one": "(+1 символ)",
     "row.delta.down.one": "(-1 символ)",
-    "tooltip.bodyChars.one": "1 символ"
+    "tooltip.bodyChars.one": "1 символ",
+    "undo.success": "Возвращено к v{n}",
+    "undo.successUnit": "Изменение отменено",
+    "undo.failed": "Отмена не завершилась. Проверьте подробности ошибки."
   },
   pt: {
     "action.archive": "arquivamento",
@@ -1362,7 +1383,10 @@ export const dictionaries = {
     "diff.removed.one": "1 linha removida",
     "row.delta.up.one": "(+1 caractere)",
     "row.delta.down.one": "(-1 caractere)",
-    "tooltip.bodyChars.one": "1 caractere"
+    "tooltip.bodyChars.one": "1 caractere",
+    "undo.success": "Voltou para a v{n}",
+    "undo.successUnit": "Esta alteração foi revertida",
+    "undo.failed": "A reversão não foi concluída. Confira os detalhes do erro."
   },
 } as const
 

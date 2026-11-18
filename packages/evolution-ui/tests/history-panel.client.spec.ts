@@ -93,7 +93,7 @@ it('does not show library-wide success counts inside one skill detail', async ()
 })
 
 describe('skill-history panel: the state machine a renderer can see', () => {
-  it('keeps the curator\'s sentence while the rows are read again', async () => {
+  it('keeps the localized undo sentence while the rows are read again', async () => {
     const reads: Array<Deferred<VersionsPayload>> = []
     render(createElement(SkillHistoryPanel, makeFace({
       loadVersions: () => { const next = deferred<VersionsPayload>(); reads.push(next); return next.promise },
@@ -105,12 +105,12 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     await screen.findByRole('button', { name: 'undo' })
     fireEvent.click(screen.getByRole('button', { name: 'undo' }))
     fireEvent.click(screen.getByRole('button', { name: 'undo.confirm' }))
-    await screen.findByText('UNDONE')
+    await screen.findByText('undo.success(2)')
     // The re-read the restore itself triggered lands AFTER the sentence: it must not clear it.
     await waitFor(() => { expect(reads.length).toBeGreaterThan(1) })
     reads[1]!.resolve(payload())
     await new Promise(resolve => setTimeout(resolve, 10))
-    expect(screen.getByText('UNDONE')).toBeTruthy()
+    expect(screen.getByText('undo.success(2)')).toBeTruthy()
   })
 
   it('arms the undo on the first click, cancels on demand, and writes only on the confirm', async () => {
@@ -237,4 +237,5 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     expect(errors.filter(line => line.includes('unique'))).toEqual([])
   })
 })
+
 

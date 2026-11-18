@@ -37,7 +37,7 @@ export const dictionaries = {
     "copied": "已复制：",
     "copyFailed": "复制失败：浏览器没有接受剪贴板写入。",
     "copyRetry": "重试复制",
-    "decide.failed": "审批请求失败",
+    "decide.failed": "操作没有完成，请查看错误详情。",
     "decision.approve": "批准",
     "decision.reject": "拒绝",
     "degraded": "读取结果不完整：",
@@ -231,7 +231,9 @@ export const dictionaries = {
     "blocked.hint.migration-blocked": "先停止宿主，再运行迁移工具；它会先备份旧数据，失败可以恢复。完成后刷新页面。",
     "blocked.hint.forward-only": "合并数据来自更新版本的面板；先升级插件，再刷新页面。",
     "blocked.hint.needs-repair": "合并数据不完整；运行迁移工具，它会先备份再修复。完成后刷新页面。",
-    "blocked.hint.unknown": "先运行诊断命令确认合并状态，再刷新页面。"
+    "blocked.hint.unknown": "先运行诊断命令确认合并状态，再刷新页面。",
+    "decide.approved": "已批准合并。",
+    "decide.rejected": "已拒绝合并。"
   },
   en: {
     "action.approve": "Copy approve command",
@@ -266,7 +268,7 @@ export const dictionaries = {
     "copied": "Copied:",
     "copyFailed": "Copy failed: the browser didn't accept the clipboard write.",
     "copyRetry": "Try copying again",
-    "decide.failed": "The approval request failed",
+    "decide.failed": "That didn’t complete. Check the error details.",
     "decision.approve": "Approve",
     "decision.reject": "Reject",
     "degraded": "Incomplete results:",
@@ -460,7 +462,9 @@ export const dictionaries = {
     "blocked.hint.migration-blocked": "Stop the host, then run the migration tool. It backs up the old data first and can restore it on failure. Refresh when done.",
     "blocked.hint.forward-only": "The merge data comes from a newer panel version. Upgrade the plugin, then refresh.",
     "blocked.hint.needs-repair": "The merge data is incomplete. Run the migration tool; it backs up before repairing. Refresh when done.",
-    "blocked.hint.unknown": "Run diagnostics to check the merge state, then refresh."
+    "blocked.hint.unknown": "Run diagnostics to check the merge state, then refresh.",
+    "decide.approved": "Merge approved.",
+    "decide.rejected": "Merge rejected."
   },
   ja: {
     "action.approve": "承認コマンドをコピー",
@@ -495,7 +499,7 @@ export const dictionaries = {
     "copied": "コピーしました：",
     "copyFailed": "コピーに失敗しました。ブラウザがクリップボードへの書き込みを受け付けませんでした。",
     "copyRetry": "コピーを再試行",
-    "decide.failed": "承認リクエストに失敗しました",
+    "decide.failed": "操作を完了できませんでした。エラーの詳細を確認してください。",
     "decision.approve": "承認",
     "decision.reject": "却下",
     "degraded": "読み取り結果が不完全です：",
@@ -689,7 +693,9 @@ export const dictionaries = {
     "blocked.hint.migration-blocked": "ホストを停止してから移行ツールを実行してください。実行前に旧データをバックアップし、失敗時は復元できます。完了後に再読み込みしてください。",
     "blocked.hint.forward-only": "マージデータは新しいバージョンのパネルで作成されています。プラグインを更新してから再読み込みしてください。",
     "blocked.hint.needs-repair": "マージデータが不完全です。移行ツールを実行してください。修復前にバックアップします。完了後に再読み込みしてください。",
-    "blocked.hint.unknown": "診断を実行してマージ状態を確認してから、再読み込みしてください。"
+    "blocked.hint.unknown": "診断を実行してマージ状態を確認してから、再読み込みしてください。",
+    "decide.approved": "統合を承認しました。",
+    "decide.rejected": "統合を却下しました。"
   },
   es: {
     "action.approve": "Copiar el comando de aprobación",
@@ -724,7 +730,7 @@ export const dictionaries = {
     "copied": "Copiado: ",
     "copyFailed": "No se pudo copiar: el navegador no aceptó la escritura en el portapapeles.",
     "copyRetry": "Reintentar copia",
-    "decide.failed": "La solicitud de aprobación falló",
+    "decide.failed": "La operación no se completó. Consulta los detalles del error.",
     "decision.approve": "Aprobar",
     "decision.reject": "Rechazar",
     "degraded": "Resultado de lectura incompleto: ",
@@ -918,7 +924,9 @@ export const dictionaries = {
     "blocked.hint.migration-blocked": "Detén el host y ejecuta la herramienta de migración. Antes hace una copia de seguridad y puede restaurarla si falla. Actualiza la página al terminar.",
     "blocked.hint.forward-only": "Los datos de fusión vienen de una versión más reciente del panel. Actualiza el plugin y vuelve a cargar.",
     "blocked.hint.needs-repair": "Los datos de fusión están incompletos. Ejecuta la herramienta de migración; hace copia antes de reparar. Actualiza al terminar.",
-    "blocked.hint.unknown": "Ejecuta el diagnóstico para comprobar el estado de fusión y luego actualiza la página."
+    "blocked.hint.unknown": "Ejecuta el diagnóstico para comprobar el estado de fusión y luego actualiza la página.",
+    "decide.approved": "Fusión aprobada.",
+    "decide.rejected": "Fusión rechazada."
   },
   fr: {
     "action.approve": "Copier la commande d’approbation",
@@ -953,7 +961,7 @@ export const dictionaries = {
     "copied": "Copié :",
     "copyFailed": "Copie impossible : le navigateur n’a pas accepté l’écriture dans le presse-papiers.",
     "copyRetry": "Réessayer la copie",
-    "decide.failed": "La demande d’approbation a échoué",
+    "decide.failed": "L’opération n’a pas abouti. Consultez les détails de l’erreur.",
     "decision.approve": "Approuver",
     "decision.reject": "Rejeter",
     "degraded": "Lecture incomplète :",
@@ -1147,7 +1155,9 @@ export const dictionaries = {
     "blocked.hint.migration-blocked": "Arrêtez l’hôte, puis lancez l’outil de migration. Il sauvegarde d’abord les anciennes données et peut les restaurer en cas d’échec. Rechargez ensuite.",
     "blocked.hint.forward-only": "Les données de fusion proviennent d’une version plus récente du panneau. Mettez le plugin à jour, puis rechargez.",
     "blocked.hint.needs-repair": "Les données de fusion sont incomplètes. Lancez l’outil de migration ; il sauvegarde avant de réparer. Rechargez ensuite.",
-    "blocked.hint.unknown": "Lancez le diagnostic pour vérifier l’état de fusion, puis rechargez."
+    "blocked.hint.unknown": "Lancez le diagnostic pour vérifier l’état de fusion, puis rechargez.",
+    "decide.approved": "Fusion approuvée.",
+    "decide.rejected": "Fusion rejetée."
   },
   de: {
     "action.approve": "Freigabe-Befehl kopieren",
@@ -1182,7 +1192,7 @@ export const dictionaries = {
     "copied": "Kopiert: ",
     "copyFailed": "Kopieren fehlgeschlagen: Der Browser hat das Schreiben in die Zwischenablage nicht angenommen.",
     "copyRetry": "Kopieren erneut versuchen",
-    "decide.failed": "Freigabe-Anfrage fehlgeschlagen",
+    "decide.failed": "Die Aktion wurde nicht abgeschlossen. Prüfe die Fehlerdetails.",
     "decision.approve": "Freigeben",
     "decision.reject": "Ablehnen",
     "degraded": "Unvollständiges Lesen: ",
@@ -1376,7 +1386,9 @@ export const dictionaries = {
     "blocked.hint.migration-blocked": "Beenden Sie den Host und starten Sie dann das Migrationswerkzeug. Es sichert zuerst die alten Daten und kann sie bei einem Fehler wiederherstellen. Danach neu laden.",
     "blocked.hint.forward-only": "Die Zusammenführungsdaten stammen aus einer neueren Version der Oberfläche. Aktualisieren Sie das Plugin und laden Sie dann neu.",
     "blocked.hint.needs-repair": "Die Zusammenführungsdaten sind unvollständig. Starten Sie das Migrationswerkzeug; es sichert vor der Reparatur. Danach neu laden.",
-    "blocked.hint.unknown": "Starten Sie die Diagnose, um den Zusammenführungsstatus zu prüfen, und laden Sie dann neu."
+    "blocked.hint.unknown": "Starten Sie die Diagnose, um den Zusammenführungsstatus zu prüfen, und laden Sie dann neu.",
+    "decide.approved": "Merge freigegeben.",
+    "decide.rejected": "Merge abgelehnt."
   },
   ru: {
     "action.approve": "Скопировать команду одобрения",
@@ -1411,7 +1423,7 @@ export const dictionaries = {
     "copied": "Скопировано: ",
     "copyFailed": "Не удалось скопировать: браузер отклонил запись в буфер обмена.",
     "copyRetry": "Повторить копирование",
-    "decide.failed": "Запрос одобрения не выполнен",
+    "decide.failed": "Действие не завершено. Проверьте подробности ошибки.",
     "decision.approve": "Одобрить",
     "decision.reject": "Отклонить",
     "degraded": "Данные прочитаны не полностью: ",
@@ -1605,7 +1617,9 @@ export const dictionaries = {
     "blocked.hint.migration-blocked": "Остановите хост и запустите инструмент миграции. Сначала он создаёт резервную копию старых данных и может восстановить её при сбое. Затем перезагрузите страницу.",
     "blocked.hint.forward-only": "Данные объединения созданы более новой версией панели. Обновите плагин и перезагрузите страницу.",
     "blocked.hint.needs-repair": "Данные объединения неполные. Запустите инструмент миграции: перед восстановлением он создаёт резервную копию. Затем перезагрузите страницу.",
-    "blocked.hint.unknown": "Запустите диагностику, чтобы проверить состояние объединения, и перезагрузите страницу."
+    "blocked.hint.unknown": "Запустите диагностику, чтобы проверить состояние объединения, и перезагрузите страницу.",
+    "decide.approved": "Объединение одобрено.",
+    "decide.rejected": "Объединение отклонено."
   },
   pt: {
     "action.approve": "Copiar comando de aprovação",
@@ -1640,7 +1654,7 @@ export const dictionaries = {
     "copied": "Copiado:",
     "copyFailed": "Falha ao copiar: o navegador não aceitou a gravação na área de transferência.",
     "copyRetry": "Tentar copiar novamente",
-    "decide.failed": "A solicitação de aprovação falhou",
+    "decide.failed": "A operação não foi concluída. Confira os detalhes do erro.",
     "decision.approve": "Aprovar",
     "decision.reject": "Rejeitar",
     "degraded": "Leitura incompleta:",
@@ -1834,7 +1848,9 @@ export const dictionaries = {
     "blocked.hint.migration-blocked": "Pare o host e execute a ferramenta de migração. Ela faz backup dos dados antigos primeiro e pode restaurá-los em caso de falha. Recarregue depois.",
     "blocked.hint.forward-only": "Os dados de merge vêm de uma versão mais recente do painel. Atualize o plugin e recarregue.",
     "blocked.hint.needs-repair": "Os dados de merge estão incompletos. Execute a ferramenta de migração; ela faz backup antes de reparar. Recarregue depois.",
-    "blocked.hint.unknown": "Execute o diagnóstico para verificar o estado do merge e recarregue."
+    "blocked.hint.unknown": "Execute o diagnóstico para verificar o estado do merge e recarregue.",
+    "decide.approved": "Mesclagem aprovada.",
+    "decide.rejected": "Mesclagem rejeitada."
   },
 } as const
 

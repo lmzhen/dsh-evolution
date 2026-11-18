@@ -1681,6 +1681,36 @@
       "de": "1 Zeichen",
       "pt": "1 caractere",
       "ru": "1 символ"
+    },
+    "undo.success": {
+      "zh": "已回退到 v{n}",
+      "en": "Back to v{n}",
+      "ja": "v{n} に戻しました",
+      "es": "Vuelto a la v{n}",
+      "fr": "Revenu à la v{n}",
+      "de": "Zurück zu v{n}",
+      "pt": "Voltou para a v{n}",
+      "ru": "Возвращено к v{n}"
+    },
+    "undo.successUnit": {
+      "zh": "已回退这次改动",
+      "en": "This change was reverted",
+      "ja": "この変更を元に戻しました",
+      "es": "Este cambio se ha revertido",
+      "fr": "Cette modification a été annulée",
+      "de": "Diese Änderung wurde rückgängig gemacht",
+      "pt": "Esta alteração foi revertida",
+      "ru": "Изменение отменено"
+    },
+    "undo.failed": {
+      "zh": "回退没有完成，请查看错误详情。",
+      "en": "The revert didn’t complete. Check the error details.",
+      "ja": "元に戻せませんでした。エラーの詳細を確認してください。",
+      "es": "La reversión no se completó. Consulta los detalles del error.",
+      "fr": "L’annulation n’a pas abouti. Consultez les détails de l’erreur.",
+      "de": "Das Rückgängigmachen ist nicht abgeschlossen. Prüfe die Fehlerdetails.",
+      "pt": "A reversão não foi concluída. Confira os detalhes do erro.",
+      "ru": "Отмена не завершилась. Проверьте подробности ошибки."
     }
   }
 }

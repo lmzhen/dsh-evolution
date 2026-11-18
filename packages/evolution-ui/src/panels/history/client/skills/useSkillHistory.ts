@@ -101,8 +101,10 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
   const failed = (error: unknown, source: 'read' | 'write' = 'read'): void => {
     failureSource.current = source
     setNoteError(true)
-    setNoteText(face.t('error.hint') + '\n' + face.t('error') + ': '
-      + (error instanceof Error ? error.message : String(error)))
+    setNoteText(source === 'write'
+      ? face.t('undo.failed')
+      : face.t('error.hint') + '\n' + face.t('error') + ': '
+        + (error instanceof Error ? error.message : String(error)))
     setFailure(error instanceof SkillHistoryRefusal ? error.failure : { kind: 'server', status: 0 })
   }
 
@@ -218,15 +220,15 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
     }
     setPending(undefined)
     const name = selected
-    // The result sentence is the curator's — shown verbatim, then the rows are READ AGAIN because the
-    // restore itself recorded a new version. A re-read that fails is APPENDED to that sentence: the
-    // write already happened, so replacing it with "could not load" would report the wrong thing.
-    void face.undo(name, unitId === undefined ? v : undefined, unitId).then((message) => {
+    // The write result is localized here; the host sentence is a CLI/diagnostic
+    // message and is not shown in the eight-locale UI. The rows are READ AGAIN
+    // because the restore itself recorded a new version.
+    void face.undo(name, unitId === undefined ? v : undefined, unitId).then(() => {
       showVersions(name, (error) => {
         setNoteError(true)
-        setNoteText(message + '\n' + face.t('error') + ': ' + (error instanceof Error ? error.message : String(error)))
+        setNoteText(face.t('undo.failed') + '\n' + face.t('error') + ': ' + (error instanceof Error ? error.message : String(error)))
       })
-      succeeded(message)
+      succeeded(unitId === undefined ? face.format('undo.success', { n: v }) : face.t('undo.successUnit'))
     }).catch((error: unknown) => { failed(error, 'write') })
   }
 

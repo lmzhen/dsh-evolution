@@ -156,7 +156,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const [orders, setOrders] = useState<Record<string, readonly string[]>>({})
   const [dragId, setDragId] = useState<string | undefined>(undefined)
   const [deciding, setDeciding] = useState<string | undefined>(undefined)
-  const [decisionNotice, setDecisionNotice] = useState<{ rowId: string; ok: boolean; message: string } | undefined>(undefined)
+  const [decisionNotice, setDecisionNotice] = useState<{ rowId: string; verb: 'approve' | 'reject'; ok: boolean } | undefined>(undefined)
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | undefined>(undefined)
   const returnFocus = useRef<HTMLElement | null>(null)
   const captureFocus = (): void => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }
@@ -171,10 +171,10 @@ export function MergePanel(face: MergeFace): ReactNode {
     void (async () => {
       try {
         const result = await face.decide!(rowId, verb)
-        setDecisionNotice({ rowId, ...result })
+        setDecisionNotice({ rowId, verb, ok: result.ok })
         store.refresh()
-      } catch (error) {
-        setDecisionNotice({ rowId, ok: false, message: error instanceof Error ? error.message : String(error) })
+      } catch {
+        setDecisionNotice({ rowId, verb, ok: false })
       } finally {
         setDeciding(undefined)
       }
@@ -263,7 +263,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const expiredToggle = snapshot.queue === 'pending' ? createElement('button', {
     type: 'button', role: 'switch', 'aria-checked': snapshot.expiredOnly ? 'true' : 'false', 'data-role': 'expired-toggle', 'data-active': snapshot.expiredOnly ? 'true' : 'false', onClick: () => { store.toggleExpired() },
   }, t('tab.expired') + ' ' + String(view.expired)) : null
-  const notice = decisionNotice === undefined ? null : createElement('p', { 'data-role': 'decision-notice', 'data-ok': decisionNotice.ok ? 'true' : 'false' }, decisionNotice.message)
+  const notice = decisionNotice === undefined ? null : createElement('p', { 'data-role': 'decision-notice', 'data-ok': decisionNotice.ok ? 'true' : 'false' }, t(decisionNotice.ok ? (decisionNotice.verb === 'approve' ? 'decide.approved' : 'decide.rejected') : 'decide.failed'))
   const taskBanner = view.counts.pending > 0
     ? createElement(TaskBanner, { count: view.counts.pending, text: t('task.pending') })
     : null

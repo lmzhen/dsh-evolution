@@ -1,5 +1,6 @@
 import { dirname, join } from 'node:path'
 import { DEFAULT_SKILL_LIMITS } from './limits.ts'
+import { measureUnit } from './text-metrics.ts'
 import { contentHash } from './mutations.ts'
 import { parseFrontmatter } from './frontmatter.ts'
 import { isPresent } from './probe.ts'
@@ -98,7 +99,7 @@ export async function buildExtractPlanFromLibrary(
     if (!plan.ok) return { ok: false, message: plan.message + candidateHint }
     return { ok: true, plan: plan.plan, candidates: lookup.candidates }
   }
-  if (targetMd.length > DEFAULT_SKILL_LIMITS.maxSkillContentChars) return { ok: false, message: '目标技能「' + target + '」已超过 ' + DEFAULT_SKILL_LIMITS.maxSkillContentChars + ' 字符，拒绝继续提取。' }
+  if (measureUnit(targetMd, 'codePoints') > DEFAULT_SKILL_LIMITS.maxSkillContentChars) return { ok: false, message: '目标技能「' + target + '」已超过 ' + DEFAULT_SKILL_LIMITS.maxSkillContentChars + ' 字符，拒绝继续提取。' }
   const candidate = findOwnerCandidate(lookup, target)
   if (candidate === undefined) return { ok: false, message: '目标「' + target + '」不是可用的 owner candidate（描述为空或已排除）；owner-gap，不自动 create。' + candidateHint }
   if (!candidate.managed) return { ok: false, message: '目标「' + target + '」不是家族 managed 技能；拒绝把可复用部分写进不受管目录。' }
@@ -161,7 +162,7 @@ export async function buildExtractPlanFromLibrary(
     anchors: { sourceMdSha256: contentHash(sourceMd), targetMdSha256: contentHash(targetMd) },
   })
   if (!plan.ok) return { ok: false, message: plan.message }
-  const projectedChars = targetMd.length + plan.plan.parts.reduce((sum, part) => sum + part.movedText.length + 2, 0)
+  const projectedChars = measureUnit(targetMd, 'codePoints') + plan.plan.parts.reduce((sum, part) => sum + measureUnit(part.movedText, 'codePoints') + 2, 0)
   if (projectedChars > DEFAULT_SKILL_LIMITS.maxSkillContentChars) {
     return { ok: false, message: '目标「' + target + '」投影后约 ' + projectedChars + ' 字符，超过 ' + DEFAULT_SKILL_LIMITS.maxSkillContentChars + ' 上限；拒绝提取。' }
   }
