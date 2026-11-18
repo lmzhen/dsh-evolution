@@ -8,7 +8,7 @@ import type { Context, Volatile } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, paramRowId, payloadText, userSetKeys, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampOnce, liveBool, unwrapLive } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_CONSOLIDATION_FAILURES, DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT, DEFAULT_MEMORY_TOKENS, DEFAULT_USER_TOKENS, UPSTREAM_LIMIT_CHARS_PER_TOKEN, paramRowId, payloadText, userSetKeys, evolutionIoAdapter, makeSerialQueue, MemoryStore, clampOnce, liveBool, unwrapLive } from '@deepseek-ai/dsh-evolution-core'
 import type { LiveValue, MemoryStoreOptions } from '@deepseek-ai/dsh-evolution-core'
 import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import type { MemoryOperation, MemoryProvider, MemorySnapshot, MemoryTarget } from '../index.ts'
@@ -117,7 +117,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
   const policyTokens = (): { memory: number | undefined; user: number | undefined } => {
     const snapshot = policySnapshot()
-    return { memory: snapshot?.memoryTokens, user: snapshot?.userTokens }
+    return {
+      memory: snapshot?.memoryTokens
+        ?? (snapshot?.memoryChars === undefined ? undefined : Math.round(snapshot.memoryChars / UPSTREAM_LIMIT_CHARS_PER_TOKEN)),
+      user: snapshot?.userTokens
+        ?? (snapshot?.userChars === undefined ? undefined : Math.round(snapshot.userChars / UPSTREAM_LIMIT_CHARS_PER_TOKEN)),
+    }
   }
   const DEFAULTS = { memoryChars: DEFAULT_MEMORY_CHAR_LIMIT, userChars: DEFAULT_USER_CHAR_LIMIT } as const
   /**
@@ -133,7 +138,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   /**
    * The token budget the store should use. A row-level char value is an explicit
    * legacy override and keeps char mode; otherwise the row token value wins over
-   * the policy token value, which wins over the package default.
+   * the policy token value, which wins over the token default.
    */
   const effectiveTokenLimit = (id: 'memoryTokens' | 'userTokens'): number | undefined => {
     const rowToken = canonicalTokenBudget(id)
@@ -141,7 +146,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const rowChar = canonicalBudget(id === 'memoryTokens' ? 'memoryChars' : 'userChars')
     if (rowChar !== undefined) return undefined
     const policy = policyTokens()
-    return id === 'memoryTokens' ? policy.memory : policy.user
+    const policyToken = id === 'memoryTokens' ? policy.memory : policy.user
+    return policyToken ?? (id === 'memoryTokens' ? DEFAULT_MEMORY_TOKENS : DEFAULT_USER_TOKENS)
   }
   /**
    * Whether the OPERATOR set this budget on THIS ROW (G0/S0.4 + G1). The canonical

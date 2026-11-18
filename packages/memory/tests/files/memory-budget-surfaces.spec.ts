@@ -62,12 +62,14 @@ describe('memory budget surfaces (S2-12③)', () => {
     expect(budget.userSource).toBe('policy')
   })
 
-  it('without a policy an UNSET limit keeps the package default', async () => {
+  it('without a policy an UNSET limit uses the token default and keeps the legacy char view', async () => {
     const ctx = await context()
     await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-budget-') })
-    const budget = budgetOf(ctx)
+    const budget = budgetOf(ctx) as unknown as Budget & { memoryTokens?: number; userTokens?: number }
     expect(budget.memorySource).toBe('default')
     expect(budget.memoryChars).toBe(2200)
+    expect(budget.memoryTokens).toBe(800)
+    expect(budget.userTokens).toBe(500)
   })
 
   it('a policy token budget reaches the store when the row has no explicit budget', async () => {
