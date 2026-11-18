@@ -23,8 +23,14 @@
 
 | 设置 | 默认值 | 说明 |
 |---|---:|---|
-| `memoryChars` | 2200 | `MEMORY.md` 的字符预算 |
-| `userChars` | 1375 | `USER.md` 的字符预算 |
+| `memoryTokens` | `800` | `MEMORY.md` 的估算 token 预算 |
+| `userTokens` | `500` | `USER.md` 的估算 token 预算 |
+| `memoryChars` | 未设置 | 旧字符口径；显式设置后该行按字符模式工作 |
+| `userChars` | 未设置 | 旧字符口径；显式设置后该行按字符模式工作 |
+
+token 数是写入前的保守估算：取 UTF-8 字节数 ÷ 3 与 Unicode 码点数 ÷ 4 的较大值，不按语言设阈值，也不等同 provider 的精确 usage。英文约 2,400 字符、中文约 800 字符触及默认的 800 token 线。
+
+旧配置迁移：只在 policy 里保留 `memoryChars` / `userChars` 时，插件按 2.75 字符/token 换算成 token；row 上显式写 `memoryChars` / `userChars` 则保持字符模式，作为兼容覆盖。新旧字段同时出现时，doctor 会报告 store 与 policy 的口径冲突。
 
 用量达到约 80% 后会出现存储提示。预算写满时新增会被拒绝；替换只有在未触发超限保护且替换后仍满足预算时才能执行。
 

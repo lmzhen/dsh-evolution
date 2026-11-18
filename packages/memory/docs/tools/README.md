@@ -12,7 +12,7 @@ Use one `operations` array for a batch. The batch is evaluated against the final
 
 - `memoryEnabled`: default `true`; disabling removes the model tool and prompt sections while retaining an explicit refusal runner for previously staged writes.
 - `entryPreviewChars`: default 200 characters per entry in the tool response; this does not truncate stored content.
-- `memoryChars` and `userChars`: enforced by the selected provider, not by this tool; see [memory-files](../memory-files/README.md).
+- `memoryTokens` and `userTokens`: estimated token budgets enforced by the selected provider; `memoryChars` / `userChars` remain legacy character-mode overrides. The tool reports the active unit and marks estimates as estimates; see [memory-files](../files/README.md).
 
 When ordinary approval is enabled, a write can return `pending_id` instead of executing immediately. An effective platform session policy of `never` bypasses staging as designed.
 
