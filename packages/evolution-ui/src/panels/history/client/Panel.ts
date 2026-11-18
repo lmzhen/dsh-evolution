@@ -11,7 +11,7 @@ import type { Copy } from './chrome.ts'
 import { SkillList } from './skills/SkillList.ts'
 import { SkillDetail } from './skills/SkillDetail.ts'
 import { useSkillHistory } from './skills/useSkillHistory.ts'
-import type { GovernanceRow, HealthPayload, SkillRow, VersionBodyRow, VersionDiffRow, VersionsPayload } from './api.ts'
+import type { HealthPayload, SkillRow, VersionBodyRow, VersionDiffRow, VersionsPayload } from './api.ts'
 import type { SkillStatsSnapshot } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { MarkdownWords } from './markdown.ts'
 
@@ -21,7 +21,6 @@ export interface PanelFace extends Copy {
   readonly markdownWords: MarkdownWords
   readonly loadSkills: () => Promise<readonly SkillRow[]>
   readonly loadVersions: (name: string) => Promise<VersionsPayload>
-  readonly loadGovernance?: () => Promise<readonly GovernanceRow[]>
   readonly loadHealth?: () => Promise<HealthPayload>
   readonly loadStats?: () => Promise<SkillStatsSnapshot>
   /** Drop the workbench's shared stats cache; the panel refresh calls this before re-reading. */
@@ -29,9 +28,15 @@ export interface PanelFace extends Copy {
   readonly loadDiff: (name: string, v: number) => Promise<VersionDiffRow>
   readonly loadBody: (name: string, v: number) => Promise<VersionBodyRow>
   readonly undo: (name: string, v?: number, unitId?: string) => Promise<string>
-  /** One explicit navigation request: select this skill when the revision is new. */
-  readonly focusSkill?: string | undefined
-  readonly focusRevision?: number | undefined
+  /** Controlled selection; the workbench store is the only owner. */
+  readonly selected?: string | undefined
+  /** Bumped for every explicit open, including a repeated same-skill navigation. */
+  readonly selectionRevision?: number | undefined
+  /** A list click asks the owner to select this skill. */
+  readonly onSelect?: ((name: string) => void) | undefined
+  /** Controlled list search; restored when the user returns from data. */
+  readonly query?: string | undefined
+  readonly onQuery?: ((value: string) => void) | undefined
 }
 
 /**
@@ -42,7 +47,7 @@ export interface PanelFace extends Copy {
 export function SkillHistoryPanel(face: PanelFace): ReactNode {
   const history = useSkillHistory(face)
   return createElement('div', { className: 'evo-hist-frame' },
-    createElement('div', { className: 'evo-hist-root' },
+    createElement('div', { className: 'evo-hist-root', 'data-detail': history.selected === undefined ? 'false' : 'true' },
       createElement(SkillList, {
         copy: face,
         query: history.query,
@@ -60,8 +65,6 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
         selected: history.selected,
         noteText: history.noteText,
         noteError: history.noteError,
-        governance: history.governance,
-        counts: history.counts,
         errorNotes: history.errorNotes.get(history.selected ?? '') ?? [],
         failureNode: history.failureNode,
         skills: history.skills,

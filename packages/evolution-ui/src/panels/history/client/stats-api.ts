@@ -86,12 +86,21 @@ function rowOf(value: unknown): SkillStatsRow | null {
   const source = recordOf(value)
   const name = typeof source?.name === 'string' ? source.name : ''
   if (source === null || name === '') return null
+  const lastChangedAt = stringOrNull(source.lastChangedAt) ?? stringOrNull(source.lastAt)
+  const health = healthOf(source.health)
+  const needsAttention = typeof source.needsAttention === 'boolean'
+    ? source.needsAttention
+    : health?.verdict === 'warn' || health?.verdict === 'needs-restructure'
   return {
     name,
     description: typeof source.description === 'string' ? source.description : '',
     versions: numberOrNull(source.versions) ?? 0,
-    lastAt: stringOrNull(source.lastAt),
-    health: healthOf(source.health),
+    lastChangedAt,
+    lastAt: stringOrNull(source.lastAt) ?? lastChangedAt,
+    lastActivityAt: stringOrNull(source.lastActivityAt),
+    recentlyUsed: booleanOrNull(source.recentlyUsed),
+    needsAttention,
+    health,
     usage: usageOf(source.usage),
     feedback: numberOrNull(source.feedback),
     feedback30d: numberOrNull(source.feedback30d),
@@ -115,7 +124,7 @@ function totalsOf(value: unknown, rows: readonly SkillStatsRow[]): SkillStatsTot
   const successes = countsOf(source?.successes)
   return {
     skills: numberOrNull(source?.skills) ?? rows.length,
-    needsAttention: numberOrNull(source?.needsAttention) ?? rows.filter(row => row.health?.verdict === 'warn' || row.health?.verdict === 'needs-restructure').length,
+    needsAttention: numberOrNull(source?.needsAttention) ?? rows.filter(row => row.needsAttention).length,
     bodyChars: numberOrNull(source?.bodyChars),
     supportFiles: numberOrNull(source?.supportFiles),
     successes,
@@ -153,11 +162,22 @@ export function parseSkillStats(value: unknown): SkillStatsSnapshot {
   const rows = Array.isArray(source?.rows)
     ? source.rows.map(rowOf).filter((row): row is SkillStatsRow => row !== null)
     : []
+  const totals = totalsOf(source?.totals, rows)
+  const counts = countsOf(source?.counts)
+  const governance = governanceOf(source?.governance)
+  const globalSource = recordOf(source?.global)
+  const globalGovernance = governanceOf(globalSource?.governance)
+  const global = {
+    totals: globalSource?.totals === undefined ? totals : totalsOf(globalSource.totals, rows),
+    counts: countsOf(globalSource?.counts) ?? counts,
+    governance: globalGovernance.length > 0 ? globalGovernance : governance,
+  }
   return {
     rows,
-    totals: totalsOf(source?.totals, rows),
-    counts: countsOf(source?.counts),
-    governance: governanceOf(source?.governance),
+    global,
+    totals: global.totals,
+    counts: global.counts,
+    governance: global.governance,
     generatedAt: stringOrNull(source?.generatedAt) ?? '',
   }
 }

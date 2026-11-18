@@ -14,7 +14,11 @@ function row(name: string, body: number | null, verdict: string, lastAt: string 
     name,
     description: name,
     versions: name.length,
+    lastChangedAt: lastAt,
     lastAt,
+    lastActivityAt: null,
+    recentlyUsed: null,
+    needsAttention: verdict === 'warn' || verdict === 'needs-restructure',
     health: {
       verdict,
       bodyChars: body,
@@ -53,8 +57,15 @@ describe('browser stats model parity', () => {
   }
 
   it('keeps the same attention filter', () => {
-    const host = rows.filter(row => row.health?.verdict === 'warn' || row.health?.verdict === 'needs-restructure').map(r => r.name)
+    const host = rows.filter(row => row.needsAttention).map(r => r.name)
     expect(filterRows(rows, 'attention').map(r => r.name)).toEqual(host)
+  })
+
+  it('keeps the same recent-use filter', () => {
+    const recent = [row('recent', 1, 'healthy'), row('stale', 2, 'healthy')]
+    recent[0] = { ...recent[0]!, recentlyUsed: true }
+    recent[1] = { ...recent[1]!, recentlyUsed: false }
+    expect(filterRows(recent, 'recent').map(r => r.name)).toEqual(['recent'])
   })
 
   it('treats two rows with the same value as a name tie-break', () => {

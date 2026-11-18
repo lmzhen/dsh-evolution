@@ -72,6 +72,7 @@ export const CSS = [
   '.evo-hist-main{flex:1 1 32ch;min-width:min(100%,32ch);min-height:0;overflow-y:auto;padding:var(--evo-space-12) var(--evo-space-12)}',
   '.evo-hist-head{display:flex;align-items:center;flex-wrap:wrap;gap:var(--evo-space-10);margin:0 0 var(--evo-space-4)}',
   '.evo-hist-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font-size:var(--evo-type-lg);font-weight:600}',
+  '.evo-hist-title:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset);border-radius:var(--evo-radius-control)}',
   '.evo-hist-governance{margin:0 0 var(--evo-space-10);padding:var(--evo-space-8) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control)}',
   '.evo-hist-governance-list{list-style:none;margin:0;padding:0;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   '.evo-hist-governance-row{padding:var(--evo-space-2) 0}',
@@ -147,6 +148,7 @@ export const CSS = [
   '.evo-doc-line-add{color:var(--evo-tone-success)}',
   '.evo-doc-line-del{color:var(--evo-tone-danger)}',
   '@media (max-width:1100px){.evo-hist-actions{justify-content:flex-start;margin-inline-start:0}}',
-  '@container (max-width:760px){.evo-hist-root{flex-direction:column}.evo-hist-aside{flex:0 0 auto;width:100%;max-height:42%;border-right:0;border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}.evo-hist-main{flex:1 1 0;width:100%;min-height:0;overflow-y:auto}.evo-hist-row{max-width:none}}',
-  '@media (max-width:900px){.evo-hist-root{flex-direction:column}.evo-hist-aside{flex:0 0 auto;width:100%;max-height:42%;border-right:0;border-bottom:var(--evo-hairline-width) solid var(--dsw-alias-border-l2)}.evo-hist-main{flex:1 1 0;min-height:0;overflow-y:auto}.evo-hist-row{max-width:none}}',
+  // One container rule for the whole history surface. The workbench body is the container; at narrow
+  // widths the list and detail are alternative pages, never a half-height stack.
+  '@container (max-width:959.98px){.evo-hist-root[data-detail="true"] .evo-hist-aside{display:none}.evo-hist-root[data-detail="false"] .evo-hist-main{display:none}.evo-hist-aside{flex:1 1 auto;width:100%;max-width:none;border-right:0;border-bottom:0}.evo-hist-main{flex:1 1 auto;width:100%;min-height:0;overflow-y:auto}.evo-hist-row{max-width:none}}',
 ].join('\n')

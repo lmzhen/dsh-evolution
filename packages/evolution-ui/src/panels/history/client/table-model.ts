@@ -9,9 +9,9 @@
  */
 import type { SkillStatsFilter, SkillStatsRow, SkillStatsSortKey, SortDirection } from '@deepseek-ai/dsh-evolution-core/skills'
 
-/** The actionable verdicts, same rule as core's `needsAttention`. */
+/** The actionable flag is host-derived; this copy no longer re-interprets the verdict. */
 export function needsAttention(row: SkillStatsRow): boolean {
-  return row.health?.verdict === 'warn' || row.health?.verdict === 'needs-restructure'
+  return row.needsAttention
 }
 
 function verdictRank(verdict: string | undefined): number | null {
@@ -41,7 +41,7 @@ export function sortValue(row: SkillStatsRow, key: SkillStatsSortKey): string | 
     case 'feedback30d': return row.feedback30d
     case 'negativeFeedback30d': return row.negativeFeedback30d
     case 'feedbackRate30d': return row.feedbackRate30d
-    case 'lastAt': return row.lastAt === null ? null : Date.parse(row.lastAt)
+    case 'lastAt': return row.lastChangedAt === null ? null : Date.parse(row.lastChangedAt)
   }
 }
 
@@ -64,5 +64,5 @@ export function sortRows(rows: readonly SkillStatsRow[], key: SkillStatsSortKey,
 export function filterRows(rows: readonly SkillStatsRow[], filter: SkillStatsFilter): SkillStatsRow[] {
   if (filter === 'all') return [...rows]
   if (filter === 'attention') return rows.filter(needsAttention)
-  return rows.filter(row => row.lastAt !== null)
+  return rows.filter(row => row.recentlyUsed === true)
 }

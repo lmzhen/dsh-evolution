@@ -11,7 +11,7 @@ import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } f
 import { type OpenKind } from '../chrome.ts'
 import { DiffBody, PreviewBody, type BodyState, type DiffState } from '../document.ts'
 import { historyViewModel, type HistoryViewModel } from '../history-presentation.ts'
-import { SkillHistoryRefusal, type GovernanceRow, type HealthPayload, type SkillRow, type VersionsPayload, type VersionRow } from '../api.ts'
+import { SkillHistoryRefusal, type HealthPayload, type SkillRow, type VersionsPayload, type VersionRow } from '../api.ts'
 import type { RouteFailure } from '@lmzhen/dsh-evolution-client-kit/generated/route-client'
 import { fillTemplate } from '@lmzhen/dsh-evolution-client-kit'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
@@ -39,8 +39,6 @@ export interface SkillHistoryController {
   readonly onRefresh: () => void
   readonly noteText: string | undefined
   readonly noteError: boolean
-  readonly governance: readonly GovernanceRow[]
-  readonly counts: HealthPayload['counts']
   readonly failureNode: ReactNode
   readonly loaded: boolean
   readonly versionsFailed: string | undefined
@@ -68,6 +66,12 @@ function failureBlock(t: (key: string) => string, failure: RouteFailure): ReactN
  * @returns the state and callbacks the list/detail views render.
  */
 export function useSkillHistory(face: PanelFace): SkillHistoryController {
+  const controlledSelection = face.onSelect !== undefined
+  const controlledQuery = face.onQuery !== undefined
+  const [localSelected, setLocalSelected] = useState<string | undefined>(undefined)
+  const [localQuery, setLocalQuery] = useState('')
+  const selected = controlledSelection ? face.selected : localSelected
+  const query = controlledQuery ? face.query ?? '' : localQuery
   const [skills, setSkills] = useState<readonly SkillRow[]>([])
   // Whether the first list read has LANDED. Without it an empty list renders the empty state while the
   // answer is still in flight, and a reader cannot tell "nothing recorded" from "not read yet" (E7).
@@ -75,7 +79,6 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
   // G5/W7 S6b: the panel-level failure as the classified four-state object (rendered with the shared
   // block + the command fallback). Row-level read failures keep their inline sentences.
   const [failure, setFailure] = useState<RouteFailure | undefined>(undefined)
-  const [selected, setSelected] = useState<string | undefined>(undefined)
   const [payload, setPayload] = useState<VersionsPayload | undefined>(undefined)
   // T5-09 (S3.4): the version read needs a FAILED state of its own. `payload === undefined` covered
   // both "still reading" and "the read failed", so a failed read left the pane saying 读取中… — the
@@ -84,15 +87,11 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
   const [noteText, setNoteText] = useState<string | undefined>(undefined)
   const [noteError, setNoteError] = useState(false)
   const [pending, setPending] = useState<number | undefined>(undefined)
-  const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState<OpenRow | undefined>(undefined)
   const [diffs, setDiffs] = useState<ReadonlyMap<number, DiffState>>(new Map())
   const [bodies, setBodies] = useState<ReadonlyMap<number, BodyState>>(new Map())
-  const [governance, setGovernance] = useState<readonly GovernanceRow[]>([])
-  const [counts, setCounts] = useState<HealthPayload['counts']>(null)
   const [healthByName, setHealthByName] = useState<ReadonlyMap<string, HealthPayload['rows'][number]>>(new Map())
   const [errorNotes, setErrorNotes] = useState<ReadonlyMap<string, readonly SkillErrorNote[]>>(new Map())
-  const [statsEpoch, setStatsEpoch] = useState(0)
   // Every rows read takes a ticket, and only the newest one may write state. Without it a slow reply
   // for skill A lands while B is open: B would show A's rows, and B's restore buttons would post A's
   // version number at B's name — a write against the wrong skill.
@@ -155,7 +154,6 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
   const showVersions = (name: string, onFailure: (error: unknown) => void = failed, keepContent = false): void => {
     const ticket = readTicket.current + 1
     readTicket.current = ticket
-    setSelected(name)
     if (!keepContent) {
       setPayload(undefined)
       setVersionsFailed(undefined)
@@ -182,33 +180,36 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
     })
   }
 
-  /** Open a skill from the list: another skill's sentence described another skill, so it goes away. */
+  /** Open a skill from the list: the owner stores the selection and this hook loads it. */
   const open = (name: string): void => {
     if (name !== selected) {
       setNoteText(undefined)
       setNoteError(false)
     }
-    // A report may have landed since the data page mounted; opening a skill must not show its stale
-    // stats snapshot (notably the error-note history).
-    face.invalidateStats?.()
-    setStatsEpoch(epoch => epoch + 1)
-    showVersions(name)
+    if (controlledSelection) face.onSelect?.(name)
+    else setLocalSelected(name)
   }
 
   /** What the refresh control does: both reads again, and the sentence stays. */
   const refresh = (): void => {
     face.invalidateStats?.()
-    setStatsEpoch(epoch => epoch + 1)
     reloadSkills()
     if (selected !== undefined) showVersions(selected, failed, true)
   }
 
   useEffect(() => {
-    if (face.focusSkill === undefined || face.focusSkill === '') return
+    if (selected === undefined || selected === '') {
+      setPayload(undefined)
+      setVersionsFailed(undefined)
+      setPending(undefined)
+      setExpanded(undefined)
+      setDiffs(new Map())
+      setBodies(new Map())
+      return
+    }
     face.invalidateStats?.()
-    setStatsEpoch(epoch => epoch + 1)
-    showVersions(face.focusSkill)
-  }, [face.focusSkill, face.focusRevision])
+    showVersions(selected)
+  }, [selected, face.selectionRevision])
 
   const restore = (v: number, unitId?: string): void => {
     if (selected === undefined) return
@@ -270,15 +271,12 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
   useEffect(() => {
     const loadStats = face.loadStats
     const loadHealth = face.loadHealth
-    const loadGovernance = face.loadGovernance
-    if (loadStats === undefined && loadHealth === undefined && loadGovernance === undefined) return
+    if (loadStats === undefined && loadHealth === undefined) return
     let live = true
     const fromStats = loadStats === undefined
       ? undefined
       : loadStats().then((snapshot) => {
         if (!live) return
-        setGovernance(snapshot.governance ?? [])
-        setCounts(snapshot.counts)
         setHealthByName(new Map(snapshot.rows
           .filter(row => row.health !== null)
           .map(row => [row.name, {
@@ -294,17 +292,13 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
       }).catch(() => { /* fall back to the legacy health read below */ })
     const read = loadStats !== undefined
       ? fromStats
-      : loadHealth !== undefined
-        ? loadHealth().then((payload) => {
-          if (!live) return
-          setGovernance(payload.governance)
-          setCounts(payload.counts)
-          setHealthByName(new Map(payload.rows.map(row => [row.name, row])))
-        })
-        : loadGovernance!().then((rows) => { if (live) setGovernance(rows) })
+      : loadHealth!().then((payload) => {
+        if (!live) return
+        setHealthByName(new Map(payload.rows.map(row => [row.name, row])))
+      })
     void read?.catch(() => { /* the aggregate read is optional */ })
     return () => { live = false }
-  }, [face.loadStats, face.loadHealth, face.loadGovernance, statsEpoch])
+  }, [face.loadStats, face.loadHealth])
 
   const needle = query.trim().toLowerCase()
   const visible = useMemo(() => needle === ''
@@ -334,7 +328,7 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
 
   return {
     query,
-    onQuery: setQuery,
+    onQuery: controlledQuery ? face.onQuery! : setLocalQuery,
     skills,
     visible,
     skillsLoaded,
@@ -345,8 +339,6 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
     onRefresh: refresh,
     noteText,
     noteError,
-    governance,
-    counts,
     failureNode,
     loaded,
     versionsFailed,
@@ -379,4 +371,3 @@ function without<K, V>(current: ReadonlyMap<K, V>, key: K): Map<K, V> {
   next.delete(key)
   return next
 }
-

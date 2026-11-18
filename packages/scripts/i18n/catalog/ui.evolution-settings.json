@@ -423,8 +423,8 @@
       "ru": "Выполняется: {n}"
     },
     "approvalTitle": {
-      "zh": "待批写入",
-      "en": "Pending writes",
+      "zh": "待我确认",
+      "en": "Needs your review",
       "ja": "承認待ちの書き込み",
       "es": "Escrituras pendientes de aprobación",
       "fr": "Écritures en attente d’approbation",

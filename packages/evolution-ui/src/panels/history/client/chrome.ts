@@ -78,15 +78,15 @@ export function skillLine(copy: Copy, row: SkillRow, selected: boolean, onOpen: 
     key: row.name,
     type: 'button',
     className: 'evo-hist-skill',
+    title: row.description,
+    'data-skill': row.name,
     'aria-current': selected ? 'true' : undefined,
     onClick: onOpen,
   },
   cellLine(row.cells.title, copy, 'evo-hist-cell-line'),
   (() => {
-    const description = row.cells.meta.filter(cell => cell.key === 'description')
     const facts = row.cells.meta.filter(cell => cell.key !== 'description')
     return [
-      description.length === 0 ? null : cellLine(description, copy, 'evo-hist-cell-line evo-hist-skill-description', {}, 'description'),
       facts.length === 0 ? null : cellLine(facts, copy, 'evo-hist-cell-line evo-hist-cell-meta', {}, 'facts'),
       health === undefined || health.verdict === 'healthy' || health.verdict === 'unknown' || (health.verdict === 'ok' && health.findings === 0)
         ? null
@@ -256,7 +256,7 @@ export function panelHead(copy: Copy, onRefresh: () => void, title?: string, nam
       createElement(CopyCommandButton, { key: 'condense', copy, command: copy.format('copy.command.condense', { name }), label: copy.t('copy.condense') })))
   }
   return createElement('div', { className: 'evo-hist-head' },
-    createElement('h2', { className: 'evo-hist-title' }, title ?? copy.t('title')),
+    createElement('h2', { className: 'evo-hist-title', tabIndex: -1 }, title ?? copy.t('title')),
     ...actions)
 }
 

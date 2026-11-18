@@ -712,7 +712,16 @@
       "pt": "Copie o comando abaixo",
       "ru": "Команду можно скопировать ниже"
     },
-    "hint": {
+        "advanced": {
+      "zh": "高级",
+      "en": "Advanced",
+      "ja": "詳細",
+      "es": "Avanzado",
+      "fr": "Avancé",
+      "de": "Erweitert",
+      "pt": "Avançado",
+      "ru": "Дополнительно"
+    },"hint": {
       "zh": "先处理需要判断的合并，其他信息按需展开。",
       "en": "Handle merges that need a verdict first; expand the rest as needed.",
       "ja": "判断が必要なマージを先に処理します。その他の情報は必要に応じて展開できます。",

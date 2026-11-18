@@ -7,17 +7,22 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, useEffect, useMemo, useState } from 'react'
-import { DataTable, DATA_TABLE_CSS, type DataTableColumn, type DataTableSort } from '@lmzhen/dsh-evolution-client-kit'
-import { formatLocalDateTime } from '@lmzhen/dsh-evolution-client-kit'
+import { DataTable, DATA_TABLE_CSS, type DataTableColumn } from '@lmzhen/dsh-evolution-client-kit'
 import type { SkillStatsFilter, SkillStatsRow, SkillStatsSnapshot, SkillStatsSortKey } from '@deepseek-ai/dsh-evolution-core/skills'
 import { filterRows, sortRows } from './table-model.ts'
+import type { WorkbenchDataState } from './WorkbenchStore.ts'
+import { lastAtText, numberText, rateText, statusKey, statusTone } from './stats-format.ts'
 
 /** The data and callbacks the stats page consumes; no service handle. */
 export interface StatsFace {
   readonly t: (key: string) => string
   readonly loadStats: () => Promise<SkillStatsSnapshot>
-  /** Bumped when the workbench invalidates the shared snapshot (open/refresh). */
-  readonly refreshKey?: number
+  /** Increments when the workbench's shared stats resource is invalidated. */
+  readonly statsRevision?: number
+  /** Controlled table state; the workbench store owns query/filter/sort/scroll. */
+  readonly view: WorkbenchDataState
+  readonly onView: (patch: Partial<WorkbenchDataState>) => void
+  readonly layout: 'wide' | 'medium' | 'narrow'
   readonly openSkill: (name: string) => void
   readonly onOrganize: () => void
 }
@@ -33,30 +38,14 @@ const FILTERS: readonly { readonly id: SkillStatsFilter; readonly key: string }[
   { id: 'recent', key: 'stats.filter.recent' },
 ]
 
-function numberText(value: number | null | undefined): string {
-  return value === null || value === undefined ? '—' : value.toLocaleString()
-}
-
-/** A ratio is shown as a percentage; an absent denominator keeps the explicit dash. */
-function rateText(value: number | null | undefined): string {
-  return value === null || value === undefined ? '-' : (value * 100).toFixed(0) + '%'
-}
-
-function lastAtText(value: string | null): string {
-  return value === null ? '—' : formatLocalDateTime(value, { seconds: false }) ?? '—'
-}
-
-function statusKey(verdict: string | undefined): string {
-  if (verdict === 'warn' || verdict === 'needs-restructure') return 'health.verdict.' + verdict
-  if (verdict === 'healthy') return 'stats.verdict.healthy'
-  return 'stats.verdict.unknown'
-}
-
-function statusTone(verdict: string | undefined): string {
-  if (verdict === 'warn' || verdict === 'needs-restructure') return 'is-warn'
-  if (verdict === 'healthy') return 'is-ok'
-  return 'is-muted'
-}
+const SORT_OPTIONS: readonly { readonly key: SkillStatsSortKey; readonly label: string }[] = [
+  { key: 'bodyChars', label: 'stats.col.body' },
+  { key: 'viewCount30d', label: 'stats.col.loads30d' },
+  { key: 'negativeFeedback30d', label: 'stats.col.negativeFeedback30d' },
+  { key: 'feedbackRate30d', label: 'stats.col.feedbackRate' },
+  { key: 'lastAt', label: 'stats.col.lastAt' },
+  { key: 'name', label: 'stats.col.skill' },
+]
 
 /**
  * Render the stats page.
@@ -65,9 +54,10 @@ function statusTone(verdict: string | undefined): string {
  */
 export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<SkillStatsFilter>('all')
-  const [sort, setSort] = useState<DataTableSort>({ key: 'bodyChars', dir: 'desc' })
+  const layout = face.layout
+  const query = face.view.query
+  const filter = face.view.filter
+  const sort = face.view.sort
 
   useEffect(() => {
     let live = true
@@ -82,7 +72,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
         : { status: 'failed', message: error instanceof Error ? error.message : String(error) })
     })
     return () => { live = false }
-  }, [face.loadStats, face.refreshKey])
+  }, [face.loadStats, face.statsRevision])
 
   const snapshot = load.status === 'ready' ? load.snapshot : null
   const visible = useMemo(() => {
@@ -95,13 +85,11 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   }, [snapshot, query, filter, sort])
 
   const onSort = (key: string): void => {
-    setSort(current => current.key === key
-      ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' }
-      : { key, dir: key === 'name' ? 'asc' : 'desc' })
+    face.onView({ sort: { key, dir: sort.key === key ? (sort.dir === 'asc' ? 'desc' : 'asc') : (key === 'name' ? 'asc' : 'desc') } })
   }
 
   const Table = DataTable<SkillStatsRow>
-  const columns: readonly DataTableColumn<SkillStatsRow>[] = [
+  const allColumns: readonly DataTableColumn<SkillStatsRow>[] = [
     {
       key: 'name',
       label: face.t('stats.col.skill'),
@@ -127,14 +115,54 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
     { key: 'viewCount30d', label: face.t('stats.col.loads30d'), align: 'right', sortable: true, render: row => numberText(row.usage?.viewCount30d ?? null) },
     { key: 'negativeFeedback30d', label: face.t('stats.col.negativeFeedback30d'), align: 'right', sortable: true, render: row => numberText(row.negativeFeedback30d) },
     { key: 'feedbackRate30d', label: face.t('stats.col.feedbackRate'), align: 'right', sortable: true, render: row => rateText(row.feedbackRate30d) },
-    { key: 'lastAt', label: face.t('stats.col.lastAt'), sortable: true, render: row => lastAtText(row.lastAt) },
+    { key: 'lastAt', label: face.t('stats.col.lastAt'), sortable: true, render: row => lastAtText(row.lastChangedAt) },
   ]
 
-  const totals = snapshot?.totals
+  const totals = snapshot?.global.totals
+  const hiddenInMedium = new Set(['supportFiles', 'versions', 'viewCount', 'feedbackRate30d', 'lastAt'])
+  const columns = layout === 'wide' ? allColumns : allColumns.filter(column => !hiddenInMedium.has(column.key))
+
+  const cards = createElement('div', { className: 'evo-stats-cards' },
+    visible.map(row => createElement('article', { key: row.name, className: 'evo-stats-card' },
+      createElement('div', { className: 'evo-stats-card-head' },
+        createElement('button', {
+          type: 'button',
+          className: 'evo-stats-skill-name',
+          onClick: () => { face.openSkill(row.name) },
+        }, row.name, createElement('span', { className: 'evo-stats-skill-go', 'aria-hidden': 'true' })),
+        createElement('span', { className: 'evo-stats-pill ' + statusTone(row.health?.verdict) }, face.t(statusKey(row.health?.verdict)))),
+      createElement('p', { className: 'evo-stats-card-desc' }, row.description || '—'),
+      createElement('dl', { className: 'evo-stats-card-facts' },
+        createElement('div', null, createElement('dt', null, face.t('stats.col.body')), createElement('dd', null, numberText(row.health?.bodyChars ?? null))),
+        createElement('div', null, createElement('dt', null, face.t('stats.col.loads30d')), createElement('dd', null, numberText(row.usage?.viewCount30d ?? null))),
+        createElement('div', null, createElement('dt', null, face.t('stats.col.negativeFeedback30d')), createElement('dd', null, numberText(row.negativeFeedback30d))),
+        createElement('div', null, createElement('dt', null, face.t('stats.col.feedbackRate')), createElement('dd', null, rateText(row.feedbackRate30d))),
+        createElement('div', null, createElement('dt', null, face.t('stats.col.lastAt')), createElement('dd', null, lastAtText(row.lastChangedAt)))))))
+
+  const sortControl = layout === 'narrow'
+    ? createElement('div', { className: 'evo-stats-sort' },
+      createElement('label', null,
+        createElement('span', null, face.t('stats.sort')),
+        createElement('select', {
+          value: sort.key,
+          'aria-label': face.t('stats.sort'),
+          onChange: (event: { target: { value: string } }) => {
+            face.onView({ sort: { key: event.target.value, dir: sort.dir } })
+          },
+        }, SORT_OPTIONS.map(option => createElement('option', { key: option.key, value: option.key }, face.t(option.label)))),
+      ),
+      createElement('button', {
+        type: 'button',
+        className: 'evo-stats-sort-dir',
+        'aria-label': face.t(sort.dir === 'asc' ? 'stats.sortAsc' : 'stats.sortDesc'),
+        title: face.t(sort.dir === 'asc' ? 'stats.sortAsc' : 'stats.sortDesc'),
+        onClick: () => { face.onView({ sort: { key: sort.key, dir: sort.dir === 'asc' ? 'desc' : 'asc' } }) },
+      }, sort.dir === 'asc' ? '↑' : '↓'))
+    : null
+
   return createElement('div', { className: 'evo-stats-page' },
     createElement('header', { className: 'evo-stats-hero' },
       createElement('div', null,
-        createElement('div', { className: 'evo-stats-eyebrow' }, face.t('stats.eyebrow')),
         createElement('h2', { className: 'evo-stats-title' }, face.t('stats.title')),
         createElement('p', { className: 'evo-stats-lede' }, face.t('stats.lede'))),
       createElement('button', { type: 'button', className: 'evo-stats-primary', onClick: () => { face.onOrganize() } }, '+ ', face.t('stats.organize'))),
@@ -148,7 +176,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
         createElement('span', { className: 'evo-stats-search-mark', 'aria-hidden': 'true' }),
         createElement('input', {
           value: query,
-          onChange: (event: { target: { value: string } }) => { setQuery(event.target.value) },
+          onChange: (event: { target: { value: string } }) => { face.onView({ query: event.target.value }) },
           placeholder: face.t('stats.search'),
           'aria-label': face.t('stats.search'),
         })),
@@ -158,8 +186,9 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
           type: 'button',
           className: 'evo-stats-filter' + (filter === entry.id ? ' is-active' : ''),
           'aria-pressed': filter === entry.id ? 'true' : 'false',
-          onClick: () => { setFilter(entry.id) },
-        }, face.t(entry.key))))),
+          onClick: () => { face.onView({ filter: entry.id }) },
+        }, face.t(entry.key)))),
+      sortControl),
     load.status === 'failed'
       ? createElement('div', { className: 'evo-stats-failure' }, face.t('stats.failed') + '：' + load.message)
       : load.status === 'loading'
@@ -169,17 +198,19 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
             createElement('strong', null, face.t('stats.tableTitle')),
             createElement('span', null, face.t('stats.tableHint'))),
           createElement('p', { className: 'evo-stats-window-note' }, face.t('stats.windowNote')),
-          createElement(Table, {
-            rows: visible,
-            columns,
-            rowKey: (row: SkillStatsRow) => row.name,
-            sort,
-            onSort,
-            caption: face.t('stats.tableTitle'),
-            empty: createElement('div', { className: 'evo-stats-empty' },
-              createElement('strong', null, face.t('stats.empty')),
-              createElement('span', null, face.t('stats.emptyHint'))),
-          })))
+          layout === 'narrow'
+            ? cards
+            : createElement(Table, {
+              rows: visible,
+              columns,
+              rowKey: (row: SkillStatsRow) => row.name,
+              sort,
+              onSort,
+              caption: face.t('stats.tableTitle'),
+              empty: createElement('div', { className: 'evo-stats-empty' },
+                createElement('strong', null, face.t('stats.empty')),
+                createElement('span', null, face.t('stats.emptyHint'))),
+            })))
 }
 
 /** Page styles; tokenVars is applied by the workbench shell. */
@@ -204,6 +235,10 @@ export const STATS_CSS = [
   '.evo-stats-search-mark::before{content:"⌕"}',
   '.evo-stats-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--dsw-alias-label-primary,#20261f);font:inherit;font-size:12px}',
   '.evo-stats-filters{display:flex;gap:5px}',
+  '.evo-stats-sort{display:flex;align-items:center;gap:4px;flex:0 0 auto}',
+  '.evo-stats-sort label{display:flex;align-items:center;gap:4px;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;white-space:nowrap}',
+  '.evo-stats-sort select{height:30px;padding:0 6px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:7px;background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-primary,#20261f);font:inherit;font-size:11px}',
+  '.evo-stats-sort-dir{width:30px;height:30px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:7px;background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-secondary,#6f766d);font:inherit;font-size:13px;cursor:pointer}',
   '.evo-stats-filter{height:32px;padding:0 11px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:8px;background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-secondary,#6f766d);font:inherit;font-size:11.5px;font-weight:600;cursor:pointer}',
   '.evo-stats-filter.is-active{border-color:#bdd3c8;background:var(--evo-accent-weak,#e7f0eb);color:var(--evo-accent,#2f6b58)}',
   '.evo-stats-filter:focus-visible,.evo-stats-skill-name:focus-visible{outline:var(--evo-focus-ring,2px solid #2f6b58);outline-offset:2px}',
@@ -226,6 +261,15 @@ export const STATS_CSS = [
   '.evo-stats-empty{display:flex;flex-direction:column;gap:4px;align-items:center}',
   '.evo-stats-empty strong{font-size:12px;font-weight:650;color:var(--dsw-alias-label-secondary,#6f766d)}',
   '.evo-stats-window-note{margin:0;padding:6px 12px;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;line-height:1.5;border-bottom:1px solid var(--dsw-alias-border-l1,#f0eee8);background:var(--dsw-alias-bg-layer-2,#faf9f5)}',
+  '.evo-stats-cards{display:flex;flex-direction:column;gap:8px;padding:10px}',
+  '.evo-stats-card{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:10px;background:var(--dsw-alias-bg-layer-1,#fff)}',
+  '.evo-stats-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}',
+  '.evo-stats-card-desc{margin:0;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:11px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+  '.evo-stats-card-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:0}',
+  '.evo-stats-card-facts div{display:flex;align-items:baseline;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--dsw-alias-border-l1,#f0eee8);padding-bottom:4px}',
+  '.evo-stats-card-facts dt{margin:0;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;white-space:nowrap}',
+  '.evo-stats-card-facts dd{margin:0;color:var(--dsw-alias-label-primary,#20261f);font-size:11.5px;font-variant-numeric:tabular-nums}',
+  '.evo-stats-table-card .evo-data-table{min-width:0}',
   '@media (max-width:760px){.evo-stats-page{padding:16px}.evo-stats-hero{align-items:flex-start;flex-direction:column}.evo-stats-title{font-size:20px}}',
 ].join('')
 

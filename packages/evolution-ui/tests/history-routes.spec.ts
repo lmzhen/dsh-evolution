@@ -89,6 +89,10 @@ describe('skill-history routes: the stats snapshot', () => {
         rows: Array<{
           name: string
           versions: number
+          lastChangedAt: string | null
+          lastActivityAt: string | null
+          recentlyUsed: boolean | null
+          needsAttention: boolean
           health: { verdict: string; bodyChars: number | null; supportFiles: number | null } | null
           usage: { useCount: number | null; viewCount: number | null; viewCount30d: number | null } | null
           feedback: number | null
@@ -109,6 +113,10 @@ describe('skill-history routes: the stats snapshot', () => {
     const quiet = stats.body.data.rows.find(entry => entry.name === 'quiet-skill')!
     expect(row.name).toBe('panel-skill')
     expect(row.versions).toBe(1)
+    expect(row.lastChangedAt).not.toBeNull()
+    expect(row.lastActivityAt).toBe('2026-01-01T00:00:00.000Z')
+    expect(row.recentlyUsed).toBe(false)
+    expect(row.needsAttention).toBe(true)
     expect(row.health).toMatchObject({ verdict: 'warn', bodyChars: 0, supportFiles: 0 })
     expect(row.usage).toMatchObject({ useCount: 0, viewCount: 2 })
     expect(row.feedback).toBe(0)

@@ -19,7 +19,7 @@ import type {
   SkillStatsSnapshot,
   SkillUsageFacts,
 } from '@deepseek-ai/dsh-evolution-core/skills'
-import { computeSkillStatsTotals } from '@deepseek-ai/dsh-evolution-core/skills'
+import { computeSkillStatsTotals, latestActivityAt, recentlyUsedAt } from '@deepseek-ai/dsh-evolution-core/skills'
 import { isRecord, normalizeUsageRecord, recentViewCount } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorFace, RouteServices } from './routes.ts'
 
@@ -171,7 +171,7 @@ function governanceOf(value: unknown): SkillStatsGovernance[] {
  * @param curator - the live curator face.
  * @returns rows with per-dimension nulls plus totals, successes and recent governance.
  */
-export async function buildSkillStatsSnapshot(services: RouteServices, curator: CuratorFace): Promise<SkillStatsSnapshot> {
+export async function buildSkillStatsSnapshot(services: RouteServices, curator: CuratorFace, now: Date = new Date()): Promise<SkillStatsSnapshot> {
   const index = await readSkillIndex(curator)
   const healthView = services.getHealthView === undefined ? undefined : await services.getHealthView().catch(() => null)
   const healthRows = Array.isArray(healthView) ? healthView : []
@@ -206,11 +206,17 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
     const negativeFeedback30d = measuredWindow ? window?.negative ?? 0 : null
     const errorNotes = measuredWindow ? window?.notes ?? [] : null
     const loads30d = usage?.viewCount30d ?? null
+    const lastActivityAt = latestActivityAt(usage)
+    const verdict = healthByName.get(row.name)?.verdict
     return {
       name: row.name,
       description: row.description,
       versions: row.versions,
+      lastChangedAt: row.lastAt,
       lastAt: row.lastAt,
+      lastActivityAt,
+      recentlyUsed: recentlyUsedAt(lastActivityAt, now),
+      needsAttention: verdict === 'warn' || verdict === 'needs-restructure',
       health: healthByName.get(row.name) ?? null,
       usage,
       feedback: feedbackOf(feedbackRead, row.name),
@@ -221,9 +227,11 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
     }
   })
 
+  const totals = computeSkillStatsTotals(rows, counts)
   return {
     rows,
-    totals: computeSkillStatsTotals(rows, counts),
+    global: { totals, counts, governance },
+    totals,
     counts,
     governance,
     generatedAt: new Date().toISOString(),

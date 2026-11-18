@@ -129,7 +129,11 @@ describe('history workbench', () => {
         name: 'alpha',
         description: 'alpha desc',
         versions: 2,
+        lastChangedAt: '2026-01-01T00:00:00.000Z',
         lastAt: '2026-01-01T00:00:00.000Z',
+        lastActivityAt: null,
+        recentlyUsed: null,
+        needsAttention: true,
         health: { verdict: 'warn', bodyChars: 12, bodyTokens: null, supportFiles: 1, stampDensityPerKb: null, churnPatches: null, churnReads: null, hardCapHits: null, findings: 0 },
         usage: { useCount: 0, viewCount: 3, viewCount30d: 0, patchCount: 1, lastUsedAt: null, lastViewedAt: null, lastPatchedAt: null, state: 'active', pinned: false },
         feedback: 0,
@@ -139,6 +143,11 @@ describe('history workbench', () => {
         errorNotes: errorCount === 0 ? [] : [{ at: '2026-01-01T00:00:00.000Z', note: 'new report' }],
       }],
       totals: { skills: 1, needsAttention: 1, bodyChars: 12, supportFiles: 1, successes: { offload: 0, condense: 0, extract: 1 } },
+      global: {
+        totals: { skills: 1, needsAttention: 1, bodyChars: 12, supportFiles: 1, successes: { offload: 0, condense: 0, extract: 1 } },
+        counts: { offload: 0, condense: 0, extract: 1 },
+        governance: [],
+      },
       counts: { offload: 0, condense: 0, extract: 1 },
       governance: [],
       generatedAt: '2026-01-01T00:00:00.000Z',
@@ -148,7 +157,15 @@ describe('history workbench', () => {
       store: createWorkbenchStore(),
       history: face(),
       pending: pendingFace(),
-      stats: { t: (key: string) => key, loadStats, openSkill: () => {}, onOrganize: () => {} },
+      stats: {
+        t: (key: string) => key,
+        loadStats,
+        view: { query: '', filter: 'all', sort: { key: 'bodyChars', dir: 'desc' }, scrollTop: 0 },
+        onView: () => {},
+        layout: 'wide',
+        openSkill: () => {},
+        onOrganize: () => {},
+      },
     }))
     fireEvent.click(document.getElementById('evo-workbench-tab-data')!)
     await waitFor(() => { expect(document.getElementById('evo-workbench-tab-data')?.getAttribute('aria-selected')).toBe('true') })
@@ -172,4 +189,3 @@ describe('history workbench', () => {
     view.unmount()
   })
 })
-

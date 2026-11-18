@@ -8,7 +8,7 @@
  */
 import { createElement, type ReactNode } from 'react'
 import { emptyState, groupHeading, localTime, notice, panelHead, versionRow, type Copy, type OpenKind } from '../chrome.ts'
-import type { GovernanceRow, HealthPayload, SkillRow, VersionRow } from '../api.ts'
+import type { SkillRow, VersionRow } from '../api.ts'
 import type { SkillErrorNote } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { HistoryViewModel } from '../history-presentation.ts'
 
@@ -18,8 +18,6 @@ export interface SkillDetailProps {
   readonly selected: string | undefined
   readonly noteText: string | undefined
   readonly noteError: boolean
-  readonly governance: readonly GovernanceRow[]
-  readonly counts: HealthPayload['counts']
   readonly errorNotes: readonly SkillErrorNote[]
   readonly failureNode: ReactNode
   readonly skills: readonly SkillRow[]
@@ -72,26 +70,6 @@ export function SkillDetail(props: SkillDetailProps): ReactNode {
           },
           createElement('time', null, localTime(entry.at)),
           createElement('span', null, entry.note))))),
-    props.governance.length === 0
-      ? null
-      : createElement('section', { className: 'evo-hist-governance' },
-        createElement('h3', { className: 'evo-hist-group' }, props.copy.t('governance.title')),
-        createElement('ul', { className: 'evo-hist-governance-list' },
-          props.governance.map(row => createElement('li', { key: row.runId, className: 'evo-hist-governance-row' },
-            props.copy.format('governance.line', {
-              mode: row.mode ?? '—',
-              target: row.target ?? '—',
-              state: row.state,
-            }),
-            props.copy.t('governance.separator'),
-            localTime(new Date(row.startedAt).toISOString()))))),
-    props.counts === null
-      ? null
-      : createElement('p', { className: 'evo-hist-hint' }, props.copy.format('governance.counts', {
-        offload: props.counts.offload,
-        condense: props.counts.condense,
-        extract: props.counts.extract,
-      })),
     props.failureNode,
     props.selected === undefined
       ? [

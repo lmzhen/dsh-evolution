@@ -10,7 +10,7 @@ import type { SkillStatsSnapshot } from '@deepseek-ai/dsh-evolution-core/skills'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
 import { PendingCard, type PendingCardFace } from '../../settings/PendingCard.ts'
 import { StatsPage, STATS_CSS, type StatsFace } from './StatsPage.ts'
-import { resolveDefaultView, type WorkbenchStore, type WorkbenchTaskCounts, type WorkbenchView } from './WorkbenchStore.ts'
+import { resolveDefaultView, type WorkbenchDataState, type WorkbenchStore, type WorkbenchTaskCounts, type WorkbenchView } from './WorkbenchStore.ts'
 
 /** Stable page id used by the sidebar row, the page slot key, and navigation params. */
 export const WORKBENCH_ID = 'evolution.workbench'
@@ -50,14 +50,42 @@ function useSharedStats(loader: (() => Promise<SkillStatsSnapshot>) | undefined)
     return promise
   }, [loader])
   const invalidate = useMemo(() => () => { cache.current = null }, [])
-  return loader === undefined ? undefined : { load, invalidate }
+  return useMemo(() => loader === undefined ? undefined : { load, invalidate }, [loader, load, invalidate])
 }
 
 
 
 /**
- * Render the workbench page. The platform keeps it mounted; this component only
- * consumes a new explicit revision exactly once.
+ * Observe the workbench body, not the window: the platform can place this page in a narrow main
+ * panel while the viewport is wide. 960px is the split-pane boundary; below it the history view is a
+ * one-pane list/detail route.
+ * @param ref - the body element.
+ * @returns the current width bucket.
+ */
+function useWorkbenchLayout(ref: { readonly current: HTMLElement | null }): 'wide' | 'medium' | 'narrow' {
+  const [layout, setLayout] = useState<'wide' | 'medium' | 'narrow'>('wide')
+  useEffect(() => {
+    const element = ref.current
+    if (element === null) return
+    const measure = (): void => {
+      const width = element.getBoundingClientRect().width
+      if (width <= 0) return
+      setLayout(width >= 960 ? 'wide' : width >= 640 ? 'medium' : 'narrow')
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => { observer.disconnect() }
+  }, [ref])
+  return layout
+}
+
+
+
+/**
+ * Render the workbench page. The platform keeps it mounted, so this component only consumes
+ * store changes and dispatches explicit navigation commands.
  * @param props - page owner props plus the injected history face.
  * @returns the page surface.
  */
@@ -65,20 +93,39 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
   const state = useSyncExternalStore(props.store.subscribe, props.store.getState, props.store.getState)
   const view = state.view
   const selectedSkill = state.selectedSkill
-  const focusRevision = state.focusRevision
-  const openHistory = (skill: string | undefined, origin?: 'data'): void => { props.store.openHistory(skill, origin) }
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  const layout = useWorkbenchLayout(bodyRef)
+  const pendingListFocus = useRef<string | undefined>(undefined)
+  const openHistory = (skill: string | undefined, origin?: 'data' | 'list'): void => { props.store.openHistory(skill, origin) }
+  const backFromDetail = (): void => {
+    pendingListFocus.current = state.origin === 'list' ? selectedSkill : undefined
+    if (state.origin === 'data') props.store.backToData()
+    else props.store.backToList()
+  }
   const hasMerge = props.hasView?.('merge') ?? true
   const hasData = props.stats !== undefined
   const sharedStats = useSharedStats(props.stats?.loadStats)
-  const [statsVersion, setStatsVersion] = useState(0)
+  const [statsEpoch, setStatsEpoch] = useState(0)
+  const loadStats = useMemo(
+    () => sharedStats?.load ?? props.stats?.loadStats,
+    [sharedStats, props.stats?.loadStats, statsEpoch],
+  )
   const invalidateStats = (): void => {
     if (sharedStats === undefined) return
     sharedStats.invalidate()
-    setStatsVersion(version => version + 1)
+    setStatsEpoch(version => version + 1)
   }
   const history = sharedStats === undefined
     ? props.history
-    : { ...props.history, loadStats: sharedStats.load, invalidateStats }
+    : { ...props.history, loadStats, invalidateStats }
+  const controlledHistory = {
+    ...history,
+    selected: selectedSkill,
+    selectionRevision: state.selectionRevision,
+    onSelect: (name: string): void => { props.store.openHistory(name, 'list') },
+    query: state.historyQuery,
+    onQuery: (value: string): void => { props.store.setHistoryQuery(value) },
+  }
   // Mount the data view on first visit and keep it mounted afterwards: its search/sort/scroll survive a
   // trip into a skill, while a host that never opens "Data overview" pays no stats read.
   const [dataMounted, setDataMounted] = useState(view === 'data')
@@ -98,6 +145,19 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
     }).catch(() => { /* no counts means keep the stable history landing */ })
     return () => { live = false }
   }, [props.loadTaskCounts, state.explicitView, hasMerge, props.store])
+  useEffect(() => {
+    if (layout !== 'narrow' || state.origin !== 'list' || selectedSkill === undefined) return
+    document.querySelector<HTMLElement>('.evo-hist-title')?.focus()
+  }, [layout, state.origin, selectedSkill])
+  useEffect(() => {
+    const name = pendingListFocus.current
+    if (name === undefined || selectedSkill !== undefined) return
+    pendingListFocus.current = undefined
+    const item = Array.from(document.querySelectorAll<HTMLElement>('.evo-hist-skill'))
+      .find(candidate => candidate.dataset.skill === name)
+    if (item !== undefined) item.focus()
+    else document.querySelector<HTMLInputElement>('.evo-hist-search input')?.focus()
+  }, [selectedSkill])
   // Keyboard order contains only tabs that actually rendered; a hidden view has no button to land on.
   const viewOrder: readonly WorkbenchView[] = (['history', 'data', 'pending', 'merge'] as const)
     .filter(value => (value !== 'merge' || hasMerge) && (value !== 'data' || hasData))
@@ -120,18 +180,18 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
         !hasMerge ? null : createElement('button', { id: 'evo-workbench-tab-merge', type: 'button', role: 'tab', tabIndex: view === 'merge' ? 0 : -1, 'aria-selected': view === 'merge' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'merge' ? 'true' : undefined, onClick: () => { props.store.setView('merge') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'merge') } }, props.t('workbench.merge')),
       ),
     ),
-    createElement('div', { className: 'evo-workbench-body', id: 'evo-workbench-panel', role: 'tabpanel' },
+    createElement('div', { className: 'evo-workbench-body', id: 'evo-workbench-panel', role: 'tabpanel', ref: bodyRef },
       view === 'history'
         ? createElement('div', { className: 'evo-workbench-history-stack' },
-          state.origin === 'data'
+          state.origin !== undefined && (layout !== 'wide' || state.origin === 'data')
             ? createElement('div', { className: 'evo-workbench-backbar' },
               createElement('button', {
                 type: 'button',
                 className: 'evo-workbench-back',
-                onClick: () => { props.store.backToData() },
-              }, '← ' + props.t('workbench.backToData')))
+                onClick: backFromDetail,
+              }, '← ' + props.t(state.origin === 'data' ? 'workbench.backToData' : 'workbench.backToList')))
             : null,
-          createElement(SkillHistoryPanel, { ...history, focusSkill: selectedSkill, focusRevision }))
+          createElement(SkillHistoryPanel, controlledHistory))
         : view === 'pending'
           ? createElement(PendingCard, { ...props.pending, onHistory: () => { openHistory(undefined) } })
           : null,
@@ -139,8 +199,11 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
         ? createElement('div', { hidden: view !== 'data', className: 'evo-workbench-feature evo-workbench-data' },
           createElement(StatsPage, {
             ...props.stats!,
-            loadStats: sharedStats?.load ?? props.stats!.loadStats,
-            refreshKey: statsVersion,
+            loadStats: loadStats ?? props.stats!.loadStats,
+            statsRevision: statsEpoch,
+            view: state.data,
+            onView: (patch: Partial<WorkbenchDataState>) => { props.store.setDataView(patch) },
+            layout,
             openSkill: (name: string) => { openHistory(name, 'data') },
             onOrganize: () => { openHistory(undefined) },
           }))
@@ -176,7 +239,7 @@ export const WORKBENCH_CSS = [
   '.evo-workbench-tabs button[data-active="true"]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
   '.evo-workbench-tabs button:focus-visible{outline:var(--evo-focus-ring);outline-offset:var(--evo-focus-offset)}',
   '.evo-workbench-title{margin:0;font-size:var(--evo-type-lg);font-weight:600;line-height:var(--evo-leading-base)}',
-  '.evo-workbench-body{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}',
+  '.evo-workbench-body{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden;container-type:inline-size}',
   '.evo-workbench-history-stack{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}',
   '.evo-workbench-history-stack>.evo-hist-frame{flex:1;min-height:0}',
   '.evo-workbench-backbar{flex:0 0 auto;display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid var(--dsw-alias-border-l2)}',

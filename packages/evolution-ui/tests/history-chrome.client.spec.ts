@@ -55,11 +55,8 @@ describe('the tool face says what it is (G3)', () => {
     const aside = [...view.container.querySelectorAll('.evo-hist-slot-aside')].map(node => node.textContent)
     // The size and the last-changed age are the two facts a reader decides on, and both are `aside`.
     expect(aside).toEqual(['versions.count(2)', 'time.hours(4)'])
-    const description = view.container.querySelector('.evo-hist-skill-description .evo-hist-slot-lead')
-    expect(view.container.querySelectorAll('.evo-hist-cell-line')).toHaveLength(3)
-    // The renderer never truncates in JavaScript: the layout's ellipsis does, at the real width.
-    expect(description?.textContent).toBe(skill().description)
-    expect(description?.textContent).not.toContain('…')
+    expect(view.container.querySelectorAll('.evo-hist-cell-line')).toHaveLength(2)
+    expect(view.container.querySelector('.evo-hist-skill')?.getAttribute('title')).toBe(skill().description)
     cleanup()
   })
 

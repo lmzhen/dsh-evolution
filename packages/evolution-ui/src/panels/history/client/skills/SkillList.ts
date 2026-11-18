@@ -5,7 +5,7 @@
  * state machine and the markup stop growing inside one 380-line component.
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
-import { createElement, type ReactNode } from 'react'
+import { createElement, useEffect, useRef, type ReactNode } from 'react'
 import { emptyState, searchField, skillLine, type Copy } from '../chrome.ts'
 import type { SkillRow } from '../api.ts'
 
@@ -34,9 +34,16 @@ export interface SkillListProps {
  * @returns the aside element.
  */
 export function SkillList(props: SkillListProps): ReactNode {
+  const listRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const current = listRef.current?.querySelector<HTMLElement>('[aria-current="true"]')
+    if (current !== null && current !== undefined && typeof current.scrollIntoView === 'function') {
+      current.scrollIntoView({ block: 'center' })
+    }
+  }, [props.selected, props.visible])
   return createElement('aside', { className: 'evo-hist-aside' },
     searchField(props.copy, props.query, props.onQuery),
-    createElement('div', { className: 'evo-hist-list' },
+    createElement('div', { className: 'evo-hist-list', ref: listRef },
       props.skills.length === 0
         ? emptyState(props.copy.t(props.skillsLoaded ? 'empty.skills' : 'loading'))
         : props.visible.length === 0

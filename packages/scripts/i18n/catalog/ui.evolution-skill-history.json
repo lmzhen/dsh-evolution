@@ -553,34 +553,34 @@
       "ru": "Копировать"
     },
     "copy.tidy": {
-      "zh": "整理",
-      "en": "Tidy",
-      "ja": "整理",
-      "es": "Ordenar",
-      "fr": "Ranger",
-      "de": "Aufräumen",
-      "pt": "Organizar",
-      "ru": "Привести в порядок"
+      "zh": "高级",
+      "en": "Advanced",
+      "ja": "詳細",
+      "es": "Avanzado",
+      "fr": "Avancé",
+      "de": "Erweitert",
+      "pt": "Avançado",
+      "ru": "Дополнительно"
     },
     "copy.offload": {
-      "zh": "复制 offload 命令",
-      "en": "Copy offload command",
-      "ja": "offload コマンドをコピー",
-      "es": "Copiar comando offload",
-      "fr": "Copier la commande offload",
-      "de": "offload-Befehl kopieren",
-      "pt": "Copiar comando offload",
-      "ru": "Скопировать команду offload"
+      "zh": "复制拆分命令",
+      "en": "Copy split command",
+      "ja": "分割コマンドをコピー",
+      "es": "Copiar comando dividir",
+      "fr": "Copier la commande scinder",
+      "de": "Aufteilen-Befehl kopieren",
+      "pt": "Copiar comando dividir",
+      "ru": "Скопировать команду разделения"
     },
     "copy.condense": {
-      "zh": "复制 condense 命令",
-      "en": "Copy condense command",
-      "ja": "condense コマンドをコピー",
-      "es": "Copiar comando condense",
-      "fr": "Copier la commande condense",
-      "de": "condense-Befehl kopieren",
-      "pt": "Copiar comando condense",
-      "ru": "Скопировать команду condense"
+      "zh": "复制精简命令",
+      "en": "Copy shorten command",
+      "ja": "簡潔化コマンドをコピー",
+      "es": "Copiar comando condensar",
+      "fr": "Copier la commande condenser",
+      "de": "Verdichten-Befehl kopieren",
+      "pt": "Copiar comando condensar",
+      "ru": "Скопировать команду сжатия"
     },
     "copy.copied": {
       "zh": "已复制",
@@ -1183,8 +1183,8 @@
       "ru": "Требуют внимания"
     },
     "stats.total.body": {
-      "zh": "正文总量",
-      "en": "Total body",
+      "zh": "正文总量（字）",
+      "en": "Total body (chars)",
       "ja": "本文合計",
       "es": "Texto total",
       "fr": "Corps total",
@@ -1392,6 +1392,16 @@
       "pt": "Voltar ao resumo",
       "ru": "Назад к обзору"
     },
+    "workbench.backToList": {
+      "zh": "返回技能列表",
+      "en": "Back to skills",
+      "ja": "スキル一覧に戻る",
+      "es": "Volver a habilidades",
+      "fr": "Retour aux compétences",
+      "de": "Zurück zu den Skills",
+      "pt": "Voltar às habilidades",
+      "ru": "Назад к навыкам"
+    },
     "stats.col.loads": {
       "zh": "加载",
       "en": "Loads",
@@ -1403,14 +1413,74 @@
       "ru": "Загрузки"
     },
     "row.summary.legacy": {
-      "zh": "早期插件版本，暂不存在 summary",
-      "en": "Early plugin version — no summary yet",
-      "ja": "初期プラグインバージョンのため summary はまだありません",
-      "es": "Versión inicial del plugin: todavía no hay summary",
-      "fr": "Ancienne version du plugin : pas encore de summary",
-      "de": "Frühe Plugin-Version – noch keine Summary",
-      "pt": "Versão inicial do plugin: ainda sem summary",
-      "ru": "Ранняя версия плагина — summary пока нет"
+      "zh": "暂无变更摘要",
+      "en": "No change summary yet",
+      "ja": "初期バージョンのため変更概要はまだありません",
+      "es": "Versión inicial; todavía no hay resumen del cambio",
+      "fr": "Version initiale ; pas encore de résumé du changement",
+      "de": "Frühe Version; noch keine Änderungszusammenfassung",
+      "pt": "Versão inicial; ainda sem resumo da mudança",
+      "ru": "Ранняя версия; сводки изменений пока нет"
+    },
+    "operation.offload.label": {
+      "zh": "拆分",
+      "en": "Split",
+      "ja": "分割",
+      "es": "Dividir",
+      "fr": "Scinder",
+      "de": "Aufteilen",
+      "pt": "Dividir",
+      "ru": "Разделить"
+    },
+    "operation.offload.description": {
+      "zh": "把长段移到参考资料，正文更短",
+      "en": "Move long sections into references to shorten the body",
+      "ja": "長い節を参照資料へ移して本文を短くします",
+      "es": "Mueve secciones largas a referencias para acortar el cuerpo",
+      "fr": "Déplace les longues sections vers les références pour raccourcir le corps",
+      "de": "Verschiebt lange Abschnitte in Referenzen, um den Body zu kürzen",
+      "pt": "Move seções longas para referências para encurtar o corpo",
+      "ru": "Переносит длинные разделы в справочники, сокращая основной текст"
+    },
+    "operation.condense.label": {
+      "zh": "精简",
+      "en": "Condense",
+      "ja": "簡潔化",
+      "es": "Condensar",
+      "fr": "Condenser",
+      "de": "Verdichten",
+      "pt": "Condensar",
+      "ru": "Сжать"
+    },
+    "operation.condense.description": {
+      "zh": "收紧重复表达，保留关键约束",
+      "en": "Tighten repeated wording while keeping key constraints",
+      "ja": "重複表現を整理し、重要な制約は残します",
+      "es": "Ajusta la redacción repetida y conserva las restricciones clave",
+      "fr": "Resserre les répétitions en gardant les contraintes clés",
+      "de": "Strafft Wiederholungen und behält wichtige Vorgaben",
+      "pt": "Aperta repetições e preserva as restrições principais",
+      "ru": "Убирает повторы, сохраняя ключевые ограничения"
+    },
+    "operation.extract.label": {
+      "zh": "提取",
+      "en": "Extract",
+      "ja": "抽出",
+      "es": "Extraer",
+      "fr": "Extraire",
+      "de": "Extrahieren",
+      "pt": "Extrair",
+      "ru": "Извлечь"
+    },
+    "operation.extract.description": {
+      "zh": "把跨技能通用内容移到已有归属技能",
+      "en": "Move cross-skill material into an existing owner skill",
+      "ja": "スキル横断の内容を既存の所有スキルへ移します",
+      "es": "Mueve contenido entre habilidades a una habilidad propietaria existente",
+      "fr": "Déplace le contenu transversal vers une compétence propriétaire existante",
+      "de": "Verschiebt skillübergreifende Inhalte in einen bestehenden Besitzer-Skill",
+      "pt": "Move conteúdo entre habilidades para uma habilidade proprietária existente",
+      "ru": "Переносит межнавыковые материалы в существующий навык-владелец"
     },
     "stats.col.loads30d": {
       "zh": "近30天加载",
@@ -1443,8 +1513,8 @@
       "ru": "Ошибки"
     },
     "stats.windowNote": {
-      "zh": "近30天指标从插件升级后开始统计；旧记录显示 —。",
-      "en": "30-day metrics start at the plugin upgrade; legacy records show —.",
+      "zh": "近30天指标从升级后开始统计；旧记录显示 —。",
+      "en": "30-day metrics start at the upgrade; legacy records show —.",
       "ja": "30日指標はプラグイン更新後から集計します。旧レコードは — と表示します。",
       "es": "Las métricas de 30 días empiezan con la actualización del plugin; los registros antiguos muestran —.",
       "fr": "Les métriques sur 30 jours commencent à la mise à jour du plugin ; les anciens enregistrements affichent —.",
@@ -1461,6 +1531,36 @@
       "de": "Fähigkeiten filtern",
       "pt": "Filtrar habilidades",
       "ru": "Фильтр навыков"
+    },
+    "stats.sort": {
+      "zh": "排序",
+      "en": "Sort",
+      "ja": "並び順",
+      "es": "Ordenar",
+      "fr": "Trier",
+      "de": "Sortieren",
+      "pt": "Ordenar",
+      "ru": "Сортировка"
+    },
+    "stats.sortAsc": {
+      "zh": "升序",
+      "en": "Ascending",
+      "ja": "昇順",
+      "es": "Ascendente",
+      "fr": "Croissant",
+      "de": "Aufsteigend",
+      "pt": "Crescente",
+      "ru": "По возрастанию"
+    },
+    "stats.sortDesc": {
+      "zh": "降序",
+      "en": "Descending",
+      "ja": "降順",
+      "es": "Descendente",
+      "fr": "Décroissant",
+      "de": "Absteigend",
+      "pt": "Decrescente",
+      "ru": "По убыванию"
     },
     "errors.title": {
       "zh": "报错说明历史",

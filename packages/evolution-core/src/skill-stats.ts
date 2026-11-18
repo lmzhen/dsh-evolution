@@ -44,13 +44,48 @@ export interface SkillUsageFacts {
   readonly pinned: boolean | null
 }
 
+/** Human-facing "最近使用" window; one constant so host and tests cannot drift. */
+export const RECENT_USE_WINDOW_DAYS = 30
+
+/** Newest model load / external use timestamp, or null when neither was measured. */
+export function latestActivityAt(usage: SkillUsageFacts | null): string | null {
+  let best: string | null = null
+  let bestMs = Number.NEGATIVE_INFINITY
+  for (const value of [usage?.lastUsedAt ?? null, usage?.lastViewedAt ?? null]) {
+    if (value === null) continue
+    const ms = Date.parse(value)
+    if (!Number.isFinite(ms)) continue
+    if (ms > bestMs) {
+      best = value
+      bestMs = ms
+    }
+  }
+  return best
+}
+
+/** Whether an activity timestamp is inside the use window; null when no activity was measured. */
+export function recentlyUsedAt(lastActivityAtValue: string | null, now: Date = new Date()): boolean | null {
+  if (lastActivityAtValue === null) return null
+  const ms = Date.parse(lastActivityAtValue)
+  if (!Number.isFinite(ms)) return null
+  return ms >= now.getTime() - RECENT_USE_WINDOW_DAYS * 86_400_000
+}
+
 /** One row of the full skill table. */
 export interface SkillStatsRow {
   readonly name: string
   readonly description: string
   readonly versions: number
-  /** Last content change, or null when the skill has no recorded versions. */
+  /** Canonical last content change. */
+  readonly lastChangedAt: string | null
+  /** Compatibility alias for `lastChangedAt`; remove once every consumer reads the canonical field. */
   readonly lastAt: string | null
+  /** Newest model load / external use; null when neither timestamp was measured. */
+  readonly lastActivityAt: string | null
+  /** True when lastActivityAt is inside the 30-day use window; null when no activity was measured. */
+  readonly recentlyUsed: boolean | null
+  /** Server-derived actionable verdict; the browser must not re-derive it. */
+  readonly needsAttention: boolean
   readonly health: SkillHealthFacts | null
   readonly usage: SkillUsageFacts | null
   readonly feedback: number | null
@@ -90,9 +125,19 @@ export interface SkillStatsGovernance {
   readonly resultRef: string | null
 }
 
+/** Library-wide facts. These never belong in a single-skill detail view. */
+export interface SkillStatsGlobal {
+  readonly totals: SkillStatsTotals
+  readonly counts: SkillStatsCounts | null
+  readonly governance: readonly SkillStatsGovernance[]
+}
+
 /** One complete read of the skill library, as the host route returns it. */
 export interface SkillStatsSnapshot {
   readonly rows: readonly SkillStatsRow[]
+  /** New canonical home for library-wide facts. */
+  readonly global: SkillStatsGlobal
+  /** Compatibility aliases; new UI reads `global` and these are removed in the next contract cut. */
   readonly totals: SkillStatsTotals
   readonly counts: SkillStatsCounts | null
   readonly governance: readonly SkillStatsGovernance[]
@@ -122,8 +167,7 @@ export type SkillStatsFilter = 'all' | 'attention' | 'recent'
 
 /** A verdict that asks the user to act; `healthy` and `unknown` do not. */
 export function needsAttention(row: SkillStatsRow): boolean {
-  const verdict = row.health?.verdict
-  return verdict === 'warn' || verdict === 'needs-restructure'
+  return row.needsAttention
 }
 
 /** Severity order for the status column: actionable first, healthy last. */
@@ -156,7 +200,7 @@ export function sortValue(row: SkillStatsRow, key: SkillStatsSortKey): string | 
     case 'feedback30d': return row.feedback30d
     case 'negativeFeedback30d': return row.negativeFeedback30d
     case 'feedbackRate30d': return row.feedbackRate30d
-    case 'lastAt': return row.lastAt === null ? null : Date.parse(row.lastAt)
+    case 'lastAt': return row.lastChangedAt === null ? null : Date.parse(row.lastChangedAt)
   }
 }
 
@@ -187,7 +231,7 @@ export function sortSkillStats(rows: readonly SkillStatsRow[], key: SkillStatsSo
 export function filterSkillStats(rows: readonly SkillStatsRow[], filter: SkillStatsFilter): SkillStatsRow[] {
   if (filter === 'all') return [...rows]
   if (filter === 'attention') return rows.filter(needsAttention)
-  return rows.filter(row => row.lastAt !== null)
+  return rows.filter(row => row.recentlyUsed === true)
 }
 
 /** Sum a nullable numeric column: all-null means the total itself is unknown, not zero. */

@@ -2,6 +2,7 @@
 export * from './skill-lint.ts'
 export * from './skill-health.ts'
 export * from './skill-stats.ts'
+export * from './skill-operations.ts'
 export * from './skill-reads.ts'
 export * from './skill-row-cells.ts'
 export * from './skill-history.ts'
