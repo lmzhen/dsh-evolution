@@ -271,13 +271,13 @@ export const PARAM_FIELDS = {
     "curatorIntervalHours": {
       "label": {
         "zh": "自动整理间隔",
-        "en": "Curation interval",
+        "en": "Tidy-up interval",
         "ja": "自動整理の間隔",
-        "es": "Intervalo de limpieza",
-        "fr": "Intervalle du tri automatique",
-        "de": "Intervall der Skill-Pflege",
-        "ru": "Интервал автоупорядочивания",
-        "pt": "Intervalo da curadoria"
+        "es": "Intervalo de organización automática",
+        "fr": "Intervalle du rangement automatique",
+        "de": "Aufräum-Intervall",
+        "ru": "Интервал упорядочивания",
+        "pt": "Intervalo da organização automática"
       },
       "hint": {
         "zh": "两次自动整理之间至少间隔多少小时。",
@@ -402,14 +402,14 @@ export const PARAM_FIELDS = {
     },
     "curatorReviewMaxTokens": {
       "label": {
-        "zh": "模型挑选的字数上限",
-        "en": "Token cap for model picks",
-        "ja": "モデル選別のトークン上限",
-        "es": "Presupuesto de tokens del modelo",
-        "fr": "Budget de tokens par sélection",
-        "de": "Token-Budget des Modell-Reviews",
-        "ru": "Лимит токенов на отбор",
-        "pt": "Limite de tokens do modelo"
+        "zh": "模型挑选上限",
+        "en": "Limit per model pick",
+        "ja": "モデル選別の上限",
+        "es": "Límite por selección del modelo",
+        "fr": "Limite par sélection du modèle",
+        "de": "Limit pro Modellauswahl",
+        "ru": "Лимит на отбор",
+        "pt": "Limite por seleção do modelo"
       },
       "hint": {
         "zh": "每次用模型挑选时最多消耗多少 token（模型计费单位）。",
@@ -446,14 +446,14 @@ export const PARAM_FIELDS = {
     },
     "healthSoftBodyChars": {
       "label": {
-        "zh": "正文长度参考（旧字符）",
-        "en": "Body length (legacy chars)",
-        "ja": "本文の長さ（旧文字数）",
-        "es": "Longitud del cuerpo (caracteres antiguo)",
-        "fr": "Longueur du corps (caractères, ancien)",
-        "de": "Textlänge (alte Zeichen)",
-        "ru": "Длина текста (старые символы)",
-        "pt": "Comprimento do corpo (caracteres antigo)"
+        "zh": "正文长度参考（旧）",
+        "en": "Legacy body length",
+        "ja": "本文の長さ（旧）",
+        "es": "Longitud del cuerpo (criterio antiguo)",
+        "fr": "Longueur du corps (ancien)",
+        "de": "Textlänge (alt)",
+        "ru": "Длина текста (старая)",
+        "pt": "Comprimento do corpo (antigo)"
       },
       "hint": {
         "zh": "旧口径：技能正文超过多少字符算偏长；设置后按 2.75 字符/token 换算。",
@@ -468,14 +468,14 @@ export const PARAM_FIELDS = {
     },
     "healthSoftBodyTokens": {
       "label": {
-        "zh": "正文长度参考（token）",
-        "en": "Body length (tokens)",
-        "ja": "本文の長さ（トークン）",
-        "es": "Longitud del cuerpo (tokens)",
-        "fr": "Longueur du corps (tokens)",
-        "de": "Textlänge (Token)",
-        "ru": "Длина текста (токены)",
-        "pt": "Comprimento do corpo (tokens)"
+        "zh": "正文长度参考",
+        "en": "Body length",
+        "ja": "本文の長さ",
+        "es": "Longitud del cuerpo",
+        "fr": "Longueur du corps",
+        "de": "Textlänge",
+        "ru": "Длина текста",
+        "pt": "Comprimento do corpo"
       },
       "hint": {
         "zh": "技能正文超过多少估算 token 算偏长（只用于健康提示）；默认 7,273。",
@@ -776,14 +776,14 @@ export const PARAM_FIELDS = {
     },
     "memoryChars": {
       "label": {
-        "zh": "记忆库字符上限（旧）",
-        "en": "Memory limit (legacy chars)",
-        "ja": "メモリの保存上限（旧文字数）",
-        "es": "Límite del almacén (caracteres antiguo)",
-        "fr": "Limite de la mémoire (caractères, ancien)",
-        "de": "Limit des Gedächtnisses (alte Zeichen)",
-        "ru": "Лимит памяти (старые символы)",
-        "pt": "Limite da memória (caracteres antigo)"
+        "zh": "记忆库上限（旧）",
+        "en": "Legacy memory limit",
+        "ja": "メモリの上限（旧）",
+        "es": "Límite de memoria (criterio antiguo)",
+        "fr": "Limite de mémoire (ancien)",
+        "de": "Limit des Gedächtnisses (alt)",
+        "ru": "Лимит памяти (старый)",
+        "pt": "Limite de memória (antigo)"
       },
       "hint": {
         "zh": "旧口径：长期记忆文件（MEMORY.md）最多多少字符；设置后按字符模式工作。",
@@ -798,14 +798,14 @@ export const PARAM_FIELDS = {
     },
     "userChars": {
       "label": {
-        "zh": "用户画像字符上限（旧）",
-        "en": "User profile limit (legacy chars)",
-        "ja": "ユーザープロフィールの保存上限（旧文字数）",
-        "es": "Límite del perfil (caracteres antiguo)",
-        "fr": "Limite du profil (caractères, ancien)",
-        "de": "Limit des Nutzerprofils (alte Zeichen)",
-        "ru": "Лимит профиля (старые символы)",
-        "pt": "Limite do perfil (caracteres antigo)"
+        "zh": "用户画像上限（旧）",
+        "en": "Legacy user profile limit",
+        "ja": "ユーザープロフィールの上限（旧）",
+        "es": "Límite del perfil de usuario (criterio antiguo)",
+        "fr": "Limite du profil (ancien)",
+        "de": "Limit des Nutzerprofils (alt)",
+        "ru": "Лимит профиля (старый)",
+        "pt": "Limite do perfil (antigo)"
       },
       "hint": {
         "zh": "旧口径：用户画像文件（USER.md）最多多少字符；设置后按字符模式工作。",
@@ -820,14 +820,14 @@ export const PARAM_FIELDS = {
     },
     "memoryTokens": {
       "label": {
-        "zh": "记忆库 token 上限",
-        "en": "Memory token budget",
-        "ja": "メモリのトークン上限",
-        "es": "Límite de tokens de memoria",
-        "fr": "Limite de tokens de la mémoire",
-        "de": "Token-Limit des Gedächtnisses",
-        "ru": "Лимит токенов памяти",
-        "pt": "Limite de tokens da memória"
+        "zh": "记忆库上限",
+        "en": "Memory limit",
+        "ja": "メモリの上限",
+        "es": "Límite de memoria",
+        "fr": "Limite de mémoire",
+        "de": "Limit des Gedächtnisses",
+        "ru": "Лимит памяти",
+        "pt": "Limite de memória"
       },
       "hint": {
         "zh": "长期记忆按估算 token 计；默认 800，约等于旧英文 2200 字符的上下文成本。",
@@ -842,14 +842,14 @@ export const PARAM_FIELDS = {
     },
     "userTokens": {
       "label": {
-        "zh": "用户画像 token 上限",
-        "en": "User profile token budget",
-        "ja": "ユーザープロフィールのトークン上限",
-        "es": "Límite de tokens del perfil",
-        "fr": "Limite de tokens du profil",
-        "de": "Token-Limit des Nutzerprofils",
-        "ru": "Лимит токенов профиля",
-        "pt": "Limite de tokens do perfil"
+        "zh": "用户画像上限",
+        "en": "User profile limit",
+        "ja": "ユーザープロフィールの上限",
+        "es": "Límite del perfil de usuario",
+        "fr": "Limite du profil",
+        "de": "Limit des Nutzerprofils",
+        "ru": "Лимит профиля",
+        "pt": "Limite do perfil"
       },
       "hint": {
         "zh": "用户画像按估算 token 计；默认 500，约等于旧英文 1375 字符的上下文成本。",
@@ -1128,13 +1128,13 @@ export const PARAM_FIELDS = {
     },
     "skillWriteConfirmTimeoutSeconds": {
       "label": {
-        "zh": "确认等待秒数",
-        "en": "Confirm timeout (seconds)",
-        "ja": "確認の待ち時間（秒）",
-        "es": "Segundos de espera de confirmación",
+        "zh": "确认等待时间",
+        "en": "Confirmation timeout",
+        "ja": "確認の待ち時間",
+        "es": "Tiempo de espera de confirmación",
         "fr": "Délai de confirmation",
         "de": "Wartezeit der Rückfrage",
-        "ru": "Сколько секунд ждать подтверждения",
+        "ru": "Время ожидания подтверждения",
         "pt": "Tempo de espera da confirmação"
       },
       "hint": {
