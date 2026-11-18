@@ -70,9 +70,15 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
   const hasMerge = props.hasView?.('merge') ?? true
   const hasData = props.stats !== undefined
   const sharedStats = useSharedStats(props.stats?.loadStats)
+  const [statsVersion, setStatsVersion] = useState(0)
+  const invalidateStats = (): void => {
+    if (sharedStats === undefined) return
+    sharedStats.invalidate()
+    setStatsVersion(version => version + 1)
+  }
   const history = sharedStats === undefined
     ? props.history
-    : { ...props.history, loadStats: sharedStats.load, invalidateStats: sharedStats.invalidate }
+    : { ...props.history, loadStats: sharedStats.load, invalidateStats }
   // Mount the data view on first visit and keep it mounted afterwards: its search/sort/scroll survive a
   // trip into a skill, while a host that never opens "Data overview" pays no stats read.
   const [dataMounted, setDataMounted] = useState(view === 'data')
@@ -134,6 +140,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
           createElement(StatsPage, {
             ...props.stats!,
             loadStats: sharedStats?.load ?? props.stats!.loadStats,
+            refreshKey: statsVersion,
             openSkill: (name: string) => { openHistory(name, 'data') },
             onOrganize: () => { openHistory(undefined) },
           }))

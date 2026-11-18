@@ -16,6 +16,8 @@ import { filterRows, sortRows } from './table-model.ts'
 export interface StatsFace {
   readonly t: (key: string) => string
   readonly loadStats: () => Promise<SkillStatsSnapshot>
+  /** Bumped when the workbench invalidates the shared snapshot (open/refresh). */
+  readonly refreshKey?: number
   readonly openSkill: (name: string) => void
   readonly onOrganize: () => void
 }
@@ -76,7 +78,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       if (live) setLoad({ status: 'failed', message: error instanceof Error ? error.message : String(error) })
     })
     return () => { live = false }
-  }, [face.loadStats])
+  }, [face.loadStats, face.refreshKey])
 
   const snapshot = load.status === 'ready' ? load.snapshot : null
   const visible = useMemo(() => {

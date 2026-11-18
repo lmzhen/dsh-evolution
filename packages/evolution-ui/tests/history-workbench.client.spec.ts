@@ -122,7 +122,8 @@ describe('history workbench', () => {
     second.unmount()
   })
 
-  it('opens the data overview, navigates a name into history and returns with the table kept mounted', async () => {
+  it('opens the data overview, navigates a name into history and returns with fresh error counts', async () => {
+    let errorCount = 0
     const loadStats = vi.fn(async () => ({
       rows: [{
         name: 'alpha',
@@ -130,8 +131,12 @@ describe('history workbench', () => {
         versions: 2,
         lastAt: '2026-01-01T00:00:00.000Z',
         health: { verdict: 'warn', bodyChars: 12, bodyTokens: null, supportFiles: 1, stampDensityPerKb: null, churnPatches: null, churnReads: null, hardCapHits: null, findings: 0 },
-        usage: { useCount: 0, viewCount: 3, patchCount: 1, lastUsedAt: null, lastViewedAt: null, lastPatchedAt: null, state: 'active', pinned: false },
+        usage: { useCount: 0, viewCount: 3, viewCount30d: 0, patchCount: 1, lastUsedAt: null, lastViewedAt: null, lastPatchedAt: null, state: 'active', pinned: false },
         feedback: 0,
+        feedback30d: errorCount,
+        negativeFeedback30d: errorCount,
+        feedbackRate30d: null,
+        errorNotes: errorCount === 0 ? [] : [{ at: '2026-01-01T00:00:00.000Z', note: 'new report' }],
       }],
       totals: { skills: 1, needsAttention: 1, bodyChars: 12, supportFiles: 1, successes: { offload: 0, condense: 0, extract: 1 } },
       counts: { offload: 0, condense: 0, extract: 1 },
@@ -148,12 +153,19 @@ describe('history workbench', () => {
     fireEvent.click(document.getElementById('evo-workbench-tab-data')!)
     await waitFor(() => { expect(document.getElementById('evo-workbench-tab-data')?.getAttribute('aria-selected')).toBe('true') })
     await waitFor(() => { expect(document.querySelector('.evo-stats-skill-name')?.textContent).toContain('alpha') })
+    errorCount = 1
     fireEvent.click(document.querySelector('.evo-stats-skill-name')!)
     await waitFor(() => { expect(document.getElementById('evo-workbench-tab-history')?.getAttribute('aria-selected')).toBe('true') })
     expect(document.querySelector('.evo-workbench-back')).not.toBeNull()
     fireEvent.click(document.querySelector('.evo-workbench-back')!)
     await waitFor(() => { expect(document.getElementById('evo-workbench-tab-data')?.getAttribute('aria-selected')).toBe('true') })
     expect(document.querySelector('.evo-stats-skill-name')?.textContent).toContain('alpha')
+    await waitFor(() => {
+      const headers = Array.from(document.querySelectorAll('thead th')).map(cell => cell.textContent ?? '')
+      const column = headers.findIndex(text => text.includes('negativeFeedback30d'))
+      const dataCell = document.querySelectorAll('tbody tr')[0]?.querySelectorAll('td')[column]
+      expect(dataCell?.textContent).toBe('1')
+    })
     // Opening a skill invalidates the shared snapshot so its report note history is fresh; the
     // data table itself stays mounted (one more read, not a remount).
     expect(loadStats).toHaveBeenCalledTimes(2)
