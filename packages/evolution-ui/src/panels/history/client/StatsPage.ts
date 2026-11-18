@@ -112,8 +112,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
     { key: 'bodyChars', label: face.t('stats.col.body'), align: 'right', sortable: true, render: row => numberText(row.health?.bodyChars ?? null) },
     { key: 'supportFiles', label: face.t('stats.col.support'), align: 'right', sortable: true, render: row => numberText(row.health?.supportFiles ?? null) },
     { key: 'versions', label: face.t('stats.col.versions'), align: 'right', sortable: true, render: row => numberText(row.versions) },
-    { key: 'useCount', label: face.t('stats.col.use'), align: 'right', sortable: true, render: row => numberText(row.usage?.useCount ?? null) },
-    { key: 'viewCount', label: face.t('stats.col.view'), align: 'right', sortable: true, render: row => numberText(row.usage?.viewCount ?? null) },
+    { key: 'viewCount', label: face.t('stats.col.loads'), align: 'right', sortable: true, render: row => numberText(row.usage?.viewCount ?? null) },
     { key: 'feedback', label: face.t('stats.col.feedback'), align: 'right', sortable: true, render: row => numberText(row.feedback) },
     { key: 'lastAt', label: face.t('stats.col.lastAt'), sortable: true, render: row => lastAtText(row.lastAt) },
   ]
@@ -213,6 +212,7 @@ export const STATS_CSS = [
   '.evo-stats-empty strong{font-size:12px;font-weight:650;color:var(--dsw-alias-label-secondary,#6f766d)}',
   '@media (max-width:760px){.evo-stats-page{padding:16px}.evo-stats-hero{align-items:flex-start;flex-direction:column}.evo-stats-title{font-size:20px}}',
 ].join('')
+
 
 
 

@@ -122,7 +122,7 @@ export const dictionaries = {
     "workbench.title": "技能整理",
     "stats.eyebrow": "技能库",
     "stats.title": "数据总览",
-    "stats.lede": "把每个技能的体量、参考资料、版本、使用和反馈放在一起看。点列名排序，点技能名进入整理页。",
+    "stats.lede": "把每个技能的体量、参考资料、版本、模型加载和反馈放在一起看。点列名排序，点技能名进入整理页。",
     "stats.organize": "整理一个技能",
     "stats.total.skills": "技能总数",
     "stats.total.attention": "需要关注",
@@ -149,7 +149,8 @@ export const dictionaries = {
     "stats.verdict.healthy": "健康",
     "stats.verdict.unknown": "未知",
     "workbench.data": "数据总览",
-    "workbench.backToData": "返回数据总览"
+    "workbench.backToData": "返回数据总览",
+    "stats.col.loads": "加载"
   },
   en: {
     "action.archive": "Archived",
@@ -269,7 +270,7 @@ export const dictionaries = {
     "workbench.title": "Skill organization",
     "stats.eyebrow": "Skill library",
     "stats.title": "Data overview",
-    "stats.lede": "See size, references, versions, usage and feedback for every skill. Sort by a column; open a skill by name.",
+    "stats.lede": "See size, references, versions, model loads and feedback for every skill. Sort by a column; open a skill by name.",
     "stats.organize": "Organize a skill",
     "stats.total.skills": "Skills",
     "stats.total.attention": "Needs attention",
@@ -296,7 +297,8 @@ export const dictionaries = {
     "stats.verdict.healthy": "Healthy",
     "stats.verdict.unknown": "Unknown",
     "workbench.data": "Data overview",
-    "workbench.backToData": "Back to data"
+    "workbench.backToData": "Back to data",
+    "stats.col.loads": "Loads"
   },
   ja: {
     "action.archive": "アーカイブ",
@@ -416,7 +418,7 @@ export const dictionaries = {
     "workbench.title": "スキル整理",
     "stats.eyebrow": "スキルライブラリ",
     "stats.title": "データ概要",
-    "stats.lede": "各スキルのサイズ、参照、バージョン、使用状況、フィードバックをまとめて表示します。列名で並べ替え、スキル名で整理ページを開けます。",
+    "stats.lede": "各スキルのサイズ、参照、バージョン、モデルの読み込み、フィードバックをまとめて表示します。列名で並べ替え、スキル名で整理ページを開けます。",
     "stats.organize": "スキルを整理",
     "stats.total.skills": "スキル数",
     "stats.total.attention": "要対応",
@@ -443,7 +445,8 @@ export const dictionaries = {
     "stats.verdict.healthy": "正常",
     "stats.verdict.unknown": "不明",
     "workbench.data": "データ概要",
-    "workbench.backToData": "データ概要に戻る"
+    "workbench.backToData": "データ概要に戻る",
+    "stats.col.loads": "読み込み"
   },
   es: {
     "action.archive": "archivado",
@@ -563,7 +566,7 @@ export const dictionaries = {
     "workbench.title": "Organización de skills",
     "stats.eyebrow": "Biblioteca de skills",
     "stats.title": "Resumen de datos",
-    "stats.lede": "Consulta tamaño, referencias, versiones, uso y feedback de cada skill. Ordena por columna y abre una skill por su nombre.",
+    "stats.lede": "Consulta tamaño, referencias, versiones, cargas del modelo y feedback de cada skill. Ordena por columna y abre una skill por su nombre.",
     "stats.organize": "Organizar una skill",
     "stats.total.skills": "Skills",
     "stats.total.attention": "Requieren atención",
@@ -590,7 +593,8 @@ export const dictionaries = {
     "stats.verdict.healthy": "Saludable",
     "stats.verdict.unknown": "Desconocido",
     "workbench.data": "Resumen de datos",
-    "workbench.backToData": "Volver al resumen"
+    "workbench.backToData": "Volver al resumen",
+    "stats.col.loads": "Cargas"
   },
   fr: {
     "action.archive": "archivé",
@@ -710,7 +714,7 @@ export const dictionaries = {
     "workbench.title": "Organisation des skills",
     "stats.eyebrow": "Bibliothèque de skills",
     "stats.title": "Vue d’ensemble",
-    "stats.lede": "Voyez taille, références, versions, usage et retours de chaque skill. Triez par colonne et ouvrez une skill par son nom.",
+    "stats.lede": "Voyez taille, références, versions, chargements du modèle et retours de chaque skill. Triez par colonne et ouvrez une skill par son nom.",
     "stats.organize": "Organiser une skill",
     "stats.total.skills": "Skills",
     "stats.total.attention": "À traiter",
@@ -737,7 +741,8 @@ export const dictionaries = {
     "stats.verdict.healthy": "Sain",
     "stats.verdict.unknown": "Inconnu",
     "workbench.data": "Vue d’ensemble",
-    "workbench.backToData": "Retour au résumé"
+    "workbench.backToData": "Retour au résumé",
+    "stats.col.loads": "Chargements"
   },
   de: {
     "action.archive": "archiviert",
@@ -857,7 +862,7 @@ export const dictionaries = {
     "workbench.title": "Skill-Organisation",
     "stats.eyebrow": "Skill-Bibliothek",
     "stats.title": "Datenübersicht",
-    "stats.lede": "Größe, Referenzen, Versionen, Nutzung und Feedback jedes Skills auf einen Blick. Nach Spalte sortieren, Skill per Namen öffnen.",
+    "stats.lede": "Größe, Referenzen, Versionen, Modell-Ladevorgänge und Feedback jedes Skills auf einen Blick. Nach Spalte sortieren, Skill per Namen öffnen.",
     "stats.organize": "Skill aufräumen",
     "stats.total.skills": "Skills",
     "stats.total.attention": "Aufmerksamkeit",
@@ -884,7 +889,8 @@ export const dictionaries = {
     "stats.verdict.healthy": "Gesund",
     "stats.verdict.unknown": "Unbekannt",
     "workbench.data": "Datenübersicht",
-    "workbench.backToData": "Zurück zur Übersicht"
+    "workbench.backToData": "Zurück zur Übersicht",
+    "stats.col.loads": "Ladevorgänge"
   },
   ru: {
     "action.archive": "заархивировано",
@@ -1004,7 +1010,7 @@ export const dictionaries = {
     "workbench.title": "Упорядочивание навыков",
     "stats.eyebrow": "Библиотека навыков",
     "stats.title": "Обзор данных",
-    "stats.lede": "Размер, ссылки, версии, использование и отзывы по каждому навыку. Сортируйте по столбцу и открывайте навык по имени.",
+    "stats.lede": "Размер, ссылки, версии, загрузки модели и отзывы по каждому навыку. Сортируйте по столбцу и открывайте навык по имени.",
     "stats.organize": "Упорядочить навык",
     "stats.total.skills": "Навыки",
     "stats.total.attention": "Требуют внимания",
@@ -1031,7 +1037,8 @@ export const dictionaries = {
     "stats.verdict.healthy": "Здоров",
     "stats.verdict.unknown": "Неизвестно",
     "workbench.data": "Обзор данных",
-    "workbench.backToData": "Назад к обзору"
+    "workbench.backToData": "Назад к обзору",
+    "stats.col.loads": "Загрузки"
   },
   pt: {
     "action.archive": "arquivamento",
@@ -1151,7 +1158,7 @@ export const dictionaries = {
     "workbench.title": "Organização de skills",
     "stats.eyebrow": "Biblioteca de skills",
     "stats.title": "Visão geral",
-    "stats.lede": "Veja tamanho, referências, versões, uso e feedback de cada skill. Ordene por coluna e abra uma skill pelo nome.",
+    "stats.lede": "Veja tamanho, referências, versões, carregamentos do modelo e feedback de cada skill. Ordene por coluna e abra uma skill pelo nome.",
     "stats.organize": "Organizar uma skill",
     "stats.total.skills": "Skills",
     "stats.total.attention": "Precisam de atenção",
@@ -1178,7 +1185,8 @@ export const dictionaries = {
     "stats.verdict.healthy": "Saudável",
     "stats.verdict.unknown": "Desconhecido",
     "workbench.data": "Visão geral",
-    "workbench.backToData": "Voltar ao resumo"
+    "workbench.backToData": "Voltar ao resumo",
+    "stats.col.loads": "Carregamentos"
   },
 } as const
 
