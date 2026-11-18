@@ -877,7 +877,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       return { ok: false, message: '背景审查不能执行 extract：review 只提议；提取必须由显式前台工具/命令执行。', skills: [] }
     }
     if (action === 'patch' && change === undefined) {
-      return { ok: false, message: '动作「patch」必须提供 summary（一句变更原因）。若这是升级前的暂存记录，请驳回后按带 summary 的新 patch 重提。', skills: [] }
+      return { ok: false, message: '插件升级后，动作「patch」必须提供 summary（一句变更原因）。\n这是升级前的暂存记录，之后的「patch」会带有 summary。', skills: [] }
     }
     // Model-origin structural writes must explain themselves; foreground/human
     // writes keep the host fallback so the CLI and UI are never blocked.
