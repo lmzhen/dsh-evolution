@@ -182,6 +182,7 @@
         "evolution-ui::tests/settings-styles.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
         "evolution-ui::tests/skill-stats-parity.spec.ts",
+        "evolution-ui::tests/workbench-store.spec.ts",
         "tool-skill-manage::tests/action-table.spec.ts"
       ],
       "gatesLocal": [
@@ -729,6 +730,8 @@
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
         "evolution-ui::tests/skill-stats-parity.spec.ts",
+        "evolution-ui::tests/stats-page-layout.client.spec.ts",
+        "evolution-ui::tests/workbench-store.spec.ts",
         "memory::tests/memory.spec.ts",
         "memory::tests/tools/memory-interpolation-contract.spec.ts",
         "tool-skill-manage::tests/action-table.spec.ts"
@@ -1370,6 +1373,8 @@
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
         "evolution-ui::tests/skill-stats-parity.spec.ts",
+        "evolution-ui::tests/stats-page-layout.client.spec.ts",
+        "evolution-ui::tests/workbench-store.spec.ts",
         "memory::tests/memory.spec.ts",
         "memory::tests/tools/memory-interpolation-contract.spec.ts",
         "tool-skill-manage::tests/action-table.spec.ts"
@@ -1989,6 +1994,8 @@
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
         "evolution-ui::tests/skill-stats-parity.spec.ts",
+        "evolution-ui::tests/stats-page-layout.client.spec.ts",
+        "evolution-ui::tests/workbench-store.spec.ts",
         "memory::tests/files/memory-budget-surfaces.spec.ts",
         "memory::tests/files/memory-files-clamp.spec.ts",
         "memory::tests/files/provider.spec.ts",
@@ -2075,11 +2082,11 @@
   "counts": {
     "fast": {
       "gates": 62,
-      "specs": 107
+      "specs": 108
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 413
+      "specs": 415
     },
     "ci-only": {
       "gates": 10,
@@ -2087,16 +2094,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 413
+      "specs": 415
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 485
+      "specs": 487
     }
   },
   "specs": {
-    "total": 485,
-    "marked": 485,
+    "total": 487,
+    "marked": 487,
     "unmarked": 0
   }
 }
