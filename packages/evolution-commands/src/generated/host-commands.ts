@@ -283,16 +283,6 @@ export const HOST_COMMANDS = {
       "ru": "Записать **строку** пресета Agent самоэволюции в слой патчей текущего профиля (`profiles/<p>/cordis.patch.yml`; bases берутся из bases.json пакета agent)",
       "pt": "Gravar a **linha** do preset Agent de autoevolução na camada de patches do perfil atual (`profiles/<p>/cordis.patch.yml`; as bases vêm do bases.json do pacote agent)"
     },
-    "summary.restructure": {
-      "zh": "把技能正文的一节移到 references 文件",
-      "en": "Move one section of a skill body into a references file",
-      "ja": "スキル本文の1セクションを references ファイルへ移す",
-      "es": "Mover una sección del cuerpo de un skill a un archivo de references",
-      "fr": "Déplacer une section du corps d’un skill vers un fichier references",
-      "de": "Einen Abschnitt des Skill-Textes in eine references-Datei verschieben",
-      "ru": "Перенести один раздел текста навыка в файл references",
-      "pt": "Mover uma seção do corpo de uma skill para um arquivo references"
-    },
     "summary.offload": {
       "zh": "把技能正文的会话细节章节移到 references（后台子智能体，--dry-run 只预览）",
       "en": "Move session-detail sections from a skill body into references (background subagent; --dry-run previews only)",
@@ -312,16 +302,6 @@ export const HOST_COMMANDS = {
       "de": "Einen Skill-Text Abschnitt für Abschnitt verdichten (Hintergrund-Subagent, wiederholte kleine Änderungen; --dry-run zeigt nur die Vorschau)",
       "ru": "Сжимать текст навыка по разделам (фоновый подагент, повторные небольшие правки; --dry-run только предпросмотр)",
       "pt": "Condensar o corpo de uma skill seção por seção (subagente em segundo plano, pequenas edições repetidas; --dry-run apenas pré-visualiza)"
-    },
-    "summary.extract": {
-      "zh": "预览把源技能的可复用部分提取到已有类级 owner；默认 plan，--apply 才写（多根一次事务）",
-      "en": "Preview extracting a source skill's reusable part into an existing class-level owner; by default it produces a plan, and only --apply writes (multiple roots in one transaction)",
-      "ja": "元スキルの再利用できる部分を既存のクラス担当スキルへ抽出するプレビュー（既定は plan のみ、--apply で書き込み。複数ルートを1トランザクション）",
-      "es": "Previsualizar la extracción de la parte reutilizable de un skill de origen a un skill existente que ya cubre esa clase; por defecto solo genera un plan y solo --apply escribe (varias raíces en una transacción)",
-      "fr": "Prévisualiser l’extraction de la partie réutilisable d’un skill d’origine vers un skill existant qui couvre déjà la classe ; par défaut, elle produit un plan et seul --apply écrit (plusieurs racines en une transaction)",
-      "de": "In der Vorschau zeigen, wie der wiederverwendbare Teil eines Quell-Skills in einen vorhandenen Skill, der die Klasse abdeckt, extrahiert wird; standardmäßig entsteht nur ein Plan, und erst --apply schreibt (mehrere Roots in einer Transaktion)",
-      "ru": "Показать предпросмотр извлечения переиспользуемой части исходного навыка в существующий навык, покрывающий этот класс; по умолчанию только план, запись — с --apply (несколько корней в одной транзакции)",
-      "pt": "Pré-visualizar a extração da parte reutilizável de uma skill de origem para uma skill existente que já cobre a classe; por padrão gera só o plano e --apply é que grava (várias raízes em uma transação)"
     },
     "summary.replay": {
       "zh": "比较不同会话与重启之间的计划结果（从活动记录回填）",

@@ -106,11 +106,6 @@ describe('evolution-commands', () => {
     const learn = await captured!.handler({ agent: { ctx } as never, rawInput: 'learn capture the no-agent lesson' })
     expect(learn.kind).toBe('error')
     expect(learn.text).toContain('E-305')
-    // restructure answers too: with no io registry it says so (its session is
-    // optional now, so it must not dereference the missing agent either).
-    const restructure = await captured!.handler({ agent: { ctx } as never, rawInput: 'restructure demo "## Heading" references/heading.md' })
-    expect(restructure.kind).toBe('error')
-    expect(restructure.text).toContain('未挂载 evolution-io 注册表')
   })
 
   it('V27 G0.5 (U-1): learn delivers through the WAKING channel (followup-first, inject fallback)', async () => {
@@ -380,7 +375,7 @@ describe('evolution-commands', () => {
 
   })
 
-  it('maintain fails closed without io or subagents, and reports usage on syntax errors', async () => {
+  it('maintain fails closed without io or subagents', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
     ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
@@ -388,126 +383,6 @@ describe('evolution-commands', () => {
     const noIo = await captured!.handler({ agent: { ctx }, rawInput: 'maintain' })
     expect(noIo.kind).toBe('error')
     expect(noIo.text).toContain('未挂载 evolution-io 注册表')
-    const badRestructure = await captured!.handler({ agent: { ctx }, rawInput: 'restructure bad-syntax' })
-    expect(badRestructure.kind).toBe('error')
-    expect(badRestructure.text).toContain('用法：')
-    const badToFile = await captured!.handler({ agent: { ctx }, rawInput: 'restructure demo "Log" scripts/log.sh' })
-    expect(badToFile.kind).toBe('error')
-    expect(badToFile.text).toContain('references/')
-  })
-
-  it('restructure rejects missing skills via the real SkillLibrary path (no side effects)', async () => {
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    const io = nodeEvolutionIo()
-    ctx.provide('evolutionIo', {
-      provider: () => io,
-    })
-    await ctx.plugin(Commands)
-    // The command constructs SkillLibrary over the default skills root; use a
-    // guaranteed-absent skill name so the path resolves to an error without
-    // touching real content.
-    const missingSkill = await captured!.handler({ agent: { ctx }, rawInput: 'restructure evo-nonexistent-skill "Log" references/log.md' })
-    expect(missingSkill.kind).toBe('error')
-  })
-
-  it('restructure succeeds end-to-end on a temp library via Config.root', async () => {
-    const dir = await tempRoot('evo-commands-restructure-')
-    const root = join(dir, 'skills')
-    const skillDir = join(root, 'demo-skill')
-    await mkdir(skillDir, { recursive: true })
-    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for restructure tests.\n---\n\n# Demo\n\n## Log\n\nold detail\n\n## Keep\n\nnew\n', 'utf8')
-    const ctx = new Context()
-    // V8-08 (0.3.47): the command's restructure now wires the single
-    // write-sink so the skill-catalog cache invalidation event fires.
-    let mutatedEvent: unknown
-    ctx.on('evolution/skill-mutated', (event) => { mutatedEvent = event })
-    // V9-12 (0.3.51): the OTHER half of the V8-08 discipline — the
-    // skillUsage.record(...) observation — must be asserted too (an
-    // event-only assertion let a removed record() line pass silently).
-    const usageRecords: Array<[string, string]> = []
-    ctx.provide('skillUsage', {
-      record: async (name: string, kind: string) => { usageRecords.push([name, kind]) },
-    })
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    const io = nodeEvolutionIo()
-    ctx.provide('evolutionIo', {
-      provider: () => io,
-    })
-    // Config.root is the command-facing root (A7 alignment) — the
-    // temp root keeps the mutation off the real library.
-    await ctx.plugin(Commands, { root: root })
-    const result = await captured!.handler({ agent: { ctx }, rawInput: 'restructure demo-skill "Log" references/log.md' })
-    expect(result.kind).toBe('success')
-    expect(mutatedEvent).toEqual(expect.objectContaining({ action: 'restructure', name: 'demo-skill' }))
-    expect(usageRecords).toEqual([['demo-skill', 'patch']])
-    const body = await io.readText(join(skillDir, 'SKILL.md'))
-    expect(body).not.toContain('old detail')
-    expect(body).toContain('references/log.md')
-    const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
-    expect(support).toContain('old detail')
-  })
-
-  it('extract succeeds end-to-end on a temp library', async () => {
-    const dir = await tempRoot('evo-commands-extract-')
-    const root = join(dir, 'skills')
-    await mkdir(join(root, 'extract-source'), { recursive: true })
-    await mkdir(join(root, 'extract-target'), { recursive: true })
-    await writeFile(join(root, 'extract-target', '.hermes-managed'), '')
-    await writeFile(join(root, 'extract-source', 'SKILL.md'), '---\nname: extract-source\ndescription: source.\n---\n\n# Source\n\nIntro.\n\n## Details\n\nreusable detail\n\n## Usage\n\nUse it.\n', 'utf8')
-    await writeFile(join(root, 'extract-target', 'SKILL.md'), '---\nname: extract-target\ndescription: target.\n---\n\n# Target\n\nExisting.\n', 'utf8')
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    const io = nodeEvolutionIo()
-    ctx.provide('evolutionIo', { provider: () => io })
-    await ctx.plugin(Commands, { root })
-    const result = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --owner-covers --apply' })
-    expect(result.kind).toBe('success')
-    const source = await io.readText(join(root, 'extract-source', 'SKILL.md'))
-    const target = await io.readText(join(root, 'extract-target', 'SKILL.md'))
-    expect(source).toContain('This capability now lives in extract-target')
-    expect(source).not.toContain('reusable detail')
-    expect(target).toContain('reusable detail')
-  })
-
-  it('extract --plan and start/end sub-block are zero-write then apply', async () => {
-    const dir = await tempRoot('evo-commands-extract-plan-')
-    const root = join(dir, 'skills')
-    await mkdir(join(root, 'extract-source'), { recursive: true })
-    await mkdir(join(root, 'extract-target'), { recursive: true })
-    await writeFile(join(root, 'extract-target', '.hermes-managed'), '')
-    const sourceBody = '---\nname: extract-source\ndescription: source.\n---\n\n# Source\n\n## Details\n\nkeep before\n\nmove start\nmove end\n\nkeep after\n'
-    await writeFile(join(root, 'extract-source', 'SKILL.md'), sourceBody, 'utf8')
-    await writeFile(join(root, 'extract-target', 'SKILL.md'), '---\nname: extract-target\ndescription: target.\n---\n\n# Target\n\nExisting.\n', 'utf8')
-    const ctx = new Context()
-    let captured: Handler | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as Handler }))
-    const io = nodeEvolutionIo()
-    ctx.provide('evolutionIo', { provider: () => io })
-    await ctx.plugin(Commands, { root })
-    const planned = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --start "move start" --end "move end" --plan plan-1' })
-    expect(planned.kind, planned.text).toBe('success')
-    expect(planned.text).toContain('提取计划')
-    // EXT-002: a target's existence alone is not coverage evidence.
-    expect(planned.text).toContain('owner-gap')
-    expect(await io.readText(join(root, 'extract-source', 'SKILL.md'))).toBe(sourceBody)
-    const defaultPreview = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --start "move start" --end "move end" --outcome extract --owner-covers' })
-    expect(defaultPreview.kind, defaultPreview.text).toBe('success')
-    expect(defaultPreview.text).toContain('默认 plan')
-    expect(defaultPreview.text).toContain('outcome=extract')
-    expect(await io.readText(join(root, 'extract-source', 'SKILL.md'))).toBe(sourceBody)
-    const applied = await captured!.handler({ agent: { ctx }, rawInput: 'extract extract-source extract-target "Details" --start "move start" --end "move end" --owner-covers --apply' })
-    expect(applied.kind).toBe('success')
-    const source = await io.readText(join(root, 'extract-source', 'SKILL.md'))
-    const target = await io.readText(join(root, 'extract-target', 'SKILL.md'))
-    expect(source).toContain('keep before')
-    expect(source).toContain('keep after')
-    expect(source).not.toContain('move start')
-    expect(target).toContain('move start')
-    expect(target).toContain('move end')
   })
 
   // G4 (0.21.0): the /evolution pin face — the user gesture the tool action never had. A REAL library
@@ -686,37 +561,6 @@ describe('evolution-commands', () => {
       expect(status.text).not.toMatch(/\srunning\s/)
       expect(status.text).toContain('failed')
     })
-  })
-
-  it('extract without a target returns a read-only owner proposal', async () => {
-    const dir = await tempHome('evo-commands-extract-discover-')
-    const root = join(dir, 'skills')
-    await mkdir(join(root, 'demo-skill'), { recursive: true })
-    await writeFile(join(root, 'demo-skill', 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n\n## Run\n\ndo it\n', 'utf8')
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    provideChannel(ctx, ({
-      async start() {
-        return {
-          dispose: async () => {},
-          result: Promise.resolve({
-            text: 'proposal',
-            structured: { outcome: 'extract', target: 'owner-skill', reason: 'the Run section is reusable', parts: [{ heading: 'Run' }] },
-          }),
-        }
-      },
-    }))
-    await ctx.plugin(Commands, { root: root })
-    const result = await captured!.handler({
-      agent: { ctx, session: { id: 'parent-session', header: { origin: 'foreground' } } },
-      rawInput: 'extract demo-skill',
-    })
-    expect(result.kind).toBe('success')
-    expect(result.text).toContain('extract proposal（未写入）')
-    expect(result.text).toContain('target: owner-skill')
-    expect(result.text).toContain('parts: Run')
   })
 
   it('maintain enriches support files and reports pointer_missing truthfully (v11 P1-1)', async () => {
@@ -1401,35 +1245,6 @@ describe('evolution-commands', () => {
     expect(result.text).not.toContain('E-306')
   })
 
-  it('S5.5 (audit P2-23): a staging deployment refuses a session-less restructure with the E-306 shape instead of staging unattributed', async () => {
-    // The E-305 invocation shape (no agent → no session) used to slip past
-    // `willStage` into an unconditional approval.request WITHOUT a session,
-    // landing a staged record with no session attribution while
-    // consolidate/restore answered E-306 for the same shape.
-    const ctx = new Context()
-    let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { captured = definition as typeof captured }))
-    ctx.provide('evolutionIo', { provider: () => nodeEvolutionIo() })
-    let requested = 0
-    ctx.provide('evolutionApproval', {
-      isEnabled: true,
-      stageForeground: true,
-      hasRunner: () => true,
-      list: async () => [],
-      request: async () => {
-        requested += 1
-        return { action: 'staged', message: 'staged restructure' }
-      },
-    } as never)
-    await ctx.plugin(Commands)
-    const result = await captured!.handler({ agent: { ctx }, rawInput: 'restructure demo "## Heading" references/heading.md' })
-    expect(result.kind).toBe('error')
-    expect(result.text).toContain('E-306')
-    expect(result.text).toContain('restructure')
-    // The refusal replaces the staging call entirely — nothing is staged.
-    expect(requested).toBe(0)
-  })
-
   it('V24-12: a double-space subcommand variant dispatches instead of returning help as success', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: string; text: string }> } | undefined
@@ -1453,25 +1268,6 @@ describe('evolution-commands', () => {
   // SkillLibrary (core-side constructor option `threatExemptLabels` — P2-18
   // core batch). Default-empty semantics: a non-empty list is accepted and the
   // restructure write path behaves exactly as before on threat-free content.
-  it('restructure accepts the threatExemptLabels config and keeps write behavior (P2-18)', async () => {
-    const dir = await tempRoot('evo-commands-exempt-')
-    const root = join(dir, 'skills')
-    const skillDir = join(root, 'demo-skill')
-    await mkdir(skillDir, { recursive: true })
-    await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo-skill\ndescription: Demo skill for restructure tests.\n---\n\n# Demo\n\n## Log\n\nold detail\n\n## Keep\n\nnew\n', 'utf8')
-    const ctx = new Context()
-    let handler: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined
-    ctx.provide('commands', captureCommands((definition) => { handler = definition as typeof handler }))
-    const io = nodeEvolutionIo()
-    ctx.provide('evolutionIo', { provider: () => io })
-    await ctx.plugin(Commands, { root: root, threatExemptLabels: ['ssh_backdoor'] })
-    const result = await handler!.handler({ agent: { ctx }, rawInput: 'restructure demo-skill "Log" references/log.md' })
-    expect(result.kind).toBe('success')
-    const support = await io.readText(join(root, 'demo-skill', 'references', 'log.md'))
-    expect(support).toContain('old detail')
-  })
-
-
   it('pending --detail renders each record with its staged args, truncated and collapsed by default (F-328)', async () => {
     const ctx = new Context()
     let captured: { handler(invocation: { rawInput?: string; agent?: unknown }): Promise<{ kind: 'success' | 'error'; text: string }> } | undefined

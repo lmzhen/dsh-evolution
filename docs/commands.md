@@ -66,9 +66,7 @@
 | `/evolution learn [request]` | 向当前会话发一条学习请求 |
 | `/evolution review [memory|skill|combined]` | 立即向当前会话注入一次复盘，不等空闲 |
 | `/evolution replay` | 从活动记录比较不同会话和重启之间的计划结果 |
-| `/evolution restructure <name> "<heading>" <to_file> [--start "<exact line>"] [--end "<exact line>"] [--plan <runId>]` | 把技能正文的一节（或 start/end 连续行子块）移到 references 文件；start/end 是完整行文本，不是行号 |
 | `/evolution condense <name> [--dry-run]` | 逐章节压缩技能正文（后台治理子智能体，多次小改） |
-| `/evolution extract <source> [<target> "<heading>"] [--start "<exact line>"] [--end "<exact line>"] [--outcome extract|mixed] [--apply]` | 预览或执行跨技能提取；source-only 时只返回 owner proposal |
 
 `replay` 依赖活动记录。默认 `reviewMode=aux` 且 aux 不向父会话追加工具事件，因此没有相应数据时不能据此推断回放已经完成过实际评估。
 
@@ -144,3 +142,4 @@
 `all`、`preset` 和分层预设会话提供 `memory` / `skill_manage` 等模型工具；host 不提供这两个工具，但仍带 `maintenance_probe` 和 `merge_stage`；`merge_stage` 只绑定合并子代理，不是普通用户直接调用的工具。命令存在不代表当前形态挂载了对应功能，服务缺失时应按错误提示检查安装形态。
 
 `/evolution` 完全不存在时，先检查安装 profile 和重启状态，不要试图用同样不存在的 doctor 排查。
+

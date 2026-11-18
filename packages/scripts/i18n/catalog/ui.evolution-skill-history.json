@@ -562,26 +562,6 @@
       "pt": "Organizar",
       "ru": "Привести в порядок"
     },
-    "copy.extract": {
-      "zh": "提取",
-      "en": "Extract",
-      "ja": "抽出",
-      "es": "Extraer",
-      "fr": "Extraire",
-      "de": "Extrahieren",
-      "pt": "Extrair",
-      "ru": "Извлечь"
-    },
-    "copy.extract.discover": {
-      "zh": "复制提取命令（自动找 owner）",
-      "en": "Copy extract command (auto-pick owner)",
-      "ja": "抽出コマンドをコピー（owner を自動選択）",
-      "es": "Copiar comando extract (elige owner automáticamente)",
-      "fr": "Copier la commande extract (choix auto de l’owner)",
-      "de": "extract-Befehl kopieren (Owner automatisch wählen)",
-      "pt": "Copiar comando extract (escolher owner automaticamente)",
-      "ru": "Скопировать extract (owner выбирается автоматически)"
-    },
     "copy.offload": {
       "zh": "复制 offload 命令",
       "en": "Copy offload command",
@@ -691,16 +671,6 @@
       "de": "/evolution condense {name}",
       "pt": "/evolution condense {name}",
       "ru": "/evolution condense {name}"
-    },
-    "copy.command.extract": {
-      "zh": "/evolution extract {name}",
-      "en": "/evolution extract {name}",
-      "ja": "/evolution extract {name}",
-      "es": "/evolution extract {name}",
-      "fr": "/evolution extract {name}",
-      "de": "/evolution extract {name}",
-      "pt": "/evolution extract {name}",
-      "ru": "/evolution extract {name}"
     },
     "health.verdict.warn": {
       "zh": "需关注",

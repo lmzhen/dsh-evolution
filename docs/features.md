@@ -60,7 +60,7 @@ curator 负责技能库的生命周期整理。默认在宿主启动约 10 秒�
 
 ## 技能整理：restructure / condense
 
-offload 不需要独立执行器。技能正文达到硬上限时写入会被拒绝，并提示拆小 SKILL.md、把支撑内容放进 `references/` 或 `templates/`；达到软上限时健康检查显示 `warn` / `needs-restructure`。真正执行“移到 references”的是 `/evolution restructure <name> "<heading>" <to_file>`：一个 unit、CAS、可 undo，也支持 start/end 连续行子块（参数是完整行文本，不是行号）。
+offload 不需要独立执行器。技能正文达到硬上限时写入会被拒绝，并提示拆小 SKILL.md、把支撑内容放进 `references/` 或 `templates/`；达到软上限时健康检查显示 `warn` / `needs-restructure`。真正执行“移到 references”的是 `skill_manage` 的 `restructure` 动作（由 agent 或整理页触发）：一个 unit、CAS、可 undo，也支持 start/end 连续行子块（参数是完整行文本，不是行号）。
 
 `/evolution condense <skill>` 是逐章节压缩，使用一个独立的 governance 子智能体：
 
@@ -141,5 +141,6 @@ scan 的候选筛选需要 `mergeModelsRoot` 下的本地 potion 模型文件：
 `all` 安装形态在 Web/桌面 GUI 提供一个“技能整理”工作台页，内含技能、数据总览、待我确认、合并建议四个 tab；侧栏只有一个入口。数据总览是可排序的技能库表格（加载、近30天加载、报错、报错率），点技能名进入该技能的整理页，返回时保留搜索/筛选/排序/滚动位置。参数编辑在平台“设置 → 插件配置”的对应卡片里，设置区只保留诊断；合并视图只读，动作通过复制命令完成。
 
 技能健康结果保留在诊断卡/健康能力中，不单独占工作台 tab；未启用健康能力时工作台不显示相关入口。`host`、`preset` 和分层预设不包含这套工作台页面。
+
 
 

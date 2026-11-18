@@ -71,7 +71,6 @@ Use `all` for normal installs. The old `preset`, `agent` and layered install for
 | `/evolution pending` | List ordinary writes waiting for approval |
 | `/evolution skill history <name>` | Inspect body and support-file history |
 | `/evolution skill undo <name>` | Revert the skill body; support files are not restored |
-| `/evolution restructure <name> "<heading>" <to_file>` | Move a section (or start/end sub-block) into references |
 | `/evolution condense <name>` | Compress the body section by section via a governance subagent |
 | `/evolution curator status` | Inspect automatic curation state |
 | `/evolution merge status <runId>` | Inspect an initiated merge run |
@@ -108,6 +107,7 @@ Published packages do not cross older prerelease platform lines. See [INSTALL.md
 - [Operations](docs/operations.md): backup, upgrade, uninstall and verification.
 - [Troubleshooting](docs/troubleshooting.md): symptom-based diagnosis.
 - Maintainer references: [package map and canonical facts](packages/README.md) and [development guide](docs/developer/development.md).
+
 
 
 
