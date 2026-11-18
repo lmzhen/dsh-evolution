@@ -30,7 +30,7 @@ export const guards = [
     title: "`node packages/evolution/scripts/smoke-built-entries.mjs packages/evolution`",
     argv: ["node","packages/evolution/scripts/smoke-built-entries.mjs","packages/evolution"],
     lanes: ["local"],
-    registration: {"reason":"smoke-built-entries needs built lib artifacts that a source checkout does not carry","owner":"scripts/gates","expiry":"0.51.0","plan":"run after build-lib on the build line","renewal":"Renewed at 0.50.0 (expiry 0.51.0): smoke-built-entries still needs built lib artifacts that a source checkout does not carry; this is a registered debt, not a pass."},
+    registration: {"reason":"smoke-built-entries needs built lib artifacts that a source checkout does not carry","owner":"scripts/gates","expiry":"0.52.0","plan":"run after build-lib on the build line","renewal":"Renewed at 0.51.1 (expiry 0.52.0): smoke-built-entries still needs built lib artifacts and a complete platform scope; local runs remain a registered cannot-decide, CI runs it after build."},
   }),
 
   gate("gate-06", {
@@ -225,7 +225,7 @@ export const guards = [
     // CI uses a synthetic plane home (the action's --home "$RUNNER_TEMP/plane-home").
     ci: { argv: ["node","packages/scripts/verify-write-inventory.mjs","packages","--strict","--home","${RUNNER_TEMP}/plane-home"] },
     lanes: ["local","ci-static"],
-    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.51.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.50.0 (expiry 0.51.0): the write-inventory row still needs the CI-only $RUNNER_TEMP/plane-home argument; this is a registered debt, not a pass."},
+    registration: {"reason":"the gate table cell states the step in prose or carries a placeholder the runner cannot resolve","owner":"scripts/gate-manifest","expiry":"0.52.0","plan":"split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration","renewal":"Renewed at 0.51.1 (expiry 0.52.0): local argv keeps the <plane home> placeholder; the CI override supplies $RUNNER_TEMP/plane-home and is the release evidence."},
   }),
 
   gate("gate-30", {
@@ -553,7 +553,7 @@ export const guards = [
     title: "node packages/scripts/verify-health-admission.mjs",
     argv: ["node","packages/scripts/verify-health-admission.mjs"],
     lanes: ["local"],
-    registration: {"reason":"the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge","owner":"scripts/gates","expiry":"0.51.0","plan":"the CI lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay"},
+    registration: {"reason":"the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge","owner":"scripts/gates","expiry":"0.52.0","plan":"the CI lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay","renewal":"Renewed at 0.51.1 (expiry 0.52.0): local corpora are still absent; CI remains the green evidence."},
   }),
 
   gate("gate-82", {
