@@ -108,6 +108,10 @@ describe('skill-history routes: the stats snapshot', () => {
     expect(stats.body.data.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
     expect(stats.body.data.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
     expect(stats.body.data.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }])
+    // The probe stays tiny even when every aggregate service is present: `stats` is the one read.
+    const health = await host.json(SKILL_HISTORY_ROUTES.health)
+    expect(health.status).toBe(200)
+    expect(health.body).toEqual({ ok: true, data: { surface: 'skill-history' } })
   })
 
   it('keeps health/usage/feedback null when those services are absent', async () => {

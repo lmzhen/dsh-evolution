@@ -290,34 +290,12 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
       path: SKILL_HISTORY_ROUTES.health,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: async (request) => {
-        if (request.method !== 'GET') return methodNotAllowed(['GET'])
-        // Keep the probe answer stable for deployments that have no health view yet;
-        // only a real array upgrades the body to the aggregate read.
-        const view = await services.getHealthView?.()
-        if (!Array.isArray(view)) return json(200, { ok: true, data: { surface: 'skill-history' } })
-        const usageRead = await services.getUsage?.()
-        const usage = usageRead instanceof Map ? Object.fromEntries(usageRead) : null
-        const names = view
-          .map(row => row !== null && typeof row === 'object' && 'name' in row ? (row as { name?: unknown }).name : undefined)
-          .filter((name): name is string => typeof name === 'string' && name !== '')
-        const feedbackRead = services.getFeedback?.(names)
-        const feedback = feedbackRead !== null && typeof feedbackRead === 'object' ? feedbackRead : null
-        const governance = await services.getGovernance?.().catch(() => null) ?? null
-        const counts = await services.getCounts?.().catch(() => null) ?? null
-        return json(200, {
-          ok: true,
-          data: {
-            surface: 'skill-history',
-            rows: view,
-            usage,
-            feedback,
-            governance,
-            counts,
-            scan: { status: 'complete' },
-            readAt: Date.now(),
-          },
-        })
+      fetch: (request) => {
+        if (request.method !== 'GET') return Promise.resolve(methodNotAllowed(['GET']))
+        // Pure route-family probe: the table's full read lives on `stats`. Keeping this answer small
+        // means a deployment can advertise the family without paying for the aggregate scan, and the
+        // old aggregate shape has one compatibility reader (`api.health`) rather than a second writer.
+        return Promise.resolve(json(200, { ok: true, data: { surface: 'skill-history' } }))
       },
     },
   ]
