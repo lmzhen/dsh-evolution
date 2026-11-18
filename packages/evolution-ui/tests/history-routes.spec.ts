@@ -54,6 +54,73 @@ describe('skill-history routes: unit undo', () => {
   })
 })
 
+describe('skill-history routes: the stats snapshot', () => {
+  it('joins index, health, usage, feedback and counts without turning missing facts into zero', async () => {
+    await tempHome('dsh-skill-history-stats-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const root = join(process.env.DSH_HOME ?? '', 'skills')
+    const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
+    const body = (text: string): string => '---\nname: panel-skill\ndescription: stats fixture\n---\n' + text + '\n'
+    await library.create('panel-skill', body('One.'))
+    const host = await mountHostRoutes(ctx, audit => makeSkillHistoryRoutes({
+      getCurator: () => ctx.evolutionCurator,
+      getHealthView: async () => [{
+        name: 'panel-skill',
+        verdict: 'warn',
+        dims: { bodyChars: 0, bodyTokens: 0, supportFiles: 0, stampDensityPerKb: 0, churnPatches: 0, churnReads: 0, hardCapHits: 0 },
+        findings: [],
+      }, {
+        name: 'missing-health',
+        dims: { bodyChars: 7 },
+      }],
+      getUsage: async () => new Map([['panel-skill', { use_count: 0, view_count: 2, patch_count: 1, last_used_at: '2026-01-01T00:00:00.000Z', last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false }]]),
+      getFeedback: names => Object.fromEntries(names.map(name => [name, 0])),
+      getCounts: async () => ({ offload: 0, condense: 0, extract: 1 }),
+    }, audit))
+    const stats = await host.json<{
+      ok: boolean
+      data: {
+        rows: Array<{
+          name: string
+          versions: number
+          health: { verdict: string; bodyChars: number | null; supportFiles: number | null } | null
+          usage: { useCount: number | null; viewCount: number | null } | null
+          feedback: number | null
+        }>
+        totals: { skills: number; needsAttention: number; bodyChars: number | null; supportFiles: number | null }
+        counts: { offload: number; condense: number; extract: number } | null
+      }
+    }>(SKILL_HISTORY_ROUTES.stats)
+    expect(stats.status).toBe(200)
+    expect(stats.body.ok).toBe(true)
+    expect(stats.body.data.rows).toHaveLength(1)
+    const row = stats.body.data.rows[0]!
+    expect(row.name).toBe('panel-skill')
+    expect(row.versions).toBe(1)
+    expect(row.health).toMatchObject({ verdict: 'warn', bodyChars: 0, supportFiles: 0 })
+    expect(row.usage).toMatchObject({ useCount: 0, viewCount: 2 })
+    expect(row.feedback).toBe(0)
+    expect(stats.body.data.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
+    expect(stats.body.data.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
+  })
+
+  it('keeps health/usage/feedback null when those services are absent', async () => {
+    await tempHome('dsh-skill-history-stats-null-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    await ctx.plugin(EvolutionCurator, { autoStart: false })
+    const host = await mountHostRoutes(ctx, audit => makeSkillHistoryRoutes({ getCurator: () => ctx.evolutionCurator }, audit))
+    const stats = await host.json<{ ok: boolean; data: { rows: unknown[]; totals: { bodyChars: number | null } } }>(SKILL_HISTORY_ROUTES.stats)
+    expect(stats.status).toBe(200)
+    expect(stats.body.data.rows).toEqual([])
+    expect(stats.body.data.totals.bodyChars).toBeNull()
+  })
+})
+
 describe('skill-history routes: the read/write surface', () => {
   it('serves the health probe, the skills with history, the split version lists and one undo', async () => {
     await tempHome('dsh-skill-history-routes-')

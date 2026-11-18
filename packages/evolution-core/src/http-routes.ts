@@ -79,6 +79,7 @@ export const HOST_ROUTES = {
     body: '/api/dsh-evolution/skill-history/versions/body',
     undo: '/api/dsh-evolution/skill-history/undo',
     health: '/api/dsh-evolution/skill-history/health',
+    stats: '/api/dsh-evolution/skill-history/stats',
   },
   skillHealth: {
     rows: '/api/dsh-evolution/skill-health/rows',

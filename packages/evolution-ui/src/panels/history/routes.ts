@@ -14,6 +14,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { undoableFor, unitUndoableFlags } from './unit-undoable.ts'
+import { buildSkillStatsSnapshot } from './stats.ts'
 import { contentHash, displayBodyOf, errorText } from '@deepseek-ai/dsh-evolution-core'
 import { elapsedSince, latestVersionAt, partitionVersions, skillRowCells, textDiffFacts, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
 import { HOST_ROUTES, json, methodNotAllowed, readJsonObject } from '@deepseek-ai/dsh-evolution-core/http-routes'
@@ -271,6 +272,18 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
             return json(200, result.ok ? { ok: true, data: result } : { ok: false, code: 'undo-refused', message: result.message })
           })
         })()
+      },
+    },
+    {
+      path: SKILL_HISTORY_ROUTES.stats,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        if (request.method !== 'GET') return methodNotAllowed(['GET'])
+        return withCurator(async (curator) => {
+          const snapshot = await buildSkillStatsSnapshot(services, curator)
+          return json(200, { ok: true, data: snapshot })
+        })
       },
     },
     {
