@@ -79,8 +79,10 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 
 | 参数 | 档 | 生效 | 权威面 | owner | 旧名（仅迁移；0.48 不再读取） | 设置面 | 说明 |
 |---|---|---|---|---|---|---|---|
-| `memoryChars` | E3 | live | cordis | memory-files | memoryCharLimit | 卡：memory-files | Character budget the memory store enforces for MEMORY.md. |
-| `userChars` | E3 | live | cordis | memory-files | userCharLimit | 卡：memory-files | Character budget the memory store enforces for USER.md. |
+| `memoryChars` | E3 | live | cordis | memory-files | memoryCharLimit | 卡：memory-files | Legacy character budget for MEMORY.md; only an explicit legacy override, otherwise the token budget governs. |
+| `userChars` | E3 | live | cordis | memory-files | userCharLimit | 卡：memory-files | Legacy character budget for USER.md; only an explicit legacy override, otherwise the token budget governs. |
+| `memoryTokens` | E3 | live | cordis | memory-files | — | 卡：memory-files | Estimated token budget for MEMORY.md; the default is derived from the old 2200-character limit. |
+| `userTokens` | E3 | live | cordis | memory-files | — | 卡：memory-files | Estimated token budget for USER.md; the default is derived from the old 1375-character limit. |
 | `memoryEnabled` | E2 | none | cordis | tool-memory | — | 无（deployment） | Register the memory tool and its prompt section at all (deployment switch). |
 | `entryPreviewChars` | E3 | live | cordis | tool-memory | — | 卡：tool-memory | Characters of one memory entry shown in a tool result preview. |
 | `addDatePrefix` | E3 | live | cordis | memory-files | — | 卡：memory-files | Prefix stored memory entries with their date heading. |

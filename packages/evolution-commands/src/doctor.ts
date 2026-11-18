@@ -989,10 +989,14 @@ function memoryBudgetIssues(ctx: { get(name: string): unknown }): string[] {
   const budget = ctx.get('evolutionMemoryBudget') as {
     memoryChars?: number
     userChars?: number
+    memoryTokens?: number
+    userTokens?: number
     memorySource?: string
     userSource?: string
+    policyMemoryTokens?: number
+    policyUserTokens?: number
   } | undefined
-  const policy = (ctx.get('evolutionPolicy') as { get?: () => { memoryChars?: number; userChars?: number } } | undefined)?.get?.()
+  const policy = (ctx.get('evolutionPolicy') as { get?: () => { memoryChars?: number; userChars?: number; memoryTokens?: number; userTokens?: number } } | undefined)?.get?.()
   if (budget === undefined || policy === undefined) return []
   const issues: string[] = []
   if (budget.memoryChars !== undefined && policy.memoryChars !== undefined && budget.memoryChars !== policy.memoryChars) {
@@ -1000,6 +1004,12 @@ function memoryBudgetIssues(ctx: { get(name: string): unknown }): string[] {
   }
   if (budget.userChars !== undefined && policy.userChars !== undefined && budget.userChars !== policy.userChars) {
     issues.push(`store enforces userChars=${budget.userChars} (source: ${budget.userSource ?? 'unknown'}) while evolution-policy declares userChars=${policy.userChars} — same divergence as the memory limit`)
+  }
+  if (budget.memoryTokens !== undefined && budget.policyMemoryTokens !== undefined && budget.memoryTokens !== budget.policyMemoryTokens) {
+    issues.push(`store enforces memoryTokens=${budget.memoryTokens} while evolution-policy plans against memoryTokens=${budget.policyMemoryTokens} — align the row and policy token budgets`)
+  }
+  if (budget.userTokens !== undefined && budget.policyUserTokens !== undefined && budget.userTokens !== budget.policyUserTokens) {
+    issues.push(`store enforces userTokens=${budget.userTokens} while evolution-policy plans against userTokens=${budget.policyUserTokens} — same divergence as the memory budget`)
   }
   return issues
 }

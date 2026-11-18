@@ -754,46 +754,90 @@ export const PARAM_FIELDS = {
     },
     "memoryChars": {
       "label": {
-        "zh": "记忆库上限",
-        "en": "Memory limit",
-        "ja": "メモリの保存上限",
-        "es": "Límite del almacén de memoria",
-        "fr": "Limite de la mémoire",
-        "de": "Limit des Gedächtnisses",
-        "ru": "Лимит памяти",
-        "pt": "Limite da memória"
+        "zh": "记忆库字符上限（旧）",
+        "en": "Memory limit (legacy chars)",
+        "ja": "メモリの保存上限（旧文字数）",
+        "es": "Límite del almacén (caracteres antiguo)",
+        "fr": "Limite de la mémoire (caractères, ancien)",
+        "de": "Limit des Gedächtnisses (alte Zeichen)",
+        "ru": "Лимит памяти (старые символы)",
+        "pt": "Limite da memória (caracteres antigo)"
       },
       "hint": {
-        "zh": "长期记忆文件（MEMORY.md）最多多少字符。",
-        "en": "Max characters in the memory file (MEMORY.md).",
-        "ja": "長期メモリファイル（MEMORY.md）の文字数上限です。",
-        "es": "Caracteres máximos que admite el archivo de memoria a largo plazo (MEMORY.md).",
-        "fr": "Nombre maximal de caractères du fichier de mémoire à long terme (MEMORY.md).",
-        "de": "So viele Zeichen darf die Gedächtnisdatei (MEMORY.md) höchstens fassen.",
-        "ru": "Сколько символов максимум в файле долговременной памяти (MEMORY.md).",
-        "pt": "Máximo de caracteres do arquivo de memória de longo prazo (MEMORY.md)."
+        "zh": "旧口径：长期记忆文件（MEMORY.md）最多多少字符；设置后按字符模式工作。",
+        "en": "Legacy: max characters in MEMORY.md; setting it switches this row back to char mode.",
+        "ja": "旧仕様：MEMORY.md の文字数上限。設定すると文字数モードになります。",
+        "es": "Antiguo: máximo de caracteres en MEMORY.md; al definirlo se vuelve al modo caracteres.",
+        "fr": "Ancien : nombre maximal de caractères de MEMORY.md ; le définir repasse en mode caractères.",
+        "de": "Alt: maximale Zeichenzahl in MEMORY.md; setzen schaltet auf Zeichenmodus zurück.",
+        "ru": "Старый режим: максимум символов в MEMORY.md; включает подсчёт символов.",
+        "pt": "Antigo: máximo de caracteres em MEMORY.md; defini-lo volta ao modo de caracteres."
       }
     },
     "userChars": {
       "label": {
-        "zh": "用户画像上限",
-        "en": "User profile limit",
-        "ja": "ユーザープロフィールの保存上限",
-        "es": "Límite del perfil de usuario",
-        "fr": "Limite du profil utilisateur",
-        "de": "Limit des Nutzerprofils",
-        "ru": "Лимит профиля пользователя",
-        "pt": "Limite do perfil do usuário"
+        "zh": "用户画像字符上限（旧）",
+        "en": "User profile limit (legacy chars)",
+        "ja": "ユーザープロフィールの保存上限（旧文字数）",
+        "es": "Límite del perfil (caracteres antiguo)",
+        "fr": "Limite du profil (caractères, ancien)",
+        "de": "Limit des Nutzerprofils (alte Zeichen)",
+        "ru": "Лимит профиля (старые символы)",
+        "pt": "Limite do perfil (caracteres antigo)"
       },
       "hint": {
-        "zh": "用户画像文件（USER.md）最多多少字符。",
-        "en": "Max characters in the user profile (USER.md).",
-        "ja": "ユーザープロフィールファイル（USER.md）の文字数上限です。",
-        "es": "Caracteres máximos que admite el archivo de perfil de usuario (USER.md).",
-        "fr": "Nombre maximal de caractères du fichier de profil utilisateur (USER.md).",
-        "de": "So viele Zeichen darf die Profildatei (USER.md) höchstens fassen.",
-        "ru": "Сколько символов максимум в файле профиля пользователя (USER.md).",
-        "pt": "Máximo de caracteres do arquivo de perfil do usuário (USER.md)."
+        "zh": "旧口径：用户画像文件（USER.md）最多多少字符；设置后按字符模式工作。",
+        "en": "Legacy: max characters in USER.md; setting it switches this row back to char mode.",
+        "ja": "旧仕様：USER.md の文字数上限。設定すると文字数モードになります。",
+        "es": "Antiguo: máximo de caracteres en USER.md; al definirlo se vuelve al modo caracteres.",
+        "fr": "Ancien : nombre maximal de caractères de USER.md ; le définir repasse en mode caractères.",
+        "de": "Alt: maximale Zeichenzahl in USER.md; setzen schaltet auf Zeichenmodus zurück.",
+        "ru": "Старый режим: максимум символов в USER.md; включает подсчёт символов.",
+        "pt": "Antigo: máximo de caracteres em USER.md; defini-lo volta ao modo de caracteres."
+      }
+    },
+    "memoryTokens": {
+      "label": {
+        "zh": "记忆库 token 上限",
+        "en": "Memory token budget",
+        "ja": "メモリのトークン上限",
+        "es": "Límite de tokens de memoria",
+        "fr": "Limite de tokens de la mémoire",
+        "de": "Token-Limit des Gedächtnisses",
+        "ru": "Лимит токенов памяти",
+        "pt": "Limite de tokens da memória"
+      },
+      "hint": {
+        "zh": "长期记忆按估算 token 计；默认 800，约等于旧英文 2200 字符的上下文成本。",
+        "en": "Estimated token budget for MEMORY.md; default 800, the context cost of the old 2200 English characters.",
+        "ja": "MEMORY.md の推定トークン上限。既定 800 は旧英文 2200 文字の文脈コスト相当です。",
+        "es": "Presupuesto estimado de tokens para MEMORY.md; 800 por defecto, el coste de contexto de los antiguos 2200 caracteres en inglés.",
+        "fr": "Budget de tokens estimé pour MEMORY.md ; 800 par défaut, coût de contexte des anciens 2200 caractères anglais.",
+        "de": "Geschätztes Token-Budget für MEMORY.md; Standard 800 entspricht dem Kontextaufwand der alten 2200 englischen Zeichen.",
+        "ru": "Оценочный лимит токенов для MEMORY.md; по умолчанию 800 — контекстная стоимость старых 2200 английских символов.",
+        "pt": "Orçamento estimado de tokens para MEMORY.md; 800 por padrão, o custo de contexto dos antigos 2200 caracteres em inglês."
+      }
+    },
+    "userTokens": {
+      "label": {
+        "zh": "用户画像 token 上限",
+        "en": "User profile token budget",
+        "ja": "ユーザープロフィールのトークン上限",
+        "es": "Límite de tokens del perfil",
+        "fr": "Limite de tokens du profil",
+        "de": "Token-Limit des Nutzerprofils",
+        "ru": "Лимит токенов профиля",
+        "pt": "Limite de tokens do perfil"
+      },
+      "hint": {
+        "zh": "用户画像按估算 token 计；默认 500，约等于旧英文 1375 字符的上下文成本。",
+        "en": "Estimated token budget for USER.md; default 500, the context cost of the old 1375 English characters.",
+        "ja": "USER.md の推定トークン上限。既定 500 は旧英文 1375 文字の文脈コスト相当です。",
+        "es": "Presupuesto estimado de tokens para USER.md; 500 por defecto, el coste de contexto de los antiguos 1375 caracteres en inglés.",
+        "fr": "Budget de tokens estimé pour USER.md ; 500 par défaut, coût de contexte des anciens 1375 caractères anglais.",
+        "de": "Geschätztes Token-Budget für USER.md; Standard 500 entspricht dem Kontextaufwand der alten 1375 englischen Zeichen.",
+        "ru": "Оценочный лимит токенов для USER.md; по умолчанию 500 — контекстная стоимость старых 1375 английских символов.",
+        "pt": "Orçamento estimado de tokens para USER.md; 500 por padrão, o custo de contexto dos antigos 1375 caracteres em inglês."
       }
     },
     "addDatePrefix": {
