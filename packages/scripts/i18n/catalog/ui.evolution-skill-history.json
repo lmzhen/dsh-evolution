@@ -334,13 +334,13 @@
     },
     "entry.label": {
       "zh": "技能整理",
-      "en": "Skill organizer",
-      "ja": "スキル履歴",
-      "es": "Evolución automática de skills",
-      "fr": "Auto-évolution des skills",
-      "de": "Skill-Evolution",
-      "pt": "Evolução automática de skills",
-      "ru": "Автоэволюция навыков"
+      "en": "Skill tidy-up",
+      "ja": "スキル整理",
+      "es": "Organización de skills",
+      "fr": "Rangement des skills",
+      "de": "Skills aufräumen",
+      "pt": "Organização de skills",
+      "ru": "Упорядочивание навыков"
     },
     "error": {
       "zh": "读取失败",
@@ -643,14 +643,14 @@
       "ru": " · "
     },
     "run.chip": {
-      "zh": "run {id}",
+      "zh": "运行 {id}",
       "en": "run {id}",
-      "ja": "run {id}",
-      "es": "run {id}",
-      "fr": "run {id}",
-      "de": "run {id}",
-      "pt": "run {id}",
-      "ru": "run {id}"
+      "ja": "実行 {id}",
+      "es": "ejecución {id}",
+      "fr": "exécution {id}",
+      "de": "Lauf {id}",
+      "pt": "execução {id}",
+      "ru": "запуск {id}"
     },
     "copy.command.offload": {
       "zh": "/evolution offload {name}",
@@ -673,20 +673,20 @@
       "ru": "/evolution condense {name}"
     },
     "health.verdict.warn": {
-      "zh": "需关注",
+      "zh": "警告",
       "en": "Needs attention",
-      "ja": "要注意",
-      "es": "Requiere atención",
+      "ja": "警告",
+      "es": "Aviso",
       "fr": "À surveiller",
-      "de": "Beachten",
-      "pt": "Requer atenção",
+      "de": "Warnung",
+      "pt": "Atenção",
       "ru": "Требует внимания"
     },
     "health.verdict.needs-restructure": {
-      "zh": "需整理",
-      "en": "Needs tidying",
+      "zh": "需要整理",
+      "en": "Needs tidy-up",
       "ja": "整理が必要",
-      "es": "Necesita orden",
+      "es": "Necesita organización",
       "fr": "À ranger",
       "de": "Aufräumen nötig",
       "pt": "Precisa organizar",
@@ -700,7 +700,7 @@
       "fr": "Illisible",
       "de": "Nicht lesbar",
       "pt": "Ilegível",
-      "ru": "Не читается"
+      "ru": "Нечитаемый"
     },
     "markdown.footnotes": {
       "zh": "脚注",
@@ -1004,13 +1004,13 @@
     },
     "title": {
       "zh": "技能整理",
-      "en": "Skill organizer",
-      "ja": "スキル履歴",
-      "es": "Evolución automática de skills",
-      "fr": "Auto-évolution des skills",
-      "de": "Skill-Evolution",
-      "pt": "Evolução automática de skills",
-      "ru": "Автоэволюция навыков"
+      "en": "Skill tidy-up",
+      "ja": "スキル整理",
+      "es": "Organización de skills",
+      "fr": "Rangement des skills",
+      "de": "Skills aufräumen",
+      "pt": "Organização de skills",
+      "ru": "Упорядочивание навыков"
     },
     "undo": {
       "zh": "回退到此版",
@@ -1104,21 +1104,21 @@
     },
     "workbench.pending": {
       "zh": "待我确认",
-      "en": "Needs review",
-      "ja": "確認待ち",
-      "es": "Por revisar",
-      "fr": "À vérifier",
-      "de": "Zu prüfen",
-      "pt": "A revisar",
-      "ru": "На проверке"
+      "en": "Pending approval",
+      "ja": "承認待ち",
+      "es": "Pendientes",
+      "fr": "En attente",
+      "de": "Ausstehend",
+      "pt": "Pendentes",
+      "ru": "К подтверждению"
     },
     "workbench.title": {
       "zh": "技能整理",
-      "en": "Skill organization",
+      "en": "Skill tidy-up",
       "ja": "スキル整理",
       "es": "Organización de skills",
-      "fr": "Organisation des skills",
-      "de": "Skill-Organisation",
+      "fr": "Rangement des skills",
+      "de": "Skills aufräumen",
       "pt": "Organização de skills",
       "ru": "Упорядочивание навыков"
     },
@@ -1173,12 +1173,12 @@
       "ru": "Навыки"
     },
     "stats.total.attention": {
-      "zh": "需要关注",
+      "zh": "需要处理",
       "en": "Needs attention",
       "ja": "要対応",
       "es": "Requieren atención",
       "fr": "À traiter",
-      "de": "Aufmerksamkeit",
+      "de": "Auffällig",
       "pt": "Precisam de atenção",
       "ru": "Требуют внимания"
     },
@@ -1193,7 +1193,7 @@
       "ru": "Всего текста"
     },
     "stats.total.bodyTokens": {
-      "zh": "正文估算 tokens",
+      "zh": "正文 token 估算",
       "en": "Total body (est. tokens)",
       "ja": "本文の推定トークン",
       "es": "Texto total (tokens est.)",
@@ -1203,14 +1203,14 @@
       "ru": "Всего текста (оценка токенов)"
     },
     "stats.total.success": {
-      "zh": "整理成功",
-      "en": "Organized",
-      "ja": "整理済み",
-      "es": "Organizadas",
-      "fr": "Organisées",
-      "de": "Aufgeräumt",
-      "pt": "Organizadas",
-      "ru": "Упорядочено"
+      "zh": "成功整理",
+      "en": "Successful tidy-ups",
+      "ja": "整理できた回数",
+      "es": "Organizaciones correctas",
+      "fr": "Rangements réussis",
+      "de": "Erfolgreiche Aufräumvorgänge",
+      "pt": "Organizações concluídas",
+      "ru": "Успешные упорядочивания"
     },
     "stats.search": {
       "zh": "按名字或描述筛选",
@@ -1233,14 +1233,14 @@
       "ru": "Все"
     },
     "stats.filter.attention": {
-      "zh": "需要整理",
-      "en": "Needs work",
-      "ja": "要整理",
-      "es": "Por ordenar",
-      "fr": "À ranger",
-      "de": "Aufzuräumen",
-      "pt": "A organizar",
-      "ru": "Нужно упорядочить"
+      "zh": "需要处理",
+      "en": "Needs attention",
+      "ja": "要対応",
+      "es": "Requieren atención",
+      "fr": "À traiter",
+      "de": "Auffällig",
+      "pt": "Precisam de atenção",
+      "ru": "Требуют внимания"
     },
     "stats.filter.recent": {
       "zh": "最近使用",
@@ -1333,7 +1333,7 @@
       "ru": "Текст"
     },
     "stats.col.bodyTokens": {
-      "zh": "估算 tokens",
+      "zh": "token 估算",
       "en": "Est. tokens",
       "ja": "推定トークン",
       "es": "Tokens est.",
@@ -1343,14 +1343,14 @@
       "ru": "Оценка токенов"
     },
     "stats.col.support": {
-      "zh": "参考资料",
-      "en": "References",
-      "ja": "参照資料",
-      "es": "Referencias",
-      "fr": "Références",
-      "de": "Referenzen",
-      "pt": "Referências",
-      "ru": "Ссылки"
+      "zh": "附带文件",
+      "en": "Support files",
+      "ja": "補助ファイル",
+      "es": "Archivos adjuntos",
+      "fr": "Fichiers joints",
+      "de": "Begleitdateien",
+      "pt": "Arquivos adjuntos",
+      "ru": "Вспомогательные файлы"
     },
     "stats.col.versions": {
       "zh": "版本",
@@ -1373,14 +1373,14 @@
       "ru": "Последнее изменение"
     },
     "stats.verdict.healthy": {
-      "zh": "健康",
+      "zh": "正常",
       "en": "Healthy",
       "ja": "正常",
-      "es": "Saludable",
+      "es": "Correcto",
       "fr": "Sain",
-      "de": "Gesund",
+      "de": "In Ordnung",
       "pt": "Saudável",
-      "ru": "Здоров"
+      "ru": "В норме"
     },
     "stats.verdict.unknown": {
       "zh": "未知",
@@ -1552,7 +1552,7 @@
       "pt": "Filtrar habilidades",
       "ru": "Фильтр навыков"
     },
-        "stats.activity": {
+    "stats.activity": {
       "zh": "整理活动",
       "en": "Organizing activity",
       "ja": "整理アクティビティ",
@@ -1561,7 +1561,8 @@
       "de": "Aufräumaktivität",
       "pt": "Atividade de organização",
       "ru": "Активность упорядочивания"
-    },"stats.sort": {
+    },
+    "stats.sort": {
       "zh": "排序",
       "en": "Sort",
       "ja": "並び順",
@@ -1600,6 +1601,26 @@
       "de": "Fehlernotizen",
       "pt": "Histórico de erros",
       "ru": "История ошибок"
+    },
+    "stats.colon": {
+      "zh": "：",
+      "en": ": ",
+      "ja": "：",
+      "es": ": ",
+      "fr": " : ",
+      "de": ": ",
+      "pt": ": ",
+      "ru": ": "
+    },
+    "tooltip.bodyChars": {
+      "zh": "{n} 字符",
+      "en": "{n} chars",
+      "ja": "{n} 文字",
+      "es": "{n} caracteres",
+      "fr": "{n} caractères",
+      "de": "{n} Zeichen",
+      "pt": "{n} caracteres",
+      "ru": "{n} символов"
     }
   }
 }

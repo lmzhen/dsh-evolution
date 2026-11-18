@@ -143,7 +143,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   const activity = successCounts === null || successCounts === undefined || successOperations.length === 0
     ? null
     : createElement('p', { className: 'evo-stats-activity' },
-      face.t('stats.activity') + '：',
+      face.t('stats.activity') + face.t('stats.colon'),
       successOperations.map(operation => face.t(operation.labelKey) + ' ' + String(successCounts[operation.id])).join(' · '))
   const columns = layout === 'wide' ? allColumns : allColumns.filter(column => !hiddenInMedium.has(column.key))
 
@@ -222,7 +222,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
         }, face.t(entry.key)))),
       sortControl),
     load.status === 'failed'
-      ? createElement('div', { className: 'evo-stats-failure' }, face.t('stats.failed') + '：' + load.message)
+      ? createElement('div', { className: 'evo-stats-failure' }, face.t('stats.failed') + face.t('stats.colon') + load.message)
       : load.status === 'loading'
         ? createElement('div', { className: 'evo-stats-loading' }, face.t('loading'))
         : createElement('div', { className: 'evo-stats-table-card', ref: tableRef },

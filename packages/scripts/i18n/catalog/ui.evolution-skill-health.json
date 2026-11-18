@@ -488,7 +488,7 @@
       "ja": "帰属先スキルなし",
       "es": "sin skill de destino",
       "fr": "skill d’accueil manquant",
-      "de": "owner-gap",
+      "de": "kein passender Skill",
       "pt": "sem skill de destino",
       "ru": "нет принимающего навыка"
     },
@@ -544,11 +544,11 @@
     },
     "proposal.stale": {
       "zh": "改进建议的数据已过期；这不等于没有可整理内容，请刷新后重试。",
-      "en": "The suggestions data is out of date; that doesn't mean there's nothing to curate. Refresh and try again.",
+      "en": "The suggestions data is out of date; that doesn't mean there's nothing to tidy up. Refresh and try again.",
       "ja": "改善案のデータが古くなっています。「整理する内容がない」という意味ではありません。更新して再試行してください。",
-      "es": "Los datos de las sugerencias están desactualizados; actualiza y reintenta. Eso no significa que no haya nada que curar.",
+      "es": "Los datos de las sugerencias están desactualizados; actualiza y reintenta. Eso no significa que no haya nada que organizar.",
       "fr": "Les suggestions sont périmées ; cela ne veut pas dire qu’il n’y a rien à ranger. Actualisez puis réessayez.",
-      "de": "Die Vorschlagsdaten sind veraltet; aktualisiere und versuche es erneut. Das heißt nicht, dass es nichts zu curaten gibt.",
+      "de": "Die Vorschlagsdaten sind veraltet; aktualisiere und versuche es erneut. Das heißt nicht, dass es nichts aufzuräumen gibt.",
       "pt": "As sugestões estão desatualizadas; atualize e tente novamente. Isso não significa que não haja nada para organizar.",
       "ru": "Данные предложений устарели; это не значит, что упорядочивать нечего — обновите и повторите."
     },
@@ -594,11 +594,11 @@
     },
     "proposal.unavailable": {
       "zh": "暂时拿不到改进建议；这不等于没有可整理的内容。",
-      "en": "Suggestions aren't available right now; that doesn't mean there's nothing to curate.",
+      "en": "Suggestions aren't available right now; that doesn't mean there's nothing to tidy up.",
       "ja": "現在、改善案を取得できません。「整理する内容がない」という意味ではありません。",
-      "es": "Las sugerencias no están disponibles ahora; eso no significa que no haya nada que curar.",
+      "es": "Las sugerencias no están disponibles ahora; eso no significa que no haya nada que organizar.",
       "fr": "Suggestions indisponibles pour l’instant ; cela ne veut pas dire qu’il n’y a rien à ranger.",
-      "de": "Vorschläge sind gerade nicht abrufbar; das heißt nicht, dass es nichts zu curaten gibt.",
+      "de": "Vorschläge sind gerade nicht abrufbar; das heißt nicht, dass es nichts aufzuräumen gibt.",
       "pt": "As sugestões estão indisponíveis no momento; isso não significa que não haja nada para organizar.",
       "ru": "Предложения сейчас недоступны; это не значит, что упорядочивать нечего."
     },
@@ -827,20 +827,20 @@
       "en": "Healthy",
       "ja": "正常",
       "es": "Correcto",
-      "fr": "OK",
-      "de": "OK",
-      "pt": "OK",
-      "ru": "Норма"
+      "fr": "Sain",
+      "de": "In Ordnung",
+      "pt": "Saudável",
+      "ru": "В норме"
     },
     "verdict.needs-restructure": {
-      "zh": "需要调整结构",
-      "en": "Needs restructuring",
-      "ja": "構成の整理が必要",
-      "es": "Necesita reestructuración",
-      "fr": "Restructuration nécessaire",
-      "de": "Umstrukturierung nötig",
-      "pt": "Precisa reestruturar",
-      "ru": "Нужна перестройка"
+      "zh": "需要整理",
+      "en": "Needs tidy-up",
+      "ja": "整理が必要",
+      "es": "Necesita organización",
+      "fr": "À ranger",
+      "de": "Aufräumen nötig",
+      "pt": "Precisa organizar",
+      "ru": "Нужно упорядочить"
     },
     "verdict.unreadable": {
       "zh": "无法读取",
@@ -854,13 +854,33 @@
     },
     "verdict.warn": {
       "zh": "警告",
-      "en": "Warning",
+      "en": "Needs attention",
       "ja": "警告",
       "es": "Aviso",
-      "fr": "Avertissement",
+      "fr": "À surveiller",
       "de": "Warnung",
-      "pt": "Aviso",
-      "ru": "Предупреждение"
+      "pt": "Atenção",
+      "ru": "Требует внимания"
+    },
+    "punct.list": {
+      "zh": "、",
+      "en": ", ",
+      "ja": "、",
+      "es": ", ",
+      "fr": ", ",
+      "de": ", ",
+      "pt": ", ",
+      "ru": ", "
+    },
+    "punct.warning": {
+      "zh": "；",
+      "en": "; ",
+      "ja": "；",
+      "es": "; ",
+      "fr": " ; ",
+      "de": "; ",
+      "pt": "; ",
+      "ru": "; "
     }
   }
 }

@@ -454,13 +454,13 @@
     },
     "empty.scope": {
       "zh": "这里只处理确实重复的技能；单纯追加内容属于技能整理，不会进入合并队列。",
-      "en": "This view only handles truly duplicate skills; plain additions are skill management and never enter the merge queue.",
-      "ja": "ここでは2段階のマージのみを扱います。単純な内容の追記はスキル管理の対象であり、マージキューには入りません。",
-      "es": "Aquí solo se tratan merges de dos rondas; añadir contenido suelto es gestión de skills y no entra en la cola de merge.",
-      "fr": "Seules les fusions en deux tours sont traitées ici ; un simple ajout de contenu relève de la gestion des skills et n’entre jamais dans cette file.",
-      "de": "Hier laufen nur Zwei-Runden-Merges; reines Anhängen gehört zur Skill-Verwaltung und landet nie in dieser Warteschlange.",
-      "pt": "Aqui só são tratados merges de duas rodadas; acréscimos simples pertencem ao gerenciamento de skills e não entram nesta fila.",
-      "ru": "Здесь обрабатываются только двухраундовые объединения; обычное дополнение содержимого относится к управлению навыками и в очередь не попадает."
+      "en": "This page only handles real duplicate skills. Adding content is tidy-up and does not enter the merge queue.",
+      "ja": "ここで扱うのは本当に重複しているスキルだけです。内容を足すだけの変更はスキル整理の範囲で、ここには入りません。",
+      "es": "Aquí solo se tratan skills que son duplicados reales; añadir contenido es parte de la organización y no entra en la cola de fusión.",
+      "fr": "Ici, seuls les skills vraiment en double sont traités ; un simple ajout relève du rangement et n’entre jamais dans cette file.",
+      "de": "Hier erscheinen nur Skills, die wirklich doppelt sind; reines Ergänzen von Inhalt gehört zum Aufräumen und landet nie in dieser Warteschlange.",
+      "pt": "Aqui só aparecem skills realmente duplicadas; acrescentar conteúdo é trabalho de organização de skills e não entra nesta fila.",
+      "ru": "Здесь объединяют только навыки, которые действительно дублируются. Простое добавление текста — это упорядочивание навыков, в очередь объединения оно не попадает."
     },
     "empty.skipped": {
       "zh": "没有标记为无需合并的对。",
@@ -483,14 +483,14 @@
       "ru": "Нет пар, ожидающих решения."
     },
     "entry.label": {
-      "zh": "技能合并",
-      "en": "Skill merge",
-      "ja": "スキルマージ",
-      "es": "Merge de skills",
-      "fr": "Fusion des skills",
-      "de": "Skill-Merge",
-      "pt": "Merge de skills",
-      "ru": "Объединение навыков"
+      "zh": "合并建议",
+      "en": "Merge suggestions",
+      "ja": "統合候補",
+      "es": "Sugerencias de fusión",
+      "fr": "Suggestions de fusion",
+      "de": "Merge-Vorschläge",
+      "pt": "Sugestões de mesclagem",
+      "ru": "Предложения по объединению"
     },
     "error.raw": {
       "zh": "原始信息",
@@ -712,7 +712,7 @@
       "pt": "Copie o comando abaixo",
       "ru": "Команду можно скопировать ниже"
     },
-        "advanced": {
+    "advanced": {
       "zh": "高级",
       "en": "Advanced",
       "ja": "詳細",
@@ -721,7 +721,8 @@
       "de": "Erweitert",
       "pt": "Avançado",
       "ru": "Дополнительно"
-    },"hint": {
+    },
+    "hint": {
       "zh": "先处理需要判断的重复技能，其余按需展开。",
       "en": "Handle merges that need a verdict first; expand the rest as needed.",
       "ja": "判断が必要なマージを先に処理します。その他の情報は必要に応じて展開できます。",
@@ -1294,7 +1295,7 @@
     "row.summaryBoth": {
       "zh": "双方摘要",
       "en": "Both summaries",
-      "ja": "共通の要約",
+      "ja": "要約 A・B",
       "es": "Resumen común",
       "fr": "Résumé commun",
       "de": "Gemeinsame Zusammenfassung",
@@ -1712,14 +1713,14 @@
       "ru": "Открыть настройки платформы"
     },
     "settings.openPlatformPath": {
-      "zh": "设置 → 自进化 → 技能自动合并",
-      "en": "Settings → Self-evolution → Skill auto-merge",
-      "ja": "設定 → 内蔵プラグイン → 自己進化 → スキル自動マージ",
-      "es": "Ajustes → Evolución → Merge automático de skills",
-      "fr": "Paramètres → Auto-évolution → Fusion automatique des skills",
-      "de": "Einstellungen → Selbstevolution → Skill-Auto-Merge",
-      "pt": "Configurações → Autoevolução → Merge automático de skills",
-      "ru": "Настройки → Самоэволюция → Автообъединение навыков"
+      "zh": "设置 → 能力进化 → 合并建议",
+      "en": "Settings → Capability evolution → Merge suggestions",
+      "ja": "設定 → 能力進化 → 統合候補",
+      "es": "Ajustes → Evolución de capacidades → Sugerencias de fusión",
+      "fr": "Paramètres → Évolution des capacités → Suggestions de fusion",
+      "de": "Einstellungen → Fähigkeitsentwicklung → Merge-Vorschläge",
+      "pt": "Configurações → Evolução de capacidades → Sugestões de mesclagem",
+      "ru": "Настройки → Развитие возможностей → Предложения по объединению"
     },
     "settings.platformWrite": {
       "zh": "写入审批（平台写入）",
@@ -2132,14 +2133,14 @@
       "ru": "К объединению"
     },
     "tab.pending": {
-      "zh": "待确认",
-      "en": "To confirm",
-      "ja": "確認待ち",
+      "zh": "待我确认",
+      "en": "Pending approval",
+      "ja": "承認待ち",
       "es": "Por confirmar",
       "fr": "À confirmer",
       "de": "Zu bestätigen",
       "pt": "A confirmar",
-      "ru": "Подтвердить"
+      "ru": "К подтверждению"
     },
     "tab.skipped": {
       "zh": "已忽略",
@@ -2152,14 +2153,14 @@
       "ru": "Пропущено"
     },
     "tab.verify": {
-      "zh": "待我看",
-      "en": "Needs my review",
-      "ja": "確認待ち",
+      "zh": "待复核",
+      "en": "Needs review",
+      "ja": "要確認",
       "es": "Para revisar",
       "fr": "À vérifier",
       "de": "Zu prüfen",
       "pt": "Para revisar",
-      "ru": "Нужно проверить"
+      "ru": "К проверке"
     },
     "task.pending": {
       "zh": "条合并建议待处理",
@@ -2169,16 +2170,16 @@
       "fr": "suggestions de fusion à traiter",
       "de": "Merge-Vorschläge warten auf Bearbeitung",
       "pt": "sugestões de merge precisam de atenção",
-      "ru": "предложений по объединению ждут решения"
+      "ru": "ожидают решения"
     },
     "title": {
       "zh": "合并建议",
       "en": "Merge suggestions",
-      "ja": "マージ提案",
-      "es": "Sugerencias de merge",
+      "ja": "統合候補",
+      "es": "Sugerencias de fusión",
       "fr": "Suggestions de fusion",
       "de": "Merge-Vorschläge",
-      "pt": "Sugestões de merge",
+      "pt": "Sugestões de mesclagem",
       "ru": "Предложения по объединению"
     },
     "unpin": {

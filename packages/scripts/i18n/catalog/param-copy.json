@@ -22,12 +22,12 @@
     },
     "curator": {
       "zh": "技能整理",
-      "en": "Skill curation",
-      "ja": "スキルの整理",
-      "es": "Limpieza de skills",
-      "fr": "Tri des compétences",
-      "de": "Skill-Pflege",
-      "pt": "Curadoria de skills",
+      "en": "Skill tidy-up",
+      "ja": "スキル整理",
+      "es": "Organización de skills",
+      "fr": "Rangement des skills",
+      "de": "Skills aufräumen",
+      "pt": "Organização de skills",
       "ru": "Упорядочивание навыков"
     },
     "merge": {

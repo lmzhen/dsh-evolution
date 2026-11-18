@@ -26,13 +26,13 @@ export const PARAM_GROUPS = {
     },
     "curator": {
       "zh": "技能整理",
-      "en": "Skill curation",
-      "ja": "スキルの整理",
-      "es": "Limpieza de skills",
-      "fr": "Tri des compétences",
-      "de": "Skill-Pflege",
+      "en": "Skill tidy-up",
+      "ja": "スキル整理",
+      "es": "Organización de skills",
+      "fr": "Rangement des skills",
+      "de": "Skills aufräumen",
       "ru": "Упорядочивание навыков",
-      "pt": "Curadoria de skills"
+      "pt": "Organização de skills"
     },
     "merge": {
       "zh": "合并",

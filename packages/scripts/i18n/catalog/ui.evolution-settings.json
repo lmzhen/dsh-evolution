@@ -133,11 +133,11 @@
       "ru": "Подтвердить одобрение"
     },
     "approvalCount": {
-      "zh": "{n} 项待批",
-      "en": "{n} pending",
-      "ja": "{n} 件の承認待ち",
+      "zh": "{n} 项待我确认",
+      "en": "{n} waiting",
+      "ja": "{n} 件",
       "es": "{n} pendientes",
-      "fr": "{n} en attente d’approbation",
+      "fr": "{n} en attente",
       "de": "{n} ausstehend",
       "pt": "{n} pendentes",
       "ru": "Ждут одобрения: {n}"
@@ -383,14 +383,14 @@
       "ru": "Отклоняем…"
     },
     "approvalRelease": {
-      "zh": "放回待批",
+      "zh": "放回待我确认",
       "en": "Return to pending",
       "ja": "承認待ちに戻す",
       "es": "Volver a pendientes",
-      "fr": "Renvoyer en attente",
-      "de": "Zurück zu offen",
-      "pt": "Devolver para pendentes",
-      "ru": "Вернуть на одобрение"
+      "fr": "Remettre en attente",
+      "de": "Zurück in die Warteliste",
+      "pt": "Voltar para pendentes",
+      "ru": "Вернуть в ожидание"
     },
     "approvalReleasing": {
       "zh": "释放中…",
@@ -423,14 +423,14 @@
       "ru": "Выполняется: {n}"
     },
     "approvalTitle": {
-      "zh": "待确认的变更",
-      "en": "Changes awaiting review",
-      "ja": "確認待ちの変更",
-      "es": "Cambios pendientes de revisión",
-      "fr": "Modifications à vérifier",
-      "de": "Änderungen zur Prüfung",
-      "pt": "Alterações aguardando revisão",
-      "ru": "Изменения ждут проверки"
+      "zh": "待我确认的变更",
+      "en": "Pending approval",
+      "ja": "承認待ちの変更",
+      "es": "Cambios pendientes",
+      "fr": "Modifications en attente",
+      "de": "Ausstehende Änderungen",
+      "pt": "Alterações pendentes",
+      "ru": "Изменения ждут одобрения"
     },
     "approvalVerbAdd": {
       "zh": "新增",
@@ -534,12 +534,12 @@
     },
     "cardCurator": {
       "zh": "技能整理",
-      "en": "Skill curation",
+      "en": "Skill tidy-up",
       "ja": "スキル整理",
-      "es": "Curación de skills",
-      "fr": "Curation des skills",
-      "de": "Skill-Curation",
-      "pt": "Curadoria de skills",
+      "es": "Organización de skills",
+      "fr": "Rangement des skills",
+      "de": "Skills aufräumen",
+      "pt": "Organização de skills",
       "ru": "Упорядочивание навыков"
     },
     "cardMemory": {
@@ -954,11 +954,11 @@
     },
     "group.organize": {
       "zh": "自动整理",
-      "en": "Automatic curation",
+      "en": "Automatic tidy-up",
       "ja": "自動整理",
-      "es": "Orden automático",
+      "es": "Organización automática",
       "fr": "Rangement automatique",
-      "de": "Automatische Curation",
+      "de": "Automatisches Aufräumen",
       "pt": "Organização automática",
       "ru": "Автоматическое упорядочивание"
     },
@@ -973,14 +973,14 @@
       "ru": "Запись и одобрение"
     },
     "invalidAtLeast": {
-      "zh": "不能小于「{field}」的 {n}{unit}",
-      "en": "Minimum is {n}{unit}, set by {field}",
-      "ja": "「{field}」の {n}{unit} 以上にしてください",
-      "es": "no puede ser inferior a {n}{unit} de «{field}»",
-      "fr": "ne doit pas être inférieur à {field} : {n}{unit}",
-      "de": "Darf nicht kleiner sein als {field}: {n}{unit}",
-      "pt": "não pode ser menor que {field}: {n}{unit}",
-      "ru": "не меньше {n}{unit}, как у поля «{field}»"
+      "zh": "至少为 {n}{unit}（由「{field}」决定）",
+      "en": "Must be at least {n}{unit} (set by {field})",
+      "ja": "「{field}」に合わせて {n}{unit} 以上にしてください",
+      "es": "El mínimo es {n}{unit}; lo fija «{field}».",
+      "fr": "Le minimum est {n}{unit}, fixé par « {field} ».",
+      "de": "Muss mindestens {n}{unit} sein (vorgegeben durch {field}).",
+      "pt": "Precisa ser pelo menos {n}{unit} — o valor de “{field}”.",
+      "ru": "Минимум — {n}{unit} (задаётся полем «{field}»)."
     },
     "invalidAtLeastPeer": {
       "zh": "同组设置",

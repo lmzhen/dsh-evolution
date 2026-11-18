@@ -93,7 +93,7 @@ export function skillLine(copy: Copy, row: SkillRow, selected: boolean, onOpen: 
         : createElement('span', {
           key: 'health',
           className: 'evo-hist-chip evo-hist-health',
-          title: health.bodyChars === null ? undefined : `${health.bodyChars} chars`,
+          title: health.bodyChars === null ? undefined : copy.format('tooltip.bodyChars', { n: health.bodyChars }),
         }, copy.t('health.verdict.' + health.verdict) === 'health.verdict.' + health.verdict ? health.verdict : copy.t('health.verdict.' + health.verdict)),
     ]
   })())
@@ -133,7 +133,7 @@ export function versionRow(props: VersionRowProps): ReactNode {
     actions.push(createElement('span', {
       key: 'run',
       className: 'evo-hist-chip',
-      title: `run ${row.runId}`,
+      title: copy.format('run.chip', { id: row.runId }),
     }, copy.format('run.chip', { id: row.runId.slice(0, 8) })))
   }
   if (current) actions.push(chip({ key: 'current', children: copy.t('current') }))

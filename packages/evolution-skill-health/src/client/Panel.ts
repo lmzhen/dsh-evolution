@@ -307,9 +307,9 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
             proposal.residual === undefined || proposal.residual.trim() === '' ? null : createElement('p', { 'data-role': 'proposal-kept' },
               t('proposal.kept') + ': ' + proposal.residual.trim().slice(0, 160)),
             (proposal.parts ?? []).length === 0 ? null : createElement('p', { 'data-role': 'proposal-reusable' },
-              t('proposal.reusable') + ': ' + (proposal.parts ?? []).map(part => part.heading).join('、')),
+              t('proposal.reusable') + ': ' + (proposal.parts ?? []).map(part => part.heading).join(t('punct.list'))),
             (proposal.warnings ?? []).length === 0 ? null : createElement('p', { 'data-role': 'proposal-warnings' },
-              t('proposal.warnings') + ': ' + (proposal.warnings ?? []).join('；')),
+              t('proposal.warnings') + ': ' + (proposal.warnings ?? []).join(t('punct.warning'))),
           )
         }),
       )
