@@ -323,14 +323,14 @@
       "ru": "У этого навыка пока нет записанных версий."
     },
     "empty.versions.failed": {
-      "zh": "版本读取失败——这个技能有没有版本，现在判断不了；点「刷新」重试。",
-      "en": "Couldn't load versions, so there's no telling right now whether this skill has any. Hit Refresh to retry.",
-      "ja": "バージョンの読み取りに失敗しました。このスキルにバージョンがあるか今は判断できません。「更新」を押して再試行してください。",
-      "es": "No se pudieron leer las versiones: ahora mismo no se puede saber si este skill tiene versiones; pulsa «Actualizar» para reintentar.",
-      "fr": "La lecture des versions a échoué : impossible de savoir si ce skill a des versions ; cliquez sur « Actualiser » pour réessayer.",
-      "de": "Versionen konnten nicht gelesen werden – ob dieser Skill Versionen hat, lässt sich gerade nicht sagen. „Aktualisieren“ versucht es erneut.",
-      "pt": "A leitura das versões falhou — não é possível dizer agora se esta skill tem versões; clique em Atualizar para tentar novamente.",
-      "ru": "Не удалось прочитать версии — есть ли они у этого навыка, сейчас не определить; нажмите «Обновить» и повторите."
+      "zh": "版本读取失败，暂时判断不了这个技能有没有版本；点「刷新」重试。",
+      "en": "Couldn't load versions, so we can't tell yet whether this skill has any. Select Refresh to try again.",
+      "ja": "バージョンの読み取りに失敗しました。このスキルにバージョンがあるかは、今は分かりません。「更新」でもう一度お試しください。",
+      "es": "No se pudieron leer las versiones, así que ahora mismo no hay forma de saber si este skill tiene alguna. Pulsa «Actualizar» para reintentar.",
+      "fr": "Impossible de lire les versions : on ne sait pas encore si ce skill en a ; cliquez sur « Actualiser » pour réessayer",
+      "de": "Die Versionen ließen sich nicht laden – ob es welche gibt, ist gerade unklar. Klick auf „Aktualisieren“, um es erneut zu versuchen.",
+      "pt": "As versões não carregaram: agora não há como saber se esta skill tem alguma. Clique em Atualizar para tentar de novo.",
+      "ru": "Не удалось прочитать версии, так что пока не понять, есть ли они у этого навыка. Нажмите «Обновить», чтобы повторить."
     },
     "entry.label": {
       "zh": "技能整理",
@@ -353,14 +353,14 @@
       "ru": "Не удалось прочитать"
     },
     "error.hint": {
-      "zh": "面板连不上后台服务：通常是插件和程序版本不匹配。重启 DeepSeek Harness 再试；还不行就在对话里说明。",
-      "en": "The panel can't reach the backend service. This usually means the plugin and the app versions don't match. Restart DeepSeek Harness and try again; if it still fails, say so in chat.",
-      "ja": "パネルからバックグラウンドサービスに接続できません。通常はプラグインとアプリのバージョン不一致が原因です。DeepSeek Harness を再起動して再試行してください。解消しない場合は会話内で伝えてください。",
-      "es": "El panel no llega al servicio en segundo plano: normalmente el plugin y la app tienen versiones distintas. Reinicia DeepSeek Harness y vuelve a intentarlo; si sigue fallando, dilo en la conversación.",
-      "fr": "Le panneau n’arrive pas à joindre le service en arrière-plan : en général, le plugin et l’application ne sont pas sur la même version. Redémarrez DeepSeek Harness et réessayez ; si ça persiste, signalez-le dans la conversation.",
-      "de": "Das Panel erreicht den Hintergrunddienst nicht: meist passen Plugin- und App-Version nicht zusammen. DeepSeek Harness neu starten und erneut versuchen; wenn es dann noch scheitert, im Chat melden.",
-      "pt": "O painel não alcança o serviço em segundo plano: geralmente plugin e aplicativo estão em versões diferentes. Reinicie o DeepSeek Harness e tente novamente; se continuar falhando, diga isso na conversa.",
-      "ru": "Панель не может связаться с фоновой службой: обычно у плагина и приложения разные версии. Перезапустите DeepSeek Harness и попробуйте снова; если не помогло, напишите об этом в диалоге."
+      "zh": "面板连不上后台服务，多半是插件和程序版本对不上。重启 DeepSeek Harness 再试；还不行就在对话里说一声。",
+      "en": "The panel can't reach the service it needs. This usually means the plugin and the app versions don't match. Restart DeepSeek Harness and try again; if that doesn't help, say so in the chat.",
+      "ja": "パネルからバックエンドサービスに接続できません。多くの場合、プラグインとアプリのバージョンが合っていないのが原因です。DeepSeek Harness を再起動してから、もう一度お試しください。直らない場合はチャットでお知らせください。",
+      "es": "El panel no puede conectar con el servicio en segundo plano: normalmente pasa porque el plugin y la app no tienen la misma versión. Reinicia DeepSeek Harness y vuelve a intentarlo; si sigue igual, coméntalo en la conversación.",
+      "fr": "Le panneau n’arrive pas à joindre le service de l’application : en général, le plugin et l’application ne sont pas sur la même version. Redémarrez DeepSeek Harness et réessayez ; si le problème persiste, signalez-le dans la conversation.",
+      "de": "Die Seite erreicht den Dienst des Plugins nicht. Meist passen die Versionen von Plugin und App nicht zusammen. Starte DeepSeek Harness neu und versuche es erneut; wenn es weiter fehlschlägt, sag es im Chat.",
+      "pt": "O painel não consegue falar com o serviço interno: quase sempre é porque o plugin e o app estão em versões diferentes. Reinicie o DeepSeek Harness e tente de novo; se continuar falhando, avise na conversa.",
+      "ru": "Панель не может достучаться до сервиса плагина: чаще всего версии плагина и приложения не совпадают. Перезапустите DeepSeek Harness и попробуйте ещё раз; если не поможет, напишите об этом в диалоге."
     },
     "failure.forbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
@@ -414,13 +414,13 @@
     },
     "failureServer": {
       "zh": "读取失败，可以重试。",
-      "en": "Load failed. You can retry.",
-      "ja": "読み取りに失敗しました。再試行できます。",
-      "es": "La lectura falló; puedes reintentar.",
-      "fr": "La lecture a échoué ; vous pouvez réessayer.",
-      "de": "Lesen fehlgeschlagen; du kannst es erneut versuchen.",
-      "pt": "Falha na leitura; você pode tentar novamente.",
-      "ru": "Не удалось прочитать; можно повторить."
+      "en": "Couldn't load. You can try again.",
+      "ja": "読み込みに失敗しました。もう一度お試しください。",
+      "es": "No se pudo cargar. Puedes reintentar.",
+      "fr": "Le chargement a échoué. Réessayez.",
+      "de": "Laden fehlgeschlagen. Du kannst es erneut versuchen.",
+      "pt": "Não foi possível ler. Tente de novo.",
+      "ru": "Не удалось прочитать — попробуйте ещё раз"
     },
     "failureUnauthorized": {
       "zh": "需要登录：重新打开这个页面完成登录后再试。",
@@ -493,34 +493,34 @@
       "ru": "История"
     },
     "group.support": {
-      "zh": "文件版本（不可回退）",
-      "en": "File versions (no revert)",
+      "zh": "附带文件版本（不可回退）",
+      "en": "Support file versions (can't be reverted)",
       "ja": "補助ファイルのバージョン（復元不可）",
-      "es": "Versiones de archivos (no restaurables)",
-      "fr": "Versions des fichiers (non restaurables)",
-      "de": "Dateiversionen (nicht wiederherstellbar)",
-      "pt": "Versões de arquivos de apoio (sem restauração)",
-      "ru": "Версии файлов (без отката)"
+      "es": "Versiones de archivos adjuntos (no se pueden restaurar)",
+      "fr": "Versions des fichiers joints (non restaurables)",
+      "de": "Versionen der Begleitdateien (nicht wiederherstellbar)",
+      "pt": "Versões dos arquivos adjuntos (sem restauração)",
+      "ru": "Версии вспомогательных файлов (без отката)"
     },
     "group.support.note": {
-      "zh": "附带文件的版本会和正文一起记录；回退正文时不会恢复附带文件。",
-      "en": "Support files are versioned alongside the body; reverting the body won't restore support files.",
-      "ja": "補助ファイルのバージョンは本文と一緒に記録されます。本文を復元しても補助ファイルは元に戻りません。",
-      "es": "Las versiones de los archivos adjuntos se registran junto al cuerpo; restaurar el cuerpo no las restaura.",
-      "fr": "Les versions des fichiers joints sont enregistrées avec le texte ; restaurer le texte ne restaure pas les fichiers joints.",
-      "de": "Versionen von Begleitdateien werden zusammen mit dem Text aufgezeichnet; beim Wiederherstellen des Texts werden sie nicht zurückgesetzt.",
-      "pt": "As versões dos arquivos de apoio são registradas junto com o corpo; restaurar o corpo não restaura esses arquivos.",
-      "ru": "Версии вспомогательных файлов записываются вместе с текстом; откат текста их не восстанавливает."
+      "zh": "附带文件也会和正文一起记录版本，但回退只改正文，不会恢复附带文件。",
+      "en": "Support file versions are stored with the body; reverting the body does not restore them.",
+      "ja": "補助ファイルのバージョンは本文と一緒に記録されます。本文を復元しても、補助ファイルは元に戻りません。",
+      "es": "Las versiones de los archivos adjuntos se guardan junto con el cuerpo, pero restaurar el cuerpo no devuelve los adjuntos a esa versión.",
+      "fr": "Les fichiers joints sont versionnés avec le texte, mais restaurer le texte ne les restaure pas.",
+      "de": "Die Versionen der Begleitdateien werden zusammen mit dem Text gespeichert. Wird der Text wiederhergestellt, bleiben die Begleitdateien unverändert.",
+      "pt": "As versões dos arquivos adjuntos ficam registradas junto com o corpo; restaurar o corpo não devolve esses arquivos.",
+      "ru": "Версии вспомогательных файлов пишутся вместе с версиями текста; откат текста их не возвращает."
     },
     "hint": {
-      "zh": "每次写入技能都会留下一个内容版本。回退只改正文；技能标记、使用次数和整理状态不变。内容相同的版本会同时标为「当前」。",
-      "en": "Every skill write leaves a content version. Reverting only changes the body; skill flags, use counts, and curation state stay as they are. Versions with identical content are both marked current.",
-      "ja": "スキルが書き込まれるたびに内容のバージョンが残ります。復元で変わるのは本文のみで、スキルのマーカーや使用回数、整理状態は変わりません。同じ内容のバージョンにはすべて「現在」と表示されます。",
-      "es": "Cada escritura de un skill deja una versión de contenido. Restaurar solo cambia el cuerpo; los marcadores del skill, los recuentos de uso y el estado de curación no varían. Las versiones con el mismo contenido se marcan todas como «Actual».",
-      "fr": "Chaque écriture d’un skill laisse une version de contenu. La restauration ne modifie que le texte ; les marqueurs du skill, les compteurs d’usage et l’état de curation restent inchangés. Les versions au contenu identique sont toutes marquées « Actuelle ».",
-      "de": "Jeder Schreibvorgang an einem Skill hinterlässt eine Textversion. Wiederherstellen ändert nur den Text; Skill-Markierungen, Nutzungszahlen und Curation-Status bleiben unverändert. Versionen mit gleichem Inhalt werden alle als „Aktuell“ markiert.",
-      "pt": "Cada escrita de uma skill deixa uma versão de conteúdo. Restaurar muda só o corpo; marcadores da skill, contagem de uso e estado de organização continuam iguais. Versões com o mesmo conteúdo são todas marcadas como \"Atual\".",
-      "ru": "Каждая запись навыка оставляет версию содержимого. Откат меняет только текст; метки навыка, число использований и состояние упорядочивания остаются прежними. Версии с одинаковым содержимым все помечаются как «Текущая»."
+      "zh": "技能每写入一次就留下一个版本。回退只改正文，技能标记、使用次数、整理状态都不变。内容相同的版本都标为「当前」。",
+      "en": "Every write to a skill leaves a content version. Reverting changes only the body; skill flags, use counts, and tidy-up state stay as they are. Versions with identical content are all marked current.",
+      "ja": "スキルを書き込むたびに、そのときの内容が1つのバージョンとして残ります。復元で変わるのは本文だけです。スキルの属性、使用回数、整理状態はそのままです。中身が同じバージョンは、どれも「現在」になります。",
+      "es": "Cada vez que se escribe un skill se guarda una versión del contenido. Al restaurar solo cambia el cuerpo; las marcas del skill, el número de usos y el estado de organización se quedan igual. Las versiones con el mismo contenido se marcan todas como «Actual».",
+      "fr": "Chaque écriture d’un skill laisse une version de contenu. Restaurer ne modifie que le texte : les marqueurs du skill, le nombre d’utilisations et l’état de rangement restent tels quels. Les versions au contenu identique portent toutes la mention « Actuelle ».",
+      "de": "Jeder Schreibvorgang an einem Skill erzeugt eine Textversion. Beim Wiederherstellen ändert sich nur der Text; Skill-Markierungen, Nutzungszahlen und Aufräumstatus bleiben unverändert. Versionen mit gleichem Inhalt stehen alle auf „Aktuell“.",
+      "pt": "Toda vez que uma skill é gravada, fica registrada uma versão do corpo. Restaurar muda só o corpo; marcadores da skill, contagem de uso e estado de organização continuam como estão. Versões com o mesmo conteúdo aparecem todas como “Atual”.",
+      "ru": "Каждая запись навыка создаёт новую версию. Откат меняет только текст; метки навыка, число использований и состояние упорядочивания остаются прежними. Все версии с одинаковым текстом помечаются как «Текущая»."
     },
     "loading": {
       "zh": "读取中…",
@@ -763,14 +763,14 @@
       "ru": "Показать текст"
     },
     "preview.truncated": {
-      "zh": "正文过长：只显示前 {shown} 个字符（共 {total} 个）",
-      "en": "The body is long: showing the first {shown} characters (of {total})",
-      "ja": "本文が長いため、全 {total} 文字のうち先頭の {shown} 文字のみ表示しています",
-      "es": "el cuerpo es largo: se muestran los primeros {shown} de {total} caracteres",
-      "fr": "texte trop long : seuls les {shown} premiers caractères sur {total} sont affichés",
-      "de": "Text zu lang: die ersten {shown} von {total} Zeichen werden angezeigt",
-      "pt": "o corpo é longo: mostrando os primeiros {shown} de {total} caracteres",
-      "ru": "Текст длинный: показаны первые {shown} из {total} символов"
+      "zh": "正文太长，只显示前 {shown} 个字符（共 {total} 个字符）",
+      "en": "This body is long, so only the first {shown} of {total} characters appear here.",
+      "ja": "本文が長いため、先頭から {shown} 文字だけを表示しています（全 {total} 文字）。",
+      "es": "El cuerpo es demasiado largo: solo se muestran los primeros {shown} de {total} caracteres.",
+      "fr": "Texte trop long : aperçu limité aux {shown} premiers caractères sur {total}.",
+      "de": "Der Text ist zu lang – angezeigt werden die ersten {shown} von {total} Zeichen.",
+      "pt": "O corpo é longo demais; só os primeiros {shown} de {total} caracteres aparecem.",
+      "ru": "Текст слишком длинный: показаны первые {shown} из {total} символов."
     },
     "refresh": {
       "zh": "刷新",
@@ -1143,21 +1143,21 @@
       "ru": "Обзор данных"
     },
     "stats.lede": {
-      "zh": "把每个技能的体量、参考资料、版本、模型加载和报错放在一起看。点列名排序，点技能名进入整理页。",
-      "en": "See size, references, versions, model loads and errors for every skill. Sort by a column; open a skill by name.",
-      "ja": "各スキルのサイズ、参照資料、バージョン、モデル読み込み、エラーをまとめて確認。列で並べ替え、名前で開けます。",
-      "es": "Consulta tamaño, referencias, versiones, cargas del modelo y errores de cada skill. Ordena por columna y abre una skill por su nombre.",
-      "fr": "Taille, références, versions, chargements du modèle et erreurs de chaque compétence au même endroit. Triez par colonne, ouvrez par nom.",
-      "de": "Größe, Referenzen, Versionen, Modell-Ladevorgänge und Fehler jedes Skills auf einen Blick. Nach Spalte sortieren, Skill per Namen öffnen.",
-      "pt": "Veja tamanho, referências, versões, carregamentos do modelo e erros de cada skill. Ordene por coluna e abra uma skill pelo nome.",
-      "ru": "Размер, ссылки, версии, загрузки модели и ошибки каждого навыка в одном месте. Сортируйте по столбцу, открывайте по имени."
+      "zh": "看每个技能的体量、附带文件、版本、模型加载和报错。点列名排序，点技能名进入整理页。",
+      "en": "See body size, support files, versions, load counts, and errors for every skill in one place. Click a column to sort; click a skill name to open its tidy-up page.",
+      "ja": "各スキルのサイズ、補助ファイル、バージョン、モデルの読み込み、エラーをここでまとめて見られます。列名を押すと並べ替えられ、スキル名を押すと整理ページが開きます。",
+      "es": "Consulta en un solo sitio el tamaño, los archivos adjuntos, las versiones, las cargas del modelo y los errores de cada skill. Haz clic en una columna para ordenar y en el nombre de un skill para abrirlo en la página de organización.",
+      "fr": "Taille, fichiers joints, versions, chargements par le modèle et erreurs de chaque skill, réunis au même endroit. Triez par colonne ; cliquez sur un nom pour ouvrir le skill.",
+      "de": "Größe, Begleitdateien, Versionen, Ladevorgänge des Modells und Fehler jedes Skills auf einen Blick. Nach Spalte sortieren, ein Klick auf den Skill-Namen öffnet ihn.",
+      "pt": "Veja o tamanho, os arquivos adjuntos, as versões, quantas vezes cada skill foi carregada no modelo e os erros de cada uma. Ordene por coluna e clique no nome para abrir.",
+      "ru": "Размер, вспомогательные файлы, версии, загрузки в модель и ошибки — по каждому навыку в одной таблице. Сортируйте по столбцу, открывайте навык по имени."
     },
     "stats.organize": {
       "zh": "整理一个技能",
-      "en": "Organize a skill",
+      "en": "Tidy up a skill",
       "ja": "スキルを整理",
-      "es": "Organizar una skill",
-      "fr": "Organiser une skill",
+      "es": "Organizar un skill",
+      "fr": "Ranger un skill",
       "de": "Skill aufräumen",
       "pt": "Organizar uma skill",
       "ru": "Упорядочить навык"
@@ -1183,14 +1183,14 @@
       "ru": "Требуют внимания"
     },
     "stats.total.body": {
-      "zh": "正文总量（字）",
+      "zh": "正文总量（字符）",
       "en": "Total body (chars)",
-      "ja": "本文合計",
-      "es": "Texto total",
-      "fr": "Corps total",
-      "de": "Text gesamt",
-      "pt": "Corpo total",
-      "ru": "Всего текста"
+      "ja": "本文合計（文字）",
+      "es": "Cuerpo total (caracteres)",
+      "fr": "Corps total (caractères)",
+      "de": "Text (Zeichen)",
+      "pt": "Corpo total (caracteres)",
+      "ru": "Всего текста (символы)"
     },
     "stats.total.bodyTokens": {
       "zh": "正文 token 估算",
@@ -1326,7 +1326,7 @@
       "zh": "正文",
       "en": "Body",
       "ja": "本文",
-      "es": "Texto",
+      "es": "Cuerpo",
       "fr": "Corps",
       "de": "Text",
       "pt": "Corpo",
@@ -1416,11 +1416,11 @@
       "zh": "返回技能列表",
       "en": "Back to skills",
       "ja": "スキル一覧に戻る",
-      "es": "Volver a habilidades",
-      "fr": "Retour aux compétences",
+      "es": "Volver a la lista de skills",
+      "fr": "Retour aux skills",
       "de": "Zurück zu den Skills",
-      "pt": "Voltar às habilidades",
-      "ru": "Назад к навыкам"
+      "pt": "Voltar às skills",
+      "ru": "Вернуться к навыкам"
     },
     "stats.col.loads": {
       "zh": "加载",
@@ -1435,12 +1435,12 @@
     "row.summary.legacy": {
       "zh": "暂无变更摘要",
       "en": "No change summary yet",
-      "ja": "初期バージョンのため変更概要はまだありません",
-      "es": "Versión inicial; todavía no hay resumen del cambio",
-      "fr": "Version initiale ; pas encore de résumé du changement",
-      "de": "Frühe Version; noch keine Änderungszusammenfassung",
-      "pt": "Versão inicial; ainda sem resumo da mudança",
-      "ru": "Ранняя версия; сводки изменений пока нет"
+      "ja": "変更概要は記録されていません",
+      "es": "Todavía no hay resumen del cambio",
+      "fr": "Pas encore de résumé des changements",
+      "de": "Noch keine Zusammenfassung der Änderung",
+      "pt": "Sem resumo desta mudança.",
+      "ru": "Сводки изменений пока нет"
     },
     "operation.offload.label": {
       "zh": "拆分",
@@ -1503,14 +1503,14 @@
       "ru": "Переносит межнавыковые материалы в существующий навык-владелец"
     },
     "stats.col.loads30d": {
-      "zh": "近30天加载",
-      "en": "Loads 30d",
-      "ja": "30日読み込み",
-      "es": "Cargas 30d",
-      "fr": "Chargements 30j",
-      "de": "Ladevorgänge 30T",
-      "pt": "Carregamentos 30d",
-      "ru": "Загрузки 30д"
+      "zh": "近 30 天加载",
+      "en": "30-day loads",
+      "ja": "30日の読み込み",
+      "es": "Cargas (30 días)",
+      "fr": "Chargements (30 jours)",
+      "de": "Ladevorgänge (30 Tage)",
+      "pt": "Carregamentos (30 dias)",
+      "ru": "Загрузки за 30 дней"
     },
     "stats.col.feedbackRate": {
       "zh": "报错率",
@@ -1533,23 +1533,23 @@
       "ru": "Ошибки"
     },
     "stats.windowNote": {
-      "zh": "近30天指标从升级后开始统计；旧记录显示 —。",
-      "en": "30-day metrics start at the upgrade; legacy records show —.",
-      "ja": "30日指標はプラグイン更新後から集計します。旧レコードは — と表示します。",
-      "es": "Las métricas de 30 días empiezan con la actualización del plugin; los registros antiguos muestran —.",
-      "fr": "Les métriques sur 30 jours commencent à la mise à jour du plugin ; les anciens enregistrements affichent —.",
-      "de": "30-Tage-Werte starten mit dem Plugin-Update; alte Einträge zeigen —.",
-      "pt": "Métricas de 30 dias começam na atualização do plugin; registros antigos mostram —.",
-      "ru": "Метрики за 30 дней начинаются с обновления плагина; старые записи показывают —."
+      "zh": "近 30 天指标从升级后开始统计；升级前的记录显示为 —。",
+      "en": "30-day metrics count from the upgrade onward; older records show —.",
+      "ja": "30日の指標は、プラグインを更新してからの分だけを集計しています。それ以前の記録は「—」と表示されます。",
+      "es": "Las métricas de los últimos 30 días se cuentan desde que se actualizó el plugin; los registros anteriores muestran —.",
+      "fr": "Les indicateurs sur 30 jours ne sont comptés qu’à partir de la mise à jour du plugin ; les anciens enregistrements affichent —.",
+      "de": "Die 30-Tage-Werte werden erst seit dem Plugin-Update erfasst; ältere Einträge zeigen deshalb —.",
+      "pt": "As métricas de 30 dias passam a contar a partir da atualização do plugin; registros anteriores aparecem como —.",
+      "ru": "Метрики за 30 дней считаются с момента обновления плагина; у старых записей — прочерк."
     },
     "stats.filter.label": {
       "zh": "筛选技能",
       "en": "Filter skills",
       "ja": "スキルを絞り込む",
-      "es": "Filtrar habilidades",
-      "fr": "Filtrer les compétences",
-      "de": "Fähigkeiten filtern",
-      "pt": "Filtrar habilidades",
+      "es": "Filtrar skills",
+      "fr": "Filtrer les skills",
+      "de": "Skills filtern",
+      "pt": "Filtrar skills",
       "ru": "Фильтр навыков"
     },
     "stats.activity": {
