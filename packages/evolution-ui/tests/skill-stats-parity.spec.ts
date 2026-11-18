@@ -21,7 +21,7 @@ function row(name: string, body: number | null, verdict: string, lastAt: string 
     health: {
       verdict,
       bodyChars: body,
-      bodyTokens: null,
+      bodyTokens: body,
       supportFiles: null,
       stampDensityPerKb: null,
       churnPatches: null,
@@ -46,7 +46,7 @@ const rows = [
 ]
 
 describe('browser stats model parity', () => {
-  const keys = ['name', 'verdict', 'bodyChars', 'supportFiles', 'versions', 'useCount', 'viewCount', 'viewCount30d', 'feedback', 'feedback30d', 'negativeFeedback30d', 'feedbackRate30d', 'lastAt'] as const
+  const keys = ['name', 'verdict', 'bodyChars', 'bodyTokens', 'supportFiles', 'versions', 'useCount', 'viewCount', 'viewCount30d', 'feedback', 'feedback30d', 'negativeFeedback30d', 'feedbackRate30d', 'lastAt'] as const
   for (const key of keys) {
     for (const dir of ['asc', 'desc'] as const) {
       it(`orders ${key} ${dir} exactly like core`, () => {

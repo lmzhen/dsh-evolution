@@ -1,7 +1,6 @@
 // @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { resolveCitations } from '../src/citations.ts'
-import { bodyCost } from '../src/cost.ts'
 import {
   computeDriftSignals,
   DRIFT_MAX_LINE_CHARS,
@@ -195,15 +194,25 @@ describe('support-file cap report (V4, design §16.6)', () => {
     const measured = computeDriftSignals([{
       name: 's',
       body: HEALTHY,
-      cost: bodyCost(HEALTHY),
       supportChars: { 'references/release-log.md': 189_444, 'references/small.md': 500 },
     }])
     const signal = findDriftSignal(measured.skills[0]?.signals ?? [], 'body_size')
     expect(signal?.detail).toContain('oversize support file(s): references/release-log.md(189444)')
     expect(signal?.detail).not.toContain('small.md')
     // No measurement -> no claim (unknown is not zero).
-    const unmeasured = computeDriftSignals([{ name: 's', body: HEALTHY, cost: bodyCost(HEALTHY) }])
+    const unmeasured = computeDriftSignals([{ name: 's', body: HEALTHY }])
     expect(findDriftSignal(unmeasured.skills[0]?.signals ?? [], 'body_size')?.detail ?? '').not.toContain('oversize')
+  })
+
+  it('body_size judges the fixed token budget, not a per-body character line', () => {
+    const under = computeDriftSignals([{ name: 'under', body: 'a'.repeat(20_000) }])
+    const over = computeDriftSignals([{ name: 'over', body: 'a'.repeat(22_000) }])
+    const underSignal = findDriftSignal(under.skills[0]?.signals ?? [], 'body_size')
+    const overSignal = findDriftSignal(over.skills[0]?.signals ?? [], 'body_size')
+    expect(underSignal?.verdict).toBe('pass')
+    expect(overSignal?.verdict).toBe('over')
+    expect(overSignal?.value).toContain('tokens')
+    expect(overSignal?.threshold).toBe('7273 tokens')
   })
 })
 

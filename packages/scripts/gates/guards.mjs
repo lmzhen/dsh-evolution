@@ -257,7 +257,7 @@ export const guards = [
     tree: "mirror",
     title: "生成物 `--check`（六件一起，CI 同款）：`node packages/scripts/gen-bundle-patches.mjs packages --check` ＋ `gen-client-tokens.mjs packages --check` ＋ `gen-param-client-view.mjs packages --check` ＋ `gen-param-docs.mjs packages --check` ＋ `gen-client-guards.mjs packages --check` ＋ `gen-about.mjs packages --check`（G5.10/U-10：版本与用途的生成物 ✓）（G4.1/C5：生成物与源不同步即红——四个生成器**都已支持 `--check`**，缺的只是\"有人跑\"。drill：给 PARAMETERS.md 动一个字符 ⇒ `gen-param-docs --check` 必红，撤回即绿 ✓）",
     lanes: ["local","ci-static"],
-    reason: "The six --check generators are executable at gate-60..gate-66; this composite prose row is retired. The table number stays reserved (ids are frozen, rows are not renumbered).",
+    reason: "The six --check generators are executable at gate-60..gate-65; this composite prose row is retired. The table number stays reserved (ids are frozen, rows are not renumbered).",
   }),
 
   gate("gate-34", {
@@ -559,7 +559,7 @@ export const guards = [
   gate("gate-82", {
     kind: "script",
     tree: "mirror",
-    title: "`node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、529 个 key、113 个参数文案、31 个 host error，8 语言 key/占位符/生成物一致；`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；重跑生成器即绿）",
+    title: "`node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、601 个 key、119 个参数文案、68 个 command-help key、31 个 host error，8 语言 key/占位符/生成物一致；`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；重跑生成器即绿）",
     argv: ["node","packages/scripts/verify-i18n.mjs"],
     lanes: ["local","ci-static"],
   }),

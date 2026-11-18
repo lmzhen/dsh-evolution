@@ -79,7 +79,7 @@ describe('skill-history client api', () => {
             negativeFeedback30d: 0,
             feedbackRate30d: null,
           }, { description: 'no name' }],
-          totals: { skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0, successes: { offload: 0, condense: 0, extract: 1 } },
+          totals: { skills: 1, needsAttention: 1, bodyChars: 0, bodyTokens: null, supportFiles: 0, successes: { offload: 0, condense: 0, extract: 1 } },
           counts: { offload: 0, condense: 0, extract: 1 },
           governance: [{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'a', mode: 'offload', resultRef: null }],
           generatedAt: '2026-01-01T00:00:00.000Z',
@@ -94,7 +94,7 @@ describe('skill-history client api', () => {
     expect(stats.rows[0]?.health).toMatchObject({ bodyChars: 0, bodyTokens: null, supportFiles: 0 })
     expect(stats.rows[0]?.usage).toMatchObject({ useCount: 0, viewCount: null, viewCount30d: 0, patchCount: 1 })
     expect(stats.rows[0]).toMatchObject({ feedback30d: 0, negativeFeedback30d: 0, feedbackRate30d: null })
-    expect(stats.global.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0 })
+    expect(stats.global.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0, bodyTokens: null })
     expect(stats.global.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
     expect(stats.global.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'a', mode: 'offload', resultRef: null }])
   })

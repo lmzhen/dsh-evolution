@@ -302,7 +302,7 @@
             {
               "script": "verify-mutations.mjs",
               "reason": "CI runs the PROBE half (--probes --no-stamp --json, three-valued); the COVERAGE half stays local-only until every check carries a proven red record",
-              "expiry": "0.45.0"
+              "owner": "scripts/verify-mutations"
             }
           ],
           "workflowSteps": [
@@ -549,7 +549,7 @@
           "specGlob": "*/tests/**/*.spec.ts",
           "requiredFrom": "0.26.0",
           "owner": "scripts",
-          "reason": "the marker is a new convention (no spec carries it today); from requiredFrom a spec without one is red, and until then the taxonomy view prints the count as an observation (R28: an empty REQUIRED tier is red, an unrequired one prints requiredFrom)"
+          "reason": "the marker is a repository convention; the taxonomy report counts the specs that carry it, and a spec without one is red from requiredFrom onward (R28: an empty REQUIRED tier is red, an unrequired one prints requiredFrom)"
         }
       }
     },
@@ -613,7 +613,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "17fe5d03ca6899d3618649694ef4803a2373ee63db4a98c8069814232da96f4b",
+        "sha256": "fbcce4b12b5d34008fec91291215f75ac8337b59c148722e31cf47852b33dab4",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -985,7 +985,7 @@
           {
             "axis": "falsifiability-carrier",
             "rows": 4,
-            "reason": "three rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
+            "reason": "four rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
             "expiry": "0.55.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
@@ -2027,10 +2027,10 @@
             "renewal": "Renewed at 0.54.0 (expiry 0.55.0): the row still needs the CI-only $RUNNER_TEMP/plane-home argument; a dev tree has no such home; this is a registered debt, not a pass."
           },
           "gate-81": {
-            "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
-            "owner": "scripts/gate-manifest",
+            "reason": "the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge",
+            "owner": "scripts/gates",
             "expiry": "0.55.0",
-            "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
+            "plan": "the CI lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay",
             "renewal": "Renewed at 0.54.0 (expiry 0.55.0): a bare overlay still has no health-baseline corpora, so the row cannot decide before mutation; this is a registered debt, not a pass."
           },
           "gate-05": {

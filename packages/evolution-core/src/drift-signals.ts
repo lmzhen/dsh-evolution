@@ -15,7 +15,6 @@ import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, softBodyTokenBudget }
 import { computeDedupGroups, computePrefixClusters, LOW_QUALITY_THRESHOLD } from './quality.ts'
 import { AUTHORING_DESCRIPTION_BAR, DEFAULT_STALE_AFTER_DAYS, MAX_SKILL_CONTENT_CHARS } from './constants.ts'
 import { isFileShapedPath, scanBodyHooks, type CitationReport } from './citations.ts'
-import { type BodyCost } from './cost.ts'
 import { graphemeCount } from './text-metrics.ts'
 
 /** One skill's library state; the assembler (not this module) reads IO. */
@@ -35,8 +34,6 @@ export interface DriftSkillSnapshot {
   protected?: string | null | undefined
   /** Frontmatter values the strict-YAML platform catalog cannot load (0.3.11). */
   catalogInvalid?: boolean | undefined
-  /** Weighted context cost of the body (design §5.2); undefined = not measured. */
-  cost?: BodyCost | undefined
   /** Citation scan of the body (design §5.2); undefined = not scanned. */
   citations?: CitationReport | undefined
   /** Per-support-file read counts (design §5.5); undefined = no evidence. */

@@ -75,7 +75,7 @@ describe('skill-history routes: the stats snapshot', () => {
         findings: [],
       }, {
         name: 'missing-health',
-        dims: { bodyChars: 7 },
+        dims: { bodyChars: 7, bodyTokens: 7 },
       }],
       getUsage: async () => new Map([['panel-skill', { use_count: 0, view_count: 2, view_days: { [new Date().toISOString().slice(0, 10)]: 2 }, patch_count: 1, last_used_at: '2026-01-01T00:00:00.000Z', last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false }]]),
       getFeedback: names => Object.fromEntries(names.map(name => [name, 0])),
@@ -93,7 +93,7 @@ describe('skill-history routes: the stats snapshot', () => {
           lastActivityAt: string | null
           recentlyUsed: boolean | null
           needsAttention: boolean
-          health: { verdict: string; bodyChars: number | null; supportFiles: number | null } | null
+          health: { verdict: string; bodyChars: number | null; bodyTokens: number | null; supportFiles: number | null } | null
           usage: { useCount: number | null; viewCount: number | null; viewCount30d: number | null } | null
           feedback: number | null
           feedback30d: number | null
@@ -102,7 +102,7 @@ describe('skill-history routes: the stats snapshot', () => {
           errorNotes: Array<{ at: string; note: string }> | null
         }>
         global: {
-          totals: { skills: number; needsAttention: number; bodyChars: number | null; supportFiles: number | null }
+          totals: { skills: number; needsAttention: number; bodyChars: number | null; bodyTokens: number | null; supportFiles: number | null }
           counts: { offload: number; condense: number; extract: number } | null
           governance: Array<{ runId: string; state: string; startedAt: number; target: string | null; mode: string | null; resultRef: string | null }>
         }
@@ -119,7 +119,7 @@ describe('skill-history routes: the stats snapshot', () => {
     expect(row.lastActivityAt).toBe('2026-01-01T00:00:00.000Z')
     expect(row.recentlyUsed).toBe(false)
     expect(row.needsAttention).toBe(true)
-    expect(row.health).toMatchObject({ verdict: 'warn', bodyChars: 0, supportFiles: 0 })
+    expect(row.health).toMatchObject({ verdict: 'warn', bodyChars: 0, bodyTokens: 0, supportFiles: 0 })
     expect(row.usage).toMatchObject({ useCount: 0, viewCount: 2 })
     expect(row.feedback).toBe(0)
     expect(row.usage?.viewCount30d).toBe(2)
@@ -130,7 +130,7 @@ describe('skill-history routes: the stats snapshot', () => {
     expect(quiet.feedback30d).toBe(0)
     expect(quiet.negativeFeedback30d).toBe(0)
     expect(quiet.feedbackRate30d).toBeNull()
-    expect(stats.body.data.global.totals).toMatchObject({ skills: 2, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
+    expect(stats.body.data.global.totals).toMatchObject({ skills: 2, needsAttention: 1, bodyChars: 0, bodyTokens: 0, supportFiles: 0 })
     expect(stats.body.data.global.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
     expect(stats.body.data.global.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }])
     // The probe stays tiny even when every aggregate service is present: `stats` is the one read.
@@ -146,10 +146,11 @@ describe('skill-history routes: the stats snapshot', () => {
     await ctx.plugin(NodeIo)
     await ctx.plugin(EvolutionCurator, { autoStart: false })
     const host = await mountHostRoutes(ctx, audit => makeSkillHistoryRoutes({ getCurator: () => ctx.evolutionCurator }, audit))
-    const stats = await host.json<{ ok: boolean; data: { rows: unknown[]; totals: { bodyChars: number | null } } }>(SKILL_HISTORY_ROUTES.stats)
+    const stats = await host.json<{ ok: boolean; data: { rows: unknown[]; totals: { bodyChars: number | null; bodyTokens: number | null } } }>(SKILL_HISTORY_ROUTES.stats)
     expect(stats.status).toBe(200)
     expect(stats.body.data.rows).toEqual([])
     expect(stats.body.data.global.totals.bodyChars).toBeNull()
+    expect(stats.body.data.global.totals.bodyTokens).toBeNull()
   })
 })
 

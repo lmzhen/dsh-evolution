@@ -17,7 +17,7 @@ it('curator proposes keep for a body-oversize skill', async () => {
     await ctx.plugin(EvolutionIoRegistry)
     await ctx.plugin(NodeIo)
     const curator = new EvolutionCurator(ctx, { autoStart: false })
-    const body = '---\nname: big-keep\ndescription: big keep.\n---\n\n' + 'x'.repeat(20_500)
+    const body = '---\nname: big-keep\ndescription: big keep.\n---\n\n' + 'x'.repeat(22_000)
     const created = await curator.skills.create('big-keep', body, 'foreground')
     expect(created.ok, created.message).toBe(true)
     const result = await curator.proposeKeeps()

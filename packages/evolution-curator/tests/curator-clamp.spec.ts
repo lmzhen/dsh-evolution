@@ -13,7 +13,7 @@ import { vol } from '../../test-support/volatile-config.ts'
 // = "no boot grace" (setTimeout(0)). Every other numeric field is a threshold /
 // interval where 0 is never a legitimate meaning, so it clamps to at least 1.
 const MIN0 = ['minIdleHours', 'bootGraceSeconds']
-const MIN1 = ['curatorIntervalHours', 'staleAfterDays', 'archiveAfterDays', 'qualityWarnStaleAfterDays', 'curatorReviewMaxTokens', 'healthSoftBodyChars', 'healthStampDensityPerKb', 'healthChurnMinPatches']
+const MIN1 = ['curatorIntervalHours', 'staleAfterDays', 'archiveAfterDays', 'qualityWarnStaleAfterDays', 'curatorReviewMaxTokens', 'healthSoftBodyTokens', 'healthSoftBodyChars', 'healthStampDensityPerKb', 'healthChurnMinPatches']
 const ALL = [...MIN0, ...MIN1]
 
 describe('evolution-curator G3.1 numeric clamping', () => {
@@ -66,12 +66,12 @@ describe('evolution-curator G3.1 numeric clamping', () => {
       await ctx.plugin(EvolutionIoRegistry)
       await ctx.plugin(NodeIo)
       // Direct construction bypasses the schema, so healthSoftBodyChars: 0 is
-      // exactly the value the assembly clamp must correct (-> default 40_000).
+      // exactly the value the assembly clamp must correct (-> default 7,273 tokens).
       const curator = new EvolutionCurator(ctx, { healthSoftBodyChars: vol(0), autoStart: false })
       const skills = curator.skills
       await skills.create('fat-skill', `---\nname: fat-skill\ndescription: f\n---\n\n${'x'.repeat(2_400)}\n`, 'foreground')
       const rows = await curator.healthView()
-      // 2_400 chars < the 40_000 default: healthy, so NOT flagged. If the clamp
+      // 2_400 chars is under the 7,273-token default: healthy, so NOT flagged. If the clamp
       // had left 0 in place, every body would be flagged "above soft limit".
       const fat = rows.find(row => row.name === 'fat-skill')
       expect(fat).toBeDefined()

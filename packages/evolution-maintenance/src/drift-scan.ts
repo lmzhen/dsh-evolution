@@ -8,7 +8,7 @@
  * `unknown` (never a fabricated verdict).
  */
 
-import { bodyCost, resolveCitations, type DriftSkillSnapshot, type SkillLiveness } from '@deepseek-ai/dsh-evolution-core'
+import { resolveCitations, type DriftSkillSnapshot, type SkillLiveness } from '@deepseek-ai/dsh-evolution-core'
 
 /** Minimal SkillLibrary surface needed for snapshot assembly. */
 export interface SkillLibraryLike {
@@ -78,7 +78,6 @@ export async function snapshotFromLibrary(
       body,
       description: options.descriptions?.get(entry.name),
       supportFiles,
-      cost: bodyCost(body),
       // A citation scan needs the file list to decide existence: without it the
       // field stays absent and the signal answers `unknown` rather than a
       // fabricated pass (design §5.2).

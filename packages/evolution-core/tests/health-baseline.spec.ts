@@ -11,7 +11,7 @@ import { RULES } from '../src/skill-lint.ts'
 import { collectCorpusSkills } from '../../scripts/lib-health-corpus.mjs'
 
 describe('G1 标定：health-baseline 读数', () => {
-  const skills = collectCorpusSkills().skills as Array<{ facts: { dims: { bodyChars: number | null } } }>
+  const skills = collectCorpusSkills().skills as Array<{ facts: { dims: { bodyTokens: number | null } } }>
   const baseline = buildHealthBaseline(skills as never)
 
   it('语料状态是明确的（哪一侧为空一目了然，不假装测过）', () => {
@@ -33,18 +33,18 @@ describe('G1 标定：health-baseline 读数', () => {
     }
   })
 
-  // Calibration input for the soft-line decision: how many skills the line flags at the CURRENT
-  // default vs the candidate 24_000. Not a magic-number assertion — the invariant is containment
-  // (a lower line can only flag MORE), and the counts are printed for the record.
-  it('soft line 40k vs 24k: prints the flagged counts and holds the containment invariant', () => {
+  // Calibration input for the fixed token line: how many skills the budget flags at the
+  // default vs its 2x needs-restructure line. Not a magic-number assertion — the invariant is
+  // containment (a lower line can only flag MORE), and the counts are printed for the record.
+  it('soft line 7,273 tokens vs 2x: prints the flagged counts and holds the containment invariant', () => {
     const at = (line: number): number =>
       skills.filter(
-        (s: { facts: { dims: { bodyChars: number | null } } }) =>
-          s.facts.dims.bodyChars !== null && s.facts.dims.bodyChars >= line,
+        (s: { facts: { dims: { bodyTokens: number | null } } }) =>
+          s.facts.dims.bodyTokens !== null && s.facts.dims.bodyTokens >= line,
       ).length
-    const at40 = at(40_000)
-    const at24 = at(24_000)
-    console.log('soft line: 40_000 flags ' + String(at40) + ' of ' + String(skills.length) + '; 24_000 flags ' + String(at24))
-    expect(at24).toBeGreaterThanOrEqual(at40)
+    const atLine = at(7_273)
+    const atDouble = at(14_546)
+    console.log('soft line: 7,273 tokens flags ' + String(atLine) + ' of ' + String(skills.length) + '; 14,546 flags ' + String(atDouble))
+    expect(atLine).toBeGreaterThanOrEqual(atDouble)
   })
 })

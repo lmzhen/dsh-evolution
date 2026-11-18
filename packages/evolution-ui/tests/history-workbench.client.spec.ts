@@ -142,7 +142,7 @@ describe('history workbench', () => {
         errorNotes: errorCount === 0 ? [] : [{ at: '2026-01-01T00:00:00.000Z', note: 'new report' }],
       }],
       global: {
-        totals: { skills: 1, needsAttention: 1, bodyChars: 12, supportFiles: 1, successes: { offload: 0, condense: 0, extract: 1 } },
+        totals: { skills: 1, needsAttention: 1, bodyChars: 12, bodyTokens: null, supportFiles: 1, successes: { offload: 0, condense: 0, extract: 1 } },
         counts: { offload: 0, condense: 0, extract: 1 },
         governance: [],
       },

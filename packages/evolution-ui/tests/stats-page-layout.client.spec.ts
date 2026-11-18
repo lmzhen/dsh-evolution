@@ -29,7 +29,7 @@ function row(name: string): SkillStatsRow {
 
 function snapshot(): SkillStatsSnapshot {
   const rows = [row('alpha'), row('beta')]
-  const totals = { skills: 2, needsAttention: 0, bodyChars: 20, supportFiles: 2, successes: { offload: 0, condense: 0, extract: 0 } }
+  const totals = { skills: 2, needsAttention: 0, bodyChars: 20, bodyTokens: 30, supportFiles: 2, successes: { offload: 0, condense: 0, extract: 0 } }
   return {
     rows,
     global: { totals, counts: { offload: 0, condense: 0, extract: 0 }, governance: [] },
@@ -59,6 +59,8 @@ describe('stats page presentation', () => {
   it('keeps the table at wide and medium breaks and hides low-priority columns at medium', async () => {
     const wide = render(createElement(StatsPage, face('wide')))
     await waitFor(() => { expect(wide.container.querySelectorAll('thead th')).toHaveLength(11) })
+    expect(wide.container.textContent).toContain('stats.col.bodyTokens')
+    expect(wide.container.textContent).toContain('stats.total.bodyTokens')
     wide.unmount()
     const medium = render(createElement(StatsPage, face('medium')))
     await waitFor(() => { expect(medium.container.querySelectorAll('thead th')).toHaveLength(6) })

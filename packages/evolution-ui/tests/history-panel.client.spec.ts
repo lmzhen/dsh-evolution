@@ -89,7 +89,7 @@ it('does not show library-wide success counts inside one skill detail', async ()
     loadHealth: async () => ({ rows: [], governance: [], counts: { offload: 0, condense: 0, extract: 1 } }),
   })))
   await openSkill('alpha')
-  expect(document.body.textContent).not.toContain('governance.counts')
+  expect(document.body.textContent).not.toContain('stats.activity')
 })
 
 describe('skill-history panel: the state machine a renderer can see', () => {

@@ -10,7 +10,7 @@ import { tempRoot } from '../../../test-support/temp-home.ts'
 // memoryChars/userChars 0 is never an "unbounded" meaning (a 0 limit
 // would truncate every entry to nothing; MemoryStore keeps its own internal
 // defense), so all three clamp to at least 1.
-const FIELDS = ['memoryChars', 'userChars', 'maxConsolidationFailures'] as const
+const FIELDS = ['memoryChars', 'userChars', 'memoryTokens', 'userTokens', 'maxConsolidationFailures'] as const
 
 async function mount(config: Record<string, unknown> = {}) {
   const ctx = new Context()
@@ -36,6 +36,7 @@ describe('memory-files G3.1 numeric clamping', () => {
       expect(() => parse({ [field]: -1 }), `${field} -1`).toThrow()
     }
     expect(Number.isNaN(plainField({ memoryChars: NaN }, 'memoryChars'))).toBe(true)
+    expect(Number.isNaN(plainField({ memoryTokens: NaN }, 'memoryTokens'))).toBe(true)
     expect(plainField({ maxConsolidationFailures: Infinity }, 'maxConsolidationFailures')).toBe(Infinity)
   })
 
@@ -54,7 +55,7 @@ describe('memory-files G3.1 numeric clamping', () => {
   it('assembly applies a NaN numeric config without crashing and keeps the provider working', async () => {
     // NaN passes the schema, so the assembly clamp corrects it; the provider
     // must still register and write.
-    const ctx = await mount({ memoryChars: NaN, userChars: NaN, maxConsolidationFailures: NaN })
+    const ctx = await mount({ memoryChars: NaN, userChars: NaN, maxConsolidationFailures: NaN, memoryTokens: NaN, userTokens: NaN })
     const result = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: 'user prefers terse' }])
     expect(result.ok).toBe(true)
     expect(await ctx.memory.read('memory')).toContain('user prefers terse')

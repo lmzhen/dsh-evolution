@@ -191,7 +191,7 @@ describe('curator parameter surface (G1: row config, precedence and the cross-fi
     const churn = mutableVol(20)
     const curator = new EvolutionCurator(ctx, {
       enabled: true, autoStart: false,
-      healthSoftBodyChars: softBody.ref, healthStampDensityPerKb: stampDensity.ref, healthChurnMinPatches: churn.ref,
+      healthSoftBodyTokens: softBody.ref, healthStampDensityPerKb: stampDensity.ref, healthChurnMinPatches: churn.ref,
     })
     const skills = curator.skills
     await skills.create('ghost-skill', stampedBody('ghost-skill'), 'foreground')

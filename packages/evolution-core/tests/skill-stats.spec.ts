@@ -25,7 +25,7 @@ function row(name: string, bodyChars: number | null, overrides: Partial<SkillSta
     health: {
       verdict: 'healthy',
       bodyChars,
-      bodyTokens: null,
+      bodyTokens: bodyChars,
       supportFiles: 1,
       stampDensityPerKb: null,
       churnPatches: null,
@@ -74,6 +74,7 @@ describe('skill stats totals', () => {
   it('keeps an unmeasured total null and does not turn missing rows into zero', () => {
     const totals = computeSkillStatsTotals([row('a', null), row('b', null)], null)
     expect(totals.bodyChars).toBeNull()
+    expect(totals.bodyTokens).toBeNull()
     expect(totals.supportFiles).toBe(2)
     expect(totals.skills).toBe(2)
     expect(totals.successes).toBeNull()
@@ -87,6 +88,7 @@ describe('skill stats totals', () => {
     ]
     const totals = computeSkillStatsTotals(rows, { offload: 1, condense: 0, extract: 2 })
     expect(totals.bodyChars).toBe(15)
+    expect(totals.bodyTokens).toBe(15)
     expect(totals.needsAttention).toBe(2)
     expect(totals.successes).toEqual({ offload: 1, condense: 0, extract: 2 })
     expect(needsAttention(rows[2]!)).toBe(false)

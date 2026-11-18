@@ -13,7 +13,7 @@ it('keeps needs-restructure, severity, message and dims in the route row', () =>
   }])
   expect(rows[0]?.verdict).toBe('needs-restructure')
   expect(rows[0]?.findings[0]).toMatchObject({ severity: 'error', message: 'body twice the soft line' })
-  expect(rows[0]?.dims).toMatchObject({ bodyChars: 41000, supportFiles: 8, churnPatches: 3 })
+  expect(rows[0]?.dims).toMatchObject({ bodyChars: 41000, bodyTokens: 16000, supportFiles: 8, churnPatches: 3 })
 })
 
 it('passes a dim core adds through without a second whitelist', () => {

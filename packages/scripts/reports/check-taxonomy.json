@@ -89,7 +89,6 @@
         "evolution-core::tests/citations.spec.ts",
         "evolution-core::tests/content-hash.spec.ts",
         "evolution-core::tests/contracts.spec.ts",
-        "evolution-core::tests/cost.spec.ts",
         "evolution-core::tests/errors.spec.ts",
         "evolution-core::tests/evidence.spec.ts",
         "evolution-core::tests/external-support.spec.ts",
@@ -133,6 +132,8 @@
         "evolution-core::tests/skill-stats.spec.ts",
         "evolution-core::tests/skill-store-authority-lock.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
+        "evolution-core::tests/text-budgets.spec.ts",
+        "evolution-core::tests/text-metrics.spec.ts",
         "evolution-curator::tests/unit-undo-plan.spec.ts",
         "evolution-host::tests/decide-requires.spec.ts",
         "evolution-host::tests/gate-scheduler.spec.ts",
@@ -353,7 +354,6 @@
         "evolution-core::tests/content-hash.spec.ts",
         "evolution-core::tests/content-limit-repair.spec.ts",
         "evolution-core::tests/contracts.spec.ts",
-        "evolution-core::tests/cost.spec.ts",
         "evolution-core::tests/curator.spec.ts",
         "evolution-core::tests/document-body.spec.ts",
         "evolution-core::tests/drift-signals.spec.ts",
@@ -456,6 +456,8 @@
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
+        "evolution-core::tests/text-budgets.spec.ts",
+        "evolution-core::tests/text-metrics.spec.ts",
         "evolution-core::tests/threats.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
@@ -997,7 +999,6 @@
         "evolution-core::tests/content-hash.spec.ts",
         "evolution-core::tests/content-limit-repair.spec.ts",
         "evolution-core::tests/contracts.spec.ts",
-        "evolution-core::tests/cost.spec.ts",
         "evolution-core::tests/curator.spec.ts",
         "evolution-core::tests/document-body.spec.ts",
         "evolution-core::tests/drift-signals.spec.ts",
@@ -1100,6 +1101,8 @@
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
+        "evolution-core::tests/text-budgets.spec.ts",
+        "evolution-core::tests/text-metrics.spec.ts",
         "evolution-core::tests/threats.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
@@ -1571,7 +1574,6 @@
         "evolution-core::tests/content-hash.spec.ts",
         "evolution-core::tests/content-limit-repair.spec.ts",
         "evolution-core::tests/contracts.spec.ts",
-        "evolution-core::tests/cost.spec.ts",
         "evolution-core::tests/curator.spec.ts",
         "evolution-core::tests/document-body.spec.ts",
         "evolution-core::tests/drift-signals.spec.ts",
@@ -1678,6 +1680,8 @@
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
+        "evolution-core::tests/text-budgets.spec.ts",
+        "evolution-core::tests/text-metrics.spec.ts",
         "evolution-core::tests/threats.spec.ts",
         "evolution-core::tests/tree-write.spec.ts",
         "evolution-core::tests/unit-backend.spec.ts",
@@ -2085,11 +2089,11 @@
   "counts": {
     "fast": {
       "gates": 62,
-      "specs": 108
+      "specs": 109
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 416
+      "specs": 417
     },
     "ci-only": {
       "gates": 10,
@@ -2097,16 +2101,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 416
+      "specs": 417
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 488
+      "specs": 489
     }
   },
   "specs": {
-    "total": 488,
-    "marked": 488,
+    "total": 489,
+    "marked": 489,
     "unmarked": 0
   }
 }

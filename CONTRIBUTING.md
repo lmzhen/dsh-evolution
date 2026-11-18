@@ -116,7 +116,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 79 | node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict | mirror |
 | 80 | node packages/evolution/scripts/verify-graph-edges.mjs --report | overlay |
 | 81 | node packages/scripts/verify-health-admission.mjs | mirror |
-| 82 | `node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、529 个 key、113 个参数文案、31 个 host error，8 语言 key/占位符/生成物一致；`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；重跑生成器即绿） | mirror |
+| 82 | `node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、601 个 key、119 个参数文案、68 个 command-help key、31 个 host error，8 语言 key/占位符/生成物一致；`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；重跑生成器即绿） | mirror |
 
 ## Pull request checklist
 
