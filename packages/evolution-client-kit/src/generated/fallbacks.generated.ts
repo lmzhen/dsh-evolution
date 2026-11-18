@@ -12,10 +12,10 @@ export const FALLBACKS: Readonly<Record<'approval' | 'skill-history' | 'skill-he
     command: '/evolution pending … /evolution approve <id> … /evolution reject <id> … /evolution release <id>',
   },
   'skill-history': {
-    command: '/evolution skill undo <name> [--to v<N>]（查看：/evolution skill history <name>）',
+    command: '/evolution skill undo <name> [--to v<N>] / /evolution skill history <name>',
   },
   'skill-health': {
-    command: '/evolution skills refresh（健康行：/evolution doctor）',
+    command: '/evolution skills refresh / /evolution doctor',
   },
   merge: {
     command: '/evolution merge status / pending / approve <id> / report',
