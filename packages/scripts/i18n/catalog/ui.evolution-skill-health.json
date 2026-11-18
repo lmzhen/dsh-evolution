@@ -442,16 +442,6 @@
       "pt": "A leitura falhou — não é possível avaliar agora; clique em Atualizar para tentar novamente.",
       "ru": "Не удалось прочитать — сейчас судить нельзя; нажмите «Обновить» и повторите."
     },
-    "proposal.copy": {
-      "zh": "复制命令",
-      "en": "Copy command",
-      "ja": "コマンドをコピー",
-      "es": "Copiar comando",
-      "fr": "Copier la commande",
-      "de": "Befehl kopieren",
-      "pt": "Copiar comando",
-      "ru": "Скопировать команду"
-    },
     "proposal.kept": {
       "zh": "保留正文",
       "en": "Body kept",

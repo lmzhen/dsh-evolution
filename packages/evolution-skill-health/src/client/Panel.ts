@@ -294,11 +294,6 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
       ? createElement('details', { 'data-role': 'proposals' },
         createElement('summary', { 'data-role': 'group-title' }, t('group.proposals') + ' (' + String((view.proposals ?? []).length) + ')'),
         ...(view.proposals ?? []).map(proposal => {
-          const heading = proposal.parts?.[0]?.heading
-          const target = proposal.owner.mode === 'covered' ? proposal.owner.name : proposal.owner.neededOwner
-          const command = heading === undefined || target === undefined
-            ? undefined
-            : '/evolution extract ' + proposal.source + ' ' + target + ' "' + heading + '" --plan'
           return createElement('div', { key: proposal.id, 'data-role': 'proposal' },
             createElement('p', { 'data-role': 'proposal-summary' }, proposal.source + ' — ' + t('proposal.outcome.' + proposal.outcome)),
             createElement('p', { 'data-role': 'proposal-status' }, t('proposal.status.' + proposal.status)),
@@ -315,10 +310,6 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
               t('proposal.reusable') + ': ' + (proposal.parts ?? []).map(part => part.heading).join('、')),
             (proposal.warnings ?? []).length === 0 ? null : createElement('p', { 'data-role': 'proposal-warnings' },
               t('proposal.warnings') + ': ' + (proposal.warnings ?? []).join('；')),
-            command === undefined ? null : createElement('p', { 'data-role': 'proposal-command' },
-              createElement('code', {}, command),
-              createElement(CopyButton, { command, t, role: 'proposal-copy', label: t('proposal.copy') }),
-            ),
           )
         }),
       )
