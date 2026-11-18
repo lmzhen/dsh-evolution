@@ -45,15 +45,3 @@ export const SKILL_OPERATIONS: readonly SkillOperationMeta[] = Object.freeze([
     surface: 'advanced',
   },
 ])
-
-/** Resolve one operation by id; the caller must handle undefined instead of printing the raw id. */
-export function skillOperationOf(id: string): SkillOperationMeta | undefined {
-  return SKILL_OPERATIONS.find(operation => operation.id === id)
-}
-
-/** Label keys for the three success counters, in stable display order. */
-export const SKILL_OPERATION_LABEL_KEYS: Readonly<Record<SkillOperationId, string>> = Object.freeze({
-  offload: 'operation.offload.label',
-  condense: 'operation.condense.label',
-  extract: 'operation.extract.label',
-})

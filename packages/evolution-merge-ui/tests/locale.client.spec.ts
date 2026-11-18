@@ -3,9 +3,9 @@ import { expect, it } from 'vitest'
 import { en, zh } from '../src/client/messages.ts'
 
 it('maps the command surfaces to the three queue labels', () => {
-  expect(zh['tab.verify']).toBe('待判断')
+  expect(zh['tab.verify']).toBe('待我看')
   expect(zh['tab.fuse']).toBe('待合并')
-  expect(zh['tab.pending']).toBe('待批准')
+  expect(zh['tab.pending']).toBe('待确认')
 })
 
 it('zh and en have the same complete key set', () => {

@@ -55,6 +55,7 @@ const SORT_OPTIONS: readonly { readonly key: SkillStatsSortKey; readonly label: 
 export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
   const layout = face.layout
+  const hiddenInMedium = new Set(['supportFiles', 'versions', 'viewCount', 'feedbackRate30d', 'lastAt'])
   const query = face.view.query
   const filter = face.view.filter
   const sort = face.view.sort
@@ -87,6 +88,12 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   const onSort = (key: string): void => {
     face.onView({ sort: { key, dir: sort.key === key ? (sort.dir === 'asc' ? 'desc' : 'asc') : (key === 'name' ? 'asc' : 'desc') } })
   }
+
+  useEffect(() => {
+    if (layout === 'medium' && hiddenInMedium.has(sort.key)) {
+      face.onView({ sort: { key: 'bodyChars', dir: 'desc' } })
+    }
+  }, [layout, sort.key])
 
   const Table = DataTable<SkillStatsRow>
   const allColumns: readonly DataTableColumn<SkillStatsRow>[] = [
@@ -126,10 +133,13 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
     : createElement('p', { className: 'evo-stats-activity' },
       face.t('stats.activity') + '：',
       successOperations.map(operation => face.t(operation.labelKey) + ' ' + String(successCounts[operation.id])).join(' · '))
-  const hiddenInMedium = new Set(['supportFiles', 'versions', 'viewCount', 'feedbackRate30d', 'lastAt'])
   const columns = layout === 'wide' ? allColumns : allColumns.filter(column => !hiddenInMedium.has(column.key))
 
-  const cards = createElement('div', { className: 'evo-stats-cards' },
+  const cards = visible.length === 0
+    ? createElement('div', { className: 'evo-stats-empty evo-stats-cards-empty' },
+      createElement('strong', null, face.t('stats.empty')),
+      createElement('span', null, face.t('stats.emptyHint')))
+    : createElement('div', { className: 'evo-stats-cards' },
     visible.map(row => createElement('article', { key: row.name, className: 'evo-stats-card' },
       createElement('div', { className: 'evo-stats-card-head' },
         createElement('button', {
@@ -271,6 +281,7 @@ export const STATS_CSS = [
   '.evo-stats-empty strong{font-size:12px;font-weight:650;color:var(--dsw-alias-label-secondary,#6f766d)}',
   '.evo-stats-window-note{margin:0;padding:6px 12px;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;line-height:1.5;border-bottom:1px solid var(--dsw-alias-border-l1,#f0eee8);background:var(--dsw-alias-bg-layer-2,#faf9f5)}',
   '.evo-stats-cards{display:flex;flex-direction:column;gap:8px;padding:10px}',
+  '.evo-stats-cards-empty{padding:28px 16px}',
   '.evo-stats-card{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:10px;background:var(--dsw-alias-bg-layer-1,#fff)}',
   '.evo-stats-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}',
   '.evo-stats-card-desc{margin:0;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:11px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',

@@ -453,7 +453,7 @@
       "ru": "Нет объединений, ожидающих одобрения."
     },
     "empty.scope": {
-      "zh": "这里只处理两轮合并；单纯追加内容属于技能管理，不会进入合并队列。",
+      "zh": "这里只处理确实重复的技能；单纯追加内容属于技能整理，不会进入合并队列。",
       "en": "This view only handles two-round merges. Plain additions are skill management and never enter the merge queue.",
       "ja": "ここでは2段階のマージのみを扱います。単純な内容の追記はスキル管理の対象であり、マージキューには入りません。",
       "es": "Aquí solo se tratan merges de dos rondas; añadir contenido suelto es gestión de skills y no entra en la cola de merge.",
@@ -722,7 +722,7 @@
       "pt": "Avançado",
       "ru": "Дополнительно"
     },"hint": {
-      "zh": "先处理需要判断的合并，其他信息按需展开。",
+      "zh": "先处理需要判断的重复技能，其余按需展开。",
       "en": "Handle merges that need a verdict first; expand the rest as needed.",
       "ja": "判断が必要なマージを先に処理します。その他の情報は必要に応じて展開できます。",
       "es": "Empieza por los merges que hay que juzgar; el resto de la información se despliega cuando haga falta.",
@@ -2132,7 +2132,7 @@
       "ru": "К объединению"
     },
     "tab.pending": {
-      "zh": "待批准",
+      "zh": "待确认",
       "en": "Pending approval",
       "ja": "承認待ち",
       "es": "Pendientes",
@@ -2142,7 +2142,7 @@
       "ru": "На одобрении"
     },
     "tab.skipped": {
-      "zh": "无需合并",
+      "zh": "已忽略",
       "en": "No merge needed",
       "ja": "マージ不要",
       "es": "Omitidos",
@@ -2152,7 +2152,7 @@
       "ru": "Без объединения"
     },
     "tab.verify": {
-      "zh": "待判断",
+      "zh": "待我看",
       "en": "Awaiting verdict",
       "ja": "判定待ち",
       "es": "Por juzgar",
