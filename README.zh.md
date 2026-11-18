@@ -28,7 +28,7 @@ skill 是封装任务流程的模块：一个 `SKILL.md` 正文，加上可选�
 | 技能合并 | 通过 `/evolution merge scan` 或 `pair` 发起。scan 需要本地 potion 模型，缺少 LLM 时可回退 stub；普通 pair 不需要 potion，但 round1/authoring 需要子会话模型。发起后默认自动批准，`mergeApproval` 可改为人工批准 |
 | 记忆 | `all` 会话提供。项目记忆和用户画像预算分别为 2200、1375 字符；达到上限后拒绝新增，不静默截断 |
 | 写入审批与恢复 | 普通写入审批默认关闭，开启后可暂存记忆和技能写入；curator 与 merge 使用各自控制。技能历史、正文撤销、单元撤销和归档恢复的适用范围不同，执行期失败不承诺都能完整回退 |
-| 诊断与界面 | 提供 `/evolution doctor`、整理报告、技能健康和知识图；`all` 在 Web/桌面 GUI 提供进化工作台（技能历史/待批/合并/健康）和诊断卡，健康视图默认关闭 |
+| 诊断与界面 | 提供 `/evolution doctor`、整理报告、技能健康和知识图；`all` 在 Web/桌面 GUI 提供进化工作台（技能/数据总览/待我确认/合并建议）和诊断卡，健康能力默认关闭 |
 
 各项功能的触发条件、失败行为和限制见 [功能说明](docs/features.md)。
 
@@ -100,4 +100,5 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 - [运维](docs/operations.md)：备份、升级、卸载和检查。
 - [排障](docs/troubleshooting.md)：按症状定位问题。
 - 维护者参考：[包清单与事实源](packages/README.md)、[开发文档](docs/developer/development.md)。
+
 

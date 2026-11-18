@@ -104,8 +104,8 @@ describe('history client bundle: what it contributes, and what it takes back', (
     const seams = fakeSeams()
     apply(seams.ctx as never)
     const face = seams.faces[0] as { t: unknown; history: Record<string, unknown> }
-    expect(Object.keys(face).sort()).toEqual(['hasView', 'history', 'loadTaskCounts', 'pending', 'store', 't'])
-    expect(Object.keys(face.history).sort()).toEqual(['format', 'loadBody', 'loadDiff', 'loadHealth', 'loadSkills', 'loadVersions', 'markdownWords', 't', 'undo'])
+    expect(Object.keys(face).sort()).toEqual(['hasView', 'history', 'loadTaskCounts', 'pending', 'stats', 'store', 't'])
+    expect(Object.keys(face.history).sort()).toEqual(['format', 'loadBody', 'loadDiff', 'loadSkills', 'loadStats', 'loadVersions', 'markdownWords', 't', 'undo'])
   })
 
   it('T5-06/A61: a REFUSED dictionary registration is reported and the rest of the bundle still mounts', () => {
@@ -130,3 +130,4 @@ describe('history client bundle: what it contributes, and what it takes back', (
     expect(document.querySelectorAll('style[data-plugin-css]')).toHaveLength(0)
   })
 })
+

@@ -65,6 +65,7 @@ describe('skill-history routes: the stats snapshot', () => {
     const library = new SkillLibrary(root, nodeEvolutionIo(), { ...DEFAULT_SKILL_LIMITS, versionKeep: 20 })
     const body = (text: string): string => '---\nname: panel-skill\ndescription: stats fixture\n---\n' + text + '\n'
     await library.create('panel-skill', body('One.'))
+    await library.create('quiet-skill', body('Two.').replace('panel-skill', 'quiet-skill'))
     const host = await mountHostRoutes(ctx, audit => makeSkillHistoryRoutes({
       getCurator: () => ctx.evolutionCurator,
       getHealthView: async () => [{
@@ -102,8 +103,9 @@ describe('skill-history routes: the stats snapshot', () => {
     }>(SKILL_HISTORY_ROUTES.stats)
     expect(stats.status).toBe(200)
     expect(stats.body.ok).toBe(true)
-    expect(stats.body.data.rows).toHaveLength(1)
-    const row = stats.body.data.rows[0]!
+    expect(stats.body.data.rows).toHaveLength(2)
+    const row = stats.body.data.rows.find(entry => entry.name === 'panel-skill')!
+    const quiet = stats.body.data.rows.find(entry => entry.name === 'quiet-skill')!
     expect(row.name).toBe('panel-skill')
     expect(row.versions).toBe(1)
     expect(row.health).toMatchObject({ verdict: 'warn', bodyChars: 0, supportFiles: 0 })
@@ -113,7 +115,10 @@ describe('skill-history routes: the stats snapshot', () => {
     expect(row.feedback30d).toBe(2)
     expect(row.negativeFeedback30d).toBe(1)
     expect(row.feedbackRate30d).toBe(0.5)
-    expect(stats.body.data.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
+    expect(quiet.feedback30d).toBe(0)
+    expect(quiet.negativeFeedback30d).toBe(0)
+    expect(quiet.feedbackRate30d).toBeNull()
+    expect(stats.body.data.totals).toMatchObject({ skills: 2, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
     expect(stats.body.data.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
     expect(stats.body.data.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }])
     // The probe stays tiny even when every aggregate service is present: `stats` is the one read.

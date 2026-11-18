@@ -16,6 +16,7 @@ const expected = (): string[] => [
   SKILL_HISTORY_ROUTES.diff,
   SKILL_HISTORY_ROUTES.health,
   SKILL_HISTORY_ROUTES.skills,
+  SKILL_HISTORY_ROUTES.stats,
   SKILL_HISTORY_ROUTES.undo,
   SKILL_HISTORY_ROUTES.versions,
 ].sort()
@@ -36,7 +37,7 @@ describe('skill-history host half: mounting order', () => {
     const fiber = await ctx.plugin(SkillHistory)
     const host = provideHostConnection(ctx)
     await new Promise(resolve => setTimeout(resolve, 20))
-    expect(host.paths).toHaveLength(6)
+    expect(host.paths).toHaveLength(7)
     expect(host.released).toEqual([])
     await fiber.dispose()
     expect([...host.released].sort()).toEqual([...host.paths].sort())
@@ -51,3 +52,4 @@ describe('skill-history host half: mounting order', () => {
     expect(ctx.get('connection')).toBeUndefined()
   })
 })
+

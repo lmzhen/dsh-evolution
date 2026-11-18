@@ -1521,6 +1521,16 @@
       "de": "30-Tage-Werte starten mit dem Plugin-Update; alte Einträge zeigen —.",
       "pt": "Métricas de 30 dias começam na atualização do plugin; registros antigos mostram —.",
       "ru": "Метрики за 30 дней начинаются с обновления плагина; старые записи показывают —."
+    },
+    "stats.filter.label": {
+      "zh": "筛选技能",
+      "en": "Filter skills",
+      "ja": "スキルを絞り込む",
+      "es": "Filtrar habilidades",
+      "fr": "Filtrer les compétences",
+      "de": "Fähigkeiten filtern",
+      "pt": "Filtrar habilidades",
+      "ru": "Фильтр навыков"
     }
   }
 }

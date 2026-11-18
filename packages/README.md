@@ -37,7 +37,7 @@ This directory holds the 20 packages of the dsh-evolution family. For the user g
 | Package | Role |
 |---|---|
 | `evolution-commands` | `/evolution` command face (27 entries), diagnostics route, run registry |
-| `evolution-ui` | Parameter cards in the family settings section (approval/diagnostics/params) + skill history panel + 6 routes |
+| `evolution-ui` | Parameter cards in the family settings section (approval/diagnostics/params) + skill history panel + 7 routes |
 | `evolution-merge-ui` | Read-only merge sidebar panel |
 | `evolution-client-kit` | Sidebar registration, generated routes/contracts/states/tokens |
 
@@ -90,3 +90,4 @@ The family uses declared gates rather than trusting a green test run. A check wi
 ## Configuration dials
 
 Maintainer map of the user-facing dials: **autonomy** (approval), **curatorBackground** (curator schedule), **memoryInjection** (memory prompt), **threatStrictness** (write scan). Each dial names fields that exist in the owning package; do not document a ghost field.
+

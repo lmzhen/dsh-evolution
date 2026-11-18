@@ -151,6 +151,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
           key: entry.id,
           type: 'button',
           className: 'evo-stats-filter' + (filter === entry.id ? ' is-active' : ''),
+          'aria-pressed': filter === entry.id ? 'true' : 'false',
           onClick: () => { setFilter(entry.id) },
         }, face.t(entry.key))))),
     load.status === 'failed'

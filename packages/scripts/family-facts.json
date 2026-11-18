@@ -613,7 +613,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "87b3eab815efc90358f23abfc1fd7390dfac7f94827b68a2c9beb80fb318686a",
+        "sha256": "b07f953d7ad28cf4051b8509e178889da11fcfdf7cc75b4c393b301ae284f137",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -1597,13 +1597,13 @@
             {
               "mutate": {
                 "file": "packages/scripts/verify-host-routes.mjs",
-                "find": "if (published.length !== 19)",
-                "replace": "if (published.length !== 20)"
+                "find": "if (published.length !== 20)",
+                "replace": "if (published.length !== 21)"
               },
               "expect": "red",
-              "note": "the host route table publishes a frozen 19 paths; changing the expected count makes the verifier red on the real tree",
-              "provenAt": "2026-11-14T18:29:28.639Z",
-              "provenSha": "83fef0990c5a25213808493553e9e46b97743ccc5e29efd0b20aa31f1bb5cdf6"
+              "note": "the host route table publishes a frozen 20 paths; changing the expected count makes the verifier red on the real tree",
+              "provenAt": "2026-11-18T04:17:30.920Z",
+              "provenSha": "4a524fc47c8c838e73b68180a1b49a9d678d160507b350e2f45404191c91454b"
             }
           ],
           "gate-79": [

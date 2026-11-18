@@ -169,9 +169,14 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
     if (normalized !== null) healthByName.set(normalized.name, normalized.facts)
   }
 
-  const usageRead = await services.getUsage?.()
+  const usageRead = services.getUsage === undefined ? undefined : await services.getUsage().catch(() => null)
   const usageByName = usageRead instanceof Map ? usageRead as ReadonlyMap<string, unknown> : null
-  const feedbackRead = services.getFeedback?.(index.map(row => row.name))
+  let feedbackRead: unknown
+  try {
+    feedbackRead = services.getFeedback?.(index.map(row => row.name))
+  } catch {
+    feedbackRead = undefined
+  }
   const feedbackWindowRead = services.getFeedbackWindow === undefined
     ? null
     : await services.getFeedbackWindow(30).catch(() => null)
@@ -182,8 +187,11 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
   const rows: SkillStatsRow[] = index.map(row => {
     const usage = usageOf(usageByName?.get(row.name))
     const window = feedbackWindow?.get(row.name)
-    const feedback30d = window === undefined ? null : window.positive + window.negative
-    const negativeFeedback30d = window?.negative ?? null
+    // A present window map (even an empty one) means the window WAS measured: a missing skill key is
+    // zero events, not "unknown". Only an absent/unavailable read is null.
+    const measuredWindow = feedbackWindow !== null
+    const feedback30d = measuredWindow ? (window?.positive ?? 0) + (window?.negative ?? 0) : null
+    const negativeFeedback30d = measuredWindow ? window?.negative ?? 0 : null
     const loads30d = usage?.viewCount30d ?? null
     return {
       name: row.name,

@@ -415,8 +415,32 @@ describe('rolling view buckets', () => {
     const legacy = { ...emptyRecord(), view_days: undefined }
     expect(recentViewCount(legacy, 30)).toBeNull()
     expect(recentViewCount(emptyRecord(), 30)).toBe(0)
-    const measured = { ...emptyRecord(), view_days: {} }
+    const measured = normalizeUsageRecord({ ...emptyRecord(), view_days: {} })
+    expect(measured.view_days).toEqual({})
     expect(recentViewCount(measured, 30)).toBe(0)
+  })
+
+  it('keeps the newest buckets when normalizing more than the retention limit', () => {
+    const days: Record<string, number> = {}
+    for (let i = 0; i < 61; i += 1) {
+      const date = new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10)
+      days[date] = 1
+    }
+    const normalized = normalizeUsageRecord({ ...emptyRecord(), view_days: days })
+    expect(Object.keys(normalized.view_days ?? {})).toHaveLength(60)
+    expect(normalized.view_days?.['2026-03-02']).toBe(1)
+  })
+
+  it('persists the measured empty window across load and an unrelated write', async () => {
+    const root = await tempRoot('evo-usage-empty-window-')
+    const io = nodeEvolutionIo()
+    await mutateUsage(root, io, map => { map.set('fresh', emptyRecord()) })
+    let usage = await loadUsage(root, io)
+    expect(usage.get('fresh')?.view_days).toEqual({})
+    expect(recentViewCount(usage.get('fresh')!, 30)).toBe(0)
+    await mutateUsage(root, io, map => { getRecord(map, 'fresh').use_count += 1 })
+    usage = await loadUsage(root, io)
+    expect(usage.get('fresh')?.view_days).toEqual({})
   })
 })
 

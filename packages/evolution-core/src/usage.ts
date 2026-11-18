@@ -134,19 +134,22 @@ export const VIEW_WINDOW_DAYS = 60
 
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/
 
-/** Sanitize per-day load buckets; unusable entries are dropped, never zero-filled. */
+/** Sanitize per-day load buckets; an absent field stays unmeasured, a present empty object is measured zero. */
 function normalizeViewDays(value: unknown): Record<string, number> | undefined {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  if (value === undefined || value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const entries = Object.entries(value as Record<string, unknown>)
+  // A present empty object is the explicit "record created, window measured, zero loads" state.
+  if (entries.length === 0) return {}
+  // Retain the newest 60 buckets, not the first 60 insertion-ordered ones.
+  entries.sort((a, b) => b[0].localeCompare(a[0]))
   const out: Record<string, number> = {}
-  let kept = 0
-  for (const [key, count] of Object.entries(value as Record<string, unknown>)) {
-    if (kept >= VIEW_WINDOW_DAYS) break
+  for (const [key, count] of entries) {
+    if (Object.keys(out).length >= VIEW_WINDOW_DAYS) break
     if (!DAY_KEY.test(key)) continue
     if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) continue
     out[key] = count
-    kept += 1
   }
-  return kept === 0 ? undefined : out
+  return Object.keys(out).length === 0 ? undefined : out
 }
 
 /** Day key in UTC; the bucket is a bounded rolling window, not a calendar report. */
