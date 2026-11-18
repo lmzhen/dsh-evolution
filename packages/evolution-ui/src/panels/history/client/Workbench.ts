@@ -3,7 +3,7 @@
  * without creating another page or a second navigation registry.
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
-import { createElement, useEffect, useSyncExternalStore, type ReactNode } from 'react'
+import { createElement, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { PAGE_SURFACE_CLASS } from '@lmzhen/dsh-evolution-client-kit'
 import { tokenVars } from '@lmzhen/dsh-evolution-client-kit/tokens'
 import { SkillHistoryPanel, type PanelFace } from './Panel.ts'
@@ -46,6 +46,12 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
   const openHistory = (skill: string | undefined, origin?: 'data'): void => { props.store.openHistory(skill, origin) }
   const hasMerge = props.hasView?.('merge') ?? true
   const hasData = props.stats !== undefined
+  // Mount the data view on first visit and keep it mounted afterwards: its search/sort/scroll survive a
+  // trip into a skill, while a host that never opens "Data overview" pays no stats read.
+  const [dataMounted, setDataMounted] = useState(view === 'data')
+  useEffect(() => {
+    if (view === 'data' && !dataMounted) setDataMounted(true)
+  }, [view, dataMounted])
   useEffect(() => {
     if (view === 'merge' && !hasMerge) props.store.setDefaultView('history')
     if (view === 'data' && !hasData) props.store.setDefaultView('history')
@@ -96,7 +102,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
         : view === 'pending'
           ? createElement(PendingCard, { ...props.pending, onHistory: () => { openHistory(undefined) } })
           : null,
-      hasData
+      hasData && dataMounted
         ? createElement('div', { hidden: view !== 'data', className: 'evo-workbench-feature evo-workbench-data' },
           createElement(StatsPage, {
             ...props.stats!,
