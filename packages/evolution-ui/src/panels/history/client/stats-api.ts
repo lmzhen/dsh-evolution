@@ -8,6 +8,7 @@
  *
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
+import { isRecord } from './guards.ts'
 import type {
   SkillHealthFacts,
   SkillStatsCounts,
@@ -19,7 +20,7 @@ import type {
 } from '@deepseek-ai/dsh-evolution-core/skills'
 
 function recordOf(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+  return isRecord(value) ? value : null
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -140,4 +141,5 @@ export function parseSkillStats(value: unknown): SkillStatsSnapshot {
     generatedAt: stringOrNull(source?.generatedAt) ?? '',
   }
 }
+
 

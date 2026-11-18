@@ -3,7 +3,7 @@
  * G4/W6 host-route guard: ONE path table, ONE carrier, no second admission path.
  *
  * Checks (static, so it runs in the mirror without a build):
- *   1. HOST_ROUTES is the only home of '/api/dsh-evolution/' literals (5 surfaces / 19 endpoints).
+ *   1. HOST_ROUTES is the only home of '/api/dsh-evolution/' literals (5 surfaces / 20 endpoints).
  *   2. Business sources carry no loopback fence / webServer registration and no hand-copied route paths.
  *   3. The three migrated host packages import HOST_ROUTES from core/http-routes.
  *   4. Generated client route constants (G5), when present, carry the GENERATED header and only paths
@@ -33,7 +33,7 @@ const published = [...coreSource.matchAll(/'(\/api\/dsh-evolution\/[^']*)'/g)]
   // The registerHostRoutes prefix guard names the bare prefix; only endpoints carry a segment after it.
   .filter((path) => path !== '/api/dsh-evolution/')
 for (const path of published) seenPaths.push(path)
-if (published.length !== 19) problems.push('HOST_ROUTES carries ' + published.length + ' endpoint path(s), expected 19')
+if (published.length !== 20) problems.push('HOST_ROUTES carries ' + published.length + ' endpoint path(s), expected 20')
 if (new Set(published).size !== published.length) problems.push('HOST_ROUTES declares a duplicate endpoint path')
 for (const surface of ['approval', 'skillHistory', 'skillHealth', 'merge', 'diagnostics']) {
   if (!new RegExp('\\b' + surface + '\\s*:').test(coreSource)) problems.push('HOST_ROUTES is missing the "' + surface + '" surface')
@@ -108,3 +108,4 @@ if (problems.length > 0) {
 }
 if (JSON_OUT) console.log(JSON.stringify({ ok: true, scanned, endpoints: published.length }, null, 2))
 else console.log('verify-host-routes: OK — ' + scanned + ' business source(s), HOST_ROUTES ' + published.length + ' endpoints, no fence/webServer/hand-copied paths')
+

@@ -19,6 +19,7 @@ import type {
   SkillUsageFacts,
 } from '@deepseek-ai/dsh-evolution-core/skills'
 import { computeSkillStatsTotals } from '@deepseek-ai/dsh-evolution-core/skills'
+import { isRecord } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorFace, RouteServices } from './routes.ts'
 
 /** The index fields the table needs; listVersions is read once per skill. */
@@ -47,7 +48,7 @@ export async function readSkillIndex(curator: CuratorFace): Promise<SkillIndexRo
 }
 
 function objectOf(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+  return isRecord(value) ? value : null
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -174,3 +175,4 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
     generatedAt: new Date().toISOString(),
   }
 }
+

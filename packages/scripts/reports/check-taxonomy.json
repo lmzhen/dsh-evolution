@@ -76,6 +76,7 @@
         "gate-82"
       ],
       "specs": [
+        "evolution-client-kit::tests/data-table.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
         "evolution-commands::tests/command-catalog.spec.ts",
@@ -129,6 +130,7 @@
         "evolution-core::tests/signals.spec.ts",
         "evolution-core::tests/skill-lint.spec.ts",
         "evolution-core::tests/skill-model.spec.ts",
+        "evolution-core::tests/skill-stats.spec.ts",
         "evolution-core::tests/skill-store-authority-lock.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
         "evolution-curator::tests/unit-undo-plan.spec.ts",
@@ -179,6 +181,7 @@
         "evolution-ui::tests/settings-states.generated.spec.ts",
         "evolution-ui::tests/settings-styles.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
+        "evolution-ui::tests/skill-stats-parity.spec.ts",
         "tool-skill-manage::tests/action-table.spec.ts"
       ],
       "gatesLocal": [
@@ -323,6 +326,7 @@
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
+        "evolution-client-kit::tests/data-table.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
@@ -436,6 +440,7 @@
         "evolution-core::tests/skill-model.spec.ts",
         "evolution-core::tests/skill-restructure.spec.ts",
         "evolution-core::tests/skill-row-cells.spec.ts",
+        "evolution-core::tests/skill-stats.spec.ts",
         "evolution-core::tests/skill-store-authority-lock.spec.ts",
         "evolution-core::tests/skill-store-boundary.spec.ts",
         "evolution-core::tests/skill-store-listing-failure.spec.ts",
@@ -723,6 +728,7 @@
         "evolution-ui::tests/settings-u6-danger-weight.client.spec.ts",
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
+        "evolution-ui::tests/skill-stats-parity.spec.ts",
         "memory::tests/memory.spec.ts",
         "memory::tests/tools/memory-interpolation-contract.spec.ts",
         "tool-skill-manage::tests/action-table.spec.ts"
@@ -961,6 +967,7 @@
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
+        "evolution-client-kit::tests/data-table.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
@@ -1074,6 +1081,7 @@
         "evolution-core::tests/skill-model.spec.ts",
         "evolution-core::tests/skill-restructure.spec.ts",
         "evolution-core::tests/skill-row-cells.spec.ts",
+        "evolution-core::tests/skill-stats.spec.ts",
         "evolution-core::tests/skill-store-authority-lock.spec.ts",
         "evolution-core::tests/skill-store-boundary.spec.ts",
         "evolution-core::tests/skill-store-listing-failure.spec.ts",
@@ -1361,6 +1369,7 @@
         "evolution-ui::tests/settings-u6-danger-weight.client.spec.ts",
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
+        "evolution-ui::tests/skill-stats-parity.spec.ts",
         "memory::tests/memory.spec.ts",
         "memory::tests/tools/memory-interpolation-contract.spec.ts",
         "tool-skill-manage::tests/action-table.spec.ts"
@@ -1525,6 +1534,7 @@
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
+        "evolution-client-kit::tests/data-table.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/panel.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
@@ -1646,6 +1656,7 @@
         "evolution-core::tests/skill-model.spec.ts",
         "evolution-core::tests/skill-restructure.spec.ts",
         "evolution-core::tests/skill-row-cells.spec.ts",
+        "evolution-core::tests/skill-stats.spec.ts",
         "evolution-core::tests/skill-store-authority-lock.spec.ts",
         "evolution-core::tests/skill-store-boundary.spec.ts",
         "evolution-core::tests/skill-store-listing-failure.spec.ts",
@@ -1977,6 +1988,7 @@
         "evolution-ui::tests/settings-u6-danger-weight.client.spec.ts",
         "evolution-ui::tests/settings-u7-a11y.client.spec.ts",
         "evolution-ui::tests/settings-u8-glossary.spec.ts",
+        "evolution-ui::tests/skill-stats-parity.spec.ts",
         "memory::tests/files/memory-budget-surfaces.spec.ts",
         "memory::tests/files/memory-files-clamp.spec.ts",
         "memory::tests/files/provider.spec.ts",
@@ -2063,11 +2075,11 @@
   "counts": {
     "fast": {
       "gates": 62,
-      "specs": 104
+      "specs": 107
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 410
+      "specs": 413
     },
     "ci-only": {
       "gates": 10,
@@ -2075,16 +2087,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 410
+      "specs": 413
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 482
+      "specs": 485
     }
   },
   "specs": {
-    "total": 482,
-    "marked": 482,
+    "total": 485,
+    "marked": 485,
     "unmarked": 0
   }
 }

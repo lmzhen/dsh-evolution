@@ -100,7 +100,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
           type: 'button',
           className: 'evo-stats-skill-name',
           onClick: () => { face.openSkill(row.name) },
-        }, row.name, createElement('span', { className: 'evo-stats-skill-go', 'aria-hidden': 'true' }, '↗')),
+        }, row.name, createElement('span', { className: 'evo-stats-skill-go', 'aria-hidden': 'true' })),
         createElement('div', { className: 'evo-stats-skill-desc' }, row.description || '—')),
     },
     {
@@ -133,7 +133,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       createElement('div', { className: 'evo-stats-stat is-ok' }, createElement('span', null, face.t('stats.total.success')), createElement('b', null, totals?.successes === null || totals === undefined ? '—' : (totals.successes.offload + totals.successes.condense + totals.successes.extract).toLocaleString()))),
     createElement('div', { className: 'evo-stats-toolbar' },
       createElement('label', { className: 'evo-stats-search' },
-        createElement('span', { className: 'evo-stats-search-mark', 'aria-hidden': 'true' }, '⌕'),
+        createElement('span', { className: 'evo-stats-search-mark', 'aria-hidden': 'true' }),
         createElement('input', {
           value: query,
           onChange: (event: { target: { value: string } }) => { setQuery(event.target.value) },
@@ -187,6 +187,7 @@ export const STATS_CSS = [
   '.evo-stats-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
   '.evo-stats-search{display:flex;align-items:center;gap:7px;flex:1 1 240px;height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:9px;background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-tertiary,#9aa096)}',
   '.evo-stats-search-mark{font-size:16px}',
+  '.evo-stats-search-mark::before{content:"⌕"}',
   '.evo-stats-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--dsw-alias-label-primary,#20261f);font:inherit;font-size:12px}',
   '.evo-stats-filters{display:flex;gap:5px}',
   '.evo-stats-filter{height:32px;padding:0 11px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:8px;background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-secondary,#6f766d);font:inherit;font-size:11.5px;font-weight:600;cursor:pointer}',
@@ -200,6 +201,7 @@ export const STATS_CSS = [
   '.evo-stats-skill-name{align-self:flex-start;padding:0;border:0;background:transparent;color:var(--dsw-alias-label-primary,#20261f);font:inherit;font-size:12px;font-weight:650;text-align:left;cursor:pointer;border-bottom:1px solid transparent}',
   '.evo-stats-skill-name:hover{color:var(--evo-accent,#2f6b58);border-bottom-color:#bdd3c8}',
   '.evo-stats-skill-go{margin-left:4px;font-size:9px;color:var(--dsw-alias-label-tertiary,#9aa096);opacity:.65}',
+  '.evo-stats-skill-go::after{content:"↗"}',
   '.evo-stats-skill-desc{max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px}',
   '.evo-stats-pill{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:999px;font-size:10px;font-weight:650;white-space:nowrap}',
   '.evo-stats-pill.is-warn{background:#fbf0e7;color:#b26a3c}',
@@ -211,6 +213,7 @@ export const STATS_CSS = [
   '.evo-stats-empty strong{font-size:12px;font-weight:650;color:var(--dsw-alias-label-secondary,#6f766d)}',
   '@media (max-width:760px){.evo-stats-page{padding:16px}.evo-stats-hero{align-items:flex-start;flex-direction:column}.evo-stats-title{font-size:20px}}',
 ].join('')
+
 
 
 
