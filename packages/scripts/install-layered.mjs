@@ -572,6 +572,7 @@ export async function repairProfile(options = {}) {
   const nodeModulesPath = join(profileDir, 'node_modules')
   let movedNodeModules = false
   let installed = false
+  let pnpmStarted = false
   try {
     if (plan.hadNodeModules) {
       await rename(nodeModulesPath, join(backupDir, 'node_modules'))
@@ -603,6 +604,7 @@ export async function repairProfile(options = {}) {
       agentPresetRows: [],
       at: new Date().toISOString(),
     })
+    pnpmStarted = true
     execFileSync(invocation.file, invocation.args, {
       cwd: profileDir,
       stdio: 'inherit',
@@ -623,12 +625,19 @@ export async function repairProfile(options = {}) {
     }
   } catch (error) {
     // A failed pnpm run can leave a partial node_modules; remove it before
-    // restoring the exact pre-repair tree. The manifest/lock are restored from
+    // restoring the exact pre-repair tree. Only a tree this repair OWNS is
+    // removed: if the initial rename failed, the original tree is still at the
+    // live path and must not be deleted. The manifest/lock are restored from
     // the byte-for-byte backups written before any rename. A profile that had
     // no journal must not be left with the repair's journal after a rollback.
     try {
-      if (existsSync(nodeModulesPath)) await rm(nodeModulesPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-      if (movedNodeModules && existsSync(join(backupDir, 'node_modules'))) await rename(join(backupDir, 'node_modules'), nodeModulesPath)
+      if (movedNodeModules) {
+        if (existsSync(nodeModulesPath)) await rm(nodeModulesPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+        if (existsSync(join(backupDir, 'node_modules'))) await rename(join(backupDir, 'node_modules'), nodeModulesPath)
+      } else if (!plan.hadNodeModules && pnpmStarted) {
+        // No original tree existed, so anything here was created by pnpm.
+        if (existsSync(nodeModulesPath)) await rm(nodeModulesPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+      }
       await writeFile(manifestPath, originalManifest)
       if (hadLock) {
         await writeFile(lockPath, await readFile(join(backupDir, 'pnpm-lock.yaml'), 'utf8'))
