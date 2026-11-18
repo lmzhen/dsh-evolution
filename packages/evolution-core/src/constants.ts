@@ -141,6 +141,9 @@ export const DEFAULT_ARCHIVE_AFTER_DAYS = 90
 export const SUPPORT_SPRAWL_FILES = 60
 export const DEFAULT_MEMORY_CHAR_LIMIT = 2200
 export const DEFAULT_USER_CHAR_LIMIT = 1375
+/** Token budgets derived from the legacy character limits on the 2.75 basis. */
+export const DEFAULT_MEMORY_TOKENS = Math.round(DEFAULT_MEMORY_CHAR_LIMIT / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
+export const DEFAULT_USER_TOKENS = Math.round(DEFAULT_USER_CHAR_LIMIT / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
 /** Consolidation-failure backoff cap, shared by MemoryStore and memory-files' Config default. */
 export const DEFAULT_CONSOLIDATION_FAILURES = 3
 /** F-20 (v18): the authored-body budget and the hard ceiling are the same

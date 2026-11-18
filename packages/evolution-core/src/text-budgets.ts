@@ -12,15 +12,15 @@
 import {
   AUTHORING_DESCRIPTION_BAR,
   DEFAULT_SOFT_BODY_TOKENS,
+  DEFAULT_MEMORY_TOKENS,
+  DEFAULT_USER_TOKENS,
   DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS,
   DEFAULT_SUBSTANTIVE_MIN_USER_CHARS,
   MAX_DESCRIPTION_LENGTH,
   MAX_SKILL_CONTENT_CHARS,
   MAX_SKILL_FILE_BYTES,
   MAX_SKILL_NAME_LENGTH,
-  UPSTREAM_LIMIT_CHARS_PER_TOKEN,
 } from './constants.ts'
-import { DEFAULT_MEMORY_CHAR_LIMIT, DEFAULT_USER_CHAR_LIMIT } from './constants.ts'
 import { DEFAULT_SKILL_WRITE_SUMMARY_CHARS } from './skill-history.ts'
 import { measureText, type TextUnit, type TokenEstimator } from './text-metrics.ts'
 import { DRIFT_MAX_LINE_CHARS } from './drift-signals.ts'
@@ -52,8 +52,8 @@ export interface TextBudgetResult {
 export const SOFT_BODY_TOKENS = DEFAULT_SOFT_BODY_TOKENS
 
 /** The derived token budgets for the old character memory limits. */
-export const MEMORY_TOKENS = Math.round(DEFAULT_MEMORY_CHAR_LIMIT / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
-export const USER_TOKENS = Math.round(DEFAULT_USER_CHAR_LIMIT / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
+export const MEMORY_TOKENS = DEFAULT_MEMORY_TOKENS
+export const USER_TOKENS = DEFAULT_USER_TOKENS
 
 /**
  * The family's named budgets.
