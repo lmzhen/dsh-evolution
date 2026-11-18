@@ -11,7 +11,7 @@
 >
 > **不迁移**：没有磁盘数据格式变化；旧 usage/feedback 记录保持 null 语义；`SkillStatsRow` 的旧 `lastAt` 兼容字段在本版移除，host/客户端同步更新。
 >
-> **验证（本地，发布前）**：`evolution-core` + `evolution-ui` + `evolution-merge-ui` 52 files / 252 tests 绿；build 绿；真实 web `0.53.0` 1440/1024/390 验收 PASS，console 无 error；独立复核 GO（P1 清零，增量复核 GO）；pre-tag 64 pass / 0 fail / 3 registered cannotDecide；S1 45 rows / 29,312 bytes / reads 421,383,457ms，S2 owner 200/anonymous 401，S3 schema 2/facts 7/runtime 8/family 0.53.0，S4 2/2；20/20 tarball audit + packed install smoke 通过。CI 结果在发布后补入。
+> **验证（本地，发布前）**：`evolution-core` + `evolution-ui` + `evolution-merge-ui` 52 files / 252 tests 绿；build 绿；真实 web `0.53.0` 1440/1024/390 验收 PASS，console 无 error；独立复核 GO（P1 清零，增量复核 GO）；pre-tag 64 pass / 0 fail / 3 registered cannotDecide；S1 45 rows / 29,312 bytes / reads 421,383,457ms，S2 owner 200/anonymous 401，S3 schema 2/facts 7/runtime 8/family 0.53.0，S4 2/2；20/20 tarball audit + packed install smoke 通过。CI 主分支 `44288589331`、tag `44289678071` 全绿；20/20 npm 包为 0.53.0；独立 home `D:\dsh-homes\web0520` 从 npm 安装 0.53.0 并启动 web 3113。
 
 ## 0.52.0 (2026-11-18) — 技能整理 UI、数据总览、报错语义与工具面收敛
 
@@ -3431,5 +3431,6 @@ The review also verified the rest of the rc.42-44 surface: no `session.append('e
 - Preset now includes activity and feedback.
 - Full plugin family: memory, skills, review, policy, validator, state,
   approval, threat, curator, commands, graph, replay.
+
 
 
