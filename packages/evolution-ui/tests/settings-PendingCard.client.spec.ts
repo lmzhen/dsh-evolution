@@ -183,12 +183,12 @@ describe('the pending card', () => {
     await waitFor(() => { expect(screen.getByText(message('approvalEmpty'))).toBeDefined() })
   })
 
-  it('shows the host sentence when a decision is refused', async () => {
+  it('shows the localized refusal summary when a decision is refused', async () => {
     const approve = vi.fn(async () => ({ ok: false as const, failure: { kind: 'refused' as const, code: 'approval-refused', message: 'not in the pending window' } }))
     mount(face({ pending: windowStub([row()]), approve }))
     await waitFor(() => { expect(screen.getByText(message('approvalApprove'))).toBeDefined() })
     fireEvent.click(screen.getByText(message('approvalApprove')))
-    await waitFor(() => { expect(screen.getByText('not in the pending window')).toBeDefined() })
+    await waitFor(() => { expect(screen.getByText(message('approvalRefused'))).toBeDefined() })
   })
 
   it('C-11: two hunks keep their own rows (keys are scoped to the hunk)', async () => {

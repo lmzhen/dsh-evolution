@@ -172,7 +172,11 @@ export function PendingCard(props: PendingCardFace): ReactNode {
       const answer = action === 'approve' ? await api.approve(id) : action === 'reject' ? await api.reject(id) : await api.release(id)
       if (actionTickets.current.get(id) !== ticket) return
       if (!answer.ok) {
-        apply(current => noticed(endAction(current, id), failureText(answer.failure, translate)))
+        // A refused approve/reject/release is a normal race (handled, expired,
+        // disabled). The host sentence is a diagnostic; the operator sees the
+        // localized summary, not Chinese in the other seven locales.
+        const text = answer.failure.kind === 'refused' ? t('approvalRefused') : failureText(answer.failure, translate)
+        apply(current => noticed(endAction(current, id), text))
         return
       }
       apply(current => noticed(endAction(current, id), null))

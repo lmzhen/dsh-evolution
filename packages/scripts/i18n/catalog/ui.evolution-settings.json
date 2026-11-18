@@ -1261,6 +1261,16 @@
       "de": "1 Zeile entfernt",
       "pt": "1 linha removida",
       "ru": "Удалена 1 строка"
+    },
+    "approvalRefused": {
+      "zh": "这次操作没有被受理：记录可能已被处理，或等待已过期。",
+      "en": "The action was not accepted: the record may already be handled or the pending window expired.",
+      "ja": "操作は受け付けられませんでした。記録がすでに処理済みか、保留期限が切れている可能性があります。",
+      "es": "La acción no se aceptó: el registro puede estar ya gestionado o haber caducado.",
+      "fr": "L’action n’a pas été acceptée : l’enregistrement est peut-être déjà traité ou la fenêtre a expiré.",
+      "de": "Die Aktion wurde nicht angenommen: Der Eintrag ist eventuell bereits erledigt oder das Zeitfenster abgelaufen.",
+      "pt": "A ação não foi aceita: o registro pode já ter sido tratado ou a janela expirou.",
+      "ru": "Действие не принято: запись, возможно, уже обработана или срок ожидания истёк."
     }
   }
 }
