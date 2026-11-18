@@ -312,7 +312,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
           ? emptyState(face.t(skillsLoaded ? 'empty.skills' : 'loading'))
           : visible.length === 0
             ? emptyState(face.t('search.none'))
-            : visible.map(skill => skillLine(face, skill, skill.name === selected, () => { open(skill.name) }, healthByName.get(skill.name)))),
+            : visible.map(skill => skillLine(face, skill, skill.name === selected, () => { open(skill.name) }, healthByName.get(skill.name))))),
     createElement('div', { className: 'evo-hist-main' },
       panelHead(face, refresh, selected ?? face.t('bodyTitle'), selected),
       notice(noteText, noteError),
@@ -364,7 +364,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
           group(face.t('group.history'), model.older, undefined),
           model.support.length === 0 ? null : group(face.t('group.support'), model.support, face.t('group.support.note')),
           model.hasAny ? null : createElement('p', { className: 'evo-hist-hint' }, face.t('empty.versions')))
-        : null))))
+        : null)))
 }
 
 /**

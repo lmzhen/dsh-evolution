@@ -100,8 +100,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
           type: 'button',
           className: 'evo-stats-skill-name',
           onClick: () => { face.openSkill(row.name) },
-          title: face.t('stats.openSkill'),
-        }, row.name),
+        }, row.name, createElement('span', { className: 'evo-stats-skill-go', 'aria-hidden': 'true' }, '↗')),
         createElement('div', { className: 'evo-stats-skill-desc' }, row.description || '—')),
     },
     {
@@ -200,6 +199,7 @@ export const STATS_CSS = [
   '.evo-stats-skill{display:flex;flex-direction:column;gap:2px;min-width:220px}',
   '.evo-stats-skill-name{align-self:flex-start;padding:0;border:0;background:transparent;color:var(--dsw-alias-label-primary,#20261f);font:inherit;font-size:12px;font-weight:650;text-align:left;cursor:pointer;border-bottom:1px solid transparent}',
   '.evo-stats-skill-name:hover{color:var(--evo-accent,#2f6b58);border-bottom-color:#bdd3c8}',
+  '.evo-stats-skill-go{margin-left:4px;font-size:9px;color:var(--dsw-alias-label-tertiary,#9aa096);opacity:.65}',
   '.evo-stats-skill-desc{max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px}',
   '.evo-stats-pill{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:999px;font-size:10px;font-weight:650;white-space:nowrap}',
   '.evo-stats-pill.is-warn{background:#fbf0e7;color:#b26a3c}',

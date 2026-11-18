@@ -213,6 +213,18 @@ describe('skill-history panel: the state machine a renderer can see', () => {
   })
 
 
+  it('keeps the detail column a sibling of the list, not a child of the aside', async () => {
+    render(createElement(SkillHistoryPanel, makeFace()))
+    await screen.findByText('alpha')
+    const root = document.querySelector('.evo-hist-root')
+    const aside = document.querySelector('.evo-hist-aside')
+    const main = document.querySelector('.evo-hist-main')
+    expect(root).not.toBeNull()
+    expect(main?.parentElement).toBe(root)
+    expect(aside?.parentElement).toBe(root)
+    expect(aside?.contains(main)).toBe(false)
+  })
+
   it('S5-07 default view has no keyless sibling (React key warning)', async () => {
     const errors: string[] = []
     const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(' ')) })
