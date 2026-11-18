@@ -8,7 +8,7 @@ dsh-evolution 在 DeepSeek Harness 中增加三类能力：
 2. **技能**：Agent 可以创建、修补、整理技能；写入有门禁，审批可选。
 3. **自动化**：按配置复盘会话、整理技能库；技能合并由单独的 scan/pair 流程驱动。
 
-命令在会话内使用。技能历史工作台只在 all 安装形态 + Web/桌面 GUI 中提供；参数编辑在平台“设置 → 插件配置”。
+命令在会话内使用。技能整理工作台只在 all 安装形态 + Web/桌面 GUI 中提供；参数编辑在平台“设置 → 插件配置”。
 
 ## 2. 安装并验证
 
@@ -16,7 +16,7 @@ dsh-evolution 在 DeepSeek Harness 中增加三类能力：
 
 | 形态 | 适用场景 | 实际结果 |
 |---|---|---|
-| **all（默认）** | 大多数会话都需要完整工具 | 记忆/技能工具、技能历史工作台（历史/待批/合并/健康）、平台插件参数卡 |
+| **all（默认）** | 大多数会话都需要完整工具 | 记忆/技能工具、技能整理工作台（技能/数据总览/待我确认/合并建议）、平台插件参数卡 |
 | **host** | 只要后台整理，不给模型 memory/skill_manage | 整理和报告可用；自动复盘与用量统计不生效 |
 
 0.48 只保留 all/host 两种安装形态；旧的 one-click preset 与分层预设安装已移除，仅保留一个版本的卸载模式。
@@ -116,3 +116,4 @@ host 形态没有 `memory` / `skill_manage` 等家族模型行，复盘要求的
 - 设置与默认值：[configuration.md](configuration.md)
 - 模型和 API key：[api-keys.md](api-keys.md)
 - 故障排查：[troubleshooting.md](troubleshooting.md)
+

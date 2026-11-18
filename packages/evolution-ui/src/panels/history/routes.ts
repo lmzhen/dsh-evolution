@@ -56,7 +56,7 @@ export interface RouteServices {
 }
 
 /**
- * Build the six routes over the curator seam.
+ * Build the seven routes over the curator seam.
  * @param services - the host services the handlers read.
  * @param _audit - the registration audit (read routes record nothing; undo's decision stays the
  *   curator's own — W6 keeps the ledger to the approval surface).
@@ -302,3 +302,4 @@ export function makeSkillHistoryRoutes(services: RouteServices, _audit: Decision
     },
   ]
 }
+

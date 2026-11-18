@@ -26,8 +26,11 @@ function row(name: string, body: number | null, verdict: string, lastAt: string 
       hardCapHits: null,
       findings: 0,
     },
-    usage: { useCount: null, viewCount: null, patchCount: null, lastUsedAt: null, lastViewedAt: null, lastPatchedAt: null, state: null, pinned: null },
+    usage: { useCount: null, viewCount: null, viewCount30d: body, patchCount: null, lastUsedAt: null, lastViewedAt: null, lastPatchedAt: null, state: null, pinned: null },
     feedback: null,
+    feedback30d: body,
+    negativeFeedback30d: body === null ? null : 0,
+    feedbackRate30d: body,
   }
 }
 
@@ -39,7 +42,7 @@ const rows = [
 ]
 
 describe('browser stats model parity', () => {
-  const keys = ['name', 'verdict', 'bodyChars', 'supportFiles', 'versions', 'useCount', 'viewCount', 'feedback', 'lastAt'] as const
+  const keys = ['name', 'verdict', 'bodyChars', 'supportFiles', 'versions', 'useCount', 'viewCount', 'viewCount30d', 'feedback', 'feedback30d', 'negativeFeedback30d', 'feedbackRate30d', 'lastAt'] as const
   for (const key of keys) {
     for (const dir of ['asc', 'desc'] as const) {
       it(`orders ${key} ${dir} exactly like core`, () => {
@@ -57,3 +60,5 @@ describe('browser stats model parity', () => {
     expect(compareRows(rows[0]!, rows[3]!, 'bodyChars', 'desc')).toBeGreaterThan(0)
   })
 })
+
+

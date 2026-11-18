@@ -29,6 +29,9 @@ function row(name: string, bodyChars: number | null, overrides: Partial<SkillSta
     },
     usage: null,
     feedback: null,
+    feedback30d: null,
+    negativeFeedback30d: null,
+    feedbackRate30d: null,
     ...overrides,
   }
 }
@@ -93,3 +96,5 @@ describe('skill stats filters', () => {
     expect(filterSkillStats(rows, 'all')).toHaveLength(2)
   })
 })
+
+

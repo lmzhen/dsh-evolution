@@ -58,7 +58,7 @@ The full source layout reports<!-- gen:install-counts --> 20 packages installed 
 
 | Form | Use case | Capabilities and UI |
 |---|---|---|
-| `all` | Default product installation | Memory and skill tools in every session; evolution workbench (history/pending/merge/health) and the diagnostics card on Web/desktop GUI |
+| `all` | Default product installation | Memory and skill tools in every session; evolution workbench (skills/data overview/pending/merge suggestions) and the diagnostics card on Web/desktop GUI |
 | `host` | Advanced composition only | Infrastructure without the model memory/skill rows; not the product default |
 
 Use `all` for normal installs. The old `preset`, `agent` and layered install forms were removed in 0.48; their modes remain accepted only by `--uninstall` for one version. See [packages/INSTALL.md](packages/INSTALL.md) for exact session behavior and [INSTALL.md](INSTALL.md) for commands.
@@ -108,5 +108,6 @@ Published packages do not cross older prerelease platform lines. See [INSTALL.md
 - [Operations](docs/operations.md): backup, upgrade, uninstall and verification.
 - [Troubleshooting](docs/troubleshooting.md): symptom-based diagnosis.
 - Maintainer references: [package map and canonical facts](packages/README.md) and [development guide](docs/developer/development.md).
+
 
 

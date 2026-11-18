@@ -1,5 +1,5 @@
 /**
- * Host half of the skill-history surface: it mounts the six routes the sidebar panel reads and
+ * Host half of the skill-history surface: it mounts the seven routes the sidebar panel reads and
  * writes, and it owns nothing else.
  *
  * W6/G4: the carrier is the platform's Host connection data plane. `registerHostRoutes` waits on the
@@ -127,3 +127,4 @@ export function apply(ctx: Context): void {
     },
   }, audit))
 }
+
