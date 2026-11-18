@@ -26,10 +26,14 @@ export interface Config {
    * This is the only row key in 0.48; the store resolves
    * DEFAULT_MEMORY_CHAR_LIMIT when the row carries nothing. */
   memoryChars?: Volatile<number | undefined>
+  /** Opt-in token budgets; when present they win over the legacy char budgets. */
+  memoryTokens?: Volatile<number | undefined>
   /** Store-enforced character budget for USER.md — the CANONICAL registry id (G1),
    * a live row field on the same terms as `memoryChars`. G0/S0.3: `userCharLimit`
    * is migration/doctor input only. */
   userChars?: Volatile<number | undefined>
+  /** Opt-in USER.md token budget; when present it wins over `userChars`. */
+  userTokens?: Volatile<number | undefined>
   addDatePrefix?: Volatile<boolean>
   root?: string
   /** How many consolidation failures one turn tolerates before the tool tells the model to stop retrying. */
@@ -51,6 +55,8 @@ export const Config = z.object({
   // DEFAULT_MEMORY_CHAR_LIMIT / DEFAULT_USER_CHAR_LIMIT when the row carries nothing.
   memoryChars: z.number().min(1).volatile(),
   userChars: z.number().min(1).volatile(),
+  memoryTokens: z.number().min(1).volatile(),
+  userTokens: z.number().min(1).volatile(),
   addDatePrefix: z.boolean().default(false).volatile(),
   root: z.string().default(''),
   maxConsolidationFailures: z.number().min(1).default(DEFAULT_CONSOLIDATION_FAILURES).volatile(),
@@ -118,6 +124,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   const canonicalBudget = (id: 'memoryChars' | 'userChars'): number | undefined =>
     unwrapLive(id === 'memoryChars' ? rawConfig.memoryChars : rawConfig.userChars)
+  /** The explicitly configured opt-in token budget, if any. */
+  const canonicalTokenBudget = (id: 'memoryTokens' | 'userTokens'): number | undefined =>
+    unwrapLive(id === 'memoryTokens' ? rawConfig.memoryTokens : rawConfig.userTokens)
   /**
    * Whether the OPERATOR set this budget on THIS ROW (G0/S0.4 + G1). The canonical
    * key answers through its live reference — a user-layer value arrives the same
@@ -189,13 +198,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * @returns the current store, rebuilt when a resolved limit changed.
    */
   const currentStore = (): MemoryStore => {
-    const options: Required<Pick<MemoryStoreOptions, 'memoryCharLimit' | 'userCharLimit' | 'addDatePrefix' | 'maxConsolidationFailures'>> = {
+    const memoryTokenLimit = canonicalTokenBudget('memoryTokens')
+    const userTokenLimit = canonicalTokenBudget('userTokens')
+    const options: Pick<MemoryStoreOptions, 'memoryCharLimit' | 'userCharLimit' | 'memoryTokenLimit' | 'userTokenLimit' | 'addDatePrefix' | 'maxConsolidationFailures'> = {
       memoryCharLimit: memoryChars(),
       userCharLimit: userChars(),
+      ...(memoryTokenLimit === undefined ? {} : { memoryTokenLimit }),
+      ...(userTokenLimit === undefined ? {} : { userTokenLimit }),
       addDatePrefix: addDatePrefix(),
       maxConsolidationFailures: consolidationFailures(),
     }
-    const key = `${options.memoryCharLimit}|${options.userCharLimit}|${options.addDatePrefix}|${options.maxConsolidationFailures}`
+    const key = JSON.stringify(options)
     if (store !== undefined && key === storeKey) return store
     store = new MemoryStore({
       ...options,
@@ -261,8 +274,18 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.provide('evolutionMemoryBudget', {
     get memoryChars(): number { return memoryChars() },
     get userChars(): number { return userChars() },
+    get memoryTokens(): number | undefined { return canonicalTokenBudget('memoryTokens') },
+    get userTokens(): number | undefined { return canonicalTokenBudget('userTokens') },
     get memorySource(): string { return limitSource('memoryChars') },
     get userSource(): string { return limitSource('userChars') },
+    get memoryTokenSource(): string {
+      if (canonicalTokenBudget('memoryTokens') === undefined) return 'unset'
+      return userSetKeys(ctx, paramRowId('memory-files')).has('memoryTokens') ? 'user' : 'config'
+    },
+    get userTokenSource(): string {
+      if (canonicalTokenBudget('userTokens') === undefined) return 'unset'
+      return userSetKeys(ctx, paramRowId('memory-files')).has('userTokens') ? 'user' : 'config'
+    },
     get policyMemoryChars(): number | undefined { return policyBudget().memory },
     get policyUserChars(): number | undefined { return policyBudget().user },
   })

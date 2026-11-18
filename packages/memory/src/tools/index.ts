@@ -219,6 +219,8 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
     entries: string[]
     chars: number
     limit: number
+    tokens?: number
+    tokenLimit?: number
   }> {
     // V24-20a (v24): element-level shape guard on the DIRECT entry. The
     // approval replay runner calls executeCore with the STORED staged args
@@ -275,6 +277,8 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
       entries: result.entries.map(entry => entry.slice(0, previewChars())),
       chars: result.chars,
       limit: result.limit,
+      ...(result.tokens === undefined ? {} : { tokens: result.tokens }),
+      ...(result.tokenLimit === undefined ? {} : { tokenLimit: result.tokenLimit }),
     }
   }
 
@@ -343,10 +347,15 @@ export async function apply(ctx: Context, rawConfig: Config = {}): Promise<void>
             entries: { type: 'array', required: true, items: { type: 'string' } },
             chars: { type: 'integer', required: true },
             limit: { type: 'integer', required: true },
+            tokens: { type: 'integer' },
+            tokenLimit: { type: 'integer' },
             pending_id: { type: 'string' },
           },
         },
-        render: (_args, value) => [{ type: 'text', text: `${value.ok ? 'OK' : 'Error'}: ${value.message} (${value.chars}/${value.limit} chars)` }],
+        render: (_args, value) => [{
+          type: 'text',
+          text: `${value.ok ? 'OK' : 'Error'}: ${value.message} (${value.tokenLimit !== undefined ? `${value.tokens ?? 0}/${value.tokenLimit} tokens` : `${value.chars}/${value.limit} chars`})`,
+        }],
       },
       isConcurrencySafe: () => false,
       // F-06: `session` is optional in the exec contract too — the

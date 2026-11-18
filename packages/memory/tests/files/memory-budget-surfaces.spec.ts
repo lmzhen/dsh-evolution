@@ -70,6 +70,19 @@ describe('memory budget surfaces (S2-12③)', () => {
     expect(budget.memoryChars).toBe(2200)
   })
 
+  it('an opt-in token budget is used by the store and published on the budget surface', async () => {
+    const ctx = await context()
+    await ctx.plugin(MemoryFiles, { root: await tempRoot('dsh-memory-token-budget-'), memoryTokens: 8 })
+    const budget = budgetOf(ctx) as unknown as Budget & { memoryTokens?: number; memoryTokenSource?: string }
+    expect(budget.memoryTokens).toBe(8)
+    expect(budget.memoryTokenSource).toBe('config')
+    const first = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: '中'.repeat(8) }])
+    expect(first).toMatchObject({ ok: true, tokens: 8, tokenLimit: 8, limit: 8 })
+    const over = await ctx.memory.applyBatch('memory', [{ action: 'add', facts: '中' }])
+    expect(over.ok).toBe(false)
+    expect(over.message).toContain('tokens')
+  })
+
   it('an EXPLICIT limit wins, and contradicting the policy warns once', async () => {
     const ctx = await context({ memoryChars: 2200, userChars: 1375 })
     // The spy must exist BEFORE the row mounts: the contradiction is reported

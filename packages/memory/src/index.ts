@@ -33,6 +33,10 @@ export interface MemoryApplyResult {
   entries: string[]
   chars: number
   limit: number
+  /** Estimated tokens for the same entries; present on token-aware providers. */
+  tokens?: number
+  /** Token budget when the provider runs token mode; absent for legacy char mode. */
+  tokenLimit?: number
 }
 
 /** Fired after ANY successful memory write (P2 fix): the snapshot refresh
