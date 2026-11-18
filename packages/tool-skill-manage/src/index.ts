@@ -20,14 +20,14 @@
 
 import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
-import { currentReviewContext, skillWriteGateContext, protectedSkillNamesOf, authorityFrom, compareTextBudget, TEXT_BUDGETS } from '@deepseek-ai/dsh-evolution-core'
+import { currentReviewContext, skillWriteGateContext, protectedSkillNamesOf, authorityFrom, compareTextBudget, measureUnit, TEXT_BUDGETS } from '@deepseek-ai/dsh-evolution-core'
 import { effectiveSessionPolicy, type ApprovalLike, type PreviewAnswer, type WritePreview } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
 import { defineTool, registerEvolutionTool, skillsPort, type SystemPromptPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { Agent } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, computeDedupGroups, nearDuplicateSummaries, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
-import { DEFAULT_HEALTH_THRESHOLDS, DEFAULT_SKILL_WRITE_SUMMARY_CHARS, newSkillLibrary, normalizeChangeSummary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type ChangeSummary, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
+import { DEFAULT_SKILL_WRITE_SUMMARY_CHARS, newSkillLibrary, normalizeChangeSummary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type ChangeSummary, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fuzzyPatch } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
@@ -1080,8 +1080,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (result.ok) {
       if (name !== undefined && name !== '' && (action === 'create' || action === 'update' || action === 'patch')) {
         const body = action === 'create' ? (args.content ?? null) : await library.read(name)
-        if (body !== null && body.length > DEFAULT_HEALTH_THRESHOLDS.softBodyChars) {
-          feedbackLines.push(`正文 ${body.length} 字符，超过 ${DEFAULT_HEALTH_THRESHOLDS.softBodyChars} 字符软线；保持不改是合法的。`)
+        const bodyTokens = body === null ? null : measureUnit(body, 'tokens')
+        if (bodyTokens !== null && bodyTokens > TEXT_BUDGETS.bodySoft.limit) {
+          feedbackLines.push(`正文约 ${bodyTokens} tokens，超过 ${TEXT_BUDGETS.bodySoft.limit} tokens 软线；保持不改是合法的。`)
         }
       }
       // 0.3.11: the write point auto-quoted unquoted YAML-unsafe frontmatter
@@ -1235,11 +1236,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const sizedLines = lines.map((line, index) => {
       const body = contents.get(list[index]?.name ?? '')
       if (body === undefined) return line
-      const oversize = body.length >= DEFAULT_HEALTH_THRESHOLDS.softBodyChars ? ' [oversize]' : ''
+      const oversize = measureUnit(body, 'tokens') >= TEXT_BUDGETS.bodySoft.limit ? ' [oversize]' : ''
       return `${line} chars:${body.length}${oversize}`
     })
     const oversizeNames = list
-      .filter(summary => (contents.get(summary.name)?.length ?? 0) >= DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
+      .filter(summary => measureUnit(contents.get(summary.name) ?? '', 'tokens') >= TEXT_BUDGETS.bodySoft.limit)
       .map(summary => summary.name)
     const oversizeLine = oversizeNames.length === 0
       ? ''

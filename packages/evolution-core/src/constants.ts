@@ -97,6 +97,11 @@ export const AUTHORING_SPLIT_LINE_CHARS = 20_000
  * be converted with. */
 export const UPSTREAM_LIMIT_CHARS_PER_TOKEN = 2.75
 
+/** Default soft body budget in tokens: the upstream 20k-character authoring line
+ * converted on the documented 2.75 chars/token basis. Judged as a fixed token
+ * budget, not as a per-body character line (see text-metrics). */
+export const DEFAULT_SOFT_BODY_TOKENS = Math.round(AUTHORING_SPLIT_LINE_CHARS / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
+
 /** The platform's own estimate basis: \`CHARS_PER_TOKEN = 4\` in
  * \`@deepseek-ai/dsh-token-meter/estimate.ts\` (its comment reads "used until exact
  * tokenization is needed"), matching upstream's ESTIMATE-side heuristic — "~4

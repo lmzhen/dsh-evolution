@@ -11,7 +11,7 @@
 
 import {
   AUTHORING_DESCRIPTION_BAR,
-  AUTHORING_SPLIT_LINE_CHARS,
+  DEFAULT_SOFT_BODY_TOKENS,
   DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS,
   DEFAULT_SUBSTANTIVE_MIN_USER_CHARS,
   MAX_DESCRIPTION_LENGTH,
@@ -48,8 +48,8 @@ export interface TextBudgetResult {
   readonly remaining: number
 }
 
-/** The derived token line for the old 20k-character authoring band. */
-export const SOFT_BODY_TOKENS = Math.round(AUTHORING_SPLIT_LINE_CHARS / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
+/** The default soft body token budget. */
+export const SOFT_BODY_TOKENS = DEFAULT_SOFT_BODY_TOKENS
 
 /** The derived token budgets for the old character memory limits. */
 export const MEMORY_TOKENS = Math.round(DEFAULT_MEMORY_CHAR_LIMIT / UPSTREAM_LIMIT_CHARS_PER_TOKEN)

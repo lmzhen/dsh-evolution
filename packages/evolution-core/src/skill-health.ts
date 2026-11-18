@@ -10,16 +10,17 @@
  * `computeQualityScores` (different dimension, different consumers).
  */
 
-import { AUTHORING_SPLIT_LINE_CHARS, UPSTREAM_LIMIT_CHARS_PER_TOKEN } from './constants.ts'
-import { bodyCost, tokenLineFor } from './cost.ts'
+import { DEFAULT_SOFT_BODY_TOKENS, UPSTREAM_LIMIT_CHARS_PER_TOKEN } from './constants.ts'
+import { measureText } from './text-metrics.ts'
 import { type LintFinding, lintSkill } from './skill-lint.ts'
 
 export interface SkillHealthThresholds {
-  /** Soft body limit: a body of `softBodyChars` or MORE -> 'warn'; >= 2x ->
-   * 'needs-restructure'. V6-34 (0.3.37): the doc comment used to claim
-   * "at/below stay healthy" while the engine warns at `>=` — fixed to the
-   * implementation edge (the reason copy said "above"). */
-  softBodyChars: number
+  /** Fixed soft body budget in tokens: a body at/above it -> 'warn'; 2x ->
+   * 'needs-restructure'. This is the judged quantity. */
+  softBodyTokens?: number
+  /** Deprecated legacy character line. Used only when `softBodyTokens` is absent,
+   * converted on the documented UPSTREAM basis; never a per-body token line. */
+  softBodyChars?: number
   /** Stamp-density ceiling per KB of body text: rc.NN / commit shas / ISO
    * dates per KB at/above this -> 'warn' (log-like content living in the
    * body — the "invalid info" indicator). */
@@ -32,17 +33,20 @@ export interface SkillHealthThresholds {
 }
 
 export const DEFAULT_HEALTH_THRESHOLDS: SkillHealthThresholds = {
-  // V6: the number is the UPSTREAM line itself (20k characters — "if you're
-  // pushing past 20k, split into references/*.md"). The previous 40k was twice
-  // that line, which is why a body could sit at 2x the authoring discipline and
-  // still read as merely "warn". The JUDGMENT happens in tokens (see
-  // assessStructureHealth): the line is converted per body composition, so the
-  // textual trigger stays exactly "20k characters" while every reported number is
-  // a token count.
-  softBodyChars: AUTHORING_SPLIT_LINE_CHARS,
+  // V6: the number was the UPSTREAM 20k-character authoring line. The judgment
+  // is now a fixed token budget derived from that line; the character field stays
+  // as a deprecated migration input only.
+  softBodyTokens: DEFAULT_SOFT_BODY_TOKENS,
   stampDensityPerKb: 2,
   churnMinPatches: 20,
   hardCapMinHits: 3,
+}
+
+/** Resolve the judged soft-body token budget, accepting the legacy character line. */
+export function softBodyTokenBudget(thresholds: SkillHealthThresholds): number {
+  if (thresholds.softBodyTokens !== undefined) return thresholds.softBodyTokens
+  if (thresholds.softBodyChars !== undefined) return Math.round(thresholds.softBodyChars / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
+  return DEFAULT_SOFT_BODY_TOKENS
 }
 
 /**
@@ -191,26 +195,21 @@ export function assessStructureHealth(
     churnReads: null,
     hardCapHits: snapshot.hardCapHits ?? null,
   }
-  // V6: the JUDGMENT runs on the token scale. The configured number stays the
-  // borrowed UPSTREAM character line, converted per body composition, so the
-  // textual trigger is unchanged while every reported number is a token count.
+  // V6: the JUDGMENT runs on a FIXED token budget. A legacy character line is
+  // converted once on the documented UPSTREAM basis; it is not re-converted per
+  // body composition (that would preserve the character edge and defeat the point).
   // Without body text the token scale is unavailable — the character line then
   // decides, because an absent measurement must never read as a pass.
   const text = snapshot.bodyText
   const hasText = typeof text === 'string' && text.length > 0
-  const cost = hasText ? bodyCost(text) : null
-  const lineTokens = cost === null ? null : tokenLineFor(thresholds.softBodyChars, cost)
-  dims.bodyTokens = cost === null
+  const tokenBudget = softBodyTokenBudget(thresholds)
+  dims.bodyTokens = hasText
+    ? measureText(text).tokens.value
     // No text: no composition to weigh, so the LIMIT basis is the only honest
-    // conversion — the estimate range would need a CJK/ASCII split we do not have.
-    ? Math.round(snapshot.bodyChars / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
-    : cost.tokens
-  const overLine = cost === null || lineTokens === null
-    ? snapshot.bodyChars >= thresholds.softBodyChars
-    : cost.tokens >= lineTokens
-  const overTwice = cost === null || lineTokens === null
-    ? snapshot.bodyChars >= thresholds.softBodyChars * 2
-    : cost.tokens >= lineTokens * 2
+    // conversion — the estimate range would need a script split we do not have.
+    : Math.round(snapshot.bodyChars / UPSTREAM_LIMIT_CHARS_PER_TOKEN)
+  const overLine = dims.bodyTokens >= tokenBudget
+  const overTwice = dims.bodyTokens >= tokenBudget * 2
   // G2 ③: the over-line judgement is now expressed as `findings` (see the RULES table in skill-lint);
   // the free-text copy that used to live here is gone, and `overLine`/`overTwice` feed the facts above.
   if (snapshot.bodyText && snapshot.bodyChars >= MIN_STAMP_BODY_CHARS) {
@@ -228,7 +227,7 @@ export function assessStructureHealth(
   const findings = lintSkill({
     skillName: snapshot.skillName,
     dims,
-    softLineChars: thresholds.softBodyChars,
+    softLineTokens: tokenBudget,
     overSoftLine: overLine,
     overTwiceSoftLine: overTwice,
     stampLimitPerKb: thresholds.stampDensityPerKb,

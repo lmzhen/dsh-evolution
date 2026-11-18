@@ -1,5 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
+import { AUTHORING_SPLIT_LINE_CHARS } from '@deepseek-ai/dsh-evolution-core'
 import { assessStructureHealth, DEFAULT_HEALTH_THRESHOLDS, HEALTH_STAMP_RE } from '@deepseek-ai/dsh-evolution-core/skills'
 
 it('a small dense body with support files is healthy', () => {
@@ -13,28 +14,28 @@ it('a small dense body with support files is healthy', () => {
   expect(assessment.findings).toEqual([])
 })
 
-it('judges the borrowed char line on the token scale (V6)', () => {
-  // No body text: the character line decides (an absent measurement is never a pass).
-  const blind = assessStructureHealth({ skillName: 'b', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars + 1, supportGroups: 1 })
+it('judges a FIXED token budget, not a per-body character line (V6)', () => {
+  // No body text: the character line is converted once on the documented basis
+  // (an absent measurement is never a pass).
+  const blind = assessStructureHealth({ skillName: 'b', bodyChars: AUTHORING_SPLIT_LINE_CHARS + 1, supportGroups: 1 })
   expect(blind.verdict).toBe('warn')
   expect(blind.findings.map(f => f.rule)).toContain('body-oversize')
-  const blindNeeds = assessStructureHealth({ skillName: 'bn', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars * 2, supportGroups: 1 })
+  const blindNeeds = assessStructureHealth({ skillName: 'bn', bodyChars: AUTHORING_SPLIT_LINE_CHARS * 2 + 10, supportGroups: 1 })
   expect(blindNeeds.verdict).toBe('needs-restructure')
   expect(blindNeeds.findings.map(f => f.rule)).toContain('body-oversize-2x')
-  // With body text the judgment runs in tokens against the per-body line; the two
-  // scripts sit on their OWN line at 20k characters, which is the upstream trigger.
-  const cjkAt = '中'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
-  const cjkUnder = '中'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars - 10)
-  const asciiAt = 'a'.repeat(DEFAULT_HEALTH_THRESHOLDS.softBodyChars)
+
+  // The budget is one token line for every script: 20k CJK chars are ~20k tokens
+  // (over), while 20k ASCII chars are ~6.7k tokens (under); ASCII crosses at ~21.8k.
+  const cjkAt = '中'.repeat(AUTHORING_SPLIT_LINE_CHARS)
+  const cjkUnder = '中'.repeat(7_000)
+  const asciiAt = 'a'.repeat(AUTHORING_SPLIT_LINE_CHARS)
+  const asciiOver = 'a'.repeat(22_000)
   const atCjk = assessStructureHealth({ skillName: 'c', bodyChars: cjkAt.length, bodyText: cjkAt, supportGroups: 1 })
-  // G2 ③: the token-scale evidence used to ride on the reason TEXT. It now has to be an explicit
-  // dimension assertion, or deleting `reasons` would quietly drop the invariant it protected.
   const asciiSame = assessStructureHealth({ skillName: 'ax', bodyChars: asciiAt.length, bodyText: asciiAt, supportGroups: 1 })
   expect(atCjk.dims.bodyTokens).toBeGreaterThan(asciiSame.dims.bodyTokens)
   expect(assessStructureHealth({ skillName: 'cu', bodyChars: cjkUnder.length, bodyText: cjkUnder, supportGroups: 1 }).verdict).toBe('healthy')
-  // Same character count, other script: it is at its OWN token line, so it is flagged too —
-  // the token-scale evidence now lives on the dims assertion above (L32), not in reason text.
-  expect(assessStructureHealth({ skillName: 'a', bodyChars: asciiAt.length, bodyText: asciiAt, supportGroups: 1 }).verdict).toBe('warn')
+  expect(assessStructureHealth({ skillName: 'a', bodyChars: asciiAt.length, bodyText: asciiAt, supportGroups: 1 }).verdict).toBe('healthy')
+  expect(assessStructureHealth({ skillName: 'ao', bodyChars: asciiOver.length, bodyText: asciiOver, supportGroups: 1 }).verdict).toBe('warn')
 })
 
 it('stamp density flags log-like content in a large body', () => {
@@ -66,16 +67,19 @@ it('short bodies skip stamp density — a few dates are ordinary documentation (
 })
 
 it('a large body with no support groups is flagged as scatter', () => {
-  const assessment = assessStructureHealth({ skillName: 's', bodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars / 2, supportGroups: 0 })
+  const assessment = assessStructureHealth({ skillName: 's', bodyChars: AUTHORING_SPLIT_LINE_CHARS, supportGroups: 0 })
   expect(assessment.verdict).toBe('warn')
   expect(assessment.findings.map(f => f.rule)).toContain('body-without-support')
 })
 
-it('custom thresholds drive the same rules', () => {
-  // E3 (v15): explicit all-fields literal — SkillHealthThresholds requires
-  // churnMinPatches; the old two-field literal only compiled because test
-  // type-coverage let it slip.
-  const assessment = assessStructureHealth({ skillName: 't', bodyChars: 2_500, supportGroups: 0 }, { ...DEFAULT_HEALTH_THRESHOLDS, softBodyChars: 1_000, stampDensityPerKb: 5, churnMinPatches: DEFAULT_HEALTH_THRESHOLDS.churnMinPatches })
+it('custom token thresholds drive the same rules', () => {
+  const assessment = assessStructureHealth({ skillName: 't', bodyChars: 2_500, supportGroups: 0 }, { ...DEFAULT_HEALTH_THRESHOLDS, softBodyTokens: 400, stampDensityPerKb: 5 })
+  expect(assessment.verdict).toBe('needs-restructure')
+})
+
+it('a legacy character threshold is converted once, not per body composition', () => {
+  const thresholds = { softBodyChars: 1_000, stampDensityPerKb: 2, churnMinPatches: 20, hardCapMinHits: 3 }
+  const assessment = assessStructureHealth({ skillName: 'legacy', bodyChars: 2_500, supportGroups: 0 }, thresholds)
   expect(assessment.verdict).toBe('needs-restructure')
 })
 

@@ -1,7 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { AUTHORING_SPLIT_LINE_CHARS, UPSTREAM_LIMIT_CHARS_PER_TOKEN, bodyCost, tokenLineFor, COST_ASCII_TOKEN_HIGH, COST_ASCII_TOKEN_LOW, COST_CJK_TOKEN_HIGH, COST_CJK_TOKEN_LOW } from '@deepseek-ai/dsh-evolution-core'
-import { DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core/skills'
+import { AUTHORING_SPLIT_LINE_CHARS, DEFAULT_SOFT_BODY_TOKENS, UPSTREAM_LIMIT_CHARS_PER_TOKEN, bodyCost, tokenLineFor, COST_ASCII_TOKEN_HIGH, COST_ASCII_TOKEN_LOW, COST_CJK_TOKEN_HIGH, COST_CJK_TOKEN_LOW } from '@deepseek-ai/dsh-evolution-core'
+import { DEFAULT_HEALTH_THRESHOLDS, softBodyTokenBudget } from '@deepseek-ai/dsh-evolution-core/skills'
 
 // Every expectation is stated on the ON-DISK form: the accounting basis appends
 // one trailing newline, the same measure `maxSkillContentChars` bounds.
@@ -33,7 +33,7 @@ describe('bodyCost (design §5.2)', () => {
   it('borrows the upstream split line as the threshold, and judges it in tokens (V6)', () => {
     // The configured number IS upstream's line (20k characters) — no unit drift in
     // config; the judgment converts it per body composition.
-    expect(DEFAULT_HEALTH_THRESHOLDS.softBodyChars).toBe(AUTHORING_SPLIT_LINE_CHARS)
+    expect(softBodyTokenBudget(DEFAULT_HEALTH_THRESHOLDS)).toBe(DEFAULT_SOFT_BODY_TOKENS)
     const ascii = bodyCost('a'.repeat(AUTHORING_SPLIT_LINE_CHARS))
     const cjk = bodyCost('中'.repeat(AUTHORING_SPLIT_LINE_CHARS))
     // A 20k-character body of EITHER script sits exactly on its own line: the

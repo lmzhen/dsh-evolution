@@ -44,7 +44,7 @@ export interface SkillDims {
 export interface LintFacts {
   skillName: string
   dims: SkillDims
-  softLineChars: number
+  softLineTokens: number
   overSoftLine: boolean
   overTwiceSoftLine: boolean
   stampLimitPerKb: number
@@ -79,7 +79,7 @@ export const RULES: readonly LintRule[] = [
     severity: 'error',
     run: facts =>
       facts.overTwiceSoftLine
-        ? { severity: 'error', rule: 'body-oversize-2x', message: msg([facts.skillName, ': body is at or past twice the soft line (', facts.softLineChars, ' chars); keeping the current skill is valid']), count: 1 }
+        ? { severity: 'error', rule: 'body-oversize-2x', message: msg([facts.skillName, ': body is at or past twice the soft line (', facts.softLineTokens, ' tokens); keeping the current skill is valid']), count: 1 }
         : null,
   },
   {
@@ -87,7 +87,7 @@ export const RULES: readonly LintRule[] = [
     severity: 'warn',
     run: facts =>
       !facts.overTwiceSoftLine && facts.overSoftLine
-        ? { severity: 'warn', rule: 'body-oversize', message: msg([facts.skillName, ': body is at or above the soft line (', facts.softLineChars, ' chars); keep is valid — size alone does not require a split']), count: 1 }
+        ? { severity: 'warn', rule: 'body-oversize', message: msg([facts.skillName, ': body is at or above the soft line (', facts.softLineTokens, ' tokens); keep is valid — size alone does not require a split']), count: 1 }
         : null,
   },
   {
@@ -104,8 +104,8 @@ export const RULES: readonly LintRule[] = [
     id: 'body-without-support',
     severity: 'warn',
     run: facts =>
-      facts.dims.supportGroups === 0 && facts.dims.bodyChars !== null && facts.dims.bodyChars >= facts.softLineChars / 2
-        ? { severity: 'warn', rule: 'body-without-support', message: msg([facts.skillName, ': large body (', facts.dims.bodyChars, ' chars) with NO support files']), count: 1 }
+      facts.dims.supportGroups === 0 && facts.dims.bodyTokens !== null && facts.dims.bodyTokens >= facts.softLineTokens / 2
+        ? { severity: 'warn', rule: 'body-without-support', message: msg([facts.skillName, ': large body (', facts.dims.bodyTokens, ' tokens) with NO support files']), count: 1 }
         : null,
   },
   {

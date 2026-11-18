@@ -21,7 +21,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import z from '@deepseek-ai/schemastery'
-import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, SKILL_NAME_RE, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS } from '@deepseek-ai/dsh-evolution-core'
+import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, SKILL_NAME_RE, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, AUTHORING_SPLIT_LINE_CHARS } from '@deepseek-ai/dsh-evolution-core'
 import { relatedSkillNames } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
@@ -47,7 +47,7 @@ import { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core/skills'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillActionResult } from '@deepseek-ai/dsh-evolution-core/skills'
-import { DEFAULT_HEALTH_THRESHOLDS } from '@deepseek-ai/dsh-evolution-core/skills'
+import { DEFAULT_HEALTH_THRESHOLDS, softBodyTokenBudget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { INSTANCE_KEYS, HomeAuthority, claimInstance, contentHash, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { entryTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -305,7 +305,7 @@ export class EvolutionCurator extends Service {
     bootGraceSeconds: z.number().min(0).default(DEFAULT_CURATOR_BOOT_GRACE_SECONDS),
     curatorReviewMaxTokens: z.number().min(1).default(DEFAULT_CURATOR_REVIEW_MAX_TOKENS).volatile(),
     curatorReviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_CURATOR_REVIEW_TIMEOUT_MS).volatile(),
-    healthSoftBodyChars: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.softBodyChars).volatile(),
+    healthSoftBodyChars: z.number().min(1).default(AUTHORING_SPLIT_LINE_CHARS).volatile(),
     healthStampDensityPerKb: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb).volatile(),
     healthChurnMinPatches: z.number().min(1).default(DEFAULT_HEALTH_THRESHOLDS.churnMinPatches).volatile(),
   })
@@ -552,7 +552,7 @@ export class EvolutionCurator extends Service {
       llmReview: this.rowBoolean('llmReview', false),
       curatorReviewMaxTokens: number('curatorReviewMaxTokens', DEFAULT_CURATOR_REVIEW_MAX_TOKENS, 1),
       curatorReviewTimeoutMs: number('curatorReviewTimeoutMs', DEFAULT_CURATOR_REVIEW_TIMEOUT_MS, 1, MAX_TIMER_DELAY_MS),
-      healthSoftBodyChars: number('healthSoftBodyChars', DEFAULT_HEALTH_THRESHOLDS.softBodyChars, 1),
+      healthSoftBodyChars: number('healthSoftBodyChars', AUTHORING_SPLIT_LINE_CHARS, 1),
       healthStampDensityPerKb: number('healthStampDensityPerKb', DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb, 1),
       healthChurnMinPatches: number('healthChurnMinPatches', DEFAULT_HEALTH_THRESHOLDS.churnMinPatches, 1),
     }
@@ -2133,7 +2133,7 @@ export class EvolutionCurator extends Service {
           churnReads: null,
           hardCapHits: null,
         },
-        softLineChars: thresholds.softBodyChars,
+        softLineTokens: softBodyTokenBudget(thresholds),
         overSoftLine: false,
         overTwiceSoftLine: false,
         stampLimitPerKb: thresholds.stampDensityPerKb,

@@ -618,7 +618,7 @@ Existing.
     await ctx.fiber.dispose()
   })
 
-  it('S1: a >20k write gets one neutral size fact, a 19k write does not', async () => {
+  it('S1: a write over the token soft line gets one neutral size fact, a smaller one does not', async () => {
     const { ctx, root, previousHome } = await setup()
     const execute = (arguments_: Record<string, unknown>) => executeOne(ctx, {
       callId: ToolCallId('s1-' + Math.random()),
@@ -628,10 +628,10 @@ Existing.
       signal: new AbortController().signal,
     })
     const skill = (name: string, chars: number) => '---\nname: ' + name + '\ndescription: size fixture.\n---\n\n' + 'x'.repeat(chars)
-    const big = await execute({ action: 'create', name: 'big-write', content: skill('big-write', 20_500) })
+    const big = await execute({ action: 'create', name: 'big-write', content: skill('big-write', 22_500) })
     expect((big.value as { ok?: boolean } | undefined)?.ok).toBe(true)
     expect((big.value as { message?: string } | undefined)?.message ?? '').toContain('保持不改是合法的')
-    const small = await execute({ action: 'create', name: 'small-write', content: skill('small-write', 18_000) })
+    const small = await execute({ action: 'create', name: 'small-write', content: skill('small-write', 21_000) })
     expect((small.value as { ok?: boolean } | undefined)?.ok).toBe(true)
     expect((small.value as { message?: string } | undefined)?.message ?? '').not.toContain('保持不改是合法的')
     await ctx.fiber.dispose()

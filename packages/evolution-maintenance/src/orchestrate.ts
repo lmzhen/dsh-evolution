@@ -124,7 +124,7 @@ export function renderMaintainTemplate(
 function thresholdNoun(id: string): string {
   if (id === 'stamp_density') return `${DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb}/KB`
   if (id === 'description_chars') return `${AUTHORING_DESCRIPTION_BAR}`
-  if (id === 'body_size') return `${DEFAULT_HEALTH_THRESHOLDS.softBodyChars}`
+  if (id === 'body_size') return `${DEFAULT_HEALTH_THRESHOLDS.softBodyTokens}`
   if (id === 'overlong_line') return `${DRIFT_MAX_LINE_CHARS}`
   return `(阈 ${id})`
 }
@@ -137,7 +137,7 @@ function jointSignature(template: string, signalsVersion: string): string {
     thresholds: {
       stampDensityPerKb: DEFAULT_HEALTH_THRESHOLDS.stampDensityPerKb,
       minStampBodyChars: MIN_STAMP_BODY_CHARS,
-      softBodyChars: DEFAULT_HEALTH_THRESHOLDS.softBodyChars,
+      softBodyTokens: DEFAULT_HEALTH_THRESHOLDS.softBodyTokens,
       descriptionChars: AUTHORING_DESCRIPTION_BAR,
       qualityLow: LOW_QUALITY_THRESHOLD,
       maxLineChars: DRIFT_MAX_LINE_CHARS,

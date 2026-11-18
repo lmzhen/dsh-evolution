@@ -21,7 +21,7 @@ const facts = (over: Partial<LintFacts> = {}): LintFacts => ({
     churnReads: null,
   },
   hardCapMinHits: 0,
-  softLineChars: 24_000,
+  softLineTokens: 8_727,
   overSoftLine: false,
   overTwiceSoftLine: false,
   stampLimitPerKb: 1,
