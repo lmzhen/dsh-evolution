@@ -38,7 +38,7 @@ export function SkillList(props: SkillListProps): ReactNode {
   useEffect(() => {
     const current = listRef.current?.querySelector<HTMLElement>('[aria-current="true"]')
     if (current !== null && current !== undefined && typeof current.scrollIntoView === 'function') {
-      current.scrollIntoView({ block: 'center' })
+      current.scrollIntoView({ block: 'nearest' })
     }
   }, [props.selected, props.visible])
   return createElement('aside', { className: 'evo-hist-aside' },

@@ -122,7 +122,7 @@ describe('history workbench', () => {
     second.unmount()
   })
 
-  it('opens the data overview, navigates a name into history and returns with fresh error counts', async () => {
+  it('opens the data overview, navigates a name into history and updates counts only on explicit refresh', async () => {
     let errorCount = 0
     const loadStats = vi.fn(async () => ({
       rows: [{
@@ -170,6 +170,12 @@ describe('history workbench', () => {
     fireEvent.click(document.querySelector('.evo-stats-skill-name')!)
     await waitFor(() => { expect(document.getElementById('evo-workbench-tab-history')?.getAttribute('aria-selected')).toBe('true') })
     expect(document.querySelector('.evo-workbench-back')).not.toBeNull()
+    // Opening a skill must not trigger a library-wide scan. An explicit refresh is the only action
+    // that asks the shared stats resource for a newer snapshot.
+    expect(loadStats).toHaveBeenCalledTimes(1)
+    await waitFor(() => { expect(document.querySelector('.evo-hist-button')).not.toBeNull() })
+    fireEvent.click(document.querySelector('.evo-hist-button')!)
+    await waitFor(() => { expect(loadStats).toHaveBeenCalledTimes(2) })
     fireEvent.click(document.querySelector('.evo-workbench-back')!)
     await waitFor(() => { expect(document.getElementById('evo-workbench-tab-data')?.getAttribute('aria-selected')).toBe('true') })
     expect(document.querySelector('.evo-stats-skill-name')?.textContent).toContain('alpha')

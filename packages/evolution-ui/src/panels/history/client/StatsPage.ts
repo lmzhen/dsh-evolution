@@ -6,7 +6,7 @@
  * itself mutates nothing.
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
-import { createElement, useEffect, useMemo, useState } from 'react'
+import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import { DataTable, DATA_TABLE_CSS, type DataTableColumn } from '@lmzhen/dsh-evolution-client-kit'
 import type { SkillStatsFilter, SkillStatsRow, SkillStatsSnapshot, SkillStatsSortKey } from '@deepseek-ai/dsh-evolution-core/skills'
 import { filterRows, sortRows } from './table-model.ts'
@@ -55,6 +55,7 @@ const SORT_OPTIONS: readonly { readonly key: SkillStatsSortKey; readonly label: 
 export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
   const layout = face.layout
+  const tableRef = useRef<HTMLDivElement | null>(null)
   const hiddenInMedium = new Set(['supportFiles', 'versions', 'viewCount', 'feedbackRate30d', 'lastAt'])
   const query = face.view.query
   const filter = face.view.filter
@@ -90,10 +91,19 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   }
 
   useEffect(() => {
-    if (layout === 'medium' && hiddenInMedium.has(sort.key)) {
-      face.onView({ sort: { key: 'bodyChars', dir: 'desc' } })
-    }
+    const hidden = layout === 'medium' && hiddenInMedium.has(sort.key)
+    const unsupported = layout === 'narrow' && !SORT_OPTIONS.some(option => option.key === sort.key)
+    if (hidden || unsupported) face.onView({ sort: { key: 'bodyChars', dir: 'desc' } })
   }, [layout, sort.key])
+
+  useEffect(() => {
+    const element = tableRef.current?.querySelector<HTMLElement>('.evo-data-scroll')
+    if (element === null || element === undefined) return
+    element.scrollTop = face.view.scrollTop
+    const onScroll = (): void => { face.onView({ scrollTop: element.scrollTop }) }
+    element.addEventListener('scroll', onScroll, { passive: true })
+    return () => { element.removeEventListener('scroll', onScroll) }
+  }, [layout, visible.length])
 
   const Table = DataTable<SkillStatsRow>
   const allColumns: readonly DataTableColumn<SkillStatsRow>[] = [
@@ -180,7 +190,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   return createElement('div', { className: 'evo-stats-page' },
     createElement('header', { className: 'evo-stats-hero' },
       createElement('div', null,
-        createElement('h2', { className: 'evo-stats-title' }, face.t('stats.title')),
+        createElement('h2', { className: 'evo-stats-title', tabIndex: -1 }, face.t('stats.title')),
         createElement('p', { className: 'evo-stats-lede' }, face.t('stats.lede'))),
       createElement('button', { type: 'button', className: 'evo-stats-primary', onClick: () => { face.onOrganize() } }, '+ ', face.t('stats.organize'))),
     createElement('div', { className: 'evo-stats-summary' },
@@ -211,12 +221,12 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       ? createElement('div', { className: 'evo-stats-failure' }, face.t('stats.failed') + '：' + load.message)
       : load.status === 'loading'
         ? createElement('div', { className: 'evo-stats-loading' }, face.t('loading'))
-        : createElement('div', { className: 'evo-stats-table-card' },
+        : createElement('div', { className: 'evo-stats-table-card', ref: tableRef },
           createElement('div', { className: 'evo-stats-table-head' },
             createElement('strong', null, face.t('stats.tableTitle')),
             createElement('span', null, face.t('stats.tableHint'))),
           createElement('p', { className: 'evo-stats-window-note' }, face.t('stats.windowNote')),
-          layout === 'narrow'
+          layout === 'narrow' || visible.length === 0
             ? cards
             : createElement(Table, {
               rows: visible,
@@ -238,6 +248,7 @@ export const STATS_CSS = [
   '.evo-stats-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}',
   '.evo-stats-eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--evo-accent,#2f6b58);font-weight:700;margin-bottom:7px}',
   '.evo-stats-title{margin:0;font-size:24px;line-height:1.2;font-weight:700;color:var(--dsw-alias-label-primary,#20261f)}',
+  '.evo-stats-title:focus-visible{outline:var(--evo-focus-ring,2px solid #2f6b58);outline-offset:2px}',
   '.evo-stats-lede{margin:7px 0 0;max-width:680px;color:var(--dsw-alias-label-secondary,#6f766d);font-size:13px;line-height:1.6}',
   '.evo-stats-primary{flex:0 0 auto;height:38px;padding:0 14px;border:0;border-radius:9px;background:var(--evo-accent,#2f6b58);color:#fff;font:inherit;font-size:12.5px;font-weight:650;cursor:pointer}',
   '.evo-stats-primary:focus-visible{outline:var(--evo-focus-ring,2px solid #2f6b58);outline-offset:2px}',

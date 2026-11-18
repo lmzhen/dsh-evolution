@@ -425,12 +425,12 @@
     "approvalTitle": {
       "zh": "待确认的变更",
       "en": "Changes awaiting review",
-      "ja": "承認待ちの書き込み",
-      "es": "Escrituras pendientes de aprobación",
-      "fr": "Écritures en attente d’approbation",
-      "de": "Schreibvorgänge mit ausstehender Freigabe",
-      "pt": "Escritas aguardando aprovação",
-      "ru": "Записи, ожидающие одобрения"
+      "ja": "確認待ちの変更",
+      "es": "Cambios pendientes de revisión",
+      "fr": "Modifications à vérifier",
+      "de": "Änderungen zur Prüfung",
+      "pt": "Alterações aguardando revisão",
+      "ru": "Изменения ждут проверки"
     },
     "approvalVerbAdd": {
       "zh": "新增",

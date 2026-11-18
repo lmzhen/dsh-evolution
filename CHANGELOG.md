@@ -1,3 +1,18 @@
+## 0.53.0 (2026-11-18) — 技能整理 C 端重构、单一状态源与响应式
+
+> **范围**：① 技能整理统一命名/入口；host 统计新增 `lastChangedAt` / `lastActivityAt` / `recentlyUsed` / `needsAttention`，“最近使用”改为真实使用时间窗口，不再按版本时间；② `SkillStatsSnapshot` 拆分 `global`（全库 totals/counts/governance），技能详情不再显示全库整理次数/治理；③ WorkbenchStore 接管 selected/origin/query/filter/sort，删除 `focusRevision`，数据表与列表共享同一选中状态；④ 打开详情自动滚入选中项；窄屏单页列表↔详情，返回后焦点回原技能；⑤ 容器三档 wide/medium/narrow：medium 数据表隐藏低优先列，narrow 卡片 + 排序选择；⑥ 详情/列表密度、选中态、报错说明历史、统计活动、正文单位、窗口说明、legacy summary 文案；⑦ 待我确认/合并建议默认 C 端任务面，复制命令与运行设置收进“高级”；⑧ 技能操作 label/surface 元数据进 core，成功计数按用户词展示。
+>
+> **行为变更**：
+> - “最近使用”筛选只统计 30 天内有 `lastUsedAt/lastViewedAt` 的技能；没有使用记录的旧技能不再被当成“最近使用”。
+> - 技能详情不再显示全库 counts/governance；数据总览新增“整理活动”。
+> - 窄屏从“列表/详情上下堆叠”改为“单页列表↔详情”；返回按钮和焦点随容器宽度决定。
+> - “技能自动进化”入口/标题统一为“技能整理”；`summary` 旧记录文案改为“暂无变更摘要”。
+> - 复制命令仍保留在“高级”，但不是主操作。
+>
+> **不迁移**：没有磁盘数据格式变化；旧 usage/feedback 记录保持 null 语义；`SkillStatsRow` 的旧 `lastAt` 兼容字段在本版移除，host/客户端同步更新。
+>
+> **验证（本地，发布前）**：`evolution-core` + `evolution-ui` + `evolution-merge-ui` 52 files / 252 tests 绿；build 绿；pre-tag 64 pass / 0 fail / 3 registered cannotDecide / 2 skipped；真实 web `0.53.0-dev.6` 1440/1024/390 验收 PASS，console 无 error；独立复核待最终 GO。发布证据 S1–S4 / 20 包 / CI 在发布准备完成后补入。
+
 ## 0.52.0 (2026-11-18) — 技能整理 UI、数据总览、报错语义与工具面收敛
 
 > **范围**：① 技能整理工作台改为“技能 / 数据总览 / 待我确认 / 合并建议”四 tab；② 数据总览是可排序技能库表格（加载、近30天加载、报错、报错率），点技能名进入该技能整理页，返回保留搜索/筛选/排序/表格挂载；③ 新增 `skill-history/stats` 快照与 `SkillStatsRow` 领域模型，30 天加载用 `view_days` 日桶，报错数/报错率来自反馈事件窗口；④ 报错说明历史显示在技能页，最多 10 条；⑤ 反馈工具只保留负向报错，`note` 可选且 ≤20 字符；⑥ `edit` 从 `skill_manage` 删除，`update` 唯一整篇写入；⑦ 所有模型 `patch` 必须提供 `summary`；⑧ 删除 `/evolution extract`、`/evolution restructure` 命令，动作保留在 `skill_manage`；⑨ 旧 30 天窗口为 null，表格注明统计起点。

@@ -84,7 +84,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 |---|---|
 | 验证平台线 | **`0.2.2-rc.3`** |
 | 发布依赖窗口 | `^0.2.2-rc.3` |
-| 家族版本 | `0.52.0` |
+| 家族版本 | `0.53.0` |
 | Node | `^22.19.0` 或 `>=24.0.0` |
 
 0.50.0 只支持 DSH `0.2.2-rc.3`，不再保留 rc.1/rc.2 兼容层；仍在旧平台线的用户请继续使用 0.49.x。安装与升级顺序见 [INSTALL.md](INSTALL.md)。
@@ -99,7 +99,3 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-all
 - [运维](docs/operations.md)：备份、升级、卸载和检查。
 - [排障](docs/troubleshooting.md)：按症状定位问题。
 - 维护者参考：[包清单与事实源](packages/README.md)、[开发文档](docs/developer/development.md)。
-
-
-
-

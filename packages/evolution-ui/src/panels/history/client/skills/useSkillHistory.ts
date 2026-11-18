@@ -207,7 +207,6 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
       setBodies(new Map())
       return
     }
-    face.invalidateStats?.()
     showVersions(selected)
   }, [selected, face.selectionRevision])
 

@@ -89,9 +89,7 @@ function rowOf(value: unknown): SkillStatsRow | null {
   if (source === null || name === '') return null
   const lastChangedAt = stringOrNull(source.lastChangedAt) ?? stringOrNull(source.lastAt)
   const health = healthOf(source.health)
-  const needsAttention = typeof source.needsAttention === 'boolean'
-    ? source.needsAttention
-    : health?.verdict === 'warn' || health?.verdict === 'needs-restructure'
+  const needsAttention = source.needsAttention === true
   return {
     name,
     description: typeof source.description === 'string' ? source.description : '',

@@ -33,9 +33,6 @@ function snapshot(): SkillStatsSnapshot {
   return {
     rows,
     global: { totals, counts: { offload: 0, condense: 0, extract: 0 }, governance: [] },
-    totals,
-    counts: { offload: 0, condense: 0, extract: 0 },
-    governance: [],
     generatedAt: '2026-01-01T00:00:00.000Z',
   }
 }

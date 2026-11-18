@@ -96,9 +96,13 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const layout = useWorkbenchLayout(bodyRef)
   const pendingListFocus = useRef<string | undefined>(undefined)
-  const openHistory = (skill: string | undefined, origin?: 'data' | 'list'): void => { props.store.openHistory(skill, origin) }
+  const pendingDataFocus = useRef(false)
+  const openHistory = (skill: string | undefined, origin?: 'data' | 'list'): void => {
+    props.store.openHistory(skill, skill === undefined ? undefined : origin ?? 'list')
+  }
   const backFromDetail = (): void => {
     pendingListFocus.current = state.origin === 'list' ? selectedSkill : undefined
+    pendingDataFocus.current = state.origin === 'data'
     if (state.origin === 'data') props.store.backToData()
     else props.store.backToList()
   }
@@ -158,6 +162,11 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
     if (item !== undefined) item.focus()
     else document.querySelector<HTMLInputElement>('.evo-hist-search input')?.focus()
   }, [selectedSkill])
+  useEffect(() => {
+    if (view !== 'data' || !pendingDataFocus.current) return
+    pendingDataFocus.current = false
+    document.querySelector<HTMLElement>('.evo-stats-title')?.focus()
+  }, [view])
   // Keyboard order contains only tabs that actually rendered; a hidden view has no button to land on.
   const viewOrder: readonly WorkbenchView[] = (['history', 'data', 'pending', 'merge'] as const)
     .filter(value => (value !== 'merge' || hasMerge) && (value !== 'data' || hasData))
@@ -180,7 +189,7 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
         !hasMerge ? null : createElement('button', { id: 'evo-workbench-tab-merge', type: 'button', role: 'tab', tabIndex: view === 'merge' ? 0 : -1, 'aria-selected': view === 'merge' ? 'true' : 'false', 'aria-controls': 'evo-workbench-panel', 'data-active': view === 'merge' ? 'true' : undefined, onClick: () => { props.store.setView('merge') }, onKeyDown: (event: { key: string; preventDefault: () => void }) => { onTabKey(event, 'merge') } }, props.t('workbench.merge')),
       ),
     ),
-    createElement('div', { className: 'evo-workbench-body', id: 'evo-workbench-panel', role: 'tabpanel', ref: bodyRef },
+    createElement('div', { className: 'evo-workbench-body', id: 'evo-workbench-panel', role: 'tabpanel', 'aria-labelledby': 'evo-workbench-tab-' + view, tabIndex: 0, ref: bodyRef },
       view === 'history'
         ? createElement('div', { className: 'evo-workbench-history-stack' },
           state.origin !== undefined && (layout !== 'wide' || state.origin === 'data')
@@ -254,4 +263,3 @@ export const WORKBENCH_CSS = [
   '.evo-workbench-body>.evolution-param-card{flex:1;min-width:0;overflow:auto}',
   '@media (max-width:720px){.evo-workbench-head{flex-wrap:wrap}.evo-workbench-tabs{flex-wrap:wrap}}',
 ].join('')
-

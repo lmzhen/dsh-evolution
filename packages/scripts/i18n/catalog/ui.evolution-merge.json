@@ -454,7 +454,7 @@
     },
     "empty.scope": {
       "zh": "这里只处理确实重复的技能；单纯追加内容属于技能整理，不会进入合并队列。",
-      "en": "This view only handles two-round merges. Plain additions are skill management and never enter the merge queue.",
+      "en": "This view only handles truly duplicate skills; plain additions are skill management and never enter the merge queue.",
       "ja": "ここでは2段階のマージのみを扱います。単純な内容の追記はスキル管理の対象であり、マージキューには入りません。",
       "es": "Aquí solo se tratan merges de dos rondas; añadir contenido suelto es gestión de skills y no entra en la cola de merge.",
       "fr": "Seules les fusions en deux tours sont traitées ici ; un simple ajout de contenu relève de la gestion des skills et n’entre jamais dans cette file.",
@@ -2102,7 +2102,7 @@
       "ru": "Пропущено"
     },
     "state.verify": {
-      "zh": "待判定",
+      "zh": "待我看",
       "en": "Awaiting verdict",
       "ja": "判定待ち",
       "es": "Sin verificar",
@@ -2133,33 +2133,33 @@
     },
     "tab.pending": {
       "zh": "待确认",
-      "en": "Pending approval",
-      "ja": "承認待ち",
-      "es": "Pendientes",
-      "fr": "En attente",
-      "de": "Wartet auf Freigabe",
-      "pt": "Aguardando aprovação",
-      "ru": "На одобрении"
+      "en": "To confirm",
+      "ja": "確認待ち",
+      "es": "Por confirmar",
+      "fr": "À confirmer",
+      "de": "Zu bestätigen",
+      "pt": "A confirmar",
+      "ru": "Подтвердить"
     },
     "tab.skipped": {
       "zh": "已忽略",
-      "en": "No merge needed",
-      "ja": "マージ不要",
-      "es": "Omitidos",
-      "fr": "Sans fusion",
-      "de": "Übersprungen",
-      "pt": "Sem merge",
-      "ru": "Без объединения"
+      "en": "Ignored",
+      "ja": "無視",
+      "es": "Ignorados",
+      "fr": "Ignorés",
+      "de": "Ignoriert",
+      "pt": "Ignorados",
+      "ru": "Пропущено"
     },
     "tab.verify": {
       "zh": "待我看",
-      "en": "Awaiting verdict",
-      "ja": "判定待ち",
-      "es": "Por juzgar",
-      "fr": "À juger",
+      "en": "Needs my review",
+      "ja": "確認待ち",
+      "es": "Para revisar",
+      "fr": "À vérifier",
       "de": "Zu prüfen",
-      "pt": "A avaliar",
-      "ru": "На решение"
+      "pt": "Para revisar",
+      "ru": "Нужно проверить"
     },
     "task.pending": {
       "zh": "条合并建议待处理",

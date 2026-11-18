@@ -204,7 +204,7 @@ export const PARAM_FIELDS = {
     },
     "evolution-approval.pendingTtlMs": {
       "label": {
-        "zh": "待批过期时间",
+        "zh": "待确认过期时间",
         "en": "Pending approval expiry",
         "ja": "承認待ちの有効期限",
         "es": "Caducidad de pendientes",
@@ -214,7 +214,7 @@ export const PARAM_FIELDS = {
         "pt": "Expiração das pendências"
       },
       "hint": {
-        "zh": "一条待批写入最多等多久：超时后按「拒绝」处理，不会执行，也不会改动任何内容；0 表示一直保留（默认）。",
+        "zh": "一条待确认的写入最多等多久：超时后按「拒绝」处理，不会执行，也不会改动任何内容；0 表示一直保留（默认）。",
         "en": "How long a pending write waits before it expires. Expired writes count as rejected: they never run and nothing changes. 0 means it never expires (default).",
         "ja": "承認待ちの書き込みを保持する時間です。期限が切れると「拒否」として扱われ、実行も変更も一切行われません。0で無期限（デフォルト）。",
         "es": "Tiempo máximo que una escritura pendiente puede esperar. Al caducar se cierra como rechazada: nunca se ejecuta ni modifica nada. 0 (el valor predeterminado) significa que no caduca.",
@@ -522,7 +522,7 @@ export const PARAM_FIELDS = {
         "pt": "Aprovação de mesclagem"
       },
       "hint": {
-        "zh": "开启后，第一轮判定完先停下、进入待批准清单；关闭则直接进入第二轮合并。",
+        "zh": "开启后，第一轮判定完先停下、进入待确认清单；关闭则直接进入第二轮合并。",
         "en": "When on, merging pauses after round one and waits in the pending list; when off, it goes straight to round two.",
         "ja": "オンにすると、1回目の判定後に停止して承認待ちリストに入ります。オフならそのまま2回目のマージに進みます。",
         "es": "Al activarlo, la fusión se detiene tras la primera ronda y el par queda pendiente de aprobación; al desactivarlo, pasa directo a la segunda ronda.",

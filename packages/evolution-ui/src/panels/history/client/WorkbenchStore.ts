@@ -51,7 +51,6 @@ export interface WorkbenchStore {
   backToList(): void
   setHistoryQuery(query: string): void
   setDataView(patch: Partial<WorkbenchDataState>): void
-  clearSelection(): void
 }
 
 /**
@@ -93,9 +92,7 @@ export function createWorkbenchStore(initial: WorkbenchState = {
       }
       if (state.view !== view || state.explicitView !== true) {
         const { origin: _origin, ...rest } = state
-        emit(view === 'history'
-          ? { ...rest, view, explicitView: true, ...(state.origin === undefined ? {} : { origin: state.origin }) }
-          : { ...rest, view, explicitView: true })
+        emit({ ...rest, view, explicitView: true })
       }
     },
     setDefaultView(view) { if (state.explicitView !== true && state.view !== view) emit({ ...state, view, explicitView: false }) },
@@ -129,11 +126,6 @@ export function createWorkbenchStore(initial: WorkbenchState = {
         && next.sort.key === state.data.sort.key && next.sort.dir === state.data.sort.dir
         && next.scrollTop === state.data.scrollTop) return
       emit({ ...state, data: next })
-    },
-    clearSelection() {
-      if (state.selectedSkill === undefined && state.origin === undefined) return
-      const { selectedSkill: _selected, origin: _origin, ...rest } = state
-      emit(rest)
     },
   }
 }
