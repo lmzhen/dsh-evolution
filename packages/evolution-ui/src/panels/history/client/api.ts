@@ -82,6 +82,8 @@ export interface VersionRow {
   readonly cells: RowCells
   /** The one line the optional summarizer wrote, when the deployment turned it on. */
   readonly summary?: string
+  /** Where the summary came from; absent on legacy entries recorded before summaries existed. */
+  readonly summarySource?: 'model' | 'host' | 'fallback'
   /**
    * Which support file these bytes came from, relative to the skill directory. Absent on body rows,
    * and absent on every support row recorded before the field existed (the bytes carry no name).

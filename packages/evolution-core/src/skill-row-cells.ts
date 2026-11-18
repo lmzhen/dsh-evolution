@@ -62,6 +62,8 @@ export interface VersionRowFacts {
   readonly charsDelta?: number
   readonly path?: string
   readonly summary?: string
+  /** Where the summary came from; absent on entries recorded before summaries existed. */
+  readonly summarySource?: 'model' | 'host' | 'fallback'
   /** U-5: the body hash the host recorded for this version (the row shows a short code, hover = full). */
   readonly hash?: string
 }
@@ -150,6 +152,10 @@ export function versionRowCells(row: VersionRowFacts): RowCells {
   // verbatim, so it needs no dictionary key.
   if (row.summary !== undefined && row.summary !== '') {
     meta.push({ key: 'summary', literal: row.summary, tone: 'secondary', slot: 'lead' })
+  } else if (row.summarySource === undefined) {
+    // Entries recorded before summaries existed carry neither a summary nor a source. Say so
+    // explicitly instead of rendering an empty second line or pretending the write had no reason.
+    meta.push({ key: 'summary.legacy', copy: 'row.summary.legacy', tone: 'tertiary', slot: 'lead' })
   }
   return { title, meta }
 }

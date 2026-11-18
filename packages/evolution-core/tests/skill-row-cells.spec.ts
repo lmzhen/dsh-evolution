@@ -41,7 +41,7 @@ describe('one version row as cells (G1)', () => {
   it('reads version, action, then time', () => {
     const cells = versionRowCells(version())
     expect(keys(cells.title)).toEqual(['v', 'action', 'time'])
-    expect(cells.meta).toEqual([])
+    expect(cells.meta).toEqual([{ key: 'summary.legacy', copy: 'row.summary.legacy', tone: 'tertiary', slot: 'lead' }])
     expect(slotOf(cells.title, 'action')).toBe('lead')
     expect(slotOf(cells.title, 'v')).toBe('meta')
     expect(slotOf(cells.title, 'time')).toBe('meta')
@@ -83,9 +83,11 @@ describe('one version row as cells (G1)', () => {
   it('puts the optional summary on its own line, verbatim', () => {
     const cells = versionRowCells(version({ summary: 'tightened the trigger list' }))
     expect(cells.meta).toEqual([{ key: 'summary', literal: 'tightened the trigger list', tone: 'secondary', slot: 'lead' }])
-    // No summary (or an empty one) means no second line at all, not an empty one.
-    expect(versionRowCells(version({ summary: '' })).meta).toEqual([])
-    expect(versionRowCells(version()).meta).toEqual([])
+    // No summary (or an empty one) on a legacy entry still gets the explicit legacy sentence.
+    expect(versionRowCells(version({ summary: '' })).meta).toEqual([{ key: 'summary.legacy', copy: 'row.summary.legacy', tone: 'tertiary', slot: 'lead' }])
+    // A new entry whose summary source is known does not claim to be a legacy entry.
+    expect(versionRowCells(version({ summarySource: 'host' })).meta).toEqual([])
+    expect(versionRowCells(version()).meta).toEqual([{ key: 'summary.legacy', copy: 'row.summary.legacy', tone: 'tertiary', slot: 'lead' }])
   })
 })
 
@@ -166,4 +168,5 @@ describe('the words a cell may not carry (G1)', () => {
     }
   })
 })
+
 

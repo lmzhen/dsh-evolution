@@ -150,7 +150,8 @@ export const dictionaries = {
     "stats.verdict.unknown": "未知",
     "workbench.data": "数据总览",
     "workbench.backToData": "返回数据总览",
-    "stats.col.loads": "加载"
+    "stats.col.loads": "加载",
+    "row.summary.legacy": "早期插件版本，暂不存在 summary"
   },
   en: {
     "action.archive": "Archived",
@@ -298,7 +299,8 @@ export const dictionaries = {
     "stats.verdict.unknown": "Unknown",
     "workbench.data": "Data overview",
     "workbench.backToData": "Back to data",
-    "stats.col.loads": "Loads"
+    "stats.col.loads": "Loads",
+    "row.summary.legacy": "Early plugin version — no summary yet"
   },
   ja: {
     "action.archive": "アーカイブ",
@@ -446,7 +448,8 @@ export const dictionaries = {
     "stats.verdict.unknown": "不明",
     "workbench.data": "データ概要",
     "workbench.backToData": "データ概要に戻る",
-    "stats.col.loads": "読み込み"
+    "stats.col.loads": "読み込み",
+    "row.summary.legacy": "初期プラグインバージョンのため summary はまだありません"
   },
   es: {
     "action.archive": "archivado",
@@ -594,7 +597,8 @@ export const dictionaries = {
     "stats.verdict.unknown": "Desconocido",
     "workbench.data": "Resumen de datos",
     "workbench.backToData": "Volver al resumen",
-    "stats.col.loads": "Cargas"
+    "stats.col.loads": "Cargas",
+    "row.summary.legacy": "Versión inicial del plugin: todavía no hay summary"
   },
   fr: {
     "action.archive": "archivé",
@@ -742,7 +746,8 @@ export const dictionaries = {
     "stats.verdict.unknown": "Inconnu",
     "workbench.data": "Vue d’ensemble",
     "workbench.backToData": "Retour au résumé",
-    "stats.col.loads": "Chargements"
+    "stats.col.loads": "Chargements",
+    "row.summary.legacy": "Ancienne version du plugin : pas encore de summary"
   },
   de: {
     "action.archive": "archiviert",
@@ -890,7 +895,8 @@ export const dictionaries = {
     "stats.verdict.unknown": "Unbekannt",
     "workbench.data": "Datenübersicht",
     "workbench.backToData": "Zurück zur Übersicht",
-    "stats.col.loads": "Ladevorgänge"
+    "stats.col.loads": "Ladevorgänge",
+    "row.summary.legacy": "Frühe Plugin-Version – noch keine Summary"
   },
   ru: {
     "action.archive": "заархивировано",
@@ -1038,7 +1044,8 @@ export const dictionaries = {
     "stats.verdict.unknown": "Неизвестно",
     "workbench.data": "Обзор данных",
     "workbench.backToData": "Назад к обзору",
-    "stats.col.loads": "Загрузки"
+    "stats.col.loads": "Загрузки",
+    "row.summary.legacy": "Ранняя версия плагина — summary пока нет"
   },
   pt: {
     "action.archive": "arquivamento",
@@ -1186,7 +1193,8 @@ export const dictionaries = {
     "stats.verdict.unknown": "Desconhecido",
     "workbench.data": "Visão geral",
     "workbench.backToData": "Voltar ao resumo",
-    "stats.col.loads": "Carregamentos"
+    "stats.col.loads": "Carregamentos",
+    "row.summary.legacy": "Versão inicial do plugin: ainda sem summary"
   },
 } as const
 
