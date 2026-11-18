@@ -11,6 +11,7 @@
 
 import { latestVersionAt } from '@deepseek-ai/dsh-evolution-core/skills'
 import type {
+  SkillErrorNote,
   SkillHealthFacts,
   SkillStatsCounts,
   SkillStatsGovernance,
@@ -116,18 +117,29 @@ function feedbackOf(value: unknown, name: string): number | null {
 }
 
 /** Normalize the optional rolling feedback read; null means the service did not answer. */
-function feedbackWindowOf(value: unknown): Map<string, { positive: number; negative: number }> | null {
+function feedbackWindowOf(value: unknown): Map<string, { positive: number; negative: number; notes: readonly SkillErrorNote[] }> | null {
   if (value === null || value === undefined) return null
   const entries: Iterable<[string, unknown]> = value instanceof Map
     ? value.entries() as Iterable<[string, unknown]>
     : isRecord(value) ? Object.entries(value) : []
-  const out = new Map<string, { positive: number; negative: number }>()
+  const out = new Map<string, { positive: number; negative: number; notes: readonly SkillErrorNote[] }>()
   for (const [name, raw] of entries) {
     const source = objectOf(raw)
     const positive = numberOrNull(source?.positive)
     const negative = numberOrNull(source?.negative)
     if (name === '' || positive === null || negative === null) continue
-    out.set(name, { positive, negative })
+    const notes: SkillErrorNote[] = []
+    if (Array.isArray(source?.notes)) {
+      for (const entry of source.notes) {
+        const noteRow = objectOf(entry)
+        const at = typeof noteRow?.at === 'string' ? noteRow.at : ''
+        const note = typeof noteRow?.note === 'string' ? noteRow.note.trim() : ''
+        if (at === '' || note === '') continue
+        notes.push({ at, note })
+        if (notes.length >= 10) break
+      }
+    }
+    out.set(name, { positive, negative, notes })
   }
   return out
 }
@@ -192,6 +204,7 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
     const measuredWindow = feedbackWindow !== null
     const feedback30d = measuredWindow ? (window?.positive ?? 0) + (window?.negative ?? 0) : null
     const negativeFeedback30d = measuredWindow ? window?.negative ?? 0 : null
+    const errorNotes = measuredWindow ? window?.notes ?? [] : null
     const loads30d = usage?.viewCount30d ?? null
     return {
       name: row.name,
@@ -204,6 +217,7 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
       feedback30d,
       negativeFeedback30d,
       feedbackRate30d: negativeFeedback30d !== null && loads30d !== null && loads30d > 0 ? negativeFeedback30d / loads30d : null,
+      errorNotes,
     }
   })
 

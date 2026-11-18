@@ -17,6 +17,7 @@ import { fillTemplate } from '@lmzhen/dsh-evolution-client-kit'
 import { FailureBlock } from '@lmzhen/dsh-evolution-client-kit/generated/states'
 import { FALLBACKS } from '@lmzhen/dsh-evolution-client-kit/generated/fallbacks'
 import type { PanelFace } from '../Panel.ts'
+import type { SkillErrorNote } from '@deepseek-ai/dsh-evolution-core/skills'
 
 /** The one expanded row. */
 interface OpenRow {
@@ -34,6 +35,7 @@ export interface SkillHistoryController {
   readonly selected: string | undefined
   readonly onOpen: (name: string) => void
   readonly healthByName: ReadonlyMap<string, HealthPayload['rows'][number]>
+  readonly errorNotes: ReadonlyMap<string, readonly SkillErrorNote[]>
   readonly onRefresh: () => void
   readonly noteText: string | undefined
   readonly noteError: boolean
@@ -89,6 +91,7 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
   const [governance, setGovernance] = useState<readonly GovernanceRow[]>([])
   const [counts, setCounts] = useState<HealthPayload['counts']>(null)
   const [healthByName, setHealthByName] = useState<ReadonlyMap<string, HealthPayload['rows'][number]>>(new Map())
+  const [errorNotes, setErrorNotes] = useState<ReadonlyMap<string, readonly SkillErrorNote[]>>(new Map())
   // Every rows read takes a ticket, and only the newest one may write state. Without it a slow reply
   // for skill A lands while B is open: B would show A's rows, and B's restore buttons would post A's
   // version number at B's name — a write against the wrong skill.
@@ -276,6 +279,9 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
             supportFiles: row.health!.supportFiles,
             findings: row.health!.findings,
           }])))
+        setErrorNotes(new Map(snapshot.rows
+          .filter(row => row.errorNotes !== null)
+          .map(row => [row.name, row.errorNotes!])))
       }).catch(() => { /* fall back to the legacy health read below */ })
     const read = loadStats !== undefined
       ? fromStats
@@ -326,6 +332,7 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
     selected,
     onOpen: open,
     healthByName,
+    errorNotes,
     onRefresh: refresh,
     noteText,
     noteError,

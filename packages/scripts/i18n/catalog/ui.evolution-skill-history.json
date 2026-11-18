@@ -1173,14 +1173,14 @@
       "ru": "Обзор данных"
     },
     "stats.lede": {
-      "zh": "把每个技能的体量、参考资料、版本、模型加载和反馈放在一起看。点列名排序，点技能名进入整理页。",
-      "en": "See size, references, versions, model loads and feedback for every skill. Sort by a column; open a skill by name.",
-      "ja": "各スキルのサイズ、参照、バージョン、モデルの読み込み、フィードバックをまとめて表示します。列名で並べ替え、スキル名で整理ページを開けます。",
-      "es": "Consulta tamaño, referencias, versiones, cargas del modelo y feedback de cada skill. Ordena por columna y abre una skill por su nombre.",
-      "fr": "Voyez taille, références, versions, chargements du modèle et retours de chaque skill. Triez par colonne et ouvrez une skill par son nom.",
-      "de": "Größe, Referenzen, Versionen, Modell-Ladevorgänge und Feedback jedes Skills auf einen Blick. Nach Spalte sortieren, Skill per Namen öffnen.",
-      "pt": "Veja tamanho, referências, versões, carregamentos do modelo e feedback de cada skill. Ordene por coluna e abra uma skill pelo nome.",
-      "ru": "Размер, ссылки, версии, загрузки модели и отзывы по каждому навыку. Сортируйте по столбцу и открывайте навык по имени."
+      "zh": "把每个技能的体量、参考资料、版本、模型加载和报错放在一起看。点列名排序，点技能名进入整理页。",
+      "en": "See size, references, versions, model loads and errors for every skill. Sort by a column; open a skill by name.",
+      "ja": "各スキルのサイズ、参照資料、バージョン、モデル読み込み、エラーをまとめて確認。列で並べ替え、名前で開けます。",
+      "es": "Consulta tamaño, referencias, versiones, cargas del modelo y errores de cada skill. Ordena por columna y abre una skill por su nombre.",
+      "fr": "Taille, références, versions, chargements du modèle et erreurs de chaque compétence au même endroit. Triez par colonne, ouvrez par nom.",
+      "de": "Größe, Referenzen, Versionen, Modell-Ladevorgänge und Fehler jedes Skills auf einen Blick. Nach Spalte sortieren, Skill per Namen öffnen.",
+      "pt": "Veja tamanho, referências, versões, carregamentos do modelo e erros de cada skill. Ordene por coluna e abra uma skill pelo nome.",
+      "ru": "Размер, ссылки, версии, загрузки модели и ошибки каждого навыка в одном месте. Сортируйте по столбцу, открывайте по имени."
     },
     "stats.organize": {
       "zh": "整理一个技能",
@@ -1372,36 +1372,6 @@
       "pt": "Versões",
       "ru": "Версии"
     },
-    "stats.col.use": {
-      "zh": "使用",
-      "en": "Uses",
-      "ja": "使用",
-      "es": "Usos",
-      "fr": "Usages",
-      "de": "Nutzung",
-      "pt": "Usos",
-      "ru": "Использование"
-    },
-    "stats.col.view": {
-      "zh": "查看",
-      "en": "Views",
-      "ja": "閲覧",
-      "es": "Vistas",
-      "fr": "Vues",
-      "de": "Aufrufe",
-      "pt": "Visualizações",
-      "ru": "Просмотры"
-    },
-    "stats.col.feedback": {
-      "zh": "反馈",
-      "en": "Feedback",
-      "ja": "フィードバック",
-      "es": "Feedback",
-      "fr": "Retours",
-      "de": "Feedback",
-      "pt": "Feedback",
-      "ru": "Отзывы"
-    },
     "stats.col.lastAt": {
       "zh": "最近改动",
       "en": "Last change",
@@ -1482,35 +1452,25 @@
       "pt": "Carregamentos 30d",
       "ru": "Загрузки 30д"
     },
-    "stats.col.feedback30d": {
-      "zh": "近30天反馈",
-      "en": "Feedback 30d",
-      "ja": "30日フィードバック",
-      "es": "Feedback 30d",
-      "fr": "Retours 30j",
-      "de": "Feedback 30T",
-      "pt": "Feedback 30d",
-      "ru": "Отзывы 30д"
-    },
     "stats.col.feedbackRate": {
-      "zh": "反馈率",
-      "en": "Feedback rate",
-      "ja": "フィードバック率",
-      "es": "Tasa de feedback",
-      "fr": "Taux de retours",
-      "de": "Feedback-Rate",
-      "pt": "Taxa de feedback",
-      "ru": "Доля отзывов"
+      "zh": "报错率",
+      "en": "Error rate",
+      "ja": "エラー率",
+      "es": "Tasa de error",
+      "fr": "Taux d’erreur",
+      "de": "Fehlerrate",
+      "pt": "Taxa de erro",
+      "ru": "Доля ошибок"
     },
     "stats.col.negativeFeedback30d": {
-      "zh": "近30天负反馈",
-      "en": "Negative 30d",
-      "ja": "30日ネガティブ",
-      "es": "Negativas 30d",
-      "fr": "Négatifs 30j",
-      "de": "Negativ 30T",
-      "pt": "Negativas 30d",
-      "ru": "Негатив 30д"
+      "zh": "报错",
+      "en": "Errors",
+      "ja": "エラー",
+      "es": "Errores",
+      "fr": "Erreurs",
+      "de": "Fehler",
+      "pt": "Erros",
+      "ru": "Ошибки"
     },
     "stats.windowNote": {
       "zh": "近30天指标从插件升级后开始统计；旧记录显示 —。",
@@ -1531,6 +1491,16 @@
       "de": "Fähigkeiten filtern",
       "pt": "Filtrar habilidades",
       "ru": "Фильтр навыков"
+    },
+    "errors.title": {
+      "zh": "报错说明历史",
+      "en": "Error note history",
+      "ja": "エラー説明の履歴",
+      "es": "Historial de notas de error",
+      "fr": "Historique des notes d’erreur",
+      "de": "Fehlernotizen",
+      "pt": "Histórico de erros",
+      "ru": "История ошибок"
     }
   }
 }

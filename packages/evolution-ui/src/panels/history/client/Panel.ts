@@ -60,6 +60,7 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
         noteError: history.noteError,
         governance: history.governance,
         counts: history.counts,
+        errorNotes: history.errorNotes.get(history.selected ?? '') ?? [],
         failureNode: history.failureNode,
         skills: history.skills,
         skillsLoaded: history.skillsLoaded,

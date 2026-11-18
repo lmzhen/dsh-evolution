@@ -75,6 +75,11 @@ export const CSS = [
   '.evo-hist-governance{margin:0 0 var(--evo-space-10);padding:var(--evo-space-8) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control)}',
   '.evo-hist-governance-list{list-style:none;margin:0;padding:0;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   '.evo-hist-governance-row{padding:var(--evo-space-2) 0}',
+  '.evo-hist-errors{margin:0 0 var(--evo-space-10);padding:var(--evo-space-8) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control)}',
+  '.evo-hist-error-list{list-style:none;margin:0;padding:0;color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
+  '.evo-hist-error-row{display:flex;gap:var(--evo-space-8);padding:var(--evo-space-2) 0}',
+  '.evo-hist-error-row time{flex:0 0 auto;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
+  '.evo-hist-error-row span{min-width:0;overflow-wrap:anywhere}',
   '.evo-hist-hint{margin:0 0 var(--evo-space-10);color:var(--dsw-alias-label-secondary);line-height:var(--evo-leading-base)}',
   // A notice owns a surface and a glyph, so a refusal is not carried by colour alone (W13).
   '.evo-hist-note{display:flex;align-items:flex-start;gap:var(--evo-space-6);margin:0 0 var(--evo-space-10);color:var(--dsw-alias-label-secondary);line-height:var(--evo-leading-base)}',

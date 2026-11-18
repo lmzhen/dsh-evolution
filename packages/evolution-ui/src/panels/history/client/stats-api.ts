@@ -10,6 +10,7 @@
  */
 import { isRecord } from './guards.ts'
 import type {
+  SkillErrorNote,
   SkillHealthFacts,
   SkillStatsCounts,
   SkillStatsGovernance,
@@ -29,6 +30,20 @@ function numberOrNull(value: unknown): number | null {
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value !== '' ? value : null
+}
+
+function errorNotesOf(value: unknown): SkillErrorNote[] | null {
+  if (!Array.isArray(value)) return null
+  const notes: SkillErrorNote[] = []
+  for (const raw of value) {
+    const source = recordOf(raw)
+    const at = stringOrNull(source?.at)
+    const note = stringOrNull(source?.note)
+    if (at === null || note === null) continue
+    notes.push({ at, note })
+    if (notes.length >= 10) break
+  }
+  return notes
 }
 
 function booleanOrNull(value: unknown): boolean | null {
@@ -82,6 +97,7 @@ function rowOf(value: unknown): SkillStatsRow | null {
     feedback30d: numberOrNull(source.feedback30d),
     negativeFeedback30d: numberOrNull(source.negativeFeedback30d),
     feedbackRate30d: numberOrNull(source.feedbackRate30d),
+    errorNotes: errorNotesOf(source.errorNotes),
   }
 }
 

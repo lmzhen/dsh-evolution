@@ -42,11 +42,21 @@ export interface FeedbackRecord {
   lastNote?: string | undefined
 }
 
-/** One skill's feedback counts inside a rolling window. */
+/** One skill's negative report note inside a rolling window. */
+export interface FeedbackNote {
+  readonly at: string
+  readonly note: string
+}
+
+/** One skill's feedback counts and bounded negative notes inside a rolling window. */
 export interface FeedbackWindowRecord {
   readonly positive: number
   readonly negative: number
+  readonly notes: readonly FeedbackNote[]
 }
+
+/** Keep the history compact; the UI shows the newest explanations first. */
+export const MAX_FEEDBACK_NOTES = 10
 
 export interface FeedbackState {
   skills: Record<string, FeedbackRecord>
@@ -465,10 +475,15 @@ export class EvolutionFeedback {
         if (event.type !== 'feedback' || event.kind !== 'skill' || event.target === undefined || event.rating === undefined) continue
         const at = Date.parse(event.at)
         if (!Number.isFinite(at) || at < since) continue
-        const current = out.get(event.target) ?? { positive: 0, negative: 0 }
+        const current = out.get(event.target) ?? { positive: 0, negative: 0, notes: [] }
+        const negative = current.negative + (event.rating === 'negative' ? 1 : 0)
+        const note = event.rating === 'negative' && typeof event.note === 'string' && event.note !== ''
+          ? [...current.notes, { at: event.at, note: event.note }].slice(-MAX_FEEDBACK_NOTES)
+          : current.notes
         out.set(event.target, {
           positive: current.positive + (event.rating === 'positive' ? 1 : 0),
-          negative: current.negative + (event.rating === 'negative' ? 1 : 0),
+          negative,
+          notes: note,
         })
       }
       return out

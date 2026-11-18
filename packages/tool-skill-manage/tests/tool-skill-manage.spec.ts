@@ -1223,40 +1223,30 @@ it('records negative feedback through the existing service without touching skil
   }
 })
 
-it('records positive feedback and limits the optional negative note to 20 characters', async () => {
+it('limits the optional negative report note to 20 characters', async () => {
   const { ctx, root, previousHome } = await setup()
   const calls: unknown[][] = []
   ctx.provide('evolutionFeedback', { record: (...args: unknown[]) => { calls.push(args) } })
   try {
-    const positive = await executeOne(ctx, {
-      callId: ToolCallId(`feedback-positive-${Math.random()}`),
-      name: 'skill_manage',
-      arguments: { action: 'feedback', name: 'boundary-skill', rating: 'positive' },
-      agent: fakeAgent(undefined),
-      signal: new AbortController().signal,
-    })
-    expect(positive.isError).toBe(false)
-    expect(calls).toEqual([['boundary-skill', 'positive', undefined, 'skill']])
-
     const tooLong = await executeOne(ctx, {
       callId: ToolCallId(`feedback-long-${Math.random()}`),
       name: 'skill_manage',
-      arguments: { action: 'feedback', name: 'boundary-skill', rating: 'negative', note: 'x'.repeat(21) },
+      arguments: { action: 'feedback', name: 'boundary-skill', note: 'x'.repeat(21) },
       agent: fakeAgent(undefined),
       signal: new AbortController().signal,
     })
     expect((tooLong.value as { message?: string } | undefined)?.message ?? '').toContain('超过 20 上限')
-    expect(calls).toHaveLength(1)
+    expect(calls).toHaveLength(0)
 
     const noted = await executeOne(ctx, {
       callId: ToolCallId(`feedback-note-${Math.random()}`),
       name: 'skill_manage',
-      arguments: { action: 'feedback', name: 'boundary-skill', rating: 'negative', note: 'trigger misses' },
+      arguments: { action: 'feedback', name: 'boundary-skill', note: 'trigger misses' },
       agent: fakeAgent(undefined),
       signal: new AbortController().signal,
     })
     expect(noted.isError).toBe(false)
-    expect(calls[1]).toEqual(['boundary-skill', 'negative', 'trigger misses', 'skill'])
+    expect(calls[0]).toEqual(['boundary-skill', 'negative', 'trigger misses', 'skill'])
   } finally {
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome

@@ -24,6 +24,12 @@ export interface SkillHealthFacts {
   readonly findings: number
 }
 
+/** One bounded negative-report explanation shown in the skill page's report history. */
+export interface SkillErrorNote {
+  readonly at: string
+  readonly note: string
+}
+
 /** One usage fact set; every field stays null when the usage store did not answer for this skill. */
 export interface SkillUsageFacts {
   readonly useCount: number | null
@@ -54,6 +60,8 @@ export interface SkillStatsRow {
   readonly negativeFeedback30d: number | null
   /** negativeFeedback30d / loads30d; null when loads30d is null or zero (no denominator). */
   readonly feedbackRate30d: number | null
+  /** Negative-report notes in the window, newest last; null when the window was not measured. */
+  readonly errorNotes: readonly SkillErrorNote[] | null
 }
 
 /** Successful operation counts, as the panel's aggregate read reports them. */

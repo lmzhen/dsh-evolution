@@ -9,6 +9,7 @@
 import { createElement, type ReactNode } from 'react'
 import { emptyState, groupHeading, localTime, notice, panelHead, versionRow, type Copy, type OpenKind } from '../chrome.ts'
 import type { GovernanceRow, HealthPayload, SkillRow, VersionRow } from '../api.ts'
+import type { SkillErrorNote } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { HistoryViewModel } from '../history-presentation.ts'
 
 export interface SkillDetailProps {
@@ -19,6 +20,7 @@ export interface SkillDetailProps {
   readonly noteError: boolean
   readonly governance: readonly GovernanceRow[]
   readonly counts: HealthPayload['counts']
+  readonly errorNotes: readonly SkillErrorNote[]
   readonly failureNode: ReactNode
   readonly skills: readonly SkillRow[]
   readonly skillsLoaded: boolean
@@ -59,6 +61,17 @@ export function SkillDetail(props: SkillDetailProps): ReactNode {
   return createElement('div', { className: 'evo-hist-main' },
     panelHead(props.copy, props.onRefresh, props.selected ?? props.copy.t('bodyTitle'), props.selected),
     notice(props.noteText, props.noteError),
+    props.errorNotes.length === 0
+      ? null
+      : createElement('section', { className: 'evo-hist-errors' },
+        createElement('h3', { className: 'evo-hist-group' }, props.copy.t('errors.title')),
+        createElement('ul', { className: 'evo-hist-error-list' },
+          props.errorNotes.map((entry, index) => createElement('li', {
+            key: entry.at + ':' + index,
+            className: 'evo-hist-error-row',
+          },
+          createElement('time', null, localTime(entry.at)),
+          createElement('span', null, entry.note))))),
     props.governance.length === 0
       ? null
       : createElement('section', { className: 'evo-hist-governance' },

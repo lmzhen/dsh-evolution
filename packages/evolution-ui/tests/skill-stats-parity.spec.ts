@@ -31,6 +31,7 @@ function row(name: string, body: number | null, verdict: string, lastAt: string 
     feedback30d: body,
     negativeFeedback30d: body === null ? null : 0,
     feedbackRate30d: body,
+    errorNotes: null,
   }
 }
 
@@ -60,5 +61,6 @@ describe('browser stats model parity', () => {
     expect(compareRows(rows[0]!, rows[3]!, 'bodyChars', 'desc')).toBeGreaterThan(0)
   })
 })
+
 
 
