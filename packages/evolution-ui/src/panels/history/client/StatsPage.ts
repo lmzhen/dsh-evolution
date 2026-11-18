@@ -71,11 +71,15 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
 
   useEffect(() => {
     let live = true
-    setLoad({ status: 'loading' })
+    // Keep the current table (and its scroll position) while a refresh is in flight; only a first
+    // load has no data to preserve.
+    setLoad(current => current.status === 'ready' ? current : { status: 'loading' })
     void face.loadStats().then(snapshot => {
       if (live) setLoad({ status: 'ready', snapshot })
     }).catch((error: unknown) => {
-      if (live) setLoad({ status: 'failed', message: error instanceof Error ? error.message : String(error) })
+      if (live) setLoad(current => current.status === 'ready'
+        ? current
+        : { status: 'failed', message: error instanceof Error ? error.message : String(error) })
     })
     return () => { live = false }
   }, [face.loadStats, face.refreshKey])
