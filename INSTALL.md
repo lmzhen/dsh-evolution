@@ -54,7 +54,7 @@ dsh plugin --profile web add @lmzhen/dsh-evolution-host
 4. 升级家族 bundle：
 
 ```bash
-dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.51.1
+dsh plugin --profile web add @lmzhen/dsh-evolution-all@0.52.0
 ```
 
 5. 重启后运行 `/evolution doctor`，再实际写一次记忆、改一次技能。
@@ -86,5 +86,6 @@ node packages/scripts/install-layered.mjs --profile web --mode all --home "$DSH_
 - **UI 不出现**：确认使用 all + Web/桌面 GUI，并检查客户端与连接服务。
 - **设置面板不可用**：平台没有设置分区时（旧平台线）参数改不了，只能用 `/evolution params` 只读查看；不再有 `/evolution policy` 命令。
 - **启动报重复注册**：同一 profile 挂了多个家族形态；移除多余 bundle 后重启。
+
 
 

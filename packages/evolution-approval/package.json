@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-approval",
   "description": "Stage/pending approval service for Hermes-style self-evolution writes",
-  "version": "0.51.1",
+  "version": "0.52.0",
   "publishConfig": {
     "access": "public"
   },
@@ -41,5 +41,3 @@
     "@deepseek-ai/dsh-evolution-state": "workspace:^"
   }
 }
-
-

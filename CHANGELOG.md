@@ -1,3 +1,18 @@
+## 0.52.0 (2026-11-18) — 技能整理 UI、数据总览、报错语义与工具面收敛
+
+> **范围**：① 技能整理工作台改为“技能 / 数据总览 / 待我确认 / 合并建议”四 tab；② 数据总览是可排序技能库表格（加载、近30天加载、报错、报错率），点技能名进入该技能整理页，返回保留搜索/筛选/排序/表格挂载；③ 新增 `skill-history/stats` 快照与 `SkillStatsRow` 领域模型，30 天加载用 `view_days` 日桶，报错数/报错率来自反馈事件窗口；④ 报错说明历史显示在技能页，最多 10 条；⑤ 反馈工具只保留负向报错，`note` 可选且 ≤20 字符；⑥ `edit` 从 `skill_manage` 删除，`update` 唯一整篇写入；⑦ 所有模型 `patch` 必须提供 `summary`；⑧ 删除 `/evolution extract`、`/evolution restructure` 命令，动作保留在 `skill_manage`；⑨ 旧 30 天窗口为 null，表格注明统计起点。
+>
+> **破坏性变更（0.x）**：
+> - 删除 `skill_manage` 的 `edit` action；使用 `update`（整篇）或 `patch`（局部）。
+> - `skill_manage feedback` 不再接受 `rating`/positive；只记录负向报错，可选 `note` ≤20 字符，旧 `rating` 参数会被拒绝。
+> - 所有模型 `patch` 必须提供 `summary`；旧 staged patch 无 summary 无法重放，需驳回后按带 summary 的新 patch 重提。
+> - 删除 `/evolution extract`、`/evolution restructure` 命令；使用 agent 的 `skill_manage` extract/restructure 动作，或 offload/condense。
+> - 旧数据不迁移：旧记录近30天加载/报错为 null，显示 `—`；报错率为 null 显示 `-`。
+>
+> **验证（本地，发布前）**：全量 483 files / 2870 tests 绿；local/pre-tag 可运行门禁 0 失败（3 个 registered cannotDecide 待 CI artifacts）；独立复核第 5/7 轮 GO，无 P0/P1；真机 0.51.2-dev.5 / web 3099 验证数据总览、报错说明历史、窗口说明。
+>
+> **发布证据**：S1–S4、20/20 tarball、独立 home、CI lane 在 0.52.0 上重新实测后补入本段。
+
 ## 0.51.1 (2026-11-18) — 面板成功次数在无治理记录时可见
 
 > **修复**：技能历史面板把「成功次数」渲染在「最近治理」的条件块内；最近治理为空时，即使有 extract/offload/condense 成功计数也不会显示。现在成功次数独立渲染，计数为 0 时也显示，便于确认统计链路正常。
