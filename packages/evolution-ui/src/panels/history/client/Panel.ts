@@ -10,7 +10,9 @@
  * @module @deepseek-ai/dsh-evolution-ui/panels/history/client
  */
 import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { emptyState, groupHeading, localTime, notice, panelHead, searchField, skillLine, versionRow, type Copy, type OpenKind } from './chrome.ts'
+import { type Copy, type OpenKind } from './chrome.ts'
+import { SkillList } from './skills/SkillList.ts'
+import { SkillDetail } from './skills/SkillDetail.ts'
 import { DiffBody, PreviewBody, type BodyState, type DiffState } from './document.ts'
 import { historyViewModel } from './history-presentation.ts'
 import { SkillHistoryRefusal, type GovernanceRow, type HealthPayload, type SkillRow, type VersionBodyRow, type VersionDiffRow, type VersionsPayload, type VersionRow } from './api.ts'
@@ -286,85 +288,46 @@ export function SkillHistoryPanel(face: PanelFace): ReactNode {
     return state === undefined ? null : createElement(PreviewBody, { face, body: state })
   }
 
-  /** One group: a heading, an optional note, and its rows. */
-  const group = (title: string, entries: readonly VersionRow[], noteText2: string | undefined): ReactNode => {
-    if (entries.length === 0) return null
-    return createElement('section', { key: title },
-      ...groupHeading(title, noteText2),
-      ...entries.map(row => versionRow({
-        copy: face,
-        row,
-        confirming: pending === row.v,
-        open: expanded !== undefined && expanded.v === row.v ? expanded.kind : undefined,
-        expanded: expandedOf(row),
-        onRestore: () => { restore(row.v, row.unitId) },
-        onCancel: cancelRestore,
-        onToggle: (kind: OpenKind) => { toggle(row.v, kind) },
-      })))
-  }
+  const failureNode = failure === undefined
+    ? null
+    : createElement('div', { className: 'evo-hist-failure' }, failureBlock(face.t, failure))
 
   return createElement('div', { className: 'evo-hist-frame' },
     createElement('div', { className: 'evo-hist-root' },
-    createElement('aside', { className: 'evo-hist-aside' },
-      searchField(face, query, setQuery),
-      createElement('div', { className: 'evo-hist-list' },
-        skills.length === 0
-          ? emptyState(face.t(skillsLoaded ? 'empty.skills' : 'loading'))
-          : visible.length === 0
-            ? emptyState(face.t('search.none'))
-            : visible.map(skill => skillLine(face, skill, skill.name === selected, () => { open(skill.name) }, healthByName.get(skill.name))))),
-    createElement('div', { className: 'evo-hist-main' },
-      panelHead(face, refresh, selected ?? face.t('bodyTitle'), selected),
-      notice(noteText, noteError),
-      governance.length === 0
-        ? null
-        : createElement('section', { className: 'evo-hist-governance' },
-          createElement('h3', { className: 'evo-hist-group' }, face.t('governance.title')),
-          createElement('ul', { className: 'evo-hist-governance-list' },
-            governance.map(row => createElement('li', { key: row.runId, className: 'evo-hist-governance-row' },
-              face.format('governance.line', {
-                mode: row.mode ?? '—',
-                target: row.target ?? '—',
-                state: row.state,
-              }),
-              face.t('governance.separator'),
-              localTime(new Date(row.startedAt).toISOString()))))),
-      counts === null
-        ? null
-        : createElement('p', { className: 'evo-hist-hint' }, face.format('governance.counts', {
-          offload: counts.offload,
-          condense: counts.condense,
-          extract: counts.extract,
-        })),
-      failure === undefined ? null : createElement('div', { className: 'evo-hist-failure' }, failureBlock(face.t, failure)),
-      // The explanation is for the screen that has nothing else on it (W12): a reader who can see
-      // versions does not need to be told what a version is.
-      selected === undefined
-        ? [
-          emptyState(face.t(skills.length === 0 ? (skillsLoaded ? 'empty.skills.main' : 'loading') : 'empty.pick'), 'empty'),
-          createElement('p', { key: 'hint', className: 'evo-hist-hint' }, face.t('hint')),
-        ]
-        : loaded
-          ? null
-          // T5-09: three states, three sentences — a failed read must not render as "still reading".
-          : emptyState(versionsFailed === undefined ? face.t('loading') : `${face.t('empty.versions.failed')} — ${versionsFailed}`),
-      loaded && model !== undefined
-        ? createElement('div', { className: 'evo-hist-reader' },
-          model.current.length === 0 ? null : createElement('section', { key: 'current', className: 'evo-hist-current' },
-            ...groupHeading(face.t('group.current'), undefined),
-            ...model.current.map(row => versionRow({
-              copy: face, row,
-              confirming: pending === row.v,
-              open: expanded !== undefined && expanded.v === row.v ? expanded.kind : undefined,
-              expanded: expandedOf(row),
-              onRestore: () => { restore(row.v, row.unitId) },
-              onCancel: cancelRestore,
-              onToggle: (kind: OpenKind) => { toggle(row.v, kind) },
-            }))),
-          group(face.t('group.history'), model.older, undefined),
-          model.support.length === 0 ? null : group(face.t('group.support'), model.support, face.t('group.support.note')),
-          model.hasAny ? null : createElement('p', { className: 'evo-hist-hint' }, face.t('empty.versions')))
-        : null)))
+      createElement(SkillList, {
+        copy: face,
+        query,
+        onQuery: setQuery,
+        skills,
+        visible,
+        skillsLoaded,
+        selected,
+        onOpen: open,
+        healthByName,
+      }),
+      createElement(SkillDetail, {
+        copy: face,
+        onRefresh: refresh,
+        selected,
+        noteText,
+        noteError,
+        governance,
+        counts,
+        failureNode,
+        skills,
+        skillsLoaded,
+        loaded,
+        versionsFailed,
+        model,
+        pending,
+        expanded,
+        expandedOf,
+        onRestore: restore,
+        onCancelRestore: cancelRestore,
+        onToggle: toggle,
+      }),
+    ),
+  )
 }
 
 /**
