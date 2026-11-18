@@ -9,9 +9,9 @@
 > - 删除 `/evolution extract`、`/evolution restructure` 命令；使用 agent 的 `skill_manage` extract/restructure 动作，或 offload/condense。
 > - 旧数据不迁移：旧记录近30天加载/报错为 null，显示 `—`；报错率为 null 显示 `-`。
 >
-> **验证（本地，发布前）**：全量 483 files / 2870 tests 绿；local/pre-tag 可运行门禁 0 失败（3 个 registered cannotDecide 待 CI artifacts）；独立复核第 5/7 轮 GO，无 P0/P1；真机 0.51.2-dev.5 / web 3099 验证数据总览、报错说明历史、窗口说明。
+> **验证（0.52.0）**：全量 483 files / 2870 tests 绿；local/pre-tag 可运行门禁 0 失败（3 个 registered cannotDecide 为环境项）；独立复核第 5/7 轮 GO，无 P0/P1；真机 0.52.0 / web 3101 验证数据总览、报错说明历史、窗口说明；独立 home web0520 启动验证。CI 主分支 run `44255967763` 全绿（validate node 24/node 22、pack、desktop install）。S1 rows 29 / 22689 bytes / reads 61,67,56ms；S2 owner 200/anonymous 401；S3 schema 2/facts 7/runtime 8/family 0.52.0/mergeWire 1；S4 2/2。20/20 tarball audit 与 packed-install smoke 通过。
 >
-> **发布证据**：S1–S4、20/20 tarball、独立 home、CI lane 在 0.52.0 上重新实测后补入本段。
+> **发布证据**：S1–S4 已在 0.52.0 上实测；release-evidence rehearsal 已随仓库提交，tag workflow 会用 CI job ledger 重新 assemble。
 
 ## 0.51.1 (2026-11-18) — 面板成功次数在无治理记录时可见
 
