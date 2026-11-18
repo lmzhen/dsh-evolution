@@ -20,7 +20,7 @@ it('zh and en have the same complete key set', () => {
     'stage.state.lost', 'stage.state.expired',
     'history.reason.target-taken', 'history.reason.validation-failed', 'history.reason.merge-over-limit',
   ]))
-  expect(zh['history.reason.merge-over-limit']).toBe('融合后超出字数上限')
+  expect(zh['history.reason.merge-over-limit']).toBe('合并后超出字符上限')
   expect(zh['settings.mergeApproval']).toContain('技能自动合并')
   expect(zh['settings.platformWrite']).toContain('写入审批')
   expect(zh['settings.hint']).toContain('两轮合并工作流')

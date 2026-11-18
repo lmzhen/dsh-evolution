@@ -213,14 +213,14 @@
       "ru": "Сообщать нечего."
     },
     "empty.noneReported": {
-      "zh": "这次没有发现异常——但这不代表每个技能都能读取。",
-      "en": "No problems found this time—but that doesn't mean every skill could be read.",
-      "ja": "今回は問題が見つかりませんでした。ただし、すべてのスキルが読み取れるとは限りません。",
-      "es": "Esta vez no se marcó nada, pero eso no significa que todos los skills se pudieran leer.",
-      "fr": "Rien n’a été signalé cette fois — cela ne veut pas dire que chaque skill a pu être lu.",
-      "de": "Diesmal wurde nichts Auffälliges gefunden – das heißt aber nicht, dass jeder Skill lesbar war.",
-      "pt": "Nada foi sinalizado desta vez — mas isso não significa que todas as skills puderam ser lidas.",
-      "ru": "На этот раз проблем не найдено — но это не значит, что каждый навык удалось прочитать."
+      "zh": "这次没发现问题，但不代表所有技能都读得到。",
+      "en": "No problems were found this time, but that doesn’t mean every skill could be read.",
+      "ja": "今回は問題が見つかりませんでした。ただし、すべてのスキルを読み取れたわけではありません。",
+      "es": "Esta vez no se ha encontrado ningún problema, pero eso no significa que se pudieran leer todos los skills.",
+      "fr": "Rien à signaler cette fois — mais cela ne signifie pas que tous les skills ont pu être lus.",
+      "de": "Diesmal wurde kein Problem gefunden – das heißt aber nicht, dass sich alle Skills lesen ließen.",
+      "pt": "Nenhum problema apareceu desta vez — mas isso não quer dizer que todas as skills puderam ser lidas.",
+      "ru": "В этот раз проблем не нашли, но это не значит, что все навыки удалось прочитать."
     },
     "entry.label": {
       "zh": "技能健康",
@@ -364,13 +364,13 @@
     },
     "group.proposals": {
       "zh": "改进建议",
-      "en": "Improvement suggestions",
+      "en": "Suggested improvements",
       "ja": "改善案",
       "es": "Sugerencias de mejora",
-      "fr": "Suggestions",
-      "de": "Vorschläge",
-      "pt": "Sugestões",
-      "ru": "Предложения"
+      "fr": "Suggestions d’amélioration",
+      "de": "Verbesserungsvorschläge",
+      "pt": "Sugestões de melhoria",
+      "ru": "Предложения по улучшению"
     },
     "health.complete": {
       "zh": "没有需要处理的问题",
@@ -393,14 +393,14 @@
       "ru": "{n} в норме — разверните, чтобы увидеть"
     },
     "hint": {
-      "zh": "这里按规则汇总技能检查结果。还没定统一标准的规则只报规则名、不报数字；读不到内容的技能单独标为「无法读取」，不算正常。",
-      "en": "Skill check results are grouped by rule. Rules without a set standard report only the rule name, no numbers; skills whose content can't be read are marked unreadable and don't count as healthy.",
-      "ja": "スキルのチェック結果をルール別に集計しています。まだ統一された基準がないルールは名前のみを表示し、数値は出しません。内容を読み取れないスキルは「読み取り不可」として別に表示し、正常とは扱いません。",
-      "es": "Aquí se resumen los resultados de la revisión de skills por regla. Una regla sin estándar fijo solo muestra su nombre, sin cifra; los skills cuyo contenido no se puede leer se marcan aparte como «Ilegible» y nunca cuentan como correctos.",
-      "fr": "Les résultats de vérification des skills sont regroupés par règle. Une règle sans standard fixé n’affiche que son nom, sans chiffre ; les skills dont le contenu est illisible sont marqués « Illisible » et ne comptent jamais comme normaux.",
-      "de": "Hier sind die Skill-Prüfungen nach Regel zusammengefasst. Regeln ohne festen Maßstab zeigen nur ihren Namen, keine Zahl; Skills, deren Inhalt nicht lesbar ist, sind separat als „Nicht lesbar“ markiert und gelten nie als in Ordnung.",
-      "pt": "Aqui os resultados das verificações de skills aparecem agrupados por regra. Uma regra sem padrão definido mostra só o nome, sem número; skills que não puderam ser lidas ficam marcadas como \"Ilegível\" e nunca contam como boas.",
-      "ru": "Здесь собраны результаты проверки навыков по правилам. Если для правила ещё нет общего эталона, показывается только его название, без цифр; навыки, содержимое которых не читается, помечаются отдельно как «Нечитаемый» и не считаются нормой."
+      "zh": "检查结果按规则汇总。还没定标准的规则只显示规则名，不显示数字；读不到内容的技能标为「无法读取」，不算正常。",
+      "en": "This page groups skill checks by rule. A rule with no standard set yet shows only its name, not a count. A skill whose content can’t be read is marked Unreadable and never counts as healthy.",
+      "ja": "スキルのチェック結果をルールごとにまとめています。基準がまだ決まっていないルールは、名前だけを出して数値は出しません。内容を読めないスキルは「読み取り不可」として別に扱い、正常には数えません。",
+      "es": "Aquí se ven los resultados de las comprobaciones, agrupados por regla. Las reglas que aún no tienen un estándar común solo muestran su nombre, sin cifras; los skills cuyo contenido no se puede leer se marcan como «Ilegible» y no cuentan como correctos.",
+      "fr": "Les contrôles des skills sont regroupés par règle. Une règle sans seuil défini n’affiche que son nom, sans chiffre ; un skill au contenu illisible est marqué « Illisible » et n’est jamais compté comme sain.",
+      "de": "Die Prüfergebnisse sind nach Regel gruppiert. Regeln ohne festen Maßstab zeigen nur den Namen, keine Zahl; Skills, deren Inhalt sich nicht lesen lässt, sind eigens als „Nicht lesbar“ gekennzeichnet und zählen nicht als in Ordnung.",
+      "pt": "Aqui, os resultados da verificação das skills ficam agrupados por regra. Regras sem padrão definido mostram só o nome, sem número; skills que não puderam ser lidas aparecem como “Ilegível” e não contam como saudáveis.",
+      "ru": "Здесь результаты проверки навыков сгруппированы по правилам. Если для правила ещё нет общего эталона, показываем только его название, без цифр. Навыки, которые не удалось прочитать, помечаются отдельно как «Нечитаемый» и не считаются нормой."
     },
     "line": {
       "zh": "位置：{path}",
@@ -543,13 +543,13 @@
       "ru": "можно извлечь"
     },
     "proposal.stale": {
-      "zh": "改进建议的数据已过期；这不等于没有可整理内容，请刷新后重试。",
-      "en": "The suggestions data is out of date; that doesn't mean there's nothing to tidy up. Refresh and try again.",
+      "zh": "改进建议已过期，不代表没有可整理的内容；点「刷新」重试。",
+      "en": "The suggestions data is out of date; that doesn’t mean there’s nothing to tidy up. Refresh and try again.",
       "ja": "改善案のデータが古くなっています。「整理する内容がない」という意味ではありません。更新して再試行してください。",
-      "es": "Los datos de las sugerencias están desactualizados; actualiza y reintenta. Eso no significa que no haya nada que organizar.",
+      "es": "Los datos de las sugerencias están desactualizados; eso no significa que no haya nada que organizar. Pulsa «Actualizar» y vuelve a intentarlo.",
       "fr": "Les suggestions sont périmées ; cela ne veut pas dire qu’il n’y a rien à ranger. Actualisez puis réessayez.",
-      "de": "Die Vorschlagsdaten sind veraltet; aktualisiere und versuche es erneut. Das heißt nicht, dass es nichts aufzuräumen gibt.",
-      "pt": "As sugestões estão desatualizadas; atualize e tente novamente. Isso não significa que não haja nada para organizar.",
+      "de": "Die Vorschläge sind nicht mehr aktuell; das heißt nicht, dass es nichts aufzuräumen gibt. Bitte aktualisieren und erneut versuchen.",
+      "pt": "Os dados das sugestões estão desatualizados. Atualize e tente de novo — isso não quer dizer que não haja nada para organizar.",
       "ru": "Данные предложений устарели; это не значит, что упорядочивать нечего — обновите и повторите."
     },
     "proposal.status.dismissed": {
@@ -803,14 +803,14 @@
       "ru": "Здоровье навыков"
     },
     "unreadable.note": {
-      "zh": "读不到内容，因此无法判断（不是「通过」）。",
-      "en": "The content couldn't be read, so there's no verdict (this isn't a pass).",
-      "ja": "内容を読み取れないため判断できません（「問題なし」ではありません）。",
-      "es": "No se pudo leer el contenido, así que no se puede juzgar (no es un aprobado).",
-      "fr": "Contenu illisible, donc impossible de juger (ce n’est pas un « conforme »).",
-      "de": "Der Inhalt war nicht lesbar, deshalb lässt sich nichts sagen (es ist kein „Bestanden“).",
-      "pt": "O conteúdo não pôde ser lido, então não é possível avaliar (não significa que está tudo bem).",
-      "ru": "Содержимое не читается, поэтому судить нельзя (это не «Норма»)."
+      "zh": "内容读取失败，所以无法判断（不是通过）。",
+      "en": "The content couldn’t be read, so there’s no verdict. This is not a pass.",
+      "ja": "内容を読み取れなかったため、判定できません（正常ではありません）。",
+      "es": "No se pudo leer el contenido, así que no se puede valorar (no cuenta como aprobado).",
+      "fr": "Contenu illisible : impossible de juger — ne le comptez pas comme sain.",
+      "de": "Der Inhalt ließ sich nicht lesen, deshalb gibt es kein Urteil – „Nicht lesbar“ heißt nicht „In Ordnung“.",
+      "pt": "Não foi possível ler o conteúdo, então não dá para avaliar — e isso não quer dizer que esteja tudo bem.",
+      "ru": "Прочитать содержимое не удалось, поэтому судить нельзя (это не «В норме»)."
     },
     "verdict.error": {
       "zh": "错误",

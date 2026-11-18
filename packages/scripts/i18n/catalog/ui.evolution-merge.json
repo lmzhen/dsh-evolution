@@ -213,13 +213,13 @@
       "ru": "Состояние объединения не готово; чтение приостановлено."
     },
     "blocked.title": {
-      "zh": "合并状态未就绪",
-      "en": "Merge state isn't ready",
-      "ja": "マージ状態が未準備です",
-      "es": "El estado del merge no está listo",
-      "fr": "État de fusion bloqué",
-      "de": "Merge-Status blockiert",
-      "pt": "Estado de merge bloqueado",
+      "zh": "合并数据暂时读不了",
+      "en": "Merge data isn’t ready",
+      "ja": "統合の準備ができていません",
+      "es": "El estado de fusión no está listo",
+      "fr": "L’état de fusion n’est pas encore prêt",
+      "de": "Merge-Status nicht bereit",
+      "pt": "Estado da mesclagem não está pronto",
       "ru": "Состояние объединения не готово"
     },
     "body.archive": {
@@ -723,14 +723,14 @@
       "ru": "Дополнительно"
     },
     "hint": {
-      "zh": "先处理需要判断的重复技能，其余按需展开。",
-      "en": "Handle merges that need a verdict first; expand the rest as needed.",
-      "ja": "判断が必要なマージを先に処理します。その他の情報は必要に応じて展開できます。",
-      "es": "Empieza por los merges que hay que juzgar; el resto de la información se despliega cuando haga falta.",
-      "fr": "Traitez d’abord les fusions qui demandent une décision ; le reste s’ouvre au besoin.",
-      "de": "Erst die Merges erledigen, die eine Entscheidung brauchen; alles andere bleibt eingeklappt.",
-      "pt": "Resolva primeiro os merges que precisam de decisão; o resto fica recolhido.",
-      "ru": "Сначала разберите объединения, ждущие решения; остальное раскрывается по мере нужды."
+      "zh": "先处理待复核的合并，其余信息按需展开。",
+      "en": "Start with the pairs that need a verdict. Expand the rest as needed.",
+      "ja": "判断が必要な統合を先に処理します。ほかの情報は必要なときに開いてください。",
+      "es": "Empieza por las fusiones pendientes de decisión; el resto se despliega cuando haga falta.",
+      "fr": "Commencez par les fusions qui attendent une décision ; le reste se déplie au besoin.",
+      "de": "Zuerst die doppelten Skills erledigen, die eine Entscheidung brauchen; alles andere lässt sich bei Bedarf aufklappen.",
+      "pt": "Resolva primeiro as mesclagens que precisam de decisão; o resto fica recolhido.",
+      "ru": "Сначала займитесь парами, которые ждут проверки; остальное можно раскрыть по мере надобности."
     },
     "history": {
       "zh": "历史",
@@ -843,14 +843,14 @@
       "ru": "объединение не требуется"
     },
     "history.reason.merge-over-limit": {
-      "zh": "融合后超出字数上限",
-      "en": "Merged text would be over the length cap",
-      "ja": "マージ後の文字数が上限を超過",
-      "es": "Tras el merge superaba el límite de caracteres",
-      "fr": "le skill fusionné dépasse la limite de caractères",
-      "de": "gemergter Skill überschreitet das Zeichenlimit",
-      "pt": "o merge passa do limite de caracteres",
-      "ru": "после объединения навык превышает лимит символов"
+      "zh": "合并后超出字符上限",
+      "en": "The merged text would exceed the character limit",
+      "ja": "統合すると文字数の上限を超える",
+      "es": "La fusión superaría el límite de caracteres",
+      "fr": "la fusion dépasserait la limite de caractères",
+      "de": "Beim Zusammenführen würde der Skill das Zeichenlimit überschreiten",
+      "pt": "A mesclagem passaria do limite de caracteres",
+      "ru": "При объединении текст превысит лимит символов"
     },
     "history.reason.merged": {
       "zh": "已合并",
@@ -2163,14 +2163,14 @@
       "ru": "К проверке"
     },
     "task.pending": {
-      "zh": "条合并建议待处理",
+      "zh": "条合并建议待我确认",
       "en": "merge suggestions pending",
-      "ja": "件のマージ提案が未処理です",
-      "es": "sugerencias de merge por atender",
-      "fr": "suggestions de fusion à traiter",
-      "de": "Merge-Vorschläge warten auf Bearbeitung",
-      "pt": "sugestões de merge precisam de atenção",
-      "ru": "ожидают решения"
+      "ja": "件の統合候補が未処理です",
+      "es": "sugerencias de fusión pendientes",
+      "fr": "suggestions de fusion en attente",
+      "de": "Merge-Vorschläge ausstehend",
+      "pt": "sugestões de mesclagem pendentes",
+      "ru": "ждут подтверждения"
     },
     "title": {
       "zh": "合并建议",
