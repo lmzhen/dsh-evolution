@@ -62,6 +62,9 @@ export function emptyRecord(): UsageRecord {
     state: 'active',
     pinned: false,
     archived_at: null,
+    // A record CREATED by this runtime is a measured empty window; a legacy record normalized
+    // without the field stays undefined (unknown, not zero).
+    view_days: {},
   }
 }
 

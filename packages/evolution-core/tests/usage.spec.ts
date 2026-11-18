@@ -412,7 +412,9 @@ describe('rolling view buckets', () => {
   })
 
   it('distinguishes a legacy record (no buckets) from a measured empty window', () => {
-    expect(recentViewCount(emptyRecord(), 30)).toBeNull()
+    const legacy = { ...emptyRecord(), view_days: undefined }
+    expect(recentViewCount(legacy, 30)).toBeNull()
+    expect(recentViewCount(emptyRecord(), 30)).toBe(0)
     const measured = { ...emptyRecord(), view_days: {} }
     expect(recentViewCount(measured, 30)).toBe(0)
   })
