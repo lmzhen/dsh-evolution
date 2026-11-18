@@ -6,7 +6,7 @@
 >
 > **不迁移**：磁盘数据格式不变；已有 MEMORY.md / USER.md 不重写；旧 usage / feedback 记录保持原样。
 >
-> **验证**：待发布准备阶段补齐全量 gate、真实 npm web 升级验收与独立复核；本段在发布时替换为最终版本号和证据。
+> **验证**：0.55.0 本地 pre-tag gate **64 pass / 0 fail / 3 registered cannotDecide / 2 skipped**；`text-metrics` 与 UI copy 两轮独立复核均 **GO（P0/P1=0）**；定向测试覆盖 metric、memory、history、merge、pending approval 与 8 语言字典。真实 npm web 升级验收在发布后按 1440 / 1024 / 390 三档记录。
 
 ## 0.54.0 (2026-11-18) — 单 bundle 安装与整族点击升级
 
