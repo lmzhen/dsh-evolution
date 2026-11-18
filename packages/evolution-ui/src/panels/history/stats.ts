@@ -19,7 +19,7 @@ import type {
   SkillStatsSnapshot,
   SkillUsageFacts,
 } from '@deepseek-ai/dsh-evolution-core/skills'
-import { computeSkillStatsTotals, latestActivityAt, recentlyUsedAt } from '@deepseek-ai/dsh-evolution-core/skills'
+import { computeSkillStatsTotals, latestActivityAt, recentlyUsedAt, SKILL_OPERATIONS } from '@deepseek-ai/dsh-evolution-core/skills'
 import { isRecord, normalizeUsageRecord, recentViewCount } from '@deepseek-ai/dsh-evolution-core'
 import type { CuratorFace, RouteServices } from './routes.ts'
 
@@ -213,7 +213,6 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
       description: row.description,
       versions: row.versions,
       lastChangedAt: row.lastAt,
-      lastAt: row.lastAt,
       lastActivityAt,
       recentlyUsed: recentlyUsedAt(lastActivityAt, now),
       needsAttention: verdict === 'warn' || verdict === 'needs-restructure',
@@ -230,10 +229,12 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
   const totals = computeSkillStatsTotals(rows, counts)
   return {
     rows,
-    global: { totals, counts, governance },
-    totals,
-    counts,
-    governance,
+    global: {
+      totals,
+      counts,
+      governance,
+      operations: SKILL_OPERATIONS.map(operation => ({ id: operation.id, labelKey: operation.labelKey })),
+    },
     generatedAt: new Date().toISOString(),
   }
 }

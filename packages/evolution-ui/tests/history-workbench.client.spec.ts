@@ -130,7 +130,6 @@ describe('history workbench', () => {
         description: 'alpha desc',
         versions: 2,
         lastChangedAt: '2026-01-01T00:00:00.000Z',
-        lastAt: '2026-01-01T00:00:00.000Z',
         lastActivityAt: null,
         recentlyUsed: null,
         needsAttention: true,
@@ -142,14 +141,11 @@ describe('history workbench', () => {
         feedbackRate30d: null,
         errorNotes: errorCount === 0 ? [] : [{ at: '2026-01-01T00:00:00.000Z', note: 'new report' }],
       }],
-      totals: { skills: 1, needsAttention: 1, bodyChars: 12, supportFiles: 1, successes: { offload: 0, condense: 0, extract: 1 } },
       global: {
         totals: { skills: 1, needsAttention: 1, bodyChars: 12, supportFiles: 1, successes: { offload: 0, condense: 0, extract: 1 } },
         counts: { offload: 0, condense: 0, extract: 1 },
         governance: [],
       },
-      counts: { offload: 0, condense: 0, extract: 1 },
-      governance: [],
       generatedAt: '2026-01-01T00:00:00.000Z',
     }))
     const view = render(h(WorkbenchPage, {

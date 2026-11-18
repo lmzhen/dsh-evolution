@@ -11,6 +11,8 @@
  * @module @deepseek-ai/dsh-evolution-core
  */
 
+import type { SkillOperationId } from './skill-operations.ts'
+
 /** One health dimension the aggregate view exposes for a skill. */
 export interface SkillHealthFacts {
   readonly verdict: string
@@ -78,8 +80,6 @@ export interface SkillStatsRow {
   readonly versions: number
   /** Canonical last content change. */
   readonly lastChangedAt: string | null
-  /** Compatibility alias for `lastChangedAt`; remove once every consumer reads the canonical field. */
-  readonly lastAt: string | null
   /** Newest model load / external use; null when neither timestamp was measured. */
   readonly lastActivityAt: string | null
   /** True when lastActivityAt is inside the 30-day use window; null when no activity was measured. */
@@ -130,17 +130,15 @@ export interface SkillStatsGlobal {
   readonly totals: SkillStatsTotals
   readonly counts: SkillStatsCounts | null
   readonly governance: readonly SkillStatsGovernance[]
+  /** Label keys for the three success counters; the browser never imports core runtime. */
+  readonly operations?: readonly { readonly id: SkillOperationId; readonly labelKey: string }[]
 }
 
 /** One complete read of the skill library, as the host route returns it. */
 export interface SkillStatsSnapshot {
   readonly rows: readonly SkillStatsRow[]
-  /** New canonical home for library-wide facts. */
+  /** Library-wide facts live here, never in a single-skill detail view. */
   readonly global: SkillStatsGlobal
-  /** Compatibility aliases; new UI reads `global` and these are removed in the next contract cut. */
-  readonly totals: SkillStatsTotals
-  readonly counts: SkillStatsCounts | null
-  readonly governance: readonly SkillStatsGovernance[]
   readonly generatedAt: string
 }
 

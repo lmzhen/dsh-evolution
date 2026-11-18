@@ -119,6 +119,13 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   ]
 
   const totals = snapshot?.global.totals
+  const successCounts = snapshot?.global.counts
+  const successOperations = snapshot?.global.operations ?? []
+  const activity = successCounts === null || successCounts === undefined || successOperations.length === 0
+    ? null
+    : createElement('p', { className: 'evo-stats-activity' },
+      face.t('stats.activity') + '：',
+      successOperations.map(operation => face.t(operation.labelKey) + ' ' + String(successCounts[operation.id])).join(' · '))
   const hiddenInMedium = new Set(['supportFiles', 'versions', 'viewCount', 'feedbackRate30d', 'lastAt'])
   const columns = layout === 'wide' ? allColumns : allColumns.filter(column => !hiddenInMedium.has(column.key))
 
@@ -171,6 +178,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       createElement('div', { className: 'evo-stats-stat is-warn' }, createElement('span', null, face.t('stats.total.attention')), createElement('b', null, totals === undefined ? '—' : totals.needsAttention.toLocaleString())),
       createElement('div', { className: 'evo-stats-stat' }, createElement('span', null, face.t('stats.total.body')), createElement('b', null, totals === undefined ? '—' : numberText(totals.bodyChars))),
       createElement('div', { className: 'evo-stats-stat is-ok' }, createElement('span', null, face.t('stats.total.success')), createElement('b', null, totals?.successes === null || totals === undefined ? '—' : (totals.successes.offload + totals.successes.condense + totals.successes.extract).toLocaleString()))),
+    activity,
     createElement('div', { className: 'evo-stats-toolbar' },
       createElement('label', { className: 'evo-stats-search' },
         createElement('span', { className: 'evo-stats-search-mark', 'aria-hidden': 'true' }),
@@ -229,6 +237,7 @@ export const STATS_CSS = [
   '.evo-stats-stat b{font-size:16px;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary,#20261f)}',
   '.evo-stats-stat.is-warn b{color:var(--evo-warn,#b26a3c)}',
   '.evo-stats-stat.is-ok b{color:var(--evo-accent,#2f6b58)}',
+  '.evo-stats-activity{margin:-6px 0 0;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;line-height:1.5}',
   '.evo-stats-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
   '.evo-stats-search{display:flex;align-items:center;gap:7px;flex:1 1 240px;height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:9px;background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-tertiary,#9aa096)}',
   '.evo-stats-search-mark{font-size:16px}',

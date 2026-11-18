@@ -333,8 +333,8 @@
       "ru": "Не удалось прочитать версии — есть ли они у этого навыка, сейчас не определить; нажмите «Обновить» и повторите."
     },
     "entry.label": {
-      "zh": "技能自动进化",
-      "en": "Skill auto-evolution",
+      "zh": "技能整理",
+      "en": "Skill organizer",
       "ja": "スキル履歴",
       "es": "Evolución automática de skills",
       "fr": "Auto-évolution des skills",
@@ -623,8 +623,8 @@
       "ru": "{mode} {target} — {state}"
     },
     "governance.counts": {
-      "zh": "成功：offload {offload} · condense {condense} · extract {extract}",
-      "en": "Succeeded: offload {offload} · condense {condense} · extract {extract}",
+      "zh": "整理成功：拆分 {offload} · 精简 {condense} · 提取 {extract}",
+      "en": "Succeeded: split {offload} · condense {condense} · extract {extract}",
       "ja": "成功：offload {offload} · condense {condense} · extract {extract}",
       "es": "Correctas: offload {offload} · condense {condense} · extract {extract}",
       "fr": "Réussies : offload {offload} · condense {condense} · extract {extract}",
@@ -1003,8 +1003,8 @@
       "ru": "1 год назад"
     },
     "title": {
-      "zh": "技能自动进化",
-      "en": "Skill auto-evolution",
+      "zh": "技能整理",
+      "en": "Skill organizer",
       "ja": "スキル履歴",
       "es": "Evolución automática de skills",
       "fr": "Auto-évolution des skills",
@@ -1532,7 +1532,16 @@
       "pt": "Filtrar habilidades",
       "ru": "Фильтр навыков"
     },
-    "stats.sort": {
+        "stats.activity": {
+      "zh": "整理活动",
+      "en": "Organizing activity",
+      "ja": "整理アクティビティ",
+      "es": "Actividad de organización",
+      "fr": "Activité d’organisation",
+      "de": "Aufräumaktivität",
+      "pt": "Atividade de organização",
+      "ru": "Активность упорядочивания"
+    },"stats.sort": {
       "zh": "排序",
       "en": "Sort",
       "ja": "並び順",

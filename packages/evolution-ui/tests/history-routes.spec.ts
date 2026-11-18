@@ -101,9 +101,11 @@ describe('skill-history routes: the stats snapshot', () => {
           feedbackRate30d: number | null
           errorNotes: Array<{ at: string; note: string }> | null
         }>
-        totals: { skills: number; needsAttention: number; bodyChars: number | null; supportFiles: number | null }
-        counts: { offload: number; condense: number; extract: number } | null
-        governance: Array<{ runId: string; state: string; startedAt: number; target: string | null; mode: string | null; resultRef: string | null }>
+        global: {
+          totals: { skills: number; needsAttention: number; bodyChars: number | null; supportFiles: number | null }
+          counts: { offload: number; condense: number; extract: number } | null
+          governance: Array<{ runId: string; state: string; startedAt: number; target: string | null; mode: string | null; resultRef: string | null }>
+        }
       }
     }>(SKILL_HISTORY_ROUTES.stats)
     expect(stats.status).toBe(200)
@@ -128,9 +130,9 @@ describe('skill-history routes: the stats snapshot', () => {
     expect(quiet.feedback30d).toBe(0)
     expect(quiet.negativeFeedback30d).toBe(0)
     expect(quiet.feedbackRate30d).toBeNull()
-    expect(stats.body.data.totals).toMatchObject({ skills: 2, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
-    expect(stats.body.data.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
-    expect(stats.body.data.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }])
+    expect(stats.body.data.global.totals).toMatchObject({ skills: 2, needsAttention: 1, bodyChars: 0, supportFiles: 0 })
+    expect(stats.body.data.global.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
+    expect(stats.body.data.global.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }])
     // The probe stays tiny even when every aggregate service is present: `stats` is the one read.
     const health = await host.json(SKILL_HISTORY_ROUTES.health)
     expect(health.status).toBe(200)
@@ -147,7 +149,7 @@ describe('skill-history routes: the stats snapshot', () => {
     const stats = await host.json<{ ok: boolean; data: { rows: unknown[]; totals: { bodyChars: number | null } } }>(SKILL_HISTORY_ROUTES.stats)
     expect(stats.status).toBe(200)
     expect(stats.body.data.rows).toEqual([])
-    expect(stats.body.data.totals.bodyChars).toBeNull()
+    expect(stats.body.data.global.totals.bodyChars).toBeNull()
   })
 })
 

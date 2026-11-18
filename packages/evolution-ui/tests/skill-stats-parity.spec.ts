@@ -15,7 +15,6 @@ function row(name: string, body: number | null, verdict: string, lastAt: string 
     description: name,
     versions: name.length,
     lastChangedAt: lastAt,
-    lastAt,
     lastActivityAt: null,
     recentlyUsed: null,
     needsAttention: verdict === 'warn' || verdict === 'needs-restructure',

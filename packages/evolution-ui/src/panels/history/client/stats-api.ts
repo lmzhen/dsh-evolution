@@ -18,6 +18,7 @@ import type {
   SkillStatsSnapshot,
   SkillStatsTotals,
   SkillUsageFacts,
+  SkillOperationId,
 } from '@deepseek-ai/dsh-evolution-core/skills'
 
 function recordOf(value: unknown): Record<string, unknown> | null {
@@ -96,7 +97,6 @@ function rowOf(value: unknown): SkillStatsRow | null {
     description: typeof source.description === 'string' ? source.description : '',
     versions: numberOrNull(source.versions) ?? 0,
     lastChangedAt,
-    lastAt: stringOrNull(source.lastAt) ?? lastChangedAt,
     lastActivityAt: stringOrNull(source.lastActivityAt),
     recentlyUsed: booleanOrNull(source.recentlyUsed),
     needsAttention,
@@ -119,8 +119,21 @@ function countsOf(value: unknown): SkillStatsCounts | null {
   return offload === null || condense === null || extract === null ? null : { offload, condense, extract }
 }
 
-function totalsOf(value: unknown, rows: readonly SkillStatsRow[]): SkillStatsTotals {
-  const source = recordOf(value)
+function operationsOf(value: unknown): readonly { readonly id: SkillOperationId; readonly labelKey: string }[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const ids = new Set<SkillOperationId>(['offload', 'condense', 'extract'])
+  const out: { id: SkillOperationId; labelKey: string }[] = []
+  for (const raw of value) {
+    const source = recordOf(raw)
+    if (source === null) continue
+    const id = typeof source.id === 'string' && ids.has(source.id as SkillOperationId) ? source.id as SkillOperationId : undefined
+    const labelKey = typeof source.labelKey === 'string' && source.labelKey !== '' ? source.labelKey : undefined
+    if (id !== undefined && labelKey !== undefined) out.push({ id, labelKey })
+  }
+  return out
+}
+
+function totalsOf(value: unknown, rows: readonly SkillStatsRow[]): SkillStatsTotals {  const source = recordOf(value)
   const successes = countsOf(source?.successes)
   return {
     skills: numberOrNull(source?.skills) ?? rows.length,
@@ -167,17 +180,16 @@ export function parseSkillStats(value: unknown): SkillStatsSnapshot {
   const governance = governanceOf(source?.governance)
   const globalSource = recordOf(source?.global)
   const globalGovernance = governanceOf(globalSource?.governance)
+  const operations = operationsOf(globalSource?.operations)
   const global = {
     totals: globalSource?.totals === undefined ? totals : totalsOf(globalSource.totals, rows),
     counts: countsOf(globalSource?.counts) ?? counts,
     governance: globalGovernance.length > 0 ? globalGovernance : governance,
+    ...(operations === undefined ? {} : { operations }),
   }
   return {
     rows,
     global,
-    totals: global.totals,
-    counts: global.counts,
-    governance: global.governance,
     generatedAt: stringOrNull(source?.generatedAt) ?? '',
   }
 }

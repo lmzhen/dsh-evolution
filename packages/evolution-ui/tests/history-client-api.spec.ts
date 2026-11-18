@@ -94,9 +94,9 @@ describe('skill-history client api', () => {
     expect(stats.rows[0]?.health).toMatchObject({ bodyChars: 0, bodyTokens: null, supportFiles: 0 })
     expect(stats.rows[0]?.usage).toMatchObject({ useCount: 0, viewCount: null, viewCount30d: 0, patchCount: 1 })
     expect(stats.rows[0]).toMatchObject({ feedback30d: 0, negativeFeedback30d: 0, feedbackRate30d: null })
-    expect(stats.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0 })
-    expect(stats.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
-    expect(stats.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'a', mode: 'offload', resultRef: null }])
+    expect(stats.global.totals).toMatchObject({ skills: 1, needsAttention: 1, bodyChars: 0 })
+    expect(stats.global.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
+    expect(stats.global.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'a', mode: 'offload', resultRef: null }])
   })
 
   it('surfaces a business refusal verbatim and never as a silent empty result', async () => {
@@ -109,4 +109,3 @@ describe('skill-history client api', () => {
     await expect(api2.skills()).rejects.toThrow('HTTP 403')
   })
 })
-

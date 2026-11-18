@@ -14,7 +14,6 @@ function row(name: string): SkillStatsRow {
     description: name + ' description',
     versions: 1,
     lastChangedAt: '2026-01-01T00:00:00.000Z',
-    lastAt: '2026-01-01T00:00:00.000Z',
     lastActivityAt: null,
     recentlyUsed: null,
     needsAttention: false,
