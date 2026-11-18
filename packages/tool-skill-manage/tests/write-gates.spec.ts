@@ -104,7 +104,7 @@ describe('write gates: read-before-write (E-318)', () => {
     await createTarget(ctx, 'gate-unread')
     const refused = await callTool(
       ctx,
-      { action: 'patch', name: 'gate-unread', old_string: 'Body.', new_string: 'Rewritten.' },
+      { action: 'patch', summary: 'test patch', name: 'gate-unread', old_string: 'Body.', new_string: 'Rewritten.' },
       sessionOf('subagent'),
     )
     expect(valueOf(refused).ok).toBe(false)
@@ -118,7 +118,7 @@ describe('write gates: read-before-write (E-318)', () => {
     await createTarget(ctx, 'gate-read')
     const accepted = await callTool(
       ctx,
-      { action: 'patch', name: 'gate-read', old_string: 'Body.', new_string: 'Rewritten.' },
+      { action: 'patch', summary: 'test patch', name: 'gate-read', old_string: 'Body.', new_string: 'Rewritten.' },
       sessionOf('subagent', readFrames('gate-read')),
     )
     expect(valueOf(accepted).ok, valueOf(accepted).message).toBe(true)
@@ -130,7 +130,7 @@ describe('write gates: read-before-write (E-318)', () => {
     await createTarget(ctx, 'gate-failed-read')
     const refused = await callTool(
       ctx,
-      { action: 'patch', name: 'gate-failed-read', old_string: 'Body.', new_string: 'Rewritten.' },
+      { action: 'patch', summary: 'test patch', name: 'gate-failed-read', old_string: 'Body.', new_string: 'Rewritten.' },
       sessionOf('subagent', readFrames('gate-failed-read', true)),
     )
     expect(valueOf(refused).ok).toBe(false)
@@ -142,7 +142,7 @@ describe('write gates: read-before-write (E-318)', () => {
     await createTarget(ctx, 'gate-foreground')
     const accepted = await callTool(
       ctx,
-      { action: 'patch', name: 'gate-foreground', old_string: 'Body.', new_string: 'Operator edit.' },
+      { action: 'patch', summary: 'test patch', name: 'gate-foreground', old_string: 'Body.', new_string: 'Operator edit.' },
       sessionOf(undefined),
     )
     expect(valueOf(accepted).ok, valueOf(accepted).message).toBe(true)
@@ -158,8 +158,8 @@ describe('write gates: read-before-write (E-318)', () => {
     ctx.logger.warn = ((message: string) => { warns.push(message) }) as typeof ctx.logger.warn
     // A session object without the events accessor: the check cannot run for this call.
     const bare = { id: 'gate-bare', header: { origin: 'subagent' } }
-    const first = await callTool(ctx, { action: 'patch', name: 'gate-nolog', old_string: 'Body.', new_string: 'One.' }, bare)
-    const second = await callTool(ctx, { action: 'patch', name: 'gate-nolog', old_string: 'One.', new_string: 'Two.' }, bare)
+    const first = await callTool(ctx, { action: 'patch', summary: 'test patch', name: 'gate-nolog', old_string: 'Body.', new_string: 'One.' }, bare)
+    const second = await callTool(ctx, { action: 'patch', summary: 'test patch', name: 'gate-nolog', old_string: 'One.', new_string: 'Two.' }, bare)
     expect(valueOf(first).ok, valueOf(first).message).toBe(true)
     expect(valueOf(second).ok, valueOf(second).message).toBe(true)
     expect(warns.filter(message => message.includes('read-before-write'))).toHaveLength(1)
@@ -168,7 +168,7 @@ describe('write gates: read-before-write (E-318)', () => {
   it('keeps pure refusals ahead of the read gate: a malformed call reports its missing argument', async () => {
     const { ctx } = await setup()
     await createTarget(ctx, 'gate-order')
-    const refused = await callTool(ctx, { action: 'patch', name: 'gate-order', old_string: 'Body.' }, sessionOf('subagent'))
+    const refused = await callTool(ctx, { action: 'patch', summary: 'test patch', name: 'gate-order', old_string: 'Body.' }, sessionOf('subagent'))
     expect(valueOf(refused).ok).toBe(false)
     expect(valueOf(refused).message).toContain('skill_manage patch requires new_string')
     expect(valueOf(refused).message).not.toContain('E-318')
@@ -229,7 +229,7 @@ describe('write gates: admission runs before the approval seam', () => {
     const baseline = requests()
     const refused = await callTool(
       ctx,
-      { action: 'patch', name: 'gate-staged', old_string: 'Body.', new_string: 'Rewritten.' },
+      { action: 'patch', summary: 'test patch', name: 'gate-staged', old_string: 'Body.', new_string: 'Rewritten.' },
       sessionOf('subagent'),
     )
     expect(valueOf(refused).ok).toBe(false)
@@ -246,7 +246,7 @@ describe('write gates: admission runs before the approval seam', () => {
     const baseline = requests()
     const refused = await callTool(
       ctx,
-      { action: 'patch', name: 'gate-protected', old_string: 'Body.', new_string: 'Rewritten.' },
+      { action: 'patch', summary: 'test patch', name: 'gate-protected', old_string: 'Body.', new_string: 'Rewritten.' },
       sessionOf('subagent', readFrames('gate-protected')),
     )
     expect(valueOf(refused).ok).toBe(false)
@@ -272,7 +272,7 @@ describe('write gates: the execution point still refuses a stored plan', () => {
     await ctx.plugin(EvolutionApproval, { enabled: true })
     // The forged-record route: the runner executes STORED args with no schema in front.
     const missing = await ctx.evolutionApproval.run('skill', {
-      operation: { action: 'patch', name: 'gate-replay', old_string: 'Body.' },
+      operation: { action: 'patch', summary: 'test patch', name: 'gate-replay', old_string: 'Body.' },
       origin: 'background_review',
       libraryOrigin: 'background_review',
     }, { interface: 'background_review' })
@@ -688,12 +688,12 @@ describe('write gates: review-fix sentinels (2026-09-26 independent review)', ()
     // a different count than the caller asked for, with no signal anywhere. The plan channel already
     // refuses a non-boolean by name (S1-C1); this asserts the same rule on the replay channel.
     await createTarget(ctx, 'flag-skill')
-    const coerced = await replay({ action: 'patch', name: 'flag-skill', old_string: 'x', new_string: 'y', replace_all: 'yes' })
+    const coerced = await replay({ action: 'patch', summary: 'test patch', name: 'flag-skill', old_string: 'x', new_string: 'y', replace_all: 'yes' })
     expect(coerced.ok).toBe(false)
     expect(coerced.message).toContain('"replace_all" must be a boolean')
     // The boolean spelling passes the same gate (the control: the refusal is about the TYPE, not
     // about the flag being set).
-    const boolean = await replay({ action: 'patch', name: 'flag-skill', old_string: 'x', new_string: 'y', replace_all: true })
+    const boolean = await replay({ action: 'patch', summary: 'test patch', name: 'flag-skill', old_string: 'x', new_string: 'y', replace_all: true })
     expect(boolean.message).not.toContain('"replace_all" must be a boolean')
   })
 })

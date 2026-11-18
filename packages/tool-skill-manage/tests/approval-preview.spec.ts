@@ -100,12 +100,12 @@ describe('the staged skill write preview', () => {
   it('resolves a patch with the library matcher, and says so when the old text is gone', async () => {
     const { preview } = await mount()
     const applied = await preview({
-      operation: { action: 'patch', name: 'preview-skill', old_string: 'Body.', new_string: 'Patched body.', staged_from_sha256: contentHash(BODY) },
+      operation: { action: 'patch', summary: 'test patch', name: 'preview-skill', old_string: 'Body.', new_string: 'Patched body.', staged_from_sha256: contentHash(BODY) },
     }) as { available: boolean; after: string }
     expect(applied.available).toBe(true)
     expect(applied.after).toContain('Patched body.')
     const missing = await preview({
-      operation: { action: 'patch', name: 'preview-skill', old_string: 'not in the body', new_string: 'x', staged_from_sha256: contentHash(BODY) },
+      operation: { action: 'patch', summary: 'test patch', name: 'preview-skill', old_string: 'not in the body', new_string: 'x', staged_from_sha256: contentHash(BODY) },
     }) as { available: boolean; reason: string }
     expect(missing.available).toBe(false)
     expect(missing.reason).toContain('会被拒绝')
@@ -138,14 +138,14 @@ describe('the staged skill write preview', () => {
     const support = '---\ntitle: a: b\n---\n\nold body\n'
     await writeFile(join(root, 'skills', 'preview-skill', 'references', 'note.md'), support)
     const patched = await preview({
-      operation: { action: 'patch', name: 'preview-skill', file_path: 'references/note.md', old_string: 'old body', new_string: 'new body', staged_from_sha256: contentHash(support) },
+      operation: { action: 'patch', summary: 'test patch', name: 'preview-skill', file_path: 'references/note.md', old_string: 'old body', new_string: 'new body', staged_from_sha256: contentHash(support) },
     }) as { available: boolean; after: string }
     expect(patched.available).toBe(true)
     // Identical to the write path's rule for a support file: no normalization, trimEnd + one newline.
     expect(patched.after).toBe('---\ntitle: a: b\n---\n\nnew body\n')
     // The SKILL.md path keeps the pass (the control): a quotable frontmatter value is normalized there.
     const skill = await preview({
-      operation: { action: 'patch', name: 'preview-skill', old_string: 'Body.', new_string: 'Patched body.', staged_from_sha256: contentHash(BODY) },
+      operation: { action: 'patch', summary: 'test patch', name: 'preview-skill', old_string: 'Body.', new_string: 'Patched body.', staged_from_sha256: contentHash(BODY) },
     }) as { available: boolean; after: string }
     expect(skill.available).toBe(true)
     expect(skill.after).toContain('Patched body.')

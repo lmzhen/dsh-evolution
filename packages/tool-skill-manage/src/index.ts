@@ -876,6 +876,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (action === 'extract' && origin === 'background_review') {
       return { ok: false, message: '背景审查不能执行 extract：review 只提议；提取必须由显式前台工具/命令执行。', skills: [] }
     }
+    if (action === 'patch' && change === undefined) {
+      return { ok: false, message: '动作「patch」必须提供 summary（一句变更原因，模型调用无 host 兜底）。', skills: [] }
+    }
     // Model-origin structural writes must explain themselves; foreground/human
     // writes keep the host fallback so the CLI and UI are never blocked.
     const structural = action === 'restructure' || action === 'extract' || action === 'delete'
@@ -1296,7 +1299,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       file_path: { type: 'string' },
       file_content: { type: 'string' },
       absorbed_into: { type: 'string' },
-      summary: { type: 'string', description: 'One-line change summary for the skill history. Required for restructure/extract/delete in model-origin writes; max 50 Unicode characters by default, over-limit is rejected with the current limit.' },
+      summary: { type: 'string', description: 'One-line change summary for the skill history. Required for every model patch and for restructure/extract/delete in model-origin writes; max 50 Unicode characters by default, over-limit is rejected with the current limit.' },
       problem: { type: 'string', enum: ['wrong', 'outdated', 'incomplete', 'unsafe'], description: 'feedback only: why the loaded skill did not help.' },
       note: { type: 'string', description: 'feedback only: optional short explanation for the negative report; max 20 Unicode characters (runtime-enforced).' },
       section: { type: 'object', additionalProperties: false, properties: { heading: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, content: { type: 'string' } } },

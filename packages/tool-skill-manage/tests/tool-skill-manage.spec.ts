@@ -179,6 +179,28 @@ describe('tool-skill-manage', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
+  it('requires a summary for every model patch', async () => {
+    const { ctx, root, previousHome } = await setup()
+    const execute = (args: Record<string, unknown>) => executeOne(ctx, {
+      callId: ToolCallId(`patch-summary-${Math.random()}`),
+      name: 'skill_manage',
+      arguments: args,
+      agent: fakeAgent(undefined),
+      signal: new AbortController().signal,
+    })
+    try {
+      await execute({ action: 'create', name: 'summary-patch', content: SKILL.replace('boundary-skill', 'summary-patch') })
+      const missing = await execute({ action: 'patch', name: 'summary-patch', old_string: 'Body.', new_string: 'Changed.' })
+      expect((missing.value as { message?: string } | undefined)?.message ?? '').toContain('必须提供 summary')
+      const complete = await execute({ action: 'patch', summary: 'change body', name: 'summary-patch', old_string: 'Body.', new_string: 'Changed.' })
+      expect((complete.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    }
+  })
+
   it('V27 G5.1: the description names replace_all/file_path, and a missing argument names itself', async () => {
     const { ctx, root, previousHome } = await setup()
     const tool = ctx.tools.get('skill_manage') as unknown as { description?: string } | undefined
@@ -199,7 +221,7 @@ describe('tool-skill-manage', () => {
     await execute({ action: 'create', name: 'g51-skill', content: SKILL.replace('boundary-skill', 'g51-skill') })
     // An omitted argument is named with the action, not surfaced as an empty
     // string downstream ("File not found: ").
-    const missing = await execute({ action: 'patch', name: 'g51-skill', new_string: 'x' })
+    const missing = await execute({ action: 'patch', summary: 'test patch', name: 'g51-skill', new_string: 'x' })
     const missingMessage = (missing.value as { message?: string } | undefined)?.message ?? ''
     expect(missingMessage).toContain('patch requires')
     expect(missingMessage).toContain('old_string')
@@ -207,7 +229,7 @@ describe('tool-skill-manage', () => {
     // so a multi-site edit is never half-applied in silence.
     const content = '---\nname: g51-repeat\ndescription: repeat anchor test\n---\n\nSay hi. Say hi.\n'
     await execute({ action: 'create', name: 'g51-repeat', content })
-    const patched = await execute({ action: 'patch', name: 'g51-repeat', old_string: 'Say hi.', new_string: 'Say bye.' })
+    const patched = await execute({ action: 'patch', summary: 'test patch', name: 'g51-repeat', old_string: 'Say hi.', new_string: 'Say bye.' })
     const patchMessage = (patched.value as { message?: string } | undefined)?.message ?? ''
     expect(patchMessage).toContain('FIRST of 2 occurrences')
     expect(patchMessage).toContain('replace_all=true')
@@ -235,7 +257,7 @@ describe('tool-skill-manage', () => {
     expect(badName.isError).toBe(true)
     const nameBox = badName.value as { message?: string } | undefined
     expect(nameBox?.message ?? '').not.toContain('TypeError')
-    const badPatch = await execute({ action: 'patch', name: 'scalar-guard-skill', old_string: 7 })
+    const badPatch = await execute({ action: 'patch', summary: 'test patch', name: 'scalar-guard-skill', old_string: 7 })
     expect(badPatch.isError).toBe(true)
     const patchBox = badPatch.value as { message?: string } | undefined
     expect(patchBox?.message ?? '').not.toContain('TypeError')
@@ -267,7 +289,7 @@ describe('tool-skill-manage', () => {
     const badName = await replayRun(ctx, { action: 'create', name: 42, content: SKILL })
     expect(badName.ok).toBe(false)
     expect(badName.message).toContain('"name" must be a string')
-    const badPatch = await replayRun(ctx, { action: 'patch', name: 'scalar-guard-skill', old_string: 7 })
+    const badPatch = await replayRun(ctx, { action: 'patch', summary: 'test patch', name: 'scalar-guard-skill', old_string: 7 })
     expect(badPatch.ok).toBe(false)
     expect(badPatch.message).toContain('"old_string" must be a string')
     // A restructure move with non-string fields is coerced to '' and refused
@@ -651,13 +673,13 @@ Existing.
     expect((updated.value as { message?: string } | undefined)?.message ?? '').toContain('未变更')
     expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(0)
     // A patch whose old_string already equals the replacement is also noop.
-    const patched = await execute({ action: 'patch', name: 'noop-skill', old_string: 'Body.', new_string: 'Body.' })
+    const patched = await execute({ action: 'patch', summary: 'test patch', name: 'noop-skill', old_string: 'Body.', new_string: 'Body.' })
     expect((patched.value as { ok?: boolean } | undefined)?.ok).toBe(true)
     expect((patched.value as { message?: string } | undefined)?.message ?? '').toContain('未变更')
     expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(0)
     // A real patch still counts exactly once (the gate is noop-only, not
     // suppression of all patches).
-    const realPatch = await execute({ action: 'patch', name: 'noop-skill', old_string: 'Body.', new_string: 'Body.\n\nNew content.' })
+    const realPatch = await execute({ action: 'patch', summary: 'test patch', name: 'noop-skill', old_string: 'Body.', new_string: 'Body.\n\nNew content.' })
     expect((realPatch.value as { ok?: boolean } | undefined)?.ok).toBe(true)
     expect((await ctx.skillUsage.report()).get('noop-skill')?.patch_count).toBe(1)
     if (previousHome === undefined) delete process.env.DSH_HOME
@@ -1076,7 +1098,7 @@ it('P2-7: a patch missing new_string is refused before the approval seam — app
   })
   // The defect shape: patch without new_string — the old code asked for
   // approval and staged it (requests 1, ok:true, pending record saved).
-  const missing = await execute({ action: 'patch', name: 'p27-skill', old_string: 'Body.' })
+  const missing = await execute({ action: 'patch', summary: 'test patch', name: 'p27-skill', old_string: 'Body.' })
   const missingValue = missing.value as { ok?: boolean; message?: string; pending_id?: string }
   expect(requests).toBe(0)
   expect(missingValue.ok).toBe(false)
@@ -1086,7 +1108,7 @@ it('P2-7: a patch missing new_string is refused before the approval seam — app
   // Positive control on the SAME harness: a complete patch still reaches the
   // approval seam and stages — proving the zero above is the pre-check and
   // not a dead approval block (the old code fails here too: it asked twice).
-  const complete = await execute({ action: 'patch', name: 'p27-skill', old_string: 'Body.', new_string: 'Patched body.' })
+  const complete = await execute({ action: 'patch', summary: 'test patch', name: 'p27-skill', old_string: 'Body.', new_string: 'Patched body.' })
   const completeValue = complete.value as { ok?: boolean; pending_id?: string; message?: string }
   expect(requests).toBe(1)
   expect(completeValue.ok, completeValue.message).toBe(true)
@@ -1309,7 +1331,7 @@ it('patches one section in place without resending the old text', async () => {
     const content = '---\nname: section-skill\ndescription: section edit probe.\n---\n\n## One\n\nA\n\n## Two\n\nB\n'
     const created = await run({ action: 'create', name: 'section-skill', content })
     expect(ok(created), message(created)).toBe(true)
-    const patched = await run({ action: 'patch', name: 'section-skill', section: { heading: 'One', content: 'X' } })
+    const patched = await run({ action: 'patch', summary: 'test patch', name: 'section-skill', section: { heading: 'One', content: 'X' } })
     expect(ok(patched), message(patched)).toBe(true)
     const md = await readFile(join(root, 'skills', 'section-skill', 'SKILL.md'), 'utf8')
     expect(md).toContain('## One')

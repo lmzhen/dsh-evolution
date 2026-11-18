@@ -37,7 +37,7 @@ export const SKILL_ACTIONS: Readonly<Record<SkillActionId, SkillActionMeta>> = O
   review: { mutates: false, needsName: false, gate: 'none', summary: 'none' },
   create: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
   update: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
-  patch: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
+  patch: { mutates: true, needsName: true, gate: 'write', summary: 'required' },
   delete: { mutates: true, needsName: true, gate: 'approval', summary: 'required' },
   write_file: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
   remove_file: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
