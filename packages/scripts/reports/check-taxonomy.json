@@ -364,6 +364,7 @@
         "evolution-core::tests/external-support.spec.ts",
         "evolution-core::tests/extract-plan.spec.ts",
         "evolution-core::tests/extract-prompt.spec.ts",
+        "evolution-core::tests/family-coherence.spec.ts",
         "evolution-core::tests/frontmatter-mixed-endings.spec.ts",
         "evolution-core::tests/frontmatter-normalize.spec.ts",
         "evolution-core::tests/frontmatter-platform-string-fields.spec.ts",
@@ -1007,6 +1008,7 @@
         "evolution-core::tests/external-support.spec.ts",
         "evolution-core::tests/extract-plan.spec.ts",
         "evolution-core::tests/extract-prompt.spec.ts",
+        "evolution-core::tests/family-coherence.spec.ts",
         "evolution-core::tests/frontmatter-mixed-endings.spec.ts",
         "evolution-core::tests/frontmatter-normalize.spec.ts",
         "evolution-core::tests/frontmatter-platform-string-fields.spec.ts",
@@ -1580,6 +1582,7 @@
         "evolution-core::tests/external-support.spec.ts",
         "evolution-core::tests/extract-plan.spec.ts",
         "evolution-core::tests/extract-prompt.spec.ts",
+        "evolution-core::tests/family-coherence.spec.ts",
         "evolution-core::tests/frontmatter-mixed-endings.spec.ts",
         "evolution-core::tests/frontmatter-normalize.spec.ts",
         "evolution-core::tests/frontmatter-platform-string-fields.spec.ts",
@@ -2086,7 +2089,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 415
+      "specs": 416
     },
     "ci-only": {
       "gates": 10,
@@ -2094,16 +2097,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 415
+      "specs": 416
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 487
+      "specs": 488
     }
   },
   "specs": {
-    "total": 487,
-    "marked": 487,
+    "total": 488,
+    "marked": 488,
     "unmarked": 0
   }
 }
