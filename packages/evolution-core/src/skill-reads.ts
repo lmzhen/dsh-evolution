@@ -114,7 +114,7 @@ export function sessionReadSupportFiles(
 
 /** Actions whose target must have been read first (create is authorship, so it is exempt). */
 export const READ_REQUIRED_ACTIONS: readonly string[] = Object.freeze([
-  'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'extract',
+  'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'extract',
 ])
 
 /**
@@ -137,7 +137,7 @@ export function isUnreadWrite(
 /**
  * Drop mutating ops whose target was not read this session, in place.
  *
- * Covers the same mutating surface Hermes guards (edit/patch/write_file/remove_file), so a
+ * Covers the same mutating surface Hermes guards (update/patch/write_file/remove_file), so a
  * background review cannot blind-touch support files or edits of skills it never loaded.
  * @param ops - the plan's ops; dropped entries are removed in place.
  * @param readNames - names read this session.
@@ -158,3 +158,4 @@ export function filterUnreadSkillOps(
   }
   return dropped
 }
+

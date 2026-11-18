@@ -458,7 +458,7 @@ describe('tool-skill-manage', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
-  it('action=edit gets the same authoring strict gate as create/update (M-1)', async () => {
+  it('action=update gets the same authoring strict gate as create', async () => {
     const root = await tempHome('dsh-skill-strict-edit-')
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
@@ -467,11 +467,11 @@ describe('tool-skill-manage', () => {
     await ctx.plugin(SkillUsageRegistry, { root })
     await mountToolSkillManage(ctx, { descriptionStrict: true })
     const over = 'A comprehensive skill that lets the agent search arXiv for academic papers using keywords, authors, and categories. '
-    // edit routes to the same full-content update as update — the gate must not be bypassable.
+    // update is the one full-content write path; the gate must not be bypassable.
     const result = await executeOne(ctx, {
-      callId: ToolCallId(`edit-strict-${Math.random()}`),
+      callId: ToolCallId(`update-strict-${Math.random()}`),
       name: 'skill_manage',
-      arguments: { action: 'edit', name: 'edit-strict', content: SKILL.replace('boundary-skill', 'edit-strict').replace('lifecycle boundary test', over) },
+      arguments: { action: 'update', name: 'update-strict', content: SKILL.replace('boundary-skill', 'update-strict').replace('lifecycle boundary test', over) },
       agent: fakeAgent(undefined),
       signal: new AbortController().signal,
     })
@@ -1323,4 +1323,5 @@ it('patches one section in place without resending the old text', async () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
+
 

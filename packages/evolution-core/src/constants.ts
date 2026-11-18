@@ -39,7 +39,6 @@
  */
 export const SKILL_ACTION_REQUIRED_FIELDS: Readonly<Record<string, readonly string[]>> = {
   create: ['name', 'content'],
-  edit: ['name', 'content'],
   update: ['name', 'content'],
   patch: ['name', 'old_string', 'new_string'],
   delete: ['name'],
@@ -238,3 +237,4 @@ export const DEFAULT_CURATOR_MODEL = 'deepseek-v4-pro'
 export const MEMORY_GUIDANCE_SECTION_ORDER = 11000
 /** Order of the `evolution-skills-guidance` section (last of the two). */
 export const SKILLS_GUIDANCE_SECTION_ORDER = 11100
+

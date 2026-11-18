@@ -948,7 +948,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // against the 60-char authoring bar; the strict mode refuses a violation
     // up front (default off — advisory only, matching the platform limit).
     let candidateDescription = ''
-    if ((action === 'create' || action === 'edit' || action === 'update') && args.content) {
+    if ((action === 'create' || action === 'update') && args.content) {
       const parsed = parseFrontmatter(args.content)
       if (parsed) {
         const feedback = authoringFeedback(parsed.frontmatter)
@@ -966,8 +966,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         feedbackLines.push(...await duplicateHintLines(name, candidateDescription, crossSourceView))
         return library.create(name, args.content ?? '', origin, { managed: origin !== 'foreground' })
       },
-      edit: () => library.update(name, args.content ?? '', origin, stagedAnchor),
-      update: () => library.update(name, args.content ?? '', origin, stagedAnchor),
+        update: () => library.update(name, args.content ?? '', origin, stagedAnchor),
       patch: async () => {
         const section = args.section
         if (section === undefined) return await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
@@ -1277,13 +1276,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   registerEvolutionTool(ctx, defineTool({
     name: 'skill_manage',
     description:
-      'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/edit/update take full SKILL.md content (edit is an alias of update); patch applies old_string -> new_string; delete archives to .archive (absorbed_into names an umbrella skill); write_file/remove_file add or remove one support file under references/ or scripts/; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin are never allowed from a background review — foreground and delegated subagents may). '
+      'Manage reusable skills. review returns the library review text (state/usage/quality per skill); list returns names only; create/update take full SKILL.md content; patch applies old_string -> new_string; delete archives to .archive (absorbed_into names an umbrella skill); write_file/remove_file add or remove one support file under references/ or scripts/; pin protects a skill from deletion, background review, and the lifecycle (pin/unpin are never allowed from a background review — foreground and delegated subagents may). '
       // V27 G5.1 (v27 T-2): the two fields the model could not discover —
       // `file_path` picks WHICH file a patch/write_file/remove_file targets
       // (absent = SKILL.md), and `replace_all` decides first-occurrence-only
       // versus every occurrence. Both are real behavior; a description that
       // omits them left the model guessing.
-      + 'Per-action arguments: patch needs name + old_string + new_string and patches SKILL.md unless file_path names a support file (e.g. "references/topic.md"); patch replaces the FIRST occurrence only unless replace_all=true, and the result message reports how many anchors the file carried. patch also accepts section: {heading, start?, end?, content} to replace one H2 section content (or an exact sub-block) in place without resending the old text; the heading line is kept for a whole-section edit. write_file needs name + file_path + file_content; remove_file needs name + file_path; create/edit/update need name + content; delete needs name. A rejected patch names the reason and the remedy (missing anchor, stale snapshot, frontmatter that cannot be auto-quoted, byte/char limit). '
+      + 'Per-action arguments: patch needs name + old_string + new_string and patches SKILL.md unless file_path names a support file (e.g. "references/topic.md"); patch replaces the FIRST occurrence only unless replace_all=true, and the result message reports how many anchors the file carried. patch also accepts section: {heading, start?, end?, content} to replace one H2 section content (or an exact sub-block) in place without resending the old text; the heading line is kept for a whole-section edit. write_file needs name + file_path + file_content; remove_file needs name + file_path; create/update need name + content; delete needs name. A rejected patch names the reason and the remedy (missing anchor, stale snapshot, frontmatter that cannot be auto-quoted, byte/char limit). '
       + 'Protected bundled/hub skills reject any mutation; pinned skills reject deletion and are read-only to the background review.'
       + 'feedback records a rating for a loaded skill: rating positive|negative (default negative); a negative rating may include note (max 20 Unicode characters), and note is rejected on a positive rating. '
       + 'Prefer patching an umbrella over creating narrow skills. '
@@ -1291,7 +1290,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       + 'extract moves a reusable part (exact heading, optional start/end sub-block) into an existing class-level owner: extract: [{heading, start?, end?, to_skill}]. One target per call; an empty extract list returns the child-agent proposal (outcome/target/neededOwner/parts) without writing; supply extract items to apply, and use owner_covers only as an explicit override; owner-gap is reported, never auto-created.'
       + 'Created/edited SKILL.md MUST start with YAML frontmatter (a name/description block), or creation is rejected. ' + DSH_AUTHORING_STANDARDS,
     parameters: {
-      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'edit', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'extract', 'feedback', 'pin', 'unpin'] },
+      action: { type: 'string', required: true, enum: ['review', 'list', 'create', 'update', 'patch', 'delete', 'write_file', 'remove_file', 'restructure', 'extract', 'feedback', 'pin', 'unpin'] },
       name: { type: 'string' },
       content: { type: 'string' },
       old_string: { type: 'string' },
@@ -1457,7 +1456,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // P1-13 (v37): the 'absent' sentinel covers a target that does not exist
         // YET — same as the support-file anchor below. Unanchored staging let a
         // foreground create between staging and approval be overwritten silently.
-        if ((args.action === 'update' || args.action === 'edit') && typeof args.name === 'string' && args.name !== '') {
+        if (args.action === 'update' && typeof args.name === 'string' && args.name !== '') {
           // P2-04 (round-2 audit): an UNREADABLE target now anchors as
           // 'absent' (fail-closed, the same posture as the /graph staging)
           // instead of staying unanchored — an unanchored staging let a
@@ -1562,3 +1561,4 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     approvalCtx.effect(() => dispose, 'tool-skill-manage.approval-runner')
   })
 }
+

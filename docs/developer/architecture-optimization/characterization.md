@@ -53,7 +53,7 @@ node packages/scripts/verify-platform-matrix.mjs \
 |---|---|---:|---|---|
 | 1 | `packages/evolution/evolution-core/tests/subagent-channel.spec.ts` | 8 | 受限 preset、一次 run、双轮 open/continue、dispose、错误/取消 | `node node_modules/vitest/vitest.mjs run packages/evolution/evolution-core/tests/subagent-channel.spec.ts --maxWorkers=1 --reporter=dot` |
 | 2 | `packages/evolution/tool-skill-manage/tests/write-gates.spec.ts` | 30 | 写门禁顺序、确认 gate、审批暂存、拒绝/路径/保护技能 | 同上，换 spec |
-| 3 | `packages/evolution/tool-skill-manage/tests/tool-skill-manage.spec.ts` | 37 | skill_manage 的 create/edit/update/patch/delete/read/list/restore 等用户路径 | 同上，换 spec |
+| 3 | `packages/evolution/tool-skill-manage/tests/tool-skill-manage.spec.ts` | 37 | skill_manage 的 create/update/patch/delete/read/list/restore 等用户路径 | 同上，换 spec |
 
 合计 **75/75**。三个 spec 一起跑时必须 `--maxWorkers=1`：并行 worker 下 `tool-skill-manage` 有两个时序敏感用例会偶发失败（本次基线验证实测 2 个 flaky，单文件跑 37/37 通过）；这不是产品回归，但基线命令必须固定串行。
 

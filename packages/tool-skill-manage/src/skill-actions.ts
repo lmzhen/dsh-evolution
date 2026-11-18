@@ -10,7 +10,6 @@ export type SkillActionId =
   | 'list'
   | 'review'
   | 'create'
-  | 'edit'
   | 'update'
   | 'patch'
   | 'delete'
@@ -37,7 +36,6 @@ export const SKILL_ACTIONS: Readonly<Record<SkillActionId, SkillActionMeta>> = O
   list: { mutates: false, needsName: false, gate: 'none', summary: 'none' },
   review: { mutates: false, needsName: false, gate: 'none', summary: 'none' },
   create: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
-  edit: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
   update: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
   patch: { mutates: true, needsName: true, gate: 'write', summary: 'host' },
   delete: { mutates: true, needsName: true, gate: 'approval', summary: 'required' },
@@ -65,3 +63,4 @@ export async function commitSkillAction(run: () => Promise<SkillActionResult>): 
 export function isReadOnlySkillAction(action: unknown): boolean {
   return skillActionOf(action)?.mutates === false
 }
+
