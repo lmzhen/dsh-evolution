@@ -6,6 +6,9 @@
     },
     {
       "path": "../evolution-core"
+    },
+    {
+      "path": "../evolution-adapter"
     }
   ]
 }

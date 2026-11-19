@@ -20,6 +20,12 @@
       "path": "../../skill/skill"
     },
     {
+      "path": "../../storage/storage-domain"
+    },
+    {
+      "path": "../../subagent/subagent"
+    },
+    {
       "path": "../../core/system-prompt"
     },
     {

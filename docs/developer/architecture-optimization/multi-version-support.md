@@ -149,7 +149,7 @@ evolution-core/       # 只留域逻辑；import contract，不 import 平台包
 
 - **P0a**：新建 contract/adapter；adapter 提供 `evolutionPlatform` 与 helper；`evolution-core/platform` 变成 re-export 兼容桶；core runtime 暂时仍 mount adapter 以保持行为；rc.5 全绿。
 - **P0b**：把 adapter 中的端口接口/类型迁到 contract；feature 包逐批从 core/platform 切到 contract（类型/端口）与 adapter `./values`（宿主运行时 helper）；每次切换一个包组，测试绿后继续；最后删除兼容桶。
-  **P0b 状态（2026-11-19）**：端口接口/类型已全部迁到 `evolution-platform-contract`（含 `llm`、`projections`、`presets`、`tools`、`platformView`、`profileContext`、`subagents`、`systemPrompt`、`HostPlatformPorts`）；adapter 实现文件只保留实现并从 contract re-export 类型。剩余工作是 feature 包逐批从 `evolution-core/platform` 切到 contract 类型 + adapter `./values`，并删除兼容桶。当前构建/类型 0 错、66 项定向测试、包映射/依赖闭包绿。
+  **P0b 状态（2026-11-19）**：完成。全部端口接口/类型在 `evolution-platform-contract`；feature 包的 62 处 `evolution-core/platform` import 已切到 contract 类型 + adapter `./ports`（端口函数/错误类）+ adapter `./values`（宿主 helper），`evolution-core/platform` 兼容桶及其 package export 已删除，core 内部相对 import 同步迁移。构建/类型 0 错、58 项定向测试、包映射/依赖闭包绿；剩余 feature 包不再 import `@deepseek-ai/dsh-*`，唯一平台 runtime import 仍在 adapter。
 - **P0c**：把 adapter 作为独立 row 加入 host/all/preset/standalone，顺序在 core 之前；core runtime 不再 mount adapter；真实启动验证 row 顺序。
   **P0c 状态（2026-11-19）**：完成。`bundle-rows.json` 新增 `evolution-adapter` host 行，host/all/preset/standalone 四形态均生成；core runtime 不再 mount `EvolutionPlatform`；rc.5 干净安装后 `dump-config` 顺序为 `evolution-adapter` → `evolution-core-runtime`，真实 web 启动 200、doctor `platform-services: ok`、45 技能。`evolution-adapter` 仍是唯一平台 import 包。
 
@@ -256,7 +256,7 @@ export interface EvolutionPlatform {
 
 ### P0：边界，不改行为
 
-**P0a 状态（2026-11-19）**：完成。`evolution-platform-contract`（能力/Result/全量端口接口，无宿主 runtime import）与 `evolution-adapter`（`ports` / `values` / `service` 三个入口）已落地；core 的 17 个平台 port 文件迁入 adapter，core 只保留 `src/platform/index.ts` 兼容 re-export；core 全包不再直接 import `@deepseek-ai/dsh-*`。`verify-family-types` 0 错，104 项定向测试绿，rc.5 真实 web 启动 200、45 技能、doctor `platform-services: ok`。安装器 `--from-dist` 增加 family namespace 链接（core → adapter → contract），否则 packed composer 无法解析跨包依赖。P0b 接口迁移已完成，P0b feature import 与 P0c 仍待做。
+**P0a 状态（2026-11-19）**：完成。`evolution-platform-contract`（能力/Result/全量端口接口，无宿主 runtime import）与 `evolution-adapter`（`ports` / `values` / `service` 三个入口）已落地；core 的 17 个平台 port 文件迁入 adapter；core 全包不再直接 import `@deepseek-ai/dsh-*`。`verify-family-types` 0 错，rc.5 真实 web 启动 200、45 技能、doctor `platform-services: ok`。安装器 `--from-dist` 增加 family namespace 链接（core → adapter → contract），否则 packed composer 无法解析跨包依赖。P0b（含删除兼容桶）与 P0c 均已完成。
 
 - 按 §3.2 的 P0a/P0b/P0c 分三次落地：先 contract/adapter + 兼容桶，再逐包切 import，最后独立 row；
 - 把 `evolution-core/src/platform/*`、`runtime/platform.ts` 迁入 adapter；

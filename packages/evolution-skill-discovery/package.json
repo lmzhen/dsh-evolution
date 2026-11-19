@@ -60,6 +60,8 @@
   },
   "dependencies": {
     "minisearch": "^7.2.0",
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "workspace:^",
+    "@deepseek-ai/dsh-evolution-platform-contract": "workspace:^",
+    "@deepseek-ai/dsh-evolution-adapter": "workspace:^"
   }
 }

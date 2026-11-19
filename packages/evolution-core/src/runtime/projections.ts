@@ -6,7 +6,7 @@
  */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import { type ProjectionHandleLike, type Session } from '../platform/index.ts'
+import type { ProjectionHandleLike, Session } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { EvolutionPlatform } from './platform.ts'
 import {
   evolutionActivityProjection,

@@ -12,6 +12,7 @@
  * @module @deepseek-ai/dsh-evolution-platform-contract
  */
 
+export * from './platform-types.ts'
 export * from './result.ts'
 export * from './agents.ts'
 export * from './commands.ts'

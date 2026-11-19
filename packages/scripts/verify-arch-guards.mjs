@@ -677,6 +677,8 @@ const FAMILY_IMPORT_RE = /from\s+['"](@deepseek-ai\/dsh-evolution-[a-z0-9-]+|@de
 const CORE_ALLOWED_FAMILY = new Set([
   '@deepseek-ai/dsh-evolution-core',
   '@deepseek-ai/dsh-evolution-core/contract',
+  '@deepseek-ai/dsh-evolution-platform-contract',
+  '@deepseek-ai/dsh-evolution-adapter',
   '@deepseek-ai/dsh-evolution-state',
   '@deepseek-ai/dsh-memory',
 ])

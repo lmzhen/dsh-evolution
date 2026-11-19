@@ -15,7 +15,7 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveBasePresetPatch } from '@deepseek-ai/dsh-evolution-core/composition'
-import { profileContextPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import { profileContextPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 import type { Context } from '@deepseek-ai/cordis'
 
 /** The launcher-owned profile facts a preset write needs. */

@@ -1,6 +1,6 @@
 /** The read-only skill history and its undo (the undo write stays behind the refusal seam). */
 import type { EvolutionErrorId, HostLocale } from '@deepseek-ai/dsh-evolution-core'
-import type { CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform-contract'
 import { hostErrorText } from '../host-locale.ts'
 import { partitionVersions, type SkillVersion } from '@deepseek-ai/dsh-evolution-core/skills'
 

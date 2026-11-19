@@ -4,7 +4,7 @@
  * handle owns the continuation lifecycle and the end-event wait.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent, ContentBlock, SessionId, SubagentStopReason } from '../platform/index.ts'
+import type { Agent, ContentBlock, SessionId, SubagentStopReason } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { EvolutionPlatform } from '../runtime/platform.ts'
 
 export interface ActivationResultLike {

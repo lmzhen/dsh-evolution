@@ -1,4 +1,4 @@
-import type { SkillSummary } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { SkillSummary } from '@deepseek-ai/dsh-evolution-platform-contract'
 import {
   catalogRevisionOf,
   skillIndexRowOf,

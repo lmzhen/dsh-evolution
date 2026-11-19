@@ -18,7 +18,7 @@
  */
 
 import { type MutationAuthority } from '@deepseek-ai/dsh-evolution-core'
-import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import { settingsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'

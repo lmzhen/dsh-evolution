@@ -7,25 +7,10 @@
  *
  * @module @deepseek-ai/dsh-evolution-review/review-executor
  */
-import {
-  BlockAssembler,
-  createToolResultMessage,
-  createUserMessage,
-} from '@deepseek-ai/dsh-evolution-core/platform'
+import { BlockAssembler, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import { recordReviewRead } from '@deepseek-ai/dsh-evolution-core'
-import type {
-  ContentBlock,
-  ContextFormed,
-  GenerateOptions,
-  Message,
-  RequestMessage,
-  StreamChunk,
-  ToolCallBlock,
-  ToolCallId,
-  ToolHistory,
-  ToolSchema,
-} from '@deepseek-ai/dsh-evolution-core/platform'
-import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { ContentBlock, ContextFormed, GenerateOptions, Message, RequestMessage, StreamChunk, ToolCallBlock, ToolCallId, ToolHistory, ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-platform-contract'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {

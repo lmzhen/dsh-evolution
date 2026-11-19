@@ -40,7 +40,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { EvolutionPlatform } from './runtime/platform.ts'
 import { toolsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
-import { scopeOf } from './platform/index.ts'
+import { scopeOf } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { OpaqueScopeKey } from './scope.ts'
 
 /**

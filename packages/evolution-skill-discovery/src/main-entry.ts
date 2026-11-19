@@ -2,8 +2,8 @@ import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
-import { commandsPort, workingDirectoryPort } from '@deepseek-ai/dsh-evolution-core/platform'
-import type { Agent } from '@deepseek-ai/dsh-evolution-core/platform'
+import { commandsPort, workingDirectoryPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import type { Agent } from '@deepseek-ai/dsh-evolution-platform-contract'
 import { isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 

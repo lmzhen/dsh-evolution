@@ -30,6 +30,12 @@
     },
     {
       "path": "../evolution-curator"
+    },
+    {
+      "path": "../evolution-platform-contract"
+    },
+    {
+      "path": "../evolution-adapter"
     }
   ]
 }

@@ -15,6 +15,12 @@
     },
     {
       "path": "../../core/session"
+    },
+    {
+      "path": "../evolution-platform-contract"
+    },
+    {
+      "path": "../evolution-adapter"
     }
   ]
 }

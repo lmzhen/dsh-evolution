@@ -3,11 +3,12 @@
  * @module @deepseek-ai/dsh-tool-memory
  */
 
-import { settingsPort, systemPromptPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import { settingsPort, systemPromptPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import z from '@deepseek-ai/schemastery'
-import { defineTool, registerEvolutionTool } from '@deepseek-ai/dsh-evolution-core/platform'
+import { registerEvolutionTool } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import { defineTool } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type {} from '../index.ts'
 import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, truncateGraphemes, MEMORY_ENTRY_PREVIEW_GRAPHEMES } from '@deepseek-ai/dsh-evolution-core'
 import { resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core/skills'

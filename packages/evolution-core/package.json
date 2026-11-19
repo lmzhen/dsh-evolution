@@ -34,10 +34,6 @@
       "types": "./lib/types/runtime/plugin.d.ts",
       "default": "./lib/runtime/plugin.js"
     },
-    "./platform": {
-      "types": "./lib/types/platform/index.d.ts",
-      "default": "./lib/platform/index.js"
-    },
     "./restrictor": {
       "types": "./lib/types/restrictor.d.ts",
       "default": "./lib/restrictor.js"

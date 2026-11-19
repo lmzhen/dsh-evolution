@@ -12,7 +12,7 @@
  */
 
 import { isRecord } from '@deepseek-ai/dsh-evolution-core'
-import { configEditorPort, pluginInventoryPort, pluginManagerPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import { configEditorPort, pluginInventoryPort, pluginManagerPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 import type { Context } from '@deepseek-ai/cordis'
 
 /** One installed bundle as the platform reports it (the fields the doctor reads). */

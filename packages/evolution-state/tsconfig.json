@@ -9,6 +9,12 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../evolution-platform-contract"
+    },
+    {
+      "path": "../evolution-adapter"
     }
   ]
 }

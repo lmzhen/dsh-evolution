@@ -17,7 +17,7 @@
  *      (registered per the arch guard's scope rule), never as a silent default.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { scopeOf } from './platform/index.ts'
+import { scopeOf } from '@deepseek-ai/dsh-evolution-adapter/values'
 
 /** The platform's scope identity, kept structural so callers do not need the
  * platform type (`ScopeKey` is `object`). */

@@ -3,7 +3,7 @@
  * this module owns the argument schema and the JSON result. All policy remains in applyStageTool.
  */
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { defineTool } from '@deepseek-ai/dsh-evolution-core/platform'
+import { defineTool } from '@deepseek-ai/dsh-evolution-adapter/values'
 import { applyStageTool, type StageToolContext, type StageToolOp, type StageToolResult } from './stage-tool.ts'
 
 export const MERGE_STAGE_TOOL_NAME = 'merge_stage'

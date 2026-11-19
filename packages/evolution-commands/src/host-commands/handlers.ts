@@ -1,5 +1,5 @@
 /** Extracted command handlers; the legacy chain answers whatever is not here. */
-import type { CommandResult } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import type { ParsedCommand } from '../parse.ts'
 import { runParamsCommand } from './params-command.ts'

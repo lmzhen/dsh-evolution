@@ -3,7 +3,7 @@
  * @module @deepseek-ai/dsh-memory-files
  */
 
-import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import { settingsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'

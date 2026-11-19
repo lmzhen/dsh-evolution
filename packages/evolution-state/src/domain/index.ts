@@ -10,7 +10,9 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
-import { defineDomain, domainTable, DomainError, storageDomainPort, type Domain } from '@deepseek-ai/dsh-evolution-core/platform'
+import type { Domain } from '@deepseek-ai/dsh-evolution-platform-contract'
+import { storageDomainPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import { defineDomain, domainTable, DomainError } from '@deepseek-ai/dsh-evolution-adapter/values'
 import {
   assertCloneable,
   canClaimPending,

@@ -12,6 +12,9 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../evolution-adapter"
     }
   ]
 }
