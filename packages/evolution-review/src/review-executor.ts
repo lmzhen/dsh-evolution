@@ -100,7 +100,7 @@ const REVIEW_DONE_TOOL: ToolSchema = {
   } as ToolSchema['parameters'],
 }
 
-function parseReviewReport(raw: string): ReviewReport | undefined {
+export function parseReviewReport(raw: string): ReviewReport | undefined {
   try {
     const parsed: unknown = JSON.parse(raw)
     if (parsed === null || typeof parsed !== 'object') return undefined
@@ -352,6 +352,13 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
             : await input.channel.execute(runnable, signal)
       } finally {
         for (const release of releases) release()
+      }
+      const channelCompletion = input.channel?.completion?.()
+      if (channelCompletion?.done === true && channelCompletion.report !== undefined) {
+        report = channelCompletion.report
+        done = true
+        actions.push({ type: 'tool', action: REVIEW_DONE_TOOL_NAME, target: 'review', status: 'ok' })
+        break
       }
       const byCall = new Map(batch.results.map(item => [item.callId, item]))
       const allowedNames = [...toolAllow].sort().join(', ')

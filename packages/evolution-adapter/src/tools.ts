@@ -17,7 +17,7 @@ export function toolsPort(ctx: Context): ToolsPort | undefined {
   const tools = ctx.get('tools') as ToolRuntime | undefined
   if (tools === undefined) return undefined
   return {
-    register: (definition) => tools.register(definition),
+    register: (definition, options) => tools.register(definition, options),
     guard: (guard) => tools.guard(guard),
     restrict: (filter) => tools.restrict(filter),
     get: (name, scope) => tools.get(name, scope as Parameters<ToolRuntime['get']>[1]),

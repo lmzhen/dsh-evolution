@@ -11,6 +11,8 @@ import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-platform-contract'
 import { AUX_COMPLETION_INSTRUCTION, ReviewPartialFailure, runReview } from './review-executor.ts'
 import { nativeReviewToolChannel } from './review-tool-channel.ts'
+import { createPtcReviewToolChannel } from './review-ptc-channel.ts'
+import { createReviewChildAgent } from '@deepseek-ai/dsh-evolution-adapter/review-child'
 import { ReviewWriteLocks } from './review-write-locks.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
@@ -1050,7 +1052,8 @@ function snapshotReviewParent(agent: Agent): Agent {
     const header = session.requestHeader()
     if (header === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — parent has no request header'); return false }
     const llm = llmPort(ctx)?.streamRaw
-    const tools = toolsPort(ctx)?.execute
+    const toolsService = toolsPort(ctx)
+    const tools = toolsService?.execute
     if (llm === undefined || tools === undefined) {
       ctx.logger.warn('dsh-evolution-review: aux review skipped — llm/tools service is not mounted')
       return false
@@ -1081,6 +1084,13 @@ function snapshotReviewParent(agent: Agent): Agent {
     const AUX_TOOL_ALLOW = new Set(['skill_manage', 'memory', 'skill', 'skill_search', 'read', 'glob', 'grep'])
     const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
     const nativeChannel = nativeReviewToolChannel(reviewParent, toolAllow, { execute: tools })
+    const ptcOnly = toolAllow.size === 0 && (header.tools ?? []).some(tool => tool.name === 'run_code')
+    const reviewChild = ptcOnly && toolsService !== undefined
+      ? createReviewChildAgent(agent, 'aux-' + reviewId)
+      : undefined
+    const channel = reviewChild === undefined
+      ? nativeChannel
+      : createPtcReviewToolChannel({ taskId: reviewId, parentHeaderTools: header.tools ?? [], tools: toolsService!, childAgent: reviewChild.agent, locks: reviewWriteLocks })
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
@@ -1092,12 +1102,12 @@ function snapshotReviewParent(agent: Agent): Agent {
       let waitCount = 0
       let error: string | undefined
       try {
-        const prompt = reviewPrompt(kind, 'aux') + '\n\n' + AUX_COMPLETION_INSTRUCTION
+        const prompt = reviewPrompt(kind, 'aux') + '\n\n' + AUX_COMPLETION_INSTRUCTION + (channel.instruction === undefined ? '' : '\n\n' + channel.instruction)
         const result = await withReviewContext({ reviewId, runId: reviewId, reads: new Set<string>() }, () => runReview({
           parent: reviewParent,
           llm: { stream: options => llm(options) },
           tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent }) },
-          channel: nativeChannel,
+          channel,
           writeLocks: reviewWriteLocks,
           owner: reviewId,
           instruction: prompt,
@@ -1172,6 +1182,7 @@ function snapshotReviewParent(agent: Agent): Agent {
         active?.delete(kind)
         if (active !== undefined && active.size === 0) auxRunning.delete(session.id)
         inFlightControllers.delete(controller)
+        reviewChild?.dispose()
         if (leaseToken !== undefined && authority?.lease !== undefined) await authority.lease.release(leaseToken).catch(() => {})
         if (state.rerun !== undefined) void tryAuxReview(session, agent, state.rerun, signal, reason)
       }

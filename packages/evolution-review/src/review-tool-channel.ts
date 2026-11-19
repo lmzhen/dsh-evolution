@@ -9,13 +9,17 @@
  * @module @deepseek-ai/dsh-evolution-review/review-tool-channel
  */
 import type { ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
-import type { ReviewParent, ReviewToolOutcome, ReviewToolPort } from './review-executor.ts'
+import type { ReviewParent, ReviewReport, ReviewToolOutcome, ReviewToolPort } from './review-executor.ts'
 
 /** One executable tool transport for a review task. */
 export interface ReviewToolChannel {
   readonly mode: 'native' | 'ptc'
   /** Tool schemas the model may see; the runner adds `review_done` itself. */
   readonly visibleTools: readonly ToolSchema[]
+  /** Extra instruction appended after the review prompt (channel-specific protocol). */
+  readonly instruction?: string
+  /** Completion reported by the channel after a batch (PTC's in-code review_done). */
+  completion?(): { readonly done: boolean; readonly report?: ReviewReport } | undefined
   /** Execute the model's calls; implementations must not append to the parent Session. */
   execute(calls: Parameters<ReviewToolPort['execute']>[0]['calls'], signal: AbortSignal): Promise<{ readonly results: readonly ReviewToolOutcome[] }>
 }

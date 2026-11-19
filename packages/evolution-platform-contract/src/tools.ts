@@ -4,12 +4,15 @@
 import type {
   ToolDefinition,
   ToolGuard,
+  ToolRegistrationOptions,
   ToolRestriction,
 } from '@deepseek-ai/dsh-tools'
 
 /** The subset of the platform tools registry the family consumes. */
+export type { ToolDefinition, ToolRegistrationOptions } from '@deepseek-ai/dsh-tools'
+
 export interface ToolsPort {
-  register(definition: ToolDefinition): () => void
+  register(definition: ToolDefinition, options?: ToolRegistrationOptions): () => void
   guard(guard: ToolGuard): () => void
   restrict(filter: ToolRestriction): () => void
   /** The visible tool under this scope, or undefined; the opt-in probe reads this. */
