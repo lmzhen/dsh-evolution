@@ -536,3 +536,11 @@ interface EvolutionReviewActivityRecordV3 {
 
 - 修复复核 P2-7：inject 恢复 v0.58 latest-trigger-wins（只在 AUX 用 mergeDebt）；`ReviewLimiter` 默认值从 4 改成设计口径 2。
 - review 35 项通过，构建 0 error。
+
+
+### Round 24（2026-11-20，真实宿主 native 验收）
+
+- 在隔离 home + rc.5 host + 0.58.0-dev.5 家族上完成真实 native AUX：一次普通会话（3 个 read）触发 cadence，memory 与 skill 两个独立 task 均以 `completed` 结束；activity v3 记录 requests/toolCalls/report/kind/status，UI 数据总览显示“已完成（记忆/技能）”。memories/MEMORY.md 实际落盘。
+- 发现并修复真实宿主上的关键缺口：aux LLM 请求带了父 session 的 `toolHistory`，平台 `projectToolUpdates` 会按历史声明重建 tools，导致合成 `review_done` 不在模型工具表中（模型明确报告“工具集中没有 review_done”，两轮 review 均为 partial）。修复：aux 请求不再传 `toolHistory`，显式工具表原样发出；新增单测断言 aux 请求 tools 含 `review_done`。
+- 真实宿主 UI 截图（截图路径 `D:/dsh/_e2e-ui-review.png`）显示 completed memory/skill 与旧 partial（missing review_done）并存，证明兼容与可观测性。
+- 仍未做：PTC 真机会话（本次 UI 里误在标准模式发了第三轮，未切到 PTC）；AUX 并行/同 skill 冲突/计数复位/父 seq 的逐项真机断言；最终 pre-tag/CI。
