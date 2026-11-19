@@ -1100,6 +1100,8 @@ function snapshotReviewParent(agent: Agent): Agent {
       let requests = 0
       let toolCalls = 0
       let waitCount = 0
+      let hitRoundLimit = false
+      let report: { summary: string; memoryChanged: boolean; skillsChanged: readonly string[]; unresolved: readonly string[] } | undefined
       let error: string | undefined
       try {
         const prompt = reviewPrompt(kind, 'aux') + '\n\n' + AUX_COMPLETION_INSTRUCTION + (channel.instruction === undefined ? '' : '\n\n' + channel.instruction)
@@ -1122,6 +1124,8 @@ function snapshotReviewParent(agent: Agent): Agent {
         requests = result.requests
         toolCalls = result.toolCalls
         waitCount = result.waitCount
+        hitRoundLimit = result.hitRoundLimit
+        report = result.report
         if (result.usage !== undefined) {
           usage = {
             inputTokens: result.usage.inputTokens ?? 0,
@@ -1155,6 +1159,8 @@ function snapshotReviewParent(agent: Agent): Agent {
             requests,
             toolCalls,
             waitCount,
+            hitRoundLimit,
+            ...(report === undefined ? {} : { report }),
             ...(usage === undefined ? {} : { usage }),
             startedAt,
             finishedAt,

@@ -60,6 +60,8 @@ export interface EvolutionReviewActivityRecord {
   requests?: number | undefined
   toolCalls?: number | undefined
   waitCount?: number | undefined
+  hitRoundLimit?: boolean | undefined
+  report?: { readonly summary: string; readonly memoryChanged: boolean; readonly skillsChanged: readonly string[]; readonly unresolved: readonly string[] } | undefined
   partialReason?: string | undefined
   /** Full final-text length before the review preview was bounded. */
   finalTextChars?: number | undefined
@@ -149,6 +151,8 @@ export function applyReviewActivityEvent(
     ...event.requests === undefined ? {} : { requests: event.requests },
     ...event.toolCalls === undefined ? {} : { toolCalls: event.toolCalls },
     ...event.waitCount === undefined ? {} : { waitCount: event.waitCount },
+    ...event.hitRoundLimit === undefined ? {} : { hitRoundLimit: event.hitRoundLimit },
+    ...event.report === undefined ? {} : { report: event.report },
     ...event.partialReason === undefined ? {} : { partialReason: event.partialReason },
     actions: event.actions,
     ...event.usage === undefined ? {} : { usage: event.usage },

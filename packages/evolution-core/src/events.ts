@@ -63,6 +63,8 @@ export interface EvolutionReviewCompletedEvent {
   readonly requests?: number | undefined
   readonly toolCalls?: number | undefined
   readonly waitCount?: number | undefined
+  readonly hitRoundLimit?: boolean | undefined
+  readonly report?: { readonly summary: string; readonly memoryChanged: boolean; readonly skillsChanged: readonly string[]; readonly unresolved: readonly string[] } | undefined
   readonly partialReason?: string | undefined
   readonly usage?: { readonly inputTokens: number; readonly outputTokens: number; readonly cacheReadTokens: number; readonly cacheWriteTokens: number } | undefined
   readonly startedAt: number

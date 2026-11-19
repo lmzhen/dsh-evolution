@@ -90,6 +90,8 @@ it('keeps v3 review task fields and partial reason on the sidecar', () => {
     requests: 2,
     toolCalls: 4,
     waitCount: 1,
+    hitRoundLimit: true,
+    report: { summary: 'partial report', memoryChanged: false, skillsChanged: ['probe'], unresolved: ['left'] },
     partialReason: 'max tool calls reached before review_done',
     actions: [],
     startedAt: 1,
@@ -97,7 +99,7 @@ it('keeps v3 review task fields and partial reason on the sidecar', () => {
     at: 3,
   }, 10)
   const record = events[0]!
-  expect(record).toMatchObject({ taskId: 't1', kind: 'skill', status: 'partial', requests: 2, toolCalls: 4, waitCount: 1, partialReason: 'max tool calls reached before review_done' })
+  expect(record).toMatchObject({ taskId: 't1', kind: 'skill', status: 'partial', requests: 2, toolCalls: 4, waitCount: 1, hitRoundLimit: true, partialReason: 'max tool calls reached before review_done' })
   expect(parseActivityReviews(serializeActivity([], events))[0]).toMatchObject({ taskId: 't1', status: 'partial', waitCount: 1 })
 })
 

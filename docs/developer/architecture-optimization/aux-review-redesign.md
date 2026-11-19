@@ -463,3 +463,9 @@ interface EvolutionReviewActivityRecordV3 {
 - activity → UI 读数已接通：stats 快照新增 `global.reviews`（reviewId/kind/status/startedAt/finishedAt/partialReason），host 直接读 `activity.json` 并校验；client `parseSkillStats` 容错解析。
 - StatsPage 新增“最近自动复查”区块：memory/skill 分开、completed/partial/failed/timeout/aborted 分色；partial 显示原因；空态单独展示；i18n 已按 8 locale 写入 catalog 并生成。
 - 测试：history-routes 5 项、history-panel 12 项、stats-page-layout 4 项通过；client 构建通过。
+
+
+### Round 14（2026-11-20）
+
+- review event/activity 补齐 `hitRoundLimit` 与结构化 `report`（summary/memoryChanged/skillsChanged/unresolved）；A/F 的“记录完整完成读数”不再依赖 summary 文本。
+- activity v3 测试覆盖 hitRoundLimit/report；review 11 项 + activity 23 项通过，构建 0 error。
