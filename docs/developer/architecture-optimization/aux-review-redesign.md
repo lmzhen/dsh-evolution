@@ -475,3 +475,10 @@ interface EvolutionReviewActivityRecordV3 {
 
 - AUX 全局并发有界：新增 `ReviewLimiter(4)`，每个插件实例一个 FIFO 信号量；review 在首个模型请求前取槽，超时/卸载可中止排队；cleanup 时 `dispose()` 唤醒等待者。无 per-session/weight 公平调度，符合 C 的范围。
 - 新增 limiter 单测（槽位移交、排队中止）；接入 `tryAuxReview`。
+
+
+### Round 16（2026-11-20）
+
+- UI 回归测试补齐：`stats-page-layout.client.spec.ts` 覆盖 review 区块的 kind/status/partialReason 渲染；history-panel/stats-layout 均通过。
+- 本地门禁扫描：gate-01/02/06/08–12/17/19–22/24–28/30–46 等通过；gate-05（smoke-built-entries）与 gate-29（write inventory）因本机没有默认平台 scope/profile home 为 `cannot-decide`，不是代码失败；gate-46 初次因新增 review specs 的 taxonomy 过期失败，已运行生成器刷新 `packages/scripts/reports/check-taxonomy.json` 并复跑通过。
+- 仍未开始最终 pre-tag/CI 与独立复核。
