@@ -69,6 +69,7 @@ describe('buildDoctorView: the frozen 7+8 shape', () => {
     const platform = view.facts.find(fact => fact.key === 'platform-line')
     expect(platform?.value).toContain(PLATFORM_LINE.version)
     expect(platform?.value).toContain(PLATFORM_LINE.floor)
+    for (const version of PLATFORM_LINE.cohort) expect(platform?.value).toContain(version)
     expect(view.facts.find(fact => fact.key === 'family-version')?.value).toBe('0.27.0')
     expect(view.facts.find(fact => fact.key === 'preset-ids')?.value).toContain(String(EVOLUTION_PRESET_IDS.length) + ' 个基础预设可选')
   })

@@ -64,7 +64,7 @@ export type PlatformPairing = 'in-window' | 'host-newer' | 'out-of-window' | 'un
  */
 export interface DoctorInputs {
   readonly now: Date
-  readonly platformLine: { readonly version: string; readonly floor: string }
+  readonly platformLine: { readonly version: string; readonly floor: string; readonly cohort?: readonly string[] }
   readonly familyVersion: string
   readonly hostVersion?: string | undefined
   readonly form: { readonly id: InstallFormId; readonly evidence: readonly string[]; readonly confidence: 'declared' | 'inferred' }
@@ -134,7 +134,7 @@ const FORM_WORDS: Readonly<Record<InstallFormId, string>> = Object.freeze({
  */
 function factsOf(inputs: DoctorInputs): DocFactRow[] {
   const values: Record<string, string> = {
-    'platform-line': inputs.platformLine.version + '（最低兼容 ' + inputs.platformLine.floor + '）',
+    'platform-line': inputs.platformLine.version + '（cohort ' + (inputs.platformLine.cohort?.join(' / ') ?? inputs.platformLine.floor) + '；最低兼容 ' + inputs.platformLine.floor + '）',
     'family-version': inputs.familyVersion,
     'install-form': FORM_WORDS[inputs.form.id] + '（' + (inputs.form.confidence === 'declared' ? '安装内容已确认' : '按已安装内容推断') + '）',
     'preset-ids': '审阅、维护各有一个只读模式；另有 ' + String(EVOLUTION_PRESET_IDS.length) + ' 个基础预设可选',
@@ -482,7 +482,7 @@ export async function assembleDoctorInputs(ctx: Context, extras: {
   const hostMounted = host.available
   return {
     now: extras.now ?? new Date(),
-    platformLine: { version: PLATFORM_LINE.version, floor: PLATFORM_LINE.floor },
+    platformLine: { version: PLATFORM_LINE.version, floor: PLATFORM_LINE.floor, cohort: PLATFORM_LINE.cohort },
     familyVersion: familyVersion(),
     hostVersion: extras.hostVersion ?? platformVersion,
     form: extras.form ?? detectedForm,
