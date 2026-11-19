@@ -77,6 +77,8 @@
 
 ## 7. 综合优化方案（目标形态）
 
+> 详细接口、状态机、PTC child、锁等待与文件级改造面见 [aux-review-redesign.md](aux-review-redesign.md)。
+
 ### 7.1 结论
 
 把问题拆成四个正交层，而不是在 `tryAuxReview` 里继续加分支：
