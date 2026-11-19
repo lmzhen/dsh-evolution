@@ -64,9 +64,8 @@ export const MEMORY_TOOL_DESCRIPTION =
   + 'TARGETS: "user" = who the user is (name, role, preferences, style). '
   + '"memory" = your notes (environment, conventions, tool quirks, lessons).\n\n'
   + 'SKIP: trivial/obvious info, easily re-discovered facts, task progress, '
-  + 'completed-work logs, temporary TODO state. To recall a past session use '
-  + 'the session query tool, not memory. Reusable procedures belong in a skill, not '
-  + 'memory.'
+  + 'completed-work logs, temporary TODO state. Those belong to the session '
+  + 'log, not memory. Reusable procedures belong in a skill, not memory.'
 
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
 // authoritative consumer shape) instead of this local view. 0.3.23 (G4.8,

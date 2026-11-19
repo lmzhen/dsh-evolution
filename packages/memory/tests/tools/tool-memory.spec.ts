@@ -76,7 +76,7 @@ describe('tool-memory', () => {
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/save proactively/i)
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/user preferences & corrections/i)
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/"user" = who the user is/)
-    expect(MEMORY_TOOL_DESCRIPTION).toMatch(/session query tool/)
+    expect(MEMORY_TOOL_DESCRIPTION).toMatch(/belong to the session log/)
     expect(MEMORY_TOOL_DESCRIPTION).toMatch(/belong in a skill/)
   })
 

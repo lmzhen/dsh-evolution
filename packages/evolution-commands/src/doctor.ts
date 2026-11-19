@@ -1024,7 +1024,7 @@ function legacyLine(row: LegacyMigrationRow): string {
  * report now contributes only the facts the view does not represent yet: cross-profile bundles,
  * the family service inference, capability absence, the scoped-row probe, the legacy settings
  * document, pending/executing audit records, preset freshness, and the conflict/env/budget/
- * parameter/session-search findings + next steps. This is the W8-S7 rewrite branch: the text face
+ * parameter and budget findings + next steps. This is the W8-S7 rewrite branch: the text face
  * has real consumers (the `/evolution doctor` command, README/INSTALL, doctor.spec), so the legacy
  * rendering was rewritten instead of deleted — but every fact the view owns renders from the view
  * exactly once (the legacy install-form line is gone).
