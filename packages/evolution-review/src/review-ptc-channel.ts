@@ -83,6 +83,7 @@ export interface PtcReviewChannelOptions {
   readonly parentHeaderTools: readonly { readonly name: string; readonly description?: string; readonly parameters?: unknown }[]
   readonly tools: {
     register(definition: ToolDefinition, options?: { when?: () => boolean }): () => void
+    resolve?: (context: unknown) => Promise<unknown>
     execute?: (input: unknown) => Promise<unknown>
   }
   readonly childAgent: unknown
@@ -111,7 +112,8 @@ export function createPtcReviewToolChannel(options: PtcReviewChannelOptions): Re
       active = true
       try {
         if (options.tools.execute === undefined) throw new Error('PTC review channel requires tools.execute')
-        return await options.tools.execute({ calls, signal, agent: options.childAgent }) as { readonly results: readonly ReviewToolOutcome[] }
+        const toolSet = options.tools.resolve === undefined ? undefined : await options.tools.resolve({ agent: options.childAgent, signal })
+        return await options.tools.execute({ calls, signal, agent: options.childAgent, ...(toolSet === undefined ? {} : { toolSet }) }) as { readonly results: readonly ReviewToolOutcome[] }
       } finally {
         active = false
       }

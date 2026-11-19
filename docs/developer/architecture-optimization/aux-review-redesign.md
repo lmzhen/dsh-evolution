@@ -444,3 +444,15 @@ interface EvolutionReviewActivityRecordV3 {
 - PTC channel 的 review_done/review_wait 注册从“每次 execute 内临时注册”改为“channel 构造时注册、execute 期间用 active+reviewId 守卫”；原因是 PTC 外层步骤的工具集在 run_code 执行前已解析，execute 内新注册的工具不会进入该次 schema。
 - 真实 PTC 嵌套测试仍未通过：临时复现得到 `unknown tool "review_done"`；说明外层 toolSet 解析仍未包含后注册工具，或 `when` 守卫在嵌套解析时未按预期生效。当前 PTC 注册方案**尚未完成真实验收**，不能宣称 PTC review 可用。
 - 下一步需从 PTC `tools.schemas(agent, toolSet)` 的解析时机/作用域入手，可能改为在 review child 的 scoped context 注册工具，而不是全局 root 注册。
+
+
+### Round 12（2026-11-20）
+
+- PTC `unknown tool review_done` 根因定位：review channel 自己注册工具后，PTC 外层 `run_code` 的 `exec.toolSet` 已经在步骤准备时解析完成；仅在注册表里新增工具不会进入该次 toolSet。
+- 修复：`ToolsPort.resolve`（adapter 转发 `tools.resolve`）；PTC channel execute 在 active 期间先 `resolve({agent: child, signal})`，把解析出的 toolSet 显式传给 `tools.execute`。
+- 真实 PTC runtime 单测（临时 harness 验证，不入发布测试）已通过：
+  - `run_code` 内 `tools.review_done` 可见并执行；
+  - completion 返回 `{done:true, report}`；
+  - parent Session seq 保持 0；
+  - child Session seq 增长。
+- 正式 review/adapter 测试 33 passed，构建 0 error；真实 AUX PTC 仍需接入宿主会话验收。

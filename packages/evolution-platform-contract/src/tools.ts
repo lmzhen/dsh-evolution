@@ -17,6 +17,8 @@ export interface ToolsPort {
   restrict(filter: ToolRestriction): () => void
   /** The visible tool under this scope, or undefined; the opt-in probe reads this. */
   get(name: string, scope?: unknown): unknown
+  /** Resolve the step admission for one review child agent. */
+  resolve?(context: unknown): Promise<unknown>
   /** Raw execute for callers that own the platform call shape (review aux path). */
   execute?<T = unknown>(input: unknown): Promise<T>
 }

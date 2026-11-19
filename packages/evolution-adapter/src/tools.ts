@@ -21,6 +21,7 @@ export function toolsPort(ctx: Context): ToolsPort | undefined {
     guard: (guard) => tools.guard(guard),
     restrict: (filter) => tools.restrict(filter),
     get: (name, scope) => tools.get(name, scope as Parameters<ToolRuntime['get']>[1]),
+    ...(typeof tools.resolve === 'function' ? { resolve: <T = unknown>(context: unknown) => tools.resolve!(context as Parameters<NonNullable<ToolRuntime['resolve']>>[0]) as Promise<T> } : {}),
     ...(typeof tools.execute === 'function' ? { execute: <T = unknown>(input: unknown) => tools.execute!(input as Parameters<NonNullable<ToolRuntime['execute']>>[0]) as Promise<T> } : {}),
   }
 }
