@@ -120,7 +120,7 @@ bundle patch                 ← 只含家族 row
 
 ```text
 evolution-contract/
-  src/ports.ts        # EvolutionPlatform 端口
+  src/ports.ts        # EvolutionPlatform 端口接口
   src/capabilities.ts # PlatformCapability 枚举/能力集合
   src/types.ts        # 家族跨包数据类型
   src/tool-schemas.ts # 模型工具 schema（纯值）
@@ -130,12 +130,26 @@ evolution-adapter/
   src/detect.ts       # 从 ctx 探测能力，不按版本分支
   src/c1/...          # 当前契约代际的端口实现
   src/c2/...          # 仅真实语义变化时新增
+  src/platform-values.ts # 平台提供的运行时值（defineTool/createUserMessage/…）的家族出口
   src/diagnostics.ts  # 供 doctor 的版本/能力/缺失说明
 
 evolution-core/       # 只留域逻辑；import contract，不 import 平台包
 ```
 
-迁移顺序：先拆 `contract`，再拆 `adapter`；feature 包逐步从“core 的 re-export”切到 contract。包数增加不设硬上限；以机制边界为准。
+依赖规则：
+
+- `evolution-contract`：**零宿主 runtime import**；允许 type-only 平台类型，用于端口签名，但类型面必须由 cohort 矩阵编译覆盖。
+- `evolution-adapter`：全仓唯一 import `@deepseek-ai/dsh-*` **运行时值** 的包；实现端口，并集中导出平台提供的运行时 helper（`defineTool`、`createUserMessage`、`escapeText`、`SessionId` 等）。
+- feature 包：类型/端口从 contract 取；平台提供的运行时 helper 从 adapter 取；**不直接 import `@deepseek-ai/dsh-*`**。
+- `Cordis`/`Schemastery` 继续作为框架 seam 直接 import；它们在兼容包络中单独声明，不混入 adapter 的宿主适配面。
+
+迁移顺序：先拆 `contract`，再拆 `adapter`；`evolution-core/platform` 暂时作为 re-export 兼容桶，feature 包逐批切到 contract/adapter，最后删除兼容桶。包数增加不设硬上限；以机制边界为准。
+
+**P0 子阶段（防止大爆炸）：**
+
+- **P0a**：新建 contract/adapter；adapter 提供 `evolutionPlatform` 与 helper；`evolution-core/platform` 变成 re-export 兼容桶；core runtime 暂时仍 mount adapter 以保持行为；rc.5 全绿。
+- **P0b**：feature 包逐批从 core/platform 切到 contract/adapter；每次切换一个包组，测试绿后继续；最后删除兼容桶。
+- **P0c**：把 adapter 作为独立 row 加入 host/all/preset/standalone，顺序在 core 之前；core runtime 不再 mount adapter；真实启动验证 row 顺序。
 
 ### 3.3 契约与适配
 
@@ -243,9 +257,9 @@ export interface EvolutionPlatform {
 
 ### P0：边界，不改行为
 
-- 新建 `evolution-contract`、`evolution-adapter`；
+- 按 §3.2 的 P0a/P0b/P0c 分三次落地：先 contract/adapter + 兼容桶，再逐包切 import，最后独立 row；
 - 把 `evolution-core/src/platform/*`、`runtime/platform.ts` 迁入 adapter；
-- feature 包只依赖 contract；
+- feature 包从 contract 取类型/端口、从 adapter 取平台运行时 helper；
 - `evolution-adapter` 加入 host/all/preset/standalone 的 row 集，顺序在 core 之前；
 - 在 rc.5 上编译/测试全绿；行为不变，可回退。
 
