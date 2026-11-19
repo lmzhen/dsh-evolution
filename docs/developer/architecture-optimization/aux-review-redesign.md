@@ -551,3 +551,11 @@ interface EvolutionReviewActivityRecordV3 {
 - 真实 native 验收完成：隔离 home + rc.5 host + dev5 家族，普通会话触发 memory/skill 两个独立 task，均 `completed`；`memories/MEMORY.md` 实际写入；activity v3 有 requests/toolCalls/report/kind/status；UI 数据总览显示“已完成 记忆/技能”，旧 partial 与 `missing review_done` 原因并存。
 - 真实 PTC 验收未通过：UI 切到 PTC 模式后触发 AUX，`run_code` 调用返回 `unknown tool "run_code"`，review 只能 partial(missing review_done)。尝试过：detached Session.create（错误 `session is not live in this store`）→ 改为 live SessionStore child；随后过滤 toolSet（Map 迭代）仍未解决。
 - 结论：PTC 真实宿主仍是发布阻断项；native/default 路径已真机通过。下一步需从 PTC 模式下 child agent 的 scope/toolSet/run_code registration 入手，而不是继续堆 fake 测试。
+
+
+### Round 26（2026-11-20，PTC 真机根因与 native 验收）
+
+- PTC 真机 `unknown tool "run_code"` 根因定位：`ToolRuntime.execute` 用 `selectExecutor(input.agent)`，而 `scoped.executor` 是以**父 Agent 对象身份**为 key 注册的；review child 是用 Proxy 只替换 session 的**另一个对象**，不等于父 Agent，因此选择器退回 root native executor，`run_code` 在 native registry 中不存在。`makeSessionLive`、toolSet allowlist、review_done 注册都无法改变这一对象身份不匹配。
+- 结论：PTC review 需要平台级 **detached review Agent（真实 Agent/scope/executor，不是只换 session 的 Proxy）**，或平台提供“用父 scope executor + child session”执行入口；当前 rc.5 没有该公开入口。不能靠 family 侧补丁伪造 Agent，否则会绕过平台 scope/executor 与 approval/workingDirectory 语义。
+- native 真机已通过（见 Round 24）：memory/skill 两 task completed、memory 落盘、activity v3、UI 完成/部分并存；aux LLM 请求不传 toolHistory 后才看到合成 review_done。
+- 当前发布结论：native/default 可进入最终验收；PTC 仍为平台能力阻断，除非用户确认接受“PTC review 不可用”或先补平台 detached review Agent 能力。
