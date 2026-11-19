@@ -1,15 +1,15 @@
 {
-  "note": "0.55.1 local rehearsal: S1/S2/S3 measured on the rc.3 web host at 127.0.0.1:3086 (platform 0.2.2-rc.3, family 0.55.1, 45 skills); S4 s4-hmr-double-apply spec. Final CI face must be re-read before publish.",
-  "familyVersion": "0.55.1",
+  "note": "0.56.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host at 127.0.0.1:3088 (platform 0.2.2-rc.5, family 0.56.0, 45 skills); S4 s4-hmr-double-apply spec. Final CI face must be re-read before publish.",
+  "familyVersion": "0.56.0",
   "spikes": [
     {
       "face": "web",
-      "hostVersion": "0.2.2-rc.3",
-      "familyVersion": "0.55.1",
-      "startedAt": "2026-11-19T02:08:30.000Z",
-      "artifactSha256": "2ef78beb8da702659373b74818c9ea72e411de7e1ed3b29f44d808d6b691c038",
-      "inputsSha256": "5f778731453cb04503bfe5935738b3af321963d18486c40b27dc360a68f51b4f",
-      "commit": "a0efe964",
+      "hostVersion": "0.2.2-rc.5",
+      "familyVersion": "0.56.0",
+      "startedAt": "2026-11-19T03:54:30.000Z",
+      "artifactSha256": "75c8044a554311e87b91edd58970a75d91434a326cb456bbdd99fd6d69271ad1",
+      "inputsSha256": "ee33c89b2514592519e9fbd7b12131bf4ccc06344d2972e9011659fb50380be4",
+      "commit": "6560de01",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
@@ -17,21 +17,21 @@
         "skillHistoryBytes": 32468,
         "threeReadsStable": true,
         "readMs": [
-          952,
-          593,
-          804
+          1187,
+          755,
+          558
         ],
         "ownerStatus": 200
       }
     },
     {
       "face": "web",
-      "hostVersion": "0.2.2-rc.3",
-      "familyVersion": "0.55.1",
-      "startedAt": "2026-11-19T02:08:30.000Z",
-      "artifactSha256": "2ef78beb8da702659373b74818c9ea72e411de7e1ed3b29f44d808d6b691c038",
-      "inputsSha256": "5f778731453cb04503bfe5935738b3af321963d18486c40b27dc360a68f51b4f",
-      "commit": "a0efe964",
+      "hostVersion": "0.2.2-rc.5",
+      "familyVersion": "0.56.0",
+      "startedAt": "2026-11-19T03:54:30.000Z",
+      "artifactSha256": "75c8044a554311e87b91edd58970a75d91434a326cb456bbdd99fd6d69271ad1",
+      "inputsSha256": "ee33c89b2514592519e9fbd7b12131bf4ccc06344d2972e9011659fb50380be4",
+      "commit": "6560de01",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -39,36 +39,36 @@
         "anonymous": 401,
         "anonymousBody": "unauthorized",
         "diagnosticsReadMs": [
-          25
+          49
         ],
         "carrier": "connection.fetch"
       }
     },
     {
       "face": "web",
-      "hostVersion": "0.2.2-rc.3",
-      "familyVersion": "0.55.1",
-      "startedAt": "2026-11-19T02:08:30.000Z",
-      "artifactSha256": "2ef78beb8da702659373b74818c9ea72e411de7e1ed3b29f44d808d6b691c038",
-      "inputsSha256": "5f778731453cb04503bfe5935738b3af321963d18486c40b27dc360a68f51b4f",
-      "commit": "a0efe964",
+      "hostVersion": "0.2.2-rc.5",
+      "familyVersion": "0.56.0",
+      "startedAt": "2026-11-19T03:54:30.000Z",
+      "artifactSha256": "75c8044a554311e87b91edd58970a75d91434a326cb456bbdd99fd6d69271ad1",
+      "inputsSha256": "ee33c89b2514592519e9fbd7b12131bf4ccc06344d2972e9011659fb50380be4",
+      "commit": "6560de01",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
-        "familyVersion": "0.55.1"
+        "familyVersion": "0.56.0"
       }
     },
     {
       "face": "web",
-      "hostVersion": "0.2.2-rc.3",
-      "familyVersion": "0.55.1",
-      "startedAt": "2026-11-19T02:08:30.000Z",
-      "artifactSha256": "2ef78beb8da702659373b74818c9ea72e411de7e1ed3b29f44d808d6b691c038",
-      "inputsSha256": "5f778731453cb04503bfe5935738b3af321963d18486c40b27dc360a68f51b4f",
-      "commit": "a0efe964",
+      "hostVersion": "0.2.2-rc.5",
+      "familyVersion": "0.56.0",
+      "startedAt": "2026-11-19T03:54:30.000Z",
+      "artifactSha256": "75c8044a554311e87b91edd58970a75d91434a326cb456bbdd99fd6d69271ad1",
+      "inputsSha256": "ee33c89b2514592519e9fbd7b12131bf4ccc06344d2972e9011659fb50380be4",
+      "commit": "6560de01",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -87,7 +87,7 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on a0efe964 (OK 52/52)"
+    "source": "verify-traceability --strict on 6560de01 (OK 52/52)"
   },
-  "generatedAt": "2026-11-19T02:11:00.000Z"
+  "generatedAt": "2026-11-19T03:58:00.000Z"
 }
