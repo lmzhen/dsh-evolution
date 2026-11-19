@@ -11,6 +11,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-platform-contract'
 import { AUX_COMPLETION_INSTRUCTION, ReviewPartialFailure, runReview } from './review-executor.ts'
 import { nativeReviewToolChannel } from './review-tool-channel.ts'
+import { ReviewWriteLocks } from './review-write-locks.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).
@@ -995,6 +996,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    * created; the parent Agent is used only for tool scope/approval, with no log.
    */
   let inFlightControllers = new Set<AbortController>()
+  const reviewWriteLocks = new ReviewWriteLocks()
 
 /**
  * Freeze the parent prefix for an aux review.
@@ -1096,6 +1098,8 @@ function snapshotReviewParent(agent: Agent): Agent {
           llm: { stream: options => llm(options) },
           tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent }) },
           channel: nativeChannel,
+          writeLocks: reviewWriteLocks,
+          owner: reviewId,
           instruction: prompt,
           toolAllow,
           maxRounds: config.reviewMaxRounds,

@@ -12,6 +12,7 @@ import { recordReviewRead } from '@deepseek-ai/dsh-evolution-core'
 import type { ContentBlock, ContextFormed, GenerateOptions, Message, RequestMessage, StreamChunk, ToolCallBlock, ToolCallId, ToolHistory, ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { ReviewToolChannel } from './review-tool-channel.ts'
+import type { ReviewWriteLocks } from './review-write-locks.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -130,6 +131,21 @@ async function waitForReview(timeoutMs: number, signal: AbortSignal): Promise<vo
   signal.throwIfAborted()
 }
 
+function writeResource(call: ToolCallBlock): string | undefined {
+  if (call.name !== 'skill_manage' && call.name !== 'memory') return undefined
+  try {
+    const parsed: unknown = JSON.parse(call.arguments)
+    if (parsed !== null && typeof parsed === 'object') {
+      const value = parsed as { name?: unknown; target?: unknown }
+      const name = typeof value.name === 'string' ? value.name : undefined
+      const target = typeof value.target === 'string' ? value.target : undefined
+      if (call.name === 'skill_manage') return 'skill:' + (name ?? '<unnamed>')
+      return 'memory:' + (target ?? 'default')
+    }
+  } catch { /* malformed args are the tool's problem */ }
+  return call.name === 'skill_manage' ? 'skill:<unnamed>' : 'memory:default'
+}
+
 export class ReviewModelError extends Error {
   constructor(message: string, readonly code: 'timeout' | 'cancelled' | 'transport') { super(message); this.name = 'ReviewModelError' }
 }
@@ -178,6 +194,9 @@ export interface RunReviewInput {
   readonly tools: ReviewToolPort
   /** Optional native/PTC transport; when present it owns visible tools and execution. */
   readonly channel?: ReviewToolChannel
+  /** Optional process-local write lock registry for recoverable resource-busy results. */
+  readonly writeLocks?: ReviewWriteLocks
+  readonly owner?: string
   readonly instruction: string
   readonly toolAllow: ReadonlySet<string>
   readonly signal: AbortSignal
@@ -279,10 +298,13 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         toolCalls += 1
         waitCount += 1
         const parsed = parseWaitRequest(waitCalls[0]!.arguments)
-        await waitForReview(parsed.timeoutMs, signal)
-        actions.push({ type: 'tool', action: REVIEW_WAIT_TOOL_NAME, target: parsed.resource ?? 'resource', status: 'ok' })
+        const released = parsed.resource !== undefined && input.writeLocks !== undefined
+          ? await input.writeLocks.wait(parsed.resource, parsed.timeoutMs, signal)
+          : await waitForReview(parsed.timeoutMs, signal)
+        actions.push({ type: 'tool', action: REVIEW_WAIT_TOOL_NAME, target: parsed.resource ?? 'resource', status: released === false ? 'error' : 'ok' })
         messages.push(assistant)
-        messages.push(createToolResultMessage({ callId: waitCalls[0]!.id, content: [{ type: 'text', text: 'review_wait released' }], isError: false }))
+        messages.push(createToolResultMessage({ callId: waitCalls[0]!.id, content: [{ type: 'text', text: released === false ? 'review_wait timed out' : 'review_wait released' }], isError: released === false }))
+        if (released === false) { partialReason = 'review_wait timed out'; break }
         continue
       }
       const doneCalls = calls.filter(call => call.name === REVIEW_DONE_TOOL_NAME)
@@ -304,15 +326,44 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
       }
       messages.push(assistant)
       const allowedCalls = calls.filter(call => toolAllow.has(call.name))
-      const batch = allowedCalls.length === 0
-        ? { results: [] as ReviewToolOutcome[] }
-        : input.channel === undefined
-          ? await tools.execute({ calls: allowedCalls, signal, agent: parent })
-          : await input.channel.execute(allowedCalls, signal)
+      const releases: (() => void)[] = []
+      const held = new Set<string>()
+      const busy = new Map<string, string>()
+      const runnable: ToolCallBlock[] = []
+      for (const call of allowedCalls) {
+        const resource = writeResource(call)
+        if (resource === undefined || input.writeLocks === undefined) { runnable.push(call); continue }
+        if (held.has(resource)) { runnable.push(call); continue }
+        const release = input.writeLocks.tryAcquire(resource, input.owner ?? 'review')
+        if (release === undefined) { busy.set(call.id, resource); continue }
+        held.add(resource)
+        releases.push(release)
+        runnable.push(call)
+      }
+      let batch: { results: readonly ReviewToolOutcome[] }
+      try {
+        batch = runnable.length === 0
+          ? { results: [] as ReviewToolOutcome[] }
+          : input.channel === undefined
+            ? await tools.execute({ calls: runnable, signal, agent: parent })
+            : await input.channel.execute(runnable, signal)
+      } finally {
+        for (const release of releases) release()
+      }
       const byCall = new Map(batch.results.map(item => [item.callId, item]))
       const allowedNames = [...toolAllow].sort().join(', ')
       for (const call of calls) {
         const item = byCall.get(call.id)
+        const busyResource = busy.get(call.id)
+        if (busyResource !== undefined) {
+          actions.push({ type: actionType(call.name), action: call.name, target: toolTarget(call.name, call.arguments), status: 'error' })
+          messages.push(createToolResultMessage({
+            callId: call.id,
+            content: [{ type: 'text', text: 'resource-busy: ' + busyResource + '; call review_wait, then re-read the target and retry' }] as ContentBlock[],
+            isError: true,
+          }))
+          continue
+        }
         if (item === undefined) {
           if (toolAllow.has(call.name)) throw new Error('review tool result has no matching call')
           actions.push({
