@@ -343,6 +343,7 @@ export interface EvolutionPlatform {
 
 - **DCR-1（2026-11-19，包名冲突）**：原计划的 `@lmzhen/dsh-evolution-contract` 在 npm 已存在 `0.44.0`，是历史上的**状态/事件跨包纯契约**包，已有公开版本；直接复用会让旧消费者升级到语义完全不同的新包。决定：新包改名为 `@lmzhen/dsh-evolution-platform-contract`；旧 `@lmzhen/dsh-evolution-contract@0.44.0` 不覆盖、不 deprecate（后续如需统一再单独处理）。影响：源码目录、imports、tsconfig 路径、包映射与发布占位名同步改名；设计目标不变（纯平台契约 + 单一 adapter）。
 - **DCR-2（2026-11-19，envelope 承载文件）**：envelope 语义不新建 `platform-envelope.json`，而是扩展唯一的 `platform-line.json`（新增 `cohort`/`contract`，保留 `version`/`floor` 兼容字段）。原因：release/audit/CI 已有大量路径依赖该文件名；再建一个文件会形成第二事实源。影响：peers/engines 改为 cohort 精确并集；workflow 输出/审计参数改用 `peers_range`；release evidence 仍读同一文件。回退：若需要新文件名，必须先改所有 reader 再删除旧文件，不能双写。
+- **DCR-3（2026-11-19，cohort 扩为 rc.1–rc.5）**：用户要求按“无需改代码即可支持的版本”声明，而不是只写 rc.3/rc.5。五个 0.2.2 预发布版本均完成双线编译、干净安装、启动 200、家族 row 29/29 active、doctor ok 的实测；因此 cohort 从候选 rc.3–rc.5 扩为 `rc.1 / rc.2 / rc.3 / rc.4 / rc.5`。0.2.2 正式版未发布、不写；0.2.1 实测启动但 `platform-services=warn`，不跨 minor 纳入。回退：移除未通过复验的成员并同步重生成所有 manifest/evidence。
 - 本文 §3 的不变量、包边界、envelope 语义是**冻结面**；变更必须写 DCR（日期、原因、影响、回退），并重新评审。
 - 新发现先入 §2 台账或 §10 open questions；不擅自扩当前 Phase。
 - 代码、测试、生成器、文档、release evidence 同 PR 更新；文档滞后视为未完成。
@@ -367,3 +368,4 @@ export interface EvolutionPlatform {
 5. 旧线采用 dist-tag 还是并行 major？按 npm 发布成本与用户升级路径定。
 6. **P1 前置发现（2026-11-19，已收敛 detector 假阳性）**：rc.3 平台树里仍然带着旧 family 包副本；原矩阵把它们当成平台声明，与 mirror 的 family source 形成两套类型身份，才报 4 个 `TS2717`（`evolutionApproval` / `skillUsage` / `evolutionState` / `evolutionStateStorage`）。`verify-platform-matrix.mjs` 现在先按 `packages/*/package.json` 的名字剔除本地 family 包，再做单一声明树编译；rc.3 编译已 **0 error**。rc.5 的干净源码树没有构建后的 `lib/types`，暂用当前 `verify-family-types` 覆盖 rc.5，等 rc.5 树可构建后再补同一矩阵行。
 7. **独立复核（2026-11-19）**：P0=0，P1=8。已修：audit 范围改为 cohort 精确并集（action + gate-59）；evidence 的 platformLine.cohort/contract 与根文件逐项比较；spike commit 必须等于 evidence commit；cohort reading 增加 source，release 只接受 CI 读数；窗口网格改用真正的 semver 两谓词并加错误范围负例；smoke 增加 `--expect-platform`；新增 `verify-platform-envelope.mjs` 并接入 validate action（gate-83）；workflow 增加按 cohort 展开的 `cohort-check` matrix。pre-tag 现为 63 pass / 0 fail / 4 registered cannot-decide。仍未闭合：`verify-platform-matrix` 与 `verify-cohort-smoke` 尚未注册为强制 gate；`cohort-check` 只做 action validate，不启动 web/不产出每成员 row 读数；release evidence 的 CI cohort 读数仍缺，因此当前 release 模式会故意失败。**结论：仍不能发布。**
+8. **0.2.1 兼容性实测（2026-11-19）**：`0.2.1-rc.5` 能启动并 29/29 active，但 doctor `platform-services` 为 `warn`；按“不把一个 artifact 横跨 0.2.1/0.2.2”的不变量不纳入 cohort，0.2.1 用户继续使用 0.55.x legacy 线。
