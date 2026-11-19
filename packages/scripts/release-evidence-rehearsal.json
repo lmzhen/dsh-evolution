@@ -1,5 +1,5 @@
 {
-  "note": "0.57.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host at 127.0.0.1:3088 (platform 0.2.2-rc.5, family 0.57.0, 45 skills, no platform session-query dependency); S4 s4-hmr-double-apply spec. Final CI face must be re-read before publish.",
+  "note": "0.57.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host; cohort smoke measured on rc.3 and rc.5 clean installs (29/29 active rows, doctor ok); S4 spec. Final CI face must be re-read before publish.",
   "familyVersion": "0.57.0",
   "spikes": [
     {
@@ -89,5 +89,37 @@
     "planned": false,
     "source": "verify-traceability --strict on 704b5fce (OK 52/52)"
   },
-  "generatedAt": "2026-11-19T06:45:00.000Z"
+  "generatedAt": "2026-11-19T06:45:00.000Z",
+  "cohort": {
+    "versions": [
+      "0.2.2-rc.3",
+      "0.2.2-rc.5"
+    ],
+    "readings": [
+      {
+        "version": "0.2.2-rc.3",
+        "install": "clean",
+        "boot": 200,
+        "activeRows": 29,
+        "expectedActiveRows": 29,
+        "disabledRows": [
+          "evolution-skill-health"
+        ],
+        "doctor": "ok",
+        "smoke": "pass"
+      },
+      {
+        "version": "0.2.2-rc.5",
+        "install": "clean",
+        "boot": 200,
+        "activeRows": 29,
+        "expectedActiveRows": 29,
+        "disabledRows": [
+          "evolution-skill-health"
+        ],
+        "doctor": "ok",
+        "smoke": "pass"
+      }
+    ]
+  }
 }

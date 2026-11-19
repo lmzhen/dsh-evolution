@@ -53,6 +53,47 @@ export function validateSpikeEvidence(spike, where = 'spike') {
 }
 
 /**
+ * Validate the per-cohort runtime readings. A version listed in the envelope
+ * without a clean-install/boot/row-survival reading is not evidence that this
+ * artifact supports it.
+ *
+ * @param cohort - the evidence cohort block.
+ * @param line - the platformLine the evidence was produced against.
+ * @param release - require a complete reading for every cohort member.
+ * @returns problem strings; empty means valid.
+ */
+export function validateCohortEvidence(cohort, line, release = false) {
+  const problems = []
+  const where = 'cohort'
+  const versions = Array.isArray(line?.cohort) ? line.cohort : []
+  if (!isObject(cohort)) return [where + ': readings must be an object carrying versions/readings']
+  if (!Array.isArray(cohort.versions) || cohort.versions.length === 0) problems.push(where + '.versions must be a nonempty array')
+  else if (versions.length > 0 && JSON.stringify(cohort.versions) !== JSON.stringify(versions)) problems.push(where + '.versions must equal platformLine.cohort')
+  if (!Array.isArray(cohort.readings)) return [...problems, where + '.readings must be an array']
+  const seen = new Set()
+  for (const [index, reading] of cohort.readings.entries()) {
+    const at = where + '.readings[' + String(index) + ']'
+    if (!isObject(reading)) { problems.push(at + ': not an object'); continue }
+    if (!nonEmptyString(reading.version)) problems.push(at + '.version is required')
+    else if (seen.has(reading.version)) problems.push(at + ': duplicate version ' + reading.version)
+    else seen.add(reading.version)
+    if (reading.install !== 'clean') problems.push(at + '.install must be "clean"')
+    if (reading.boot !== 200) problems.push(at + '.boot must be HTTP 200')
+    if (!Number.isInteger(reading.activeRows) || !Number.isInteger(reading.expectedActiveRows) || reading.activeRows !== reading.expectedActiveRows) problems.push(at + ': activeRows must equal expectedActiveRows')
+    if (!Array.isArray(reading.disabledRows)) problems.push(at + '.disabledRows must be an array')
+    if (reading.doctor !== 'ok') problems.push(at + '.doctor must be "ok"')
+    if (reading.smoke !== 'pass') problems.push(at + '.smoke must be "pass"')
+  }
+  if (release) {
+    if (versions.length === 0) problems.push('release: platformLine.cohort is missing; cannot prove per-version support')
+    for (const version of versions) {
+      if (!seen.has(version)) problems.push('release: cohort member ' + version + ' has no clean-install/boot/row-survival reading')
+    }
+  }
+  return problems
+}
+
+/**
  * Validate a release-evidence document.
  * @param evidence - parsed release-evidence.json.
  * @param options.release - when true, apply the RELEASE gate (all four spikes pass, a CI face,
@@ -79,6 +120,7 @@ export function validateReleaseEvidence(evidence, options = {}) {
   // is not the declared cannot-decide report (P0-8).
   if (!isObject(line)) return [...problems, 'platformLine must be an object carrying version/peersRange/enginesRange']
   if (!nonEmptyString(line.version) || !nonEmptyString(line.peersRange) || !nonEmptyString(line.enginesRange)) problems.push('platformLine must carry version/peersRange/enginesRange')
+  if (release) problems.push(...validateCohortEvidence(evidence.cohort, line, true))
   if (!isObject(evidence.manifests) || !Number.isInteger(evidence.manifests.count) || evidence.manifests.count <= 0) problems.push('manifests.count must be a positive integer')
   else {
     if (evidence.manifests.enginesRange !== line.enginesRange) problems.push('manifests.enginesRange must equal platformLine.enginesRange')
@@ -141,6 +183,7 @@ export function releaseEvidenceSkeleton(v1) {
   return {
     ...v1,
     schemaVersion: EVIDENCE_SCHEMA_VERSION,
+    cohort: v1.cohort ?? null,
     spikes: [],
     faces: null,
     traceability: null,

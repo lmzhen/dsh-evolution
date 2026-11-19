@@ -683,6 +683,7 @@ const evidence = releaseEvidenceSkeleton({
   platformLine,
   semverVersion,
   ciFace: null,
+  cohort: { versions: platformLine.cohort, readings: [] },
   manifests: {
     count: tarballs.length,
     enginesRange: platformLine.enginesRange,

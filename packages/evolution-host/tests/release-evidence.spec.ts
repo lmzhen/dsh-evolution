@@ -46,6 +46,7 @@ function staging(): Record<string, unknown> {
   return releaseEvidenceSkeleton({
     familyVersion: FAMILY_VERSION,
     platformLine: PLATFORM_LINE,
+    cohort: { versions: PLATFORM_LINE.cohort, readings: [] },
     semverVersion: '7.8.5',
     ciFace: null,
     manifests: { count: 36, enginesRange: PLATFORM_LINE.enginesRange, peerRange: PLATFORM_LINE.peersRange },
@@ -59,6 +60,10 @@ function staging(): Record<string, unknown> {
 function releasable(): Record<string, unknown> {
   return {
     ...staging(),
+    cohort: {
+      versions: PLATFORM_LINE.cohort,
+      readings: PLATFORM_LINE.cohort.map(version => ({ version, install: 'clean', boot: 200, activeRows: 29, expectedActiveRows: 29, disabledRows: ['evolution-skill-health'], doctor: 'ok', smoke: 'pass' })),
+    },
     commit: 'a'.repeat(40),
     tag: 'v' + FAMILY_VERSION,
     ciFace: { os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' },
@@ -226,6 +231,10 @@ async function runAssemble(
 describe('release-evidence assembly (W3 injection)', () => {
   const rehearsalInputs = () => ({
     spikes: SPIKE_IDS.map(id => spike(id)),
+    cohort: {
+      versions: PLATFORM_LINE.cohort,
+      readings: PLATFORM_LINE.cohort.map(version => ({ version, install: 'clean', boot: 200, activeRows: 29, expectedActiveRows: 29, disabledRows: ['evolution-skill-health'], doctor: 'ok', smoke: 'pass' })),
+    },
     traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52, planned: false },
   })
   it('merges the rehearsal planes, the CI face and the manifest gate ledger', async () => {

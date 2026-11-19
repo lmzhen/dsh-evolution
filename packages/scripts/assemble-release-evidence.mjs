@@ -77,6 +77,7 @@ if (gates.length === 0 && gatesFromManifest === '') problems.push('rehearsal.gat
 if (rehearsal.traceability === undefined || rehearsal.traceability === null) problems.push('rehearsal.traceability must carry the W11 reading')
 const assembled = {
   ...evidence,
+  cohort: rehearsal.cohort ?? evidence.cohort,
   spikes: Array.isArray(rehearsal.spikes) ? rehearsal.spikes : evidence.spikes,
   gates: gates.length > 0 ? gates : evidence.gates,
   traceability: rehearsal.traceability ?? evidence.traceability,
