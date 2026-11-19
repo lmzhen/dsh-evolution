@@ -407,3 +407,9 @@ interface EvolutionReviewActivityRecordV3 {
 - 新增 `ReviewWriteLocks`：按 `skill:<name>` / `memory:<target>` 做进程内可恢复锁；review 之间同资源冲突时，runner 不再执行后一个写调用，而是返回 `resource-busy` 工具结果；`review_wait` 可等待 holder 释放。锁只在 review task 的写调用期间持有，最终正确性仍由 SkillLibrary 锁 + CAS 兜底。
 - 该锁是进程内、只覆盖 review task，不覆盖前台写或其他进程；这是 §8 已确认的范围。
 - 新增 `review-write-locks.spec.ts`（释放唤醒、超时）与 runner busy 分支代码；当前仍未做同资源真实双 task 的宿主验收。
+
+
+### Round 6（2026-11-20）
+
+- 完成语义补齐 `maxToolCalls`（默认 50）：达到上限且尚未 review_done 时返回 `partial`，原因写入 event/activity；新增 runner 单测。
+- 当前仍有 `maxRounds` / `deadline` / `maxToolCalls` 三条预算；都不允许把截断标 completed。
