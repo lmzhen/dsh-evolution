@@ -11,7 +11,19 @@
       "path": "../../interaction/commands"
     },
     {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
       "path": "../../skill/skill"
+    },
+    {
+      "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../core/tools"
     }
   ]
 }

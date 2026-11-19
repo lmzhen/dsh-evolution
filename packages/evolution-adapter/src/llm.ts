@@ -1,60 +1,19 @@
 /**
- * The LLM half of the family's host platform boundary.
- *
- * Features pass a family request (route, messages, purpose); this module owns
- * the platform GenerateOptions cast and text assembly. The purpose declaration
- * merge below is the family's contribution to the 0.2.2 request map.
+ * The LLM implementation half of the family's platform boundary.
  */
-import type { GenerateOptions, StreamChunk, UserMessage } from '@deepseek-ai/dsh-llm'
 import type { Context } from '@deepseek-ai/cordis'
+import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import { EvolutionLlmError } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { EvolutionLlmRequest, LlmPort, ModelRoute } from '@deepseek-ai/dsh-evolution-platform-contract'
 
-export type EvolutionLlmFailureKind = 'model-unavailable' | 'no-route' | 'timeout' | 'cancelled' | 'content-refused' | 'transport'
-
-/** Typed auxiliary-LLM failure; callers may map these without parsing messages. */
-export class EvolutionLlmError extends Error {
-  readonly kind: EvolutionLlmFailureKind
-  constructor(kind: EvolutionLlmFailureKind, message: string, cause?: unknown) {
-    super(message)
-    this.name = 'EvolutionLlmError'
-    this.kind = kind
-    if (cause !== undefined) this.cause = cause
-  }
-}
-
-export type EvolutionLlmPurpose =
-  | 'evolution-curator'
-  | 'evolution-merge-engine'
-  | 'evolution-skill-discovery'
-
-declare module '@deepseek-ai/dsh-llm/types' {
-  interface LlmRequestPurposeMap {
-    'evolution-curator': true
-    'evolution-merge-engine': true
-    'evolution-skill-discovery': true
-  }
-}
-
-export interface ModelRoute {
-  readonly provider: string
-  readonly model: string
-}
-
-export interface EvolutionLlmRequest {
-  readonly provider: string
-  readonly model: string
-  readonly purpose: EvolutionLlmPurpose
-  readonly messages: readonly UserMessage[]
-  readonly maxTokens?: number
-  readonly temperature?: number
-  readonly signal?: AbortSignal
-}
-
-export interface LlmPort {
-  stream(request: EvolutionLlmRequest): AsyncIterable<StreamChunk>
-  completeText(request: EvolutionLlmRequest): Promise<string>
-  /** Raw platform stream for features that own their full GenerateOptions (review aux path). */
-  streamRaw?(options: GenerateOptions): AsyncIterable<StreamChunk>
-}
+export { EvolutionLlmError } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type {
+  EvolutionLlmFailureKind,
+  EvolutionLlmPurpose,
+  EvolutionLlmRequest,
+  LlmPort,
+  ModelRoute,
+} from '@deepseek-ai/dsh-evolution-platform-contract'
 
 interface LlmRuntimeLike {
   stream?(options: GenerateOptions): AsyncIterable<StreamChunk>

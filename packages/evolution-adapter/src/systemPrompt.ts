@@ -1,17 +1,11 @@
 /**
- * The system-prompt half of the family's host platform boundary.
- *
- * The family registers one optional guidance section and its live variable; a
- * host without system-prompt keeps booting, so the port is optional.
+ * The system-prompt implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
+import type { SystemPromptPort } from '@deepseek-ai/dsh-evolution-platform-contract'
 
-export interface SystemPromptPort {
-  section(section: PromptSection): () => void
-  variable(name: string, provider: (context: unknown) => string | undefined): () => void
-  context?(context: PromptContext): () => void
-}
+export type { SystemPromptPort } from '@deepseek-ai/dsh-evolution-platform-contract'
 
 interface SystemPromptServiceLike {
   section(section: PromptSection): () => void
@@ -30,5 +24,3 @@ export function systemPromptPort(ctx: Context): SystemPromptPort | undefined {
     ...(typeof service.context === 'function' ? { context: (context: PromptContext) => service.context!(context) } : {}),
   }
 }
-
-

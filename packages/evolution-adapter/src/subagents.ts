@@ -1,28 +1,18 @@
 /**
- * The subagents half of the family's host platform boundary.
- *
- * Platform versions differ in the activation-spec shape. This port keeps one
- * family-facing entry (`start`) and one activation face; the platform-specific
- * shape lives in `startActivationSpec` until the version adapter replaces the
- * temporary dual-shape bridge.
+ * The subagents implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
+import type {
+  SubagentActivationPort,
+  SubagentSendOptions,
+  SubagentsPort,
+} from '@deepseek-ai/dsh-evolution-platform-contract'
 
-export interface SubagentActivationPort {
-  readonly childId: string
-  readonly result: Promise<unknown>
-  dispose(): Promise<void>
-}
-
-export interface SubagentSendOptions {
-  readonly signal?: AbortSignal
-}
-
-export interface SubagentsPort {
-  getProvider(name: string): unknown
-  start(spec: unknown): Promise<SubagentActivationPort>
-  sendMessage?(sender: unknown, targetId: string, content: unknown, options?: SubagentSendOptions): Promise<unknown>
-}
+export type {
+  SubagentActivationPort,
+  SubagentSendOptions,
+  SubagentsPort,
+} from '@deepseek-ai/dsh-evolution-platform-contract'
 
 interface SubagentsServiceLike {
   getProvider(name: string): unknown

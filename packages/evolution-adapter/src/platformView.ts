@@ -1,23 +1,18 @@
 /**
- * The remaining read-only platform surfaces the doctor's platform view uses:
- * plugin manager, plugin inventory and the config editor. Each is optional and
- * each port preserves the "absent method" shape so the view reports missing
- * capabilities instead of inventing empty data.
+ * The remaining read-only platform surfaces the doctor's platform view uses.
  */
 import type { Context } from '@deepseek-ai/cordis'
+import type {
+  ConfigEditorPort,
+  PluginInventoryPort,
+  PluginManagerPort,
+} from '@deepseek-ai/dsh-evolution-platform-contract'
 
-export interface PluginManagerPort {
-  listBundles?(): Promise<unknown>
-  listPlugins?(): Promise<unknown>
-}
-
-export interface PluginInventoryPort {
-  list?(): Promise<unknown>
-}
-
-export interface ConfigEditorPort {
-  configuration?(): Promise<unknown>
-}
+export type {
+  ConfigEditorPort,
+  PluginInventoryPort,
+  PluginManagerPort,
+} from '@deepseek-ai/dsh-evolution-platform-contract'
 
 interface PluginManagerServiceLike {
   listBundles?(): Promise<unknown>

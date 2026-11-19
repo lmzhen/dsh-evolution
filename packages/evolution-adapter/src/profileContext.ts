@@ -1,17 +1,10 @@
 /**
- * The profile-context half of the family's host platform boundary.
- *
- * A bare library mount has no profile; a profile launcher publishes the
- * directory, patch path and started bundles this port exposes.
+ * The profile-context implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
+import type { ProfileContextPort } from '@deepseek-ai/dsh-evolution-platform-contract'
 
-export interface ProfileContextPort {
-  readonly name: string
-  readonly dir: string
-  readonly patchPath?: string
-  readonly startedBundles?: readonly string[]
-}
+export type { ProfileContextPort } from '@deepseek-ai/dsh-evolution-platform-contract'
 
 interface ProfileContextServiceLike {
   readonly name?: string
