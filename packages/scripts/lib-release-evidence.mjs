@@ -83,6 +83,8 @@ export function validateCohortEvidence(cohort, line, release = false) {
     if (!Array.isArray(reading.disabledRows)) problems.push(at + '.disabledRows must be an array')
     if (reading.doctor !== 'ok') problems.push(at + '.doctor must be "ok"')
     if (reading.smoke !== 'pass') problems.push(at + '.smoke must be "pass"')
+    if (!['ci', 'local', 'rehearsal'].includes(reading.source)) problems.push(at + '.source must be ci/local/rehearsal')
+    else if (release && reading.source !== 'ci') problems.push(at + ': release requires a CI-measured reading, not ' + reading.source)
   }
   if (release) {
     if (versions.length === 0) problems.push('release: platformLine.cohort is missing; cannot prove per-version support')
@@ -167,6 +169,7 @@ export function validateReleaseEvidence(evidence, options = {}) {
       if (spike === undefined) problems.push('release: missing spike ' + id)
       else if (spike.verdict !== 'pass') problems.push('release: spike ' + id + ' is ' + String(spike.verdict) + ' (blocked/fail are not passes)')
       if (spike !== undefined && spike.familyVersion !== evidence.familyVersion) problems.push('release: spike ' + id + ' was measured on ' + String(spike.familyVersion) + ', not ' + String(evidence.familyVersion))
+      if (spike !== undefined && spike.commit !== evidence.commit) problems.push('release: spike ' + id + ' was measured on commit ' + String(spike.commit) + ', not the evidence commit ' + String(evidence.commit))
     }
     if (evidence.traceability === undefined || evidence.traceability === null) problems.push('release: traceability reading is required')
     else if (evidence.traceability.covered !== TRACEABILITY_TOTAL) problems.push('release: traceability must cover all ' + String(TRACEABILITY_TOTAL) + ' items')

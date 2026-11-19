@@ -62,7 +62,7 @@ function releasable(): Record<string, unknown> {
     ...staging(),
     cohort: {
       versions: PLATFORM_LINE.cohort,
-      readings: PLATFORM_LINE.cohort.map(version => ({ version, install: 'clean', boot: 200, activeRows: 29, expectedActiveRows: 29, disabledRows: ['evolution-skill-health'], doctor: 'ok', smoke: 'pass' })),
+      readings: PLATFORM_LINE.cohort.map(version => ({ version, install: 'clean', boot: 200, activeRows: 29, expectedActiveRows: 29, disabledRows: ['evolution-skill-health'], doctor: 'ok', smoke: 'pass', source: 'ci' })),
     },
     commit: 'a'.repeat(40),
     tag: 'v' + FAMILY_VERSION,
@@ -233,7 +233,7 @@ describe('release-evidence assembly (W3 injection)', () => {
     spikes: SPIKE_IDS.map(id => spike(id)),
     cohort: {
       versions: PLATFORM_LINE.cohort,
-      readings: PLATFORM_LINE.cohort.map(version => ({ version, install: 'clean', boot: 200, activeRows: 29, expectedActiveRows: 29, disabledRows: ['evolution-skill-health'], doctor: 'ok', smoke: 'pass' })),
+      readings: PLATFORM_LINE.cohort.map(version => ({ version, install: 'clean', boot: 200, activeRows: 29, expectedActiveRows: 29, disabledRows: ['evolution-skill-health'], doctor: 'ok', smoke: 'pass', source: 'ci' })),
     },
     traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52, planned: false },
   })

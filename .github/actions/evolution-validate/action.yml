@@ -246,7 +246,7 @@ runs:
       shell: bash
       working-directory: upstream
       run: |
-        RANGE="^$(node -p "require('./platform-line.json').floor")"
+        RANGE="$(node -p "require('./platform-line.json').cohort.join(' || ')")"
         node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist \
           --version "${RELEASE_VERSION#v}" --platform-range "$RANGE"
 

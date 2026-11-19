@@ -42,6 +42,8 @@ try {
   for (const key of ['version', 'floor', 'peersRange', 'enginesRange', 'upstreamRef']) {
     if (evidence?.platformLine?.[key] !== line[key]) problems.push('platformLine.' + key + ' differs from platform-line.json')
   }
+  if (JSON.stringify(evidence?.platformLine?.cohort) !== JSON.stringify(line.cohort)) problems.push('platformLine.cohort differs from platform-line.json')
+  if (evidence?.platformLine?.contract !== line.contract) problems.push('platformLine.contract differs from platform-line.json')
 } catch (error) {
   problems.push('platform-line.json could not be read: ' + (error instanceof Error ? error.message : String(error)))
 }

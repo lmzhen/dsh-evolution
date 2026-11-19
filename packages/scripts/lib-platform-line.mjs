@@ -141,7 +141,9 @@ export function windowRows(platformLine) {
     '0.3.0-rc.1',
   ]
   return versions.map((version) => {
-    const admitted = platformLine.cohort.includes(version)
-    return { version, peersAdmits: admitted, enginesAdmits: admitted, expected: admitted, note: admitted ? 'admit' : 'deny' }
+    const peersAdmits = semver.satisfies(version, platformLine.peersRange, { includePrerelease: true })
+    const enginesAdmits = semver.satisfies(version, platformLine.enginesRange, { includePrerelease: true })
+    const expected = peersAdmits && enginesAdmits
+    return { version, peersAdmits, enginesAdmits, expected, note: expected ? 'admit' : (peersAdmits !== enginesAdmits ? 'predicate-split: policy denies' : 'deny') }
   })
 }

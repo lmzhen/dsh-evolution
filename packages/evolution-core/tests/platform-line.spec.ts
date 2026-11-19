@@ -30,6 +30,13 @@ describe('platform line single source (G1-S1/S2/S3)', () => {
     })
   })
 
+  it('uses semver for both predicates, not a hard-coded cohort membership', () => {
+    const wrong = windowRows({ ...PLATFORM_LINE, peersRange: '^0.2.2-rc.3', enginesRange: '>=0.0.0' } as typeof PLATFORM_LINE)
+    expect(wrong.find((row: { version: string }) => row.version === '0.2.2-rc.4')).toMatchObject({ peersAdmits: true, enginesAdmits: true, expected: true })
+    expect(wrong.find((row: { version: string }) => row.version === '0.2.2')).toMatchObject({ peersAdmits: true, enginesAdmits: true, expected: true })
+    expect(wrong.filter((row: { expected: boolean }) => row.expected).map((row: { version: string }) => row.version)).not.toEqual(['0.2.2-rc.3', '0.2.2-rc.5'])
+  })
+
   it('exposes the five GITHUB_OUTPUT keys', () => {
     expect(Object.values(OUTPUT_KEYS)).toEqual(['version', 'floor', 'upstream_ref', 'peers_range', 'engines_range'])
   })

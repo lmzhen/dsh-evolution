@@ -30,6 +30,7 @@ const valueOf = (name) => {
 const baseUrl = valueOf('--url')
 const token = valueOf('--token')
 const scope = valueOf('--scope') ?? '@lmzhen'
+const expectPlatform = valueOf('--expect-platform')
 const jsonOut = args.includes('--json')
 const rowsFile = join(HERE, 'bundle-rows.json')
 
@@ -117,6 +118,7 @@ for (const row of rows) {
   else active.push(row.id)
 }
 if (services !== 'ok') failures.push('doctor platform-services is ' + String(services))
+if (expectPlatform !== undefined && !String(platform).startsWith(expectPlatform + '（')) failures.push('host platform is ' + String(platform) + ', expected ' + expectPlatform)
 
 const report = {
   ok: failures.length === 0,

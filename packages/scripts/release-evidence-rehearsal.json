@@ -106,7 +106,8 @@
           "evolution-skill-health"
         ],
         "doctor": "ok",
-        "smoke": "pass"
+        "smoke": "pass",
+        "source": "rehearsal"
       },
       {
         "version": "0.2.2-rc.5",
@@ -118,7 +119,8 @@
           "evolution-skill-health"
         ],
         "doctor": "ok",
-        "smoke": "pass"
+        "smoke": "pass",
+        "source": "rehearsal"
       }
     ]
   }
