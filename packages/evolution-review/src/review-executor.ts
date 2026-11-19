@@ -64,9 +64,25 @@ export interface ReviewReport {
 /** The only terminal tool call in an aux review. */
 export const REVIEW_DONE_TOOL_NAME = 'review_done'
 
-/** Extra instruction appended to aux prompts only; foreground prompts stay unchanged. */
-export const AUX_COMPLETION_INSTRUCTION = 'When all durable changes for this review are complete, call review_done as the only tool call in your final batch. Do not call it while more edits remain.'
+/** Tool that lets the model wait for a resource lock before re-reading. */
+export const REVIEW_WAIT_TOOL_NAME = 'review_wait'
 
+/** Extra instruction appended to aux prompts only; foreground prompts stay unchanged. */
+export const AUX_COMPLETION_INSTRUCTION = 'When all durable changes for this review are complete, call review_done as the only tool call in your final batch. Do not call it while more edits remain. If a write is locked, call review_wait once, then re-read the target and retry; never reapply a stale patch.'
+
+
+const REVIEW_WAIT_TOOL: ToolSchema = {
+  name: REVIEW_WAIT_TOOL_NAME,
+  description: 'Wait for a resource lock to clear. Call only after a write reports a lock/resource conflict; re-read after it returns.',
+  parameters: {
+    type: 'object',
+    properties: {
+      resource: { type: 'string' },
+      timeoutMs: { type: 'number' },
+    },
+    required: ['timeoutMs'],
+  } as ToolSchema['parameters'],
+}
 
 const REVIEW_DONE_TOOL: ToolSchema = {
   name: REVIEW_DONE_TOOL_NAME,
@@ -93,6 +109,25 @@ function parseReviewReport(raw: string): ReviewReport | undefined {
     if (!Array.isArray(value.unresolved) || !value.unresolved.every(item => typeof item === 'string')) return undefined
     return { summary: value.summary, memoryChanged: value.memoryChanged, skillsChanged: value.skillsChanged, unresolved: value.unresolved }
   } catch { return undefined }
+}
+
+
+function parseWaitRequest(raw: string): { resource?: string; timeoutMs: number } {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (parsed !== null && typeof parsed === 'object') {
+      const value = parsed as { resource?: unknown; timeoutMs?: unknown }
+      const timeoutMs = typeof value.timeoutMs === 'number' && Number.isFinite(value.timeoutMs) ? Math.max(1, Math.min(value.timeoutMs, 60_000)) : 1_000
+      return { ...(typeof value.resource === 'string' ? { resource: value.resource } : {}), timeoutMs }
+    }
+  } catch { /* fall through to the bounded default */ }
+  return { timeoutMs: 1_000 }
+}
+
+async function waitForReview(timeoutMs: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) throw new Error('review_wait aborted')
+  await new Promise<void>(resolve => setTimeout(resolve, timeoutMs))
+  signal.throwIfAborted()
 }
 
 export class ReviewModelError extends Error {
@@ -129,6 +164,7 @@ export interface ReviewExecutionResult {
   readonly usage?: ReviewUsage
   readonly requests: number
   readonly toolCalls: number
+  readonly waitCount: number
   readonly done: boolean
   readonly hitRoundLimit: boolean
   readonly report?: ReviewReport
@@ -202,6 +238,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
   let hitRoundLimit = false
   let partialReason: string | undefined
   let report: ReviewReport | undefined
+  let waitCount = 0
   markReview()
   try {
     for (let round = 0; round < maxRounds; round += 1) {
@@ -214,7 +251,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         ...(header.config.temperature === undefined ? {} : { temperature: header.config.temperature }),
         ...(header.config.maxTokens === undefined ? {} : { maxTokens: header.config.maxTokens }),
         messages,
-        tools: [...(input.channel?.visibleTools ?? header.tools ?? []), REVIEW_DONE_TOOL] as ToolSchema[],
+        tools: [...(input.channel?.visibleTools ?? header.tools ?? []), REVIEW_WAIT_TOOL, REVIEW_DONE_TOOL] as ToolSchema[],
         ...(toolHistory === undefined ? {} : { toolHistory }),
         signal,
       }, signal)
@@ -236,6 +273,18 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
       if (text !== '') finalText = text
       const calls = assistant.content.filter((block): block is ToolCallBlock => block.type === 'tool-call')
       if (calls.length === 0) break
+      const waitCalls = calls.filter(call => call.name === REVIEW_WAIT_TOOL_NAME)
+      if (waitCalls.length > 0) {
+        if (calls.length !== 1) { partialReason = 'review_wait must be the only tool call in its batch'; break }
+        toolCalls += 1
+        waitCount += 1
+        const parsed = parseWaitRequest(waitCalls[0]!.arguments)
+        await waitForReview(parsed.timeoutMs, signal)
+        actions.push({ type: 'tool', action: REVIEW_WAIT_TOOL_NAME, target: parsed.resource ?? 'resource', status: 'ok' })
+        messages.push(assistant)
+        messages.push(createToolResultMessage({ callId: waitCalls[0]!.id, content: [{ type: 'text', text: 'review_wait released' }], isError: false }))
+        continue
+      }
       const doneCalls = calls.filter(call => call.name === REVIEW_DONE_TOOL_NAME)
       if (doneCalls.length > 0) {
         toolCalls += calls.length
@@ -319,6 +368,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
     toolCalls,
     done,
     hitRoundLimit,
+    waitCount,
     ...(report === undefined ? {} : { report }),
     ...(partialReason === undefined ? {} : { partialReason }),
   }

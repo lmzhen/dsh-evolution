@@ -1087,6 +1087,7 @@ function snapshotReviewParent(agent: Agent): Agent {
       let usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined
       let requests = 0
       let toolCalls = 0
+      let waitCount = 0
       let error: string | undefined
       try {
         const prompt = reviewPrompt(kind, 'aux') + '\n\n' + AUX_COMPLETION_INSTRUCTION
@@ -1106,6 +1107,7 @@ function snapshotReviewParent(agent: Agent): Agent {
         actions = result.actions
         requests = result.requests
         toolCalls = result.toolCalls
+        waitCount = result.waitCount
         if (result.usage !== undefined) {
           usage = {
             inputTokens: result.usage.inputTokens ?? 0,
@@ -1138,6 +1140,7 @@ function snapshotReviewParent(agent: Agent): Agent {
             actions,
             requests,
             toolCalls,
+            waitCount,
             ...(usage === undefined ? {} : { usage }),
             startedAt,
             finishedAt,

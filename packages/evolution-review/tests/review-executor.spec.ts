@@ -64,6 +64,13 @@ function tools(seen: { agent?: ReviewParent }): ReviewToolPort {
   }
 }
 
+const waitCall = { type: 'tool-call' as const, id: ToolCallId('wait-1'), name: 'review_wait', arguments: JSON.stringify({ resource: 'skill:probe', timeoutMs: 1 }) }
+const waitChunks: StreamChunk[] = [
+  { type: 'block-start', index: 0, blockType: 'tool-call' },
+  { type: 'block-end', index: 0, block: waitCall },
+  { type: 'finish', reason: { kind: 'tool-calls' } },
+]
+
 const doneCall = { type: 'tool-call' as const, id: ToolCallId('done-1'), name: 'review_done', arguments: JSON.stringify({ summary: 'done', memoryChanged: false, skillsChanged: ['probe'], unresolved: [] }) }
 const doneChunks: StreamChunk[] = [
   { type: 'block-start', index: 0, blockType: 'tool-call' },
@@ -216,6 +223,22 @@ describe('runReview', () => {
     })
     expect(result.done).toBe(true)
     expect(result.actions[0]).toMatchObject({ action: 'skill_manage', status: 'ok' })
+  })
+
+  it('lets the model wait for a lock and continue to review_done', async () => {
+    const result = await runReview({
+      parent: parent(),
+      llm: llm([waitChunks, doneChunks]),
+      tools: tools({}),
+      instruction: 'review',
+      toolAllow: allowed(),
+      signal: new AbortController().signal,
+      markReview: () => {},
+      clearReview: () => {},
+    })
+    expect(result.done).toBe(true)
+    expect(result.waitCount).toBe(1)
+    expect(result.actions[0]).toMatchObject({ action: 'review_wait', target: 'skill:probe', status: 'ok' })
   })
 
   it('rejects review_done mixed with other calls', async () => {
