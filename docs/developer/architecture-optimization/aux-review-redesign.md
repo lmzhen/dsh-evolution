@@ -497,3 +497,11 @@ interface EvolutionReviewActivityRecordV3 {
 - PTC review 工具改为每插件一次注册的 `PtcReviewToolHost`，避免同一进程中多个 PTC review 并发时重复注册 `review_done`/`review_wait`；task 通过 active+reviewId 守卫。
 - post-refactor 重跑 gate-01/02/17/30/46/82 全部通过；review+adapter 35 项通过；构建 0 error。
 - 仍缺真实宿主验收与独立复核。
+
+
+### Round 19（2026-11-20）
+
+- 独立复核（HEAD cf5964cd）给出 P0/P1：native aux 用冻结伪 Session 执行工具会导致真机受控工具全部抛错；PTC 被 allowlist 过滤且合成 review_done 绕过 child；PTC resolve 缺 modelSelection；AUX 计数消费后未复位；taskId/partialReason 未落 event/UI；no-op prompt 与 review_done 冲突。
+- 已修：native channel 工具执行改用真实 parent agent；runner 对 PTC 只允许 channel.visibleTools（run_code），不给 PTC 模型合成 review_done/wait，完成只认 channel completion；PTC resolve 传 modelSelection；AUX 消费 debt 后复位对应 counters；event 写 taskId/partialReason；UI/activity 展示 report/unresolved；activity 旧版本（v2）按 readable 原地升级而不是 quarantine；aux/PTC 提示明确 no-op 也必须 review_done。
+- 新增/调整测试：native channel execution agent、PTC run_code 经 runner、v2 升级可读；review+adapter+activity+UI 75 项通过，构建 0 error。
+- 复核 P2 仍列出：queue-timeout/可配置并发、PTC 写锁门禁、wait 语义/文案、report 体积上限、auxRunning 同 kind 竞态、真机 PTC/ALS/child 策略未验证。独立复核结论：修完 P0/P1 仍需真机 cohort 验收，不能直接发布。

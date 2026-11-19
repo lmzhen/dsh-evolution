@@ -147,6 +147,13 @@ function feedbackWindowOf(value: unknown): Map<string, { positive: number; negat
 
 /** Normalize the optional recent-governance read; a malformed row is skipped, not invented. */
 
+function reviewReportOf(value: unknown): { summary: string; memoryChanged: boolean; skillsChanged: readonly string[]; unresolved: readonly string[] } | undefined {
+  const source = objectOf(value)
+  if (source === null || typeof source.summary !== 'string') return undefined
+  const strings = (input: unknown): string[] => Array.isArray(input) ? input.filter((item): item is string => typeof item === 'string') : []
+  return { summary: source.summary, memoryChanged: source.memoryChanged === true, skillsChanged: strings(source.skillsChanged), unresolved: strings(source.unresolved) }
+}
+
 function reviewsOf(value: unknown): SkillStatsReview[] {
   if (!Array.isArray(value)) return []
   const rows: SkillStatsReview[] = []
@@ -154,6 +161,7 @@ function reviewsOf(value: unknown): SkillStatsReview[] {
     const source = objectOf(raw)
     if (source === null) continue
     const reviewId = typeof source.reviewId === 'string' ? source.reviewId : ''
+    const report = reviewReportOf(source.report)
     const kind = source.kind === 'memory' || source.kind === 'skill' || source.kind === 'combined' ? source.kind : undefined
     const status = source.status === 'completed' || source.status === 'partial' || source.status === 'failed' || source.status === 'timeout' || source.status === 'aborted' ? source.status : undefined
     const startedAt = numberOrNull(source.startedAt)
@@ -166,6 +174,8 @@ function reviewsOf(value: unknown): SkillStatsReview[] {
       startedAt,
       finishedAt,
       ...(typeof source.partialReason === 'string' && source.partialReason !== '' ? { partialReason: source.partialReason } : {}),
+      ...(source.hitRoundLimit === true ? { hitRoundLimit: true } : {}),
+      ...(report === undefined ? {} : { report }),
     })
   }
   return rows.slice(-8).reverse()

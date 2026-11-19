@@ -19,7 +19,7 @@ export interface ReviewToolChannel {
   /** Extra instruction appended after the review prompt (channel-specific protocol). */
   readonly instruction?: string
   /** Completion reported by the channel after a batch (PTC's in-code review_done). */
-  completion?(): { readonly done: boolean; readonly report?: ReviewReport } | undefined
+  completion?(): { readonly done: boolean; readonly report?: ReviewReport; readonly waitCount?: number } | undefined
   /** Execute the model's calls; implementations must not append to the parent Session. */
   execute(calls: Parameters<ReviewToolPort['execute']>[0]['calls'], signal: AbortSignal): Promise<{ readonly results: readonly ReviewToolOutcome[] }>
 }

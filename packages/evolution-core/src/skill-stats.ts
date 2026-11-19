@@ -135,6 +135,8 @@ export interface SkillStatsReview {
   readonly startedAt: number
   readonly finishedAt: number
   readonly partialReason?: string
+  readonly hitRoundLimit?: boolean
+  readonly report?: { readonly summary: string; readonly memoryChanged: boolean; readonly skillsChanged: readonly string[]; readonly unresolved: readonly string[] }
 }
 
 /** Library-wide facts. These never belong in a single-skill detail view. */

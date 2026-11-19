@@ -216,7 +216,8 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
             createElement('span', { className: 'evo-stats-pill ' + (review.status === 'completed' ? 'is-ok' : review.status === 'partial' ? 'is-warn' : 'is-muted') }, face.t(reviewStatusKey(review.status))),
             createElement('span', { className: 'evo-stats-review-kind' }, face.t(review.kind === 'memory' ? 'stats.review.kind.memory' : 'stats.review.kind.skill')),
             createElement('span', { className: 'evo-stats-review-time' }, lastAtText(new Date(review.finishedAt).toISOString())),
-            review.partialReason === undefined ? null : createElement('span', { className: 'evo-stats-review-reason' }, review.partialReason)))))
+            review.partialReason === undefined ? null : createElement('span', { className: 'evo-stats-review-reason' }, review.partialReason),
+            review.report !== undefined && review.report.unresolved.length > 0 ? createElement('span', { className: 'evo-stats-review-reason' }, review.report.unresolved.join(' · ')) : null))))
 
   return createElement('div', { className: 'evo-stats-page' },
     createElement('header', { className: 'evo-stats-hero' },
@@ -346,6 +347,8 @@ export const STATS_CSS = [
   '.evo-stats-table-card .evo-data-table{min-width:0}',
   '@media (max-width:760px){.evo-stats-page{padding:16px}.evo-stats-hero{align-items:flex-start;flex-direction:column}.evo-stats-title{font-size:20px}}',
 ].join('')
+
+
 
 
 

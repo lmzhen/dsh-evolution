@@ -133,7 +133,7 @@ export class PtcReviewToolHost {
       visibleTools: parentHeaderTools as ReviewToolChannel['visibleTools'],
       instruction: PTC_INSTRUCTION,
       control,
-      completion: () => control.done && control.report !== undefined ? { done: true, report: control.report } : undefined,
+      completion: () => control.done && control.report !== undefined ? { done: true, report: control.report, waitCount: control.waitCount } : undefined,
       async execute(calls, signal) {
         host.active.add(taskId)
         try {

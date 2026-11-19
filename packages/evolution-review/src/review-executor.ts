@@ -361,6 +361,8 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
       if (channelCompletion?.done === true && channelCompletion.report !== undefined) {
         report = channelCompletion.report
         done = true
+        toolCalls += calls.length
+        if (channelCompletion.waitCount !== undefined) waitCount = channelCompletion.waitCount
         actions.push({ type: 'tool', action: REVIEW_DONE_TOOL_NAME, target: 'review', status: 'ok' })
         break
       }

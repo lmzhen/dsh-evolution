@@ -290,7 +290,12 @@ function activityVerdict(raw: string | null): ActivityVerdict {
     const parsed = JSON.parse(raw) as unknown
     if (typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as { items?: unknown }).items)) return 'unreadable'
     const version = (parsed as { version?: unknown }).version
-    return version !== undefined && version !== ACTIVITY_FILE_VERSION ? 'foreign' : 'readable'
+    if (version === undefined) return 'readable'
+    // Older envelopes are the same shape this reader already consumes: a v2
+    // activity file must upgrade in place, not be quarantined as a future
+    // format. Only a NEWER version is foreign.
+    if (typeof version === 'number' && version < ACTIVITY_FILE_VERSION) return 'readable'
+    return version === ACTIVITY_FILE_VERSION ? 'readable' : 'foreign'
   } catch {
     // Unparsable bytes are the one shape that is corruption on both sides: nothing readable, and
     // nothing worth preserving beyond the quarantine copy.

@@ -31,6 +31,10 @@ describe('activity sidecar version gate (H-3 / J-6)', () => {
     expect(isCorruptActivity(body(ACTIVITY_FILE_VERSION + 1))).toBe(true)
   })
 
+  it('an OLDER version is readable and upgrades in place', () => {
+    expect(isCorruptActivity(body(ACTIVITY_FILE_VERSION - 1))).toBe(false)
+  })
+
   it('unparsable bytes and a wrong top-level shape stay corrupt (unchanged)', () => {
     expect(isCorruptActivity('{ not json')).toBe(true)
     expect(isCorruptActivity(JSON.stringify({ version: ACTIVITY_FILE_VERSION }))).toBe(true)

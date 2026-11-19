@@ -157,7 +157,14 @@ function reviewsOf(value: unknown): SkillStatsReview[] | undefined {
     const startedAt = numberOrNull(source.startedAt)
     const finishedAt = numberOrNull(source.finishedAt)
     if (reviewId === undefined || kind === undefined || status === undefined || startedAt === null || finishedAt === null) continue
-    rows.push({ reviewId, kind, status, startedAt, finishedAt, ...(typeof source.partialReason === 'string' && source.partialReason !== '' ? { partialReason: source.partialReason } : {}) })
+    const report = recordOf(source.report)
+    const strings = (input: unknown): string[] => Array.isArray(input) ? input.filter((item): item is string => typeof item === 'string') : []
+    rows.push({
+      reviewId, kind, status, startedAt, finishedAt,
+      ...(typeof source.partialReason === 'string' && source.partialReason !== '' ? { partialReason: source.partialReason } : {}),
+      ...(source.hitRoundLimit === true ? { hitRoundLimit: true } : {}),
+      ...(report !== null && typeof report.summary === 'string' ? { report: { summary: report.summary, memoryChanged: report.memoryChanged === true, skillsChanged: strings(report.skillsChanged), unresolved: strings(report.unresolved) } } : {}),
+    })
   }
   return rows
 }

@@ -14,10 +14,10 @@ Subagent-origin, background-visibility, and review-child sessions are excluded. 
 
 | Mode | Behavior | Recorded history |
 |---|---|---|
-| `aux` (default) | Runs a plugin-owned manual loop over the parent request prefix: parent Agent, no child Session, no parent append, allowlisted parent-visible tools executed without a log; a disallowed call returns a tool error instead of aborting the review. | Emits `review-scheduled` and `review-completed`; the completion event is folded into the bounded activity review list (preview + actions + usage). |
+| `aux` (default) | Runs a plugin-owned manual loop over the frozen parent request prefix. Native tools execute against the real parent agent; PTC runs against a detached review child Session so `run_code` dispatch never touches the parent log. Memory and skill are independent tasks with independent leases; `review_done` is the only success terminal. | Emits `review-scheduled` and `review-completed`; the completion record includes task/kind/status, requests, toolCalls, waitCount, round limit, partial reason and the structured report. |
 | `inject` (debug) | Sends the kind-specific foreground review prompt into the parent session as an ordinary turn. `reviewWakeInject=true` uses a waking follow-up when available. | Emits `review-scheduled`; does **not** emit `plan-applied`, so plan-based activity/replay stays empty. |
 
-`reviewNotice=true` allows result notices for the inject path. Aux results are audit-only: `finalText` lands in the bounded activity review record and never becomes a parent message or a new parent turn. The aux path uses the combined prompt for skill/combined reviews, so it includes the memory pass instead of silently dropping memory. It does not declare a background role: the model sees the actual tool set, and the prompt only states that unavailable tools or paths must be replaced with verified local equivalents or reported.
+`reviewNotice=true` allows result notices for the inject path. Aux results are audit-only: `finalText` lands in the bounded activity review record and never becomes a parent message or a new parent turn. Aux never uses the combined prompt: memory and skill each get their own prompt and task. A no-op review must still finish with `review_done`; stopping without it is recorded as partial, not completed. The model sees only the review allowlist (or `run_code` in PTC mode), and unavailable tools/paths must be reported rather than silently ignored.
 
 ## Events and limits
 
@@ -31,5 +31,5 @@ The package emits `evolution/review-scheduled`, `evolution/review-completed`, `e
 
 Step-by-step upgrade instructions: [docs/UPGRADE-0.39.md](../../docs/UPGRADE-0.39.md).
 
-- **PTC sessions:** their parent request header exposes only `run_code`. Aux review deliberately rejects `run_code` to keep the parent log append-free, so a PTC review cannot inspect the skill library and may return an empty/degraded result. Use a standard Agent preset for semantic review; do not report a PTC empty review as success.
+- **PTC sessions:** aux uses the detached review child channel. `run_code` and its `tool/ptc-dispatch*` frames land on the child Session, never the parent; `review_done`/`review_wait` are registered only while that review task executes. Real-host PTC acceptance is still tracked separately; until it passes, do not treat a PTC empty review as success.
 - **0.39 migration:** `branch` was removed from the closed `reviewMode` union. An existing `reviewMode: branch` profile patch now fails validation and deactivates the policy row; rewrite it to `aux` before restarting. Old branch activity records remain readable through `branchSessionId`; no new branch run is produced.
