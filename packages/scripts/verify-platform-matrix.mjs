@@ -27,6 +27,22 @@ import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+
+/** Names of this repository's packages, so a platform tree that vendors an old
+ * family copy does not supply a second declaration identity for them. */
+function familyPackageNames() {
+  const names = new Set()
+  for (const entry of readdirSync(join(root, 'packages'), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const file = join(root, 'packages', entry.name, 'package.json')
+    if (!existsSync(file)) continue
+    try {
+      const name = JSON.parse(readFileSync(file, 'utf8')).name
+      if (typeof name === 'string') names.add(name)
+    } catch { /* ignored: a malformed manifest is another gate's finding */ }
+  }
+  return names
+}
 const args = process.argv.slice(2)
 const valueOf = (name) => {
   const i = args.indexOf(name)
@@ -202,6 +218,11 @@ function runLine(line, platformPaths) {
 
 const rc1Map = rc1Types === undefined ? new Map() : packageMapFromTypesRoot(rc1Types, false)
 const rc3Map = packageMapFromTypesRoot(rc3Root, true)
+const ownPackages = familyPackageNames()
+for (const name of ownPackages) {
+  rc1Map.delete(name)
+  rc3Map.delete(name)
+}
 const results = [
   ...(rc1Types === undefined ? [] : [runLine('rc1', typePathsFor(rc1Map))]),
   runLine('rc3', typePathsFor(rc3Map)),
