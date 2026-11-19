@@ -4,7 +4,7 @@
 >
 > **不迁移**：磁盘数据格式、配置字段和用户数据语义不变；平台线只声明 DSH `0.2.2-rc.5`。0.2.2 正式版未发布前不声明；0.2.1 继续使用 0.55.x legacy 线。
 >
-> **验证**：pre-tag gate **63 pass / 0 fail / 4 registered cannotDecide / 2 skipped**；main CI run `44555354419` 全绿（rc.5 单成员 cohort、host acceptance、cohort evidence）；独立复核最终 **P0/P1=0**。S1/S2/S3 在 rc.5 web host 的 0.58.0 候选上实测（skill-history 26 行、21,069 bytes、三次读 567/210/329 ms、诊断 82 ms、schema 2 / facts 7 / runtime 8），S4 HMR coordination/reconciliation 16 项通过。真实 npm web A→B 升级验收在发布后按 1440 / 1024 / 390 三档记录。
+> **验证**：pre-tag gate **63 pass / 0 fail / 4 registered cannotDecide / 2 skipped**；main CI run `44555354419` 全绿（rc.5 单成员 cohort、host acceptance、cohort evidence）；独立复核最终 **P0/P1=0**。S1/S2/S3 在 rc.5 web host 的 0.58.0 候选上实测（skill-history 26 行、21,069 bytes、三次读 567/210/329 ms、诊断 82 ms、schema 2 / facts 7 / runtime 8），S4 HMR coordination/reconciliation 16 项通过。发布后：npm 20/20 家族包 latest=0.58.0；npm web 实际 profile 从 0.57.0 升级到 0.58.0，22 个家族包均 0.58.0；独立 npm 新 home diagnostics familyVersion=0.58.0、schema 2 / facts 7 / runtime 8、platform pairing/services ok。1440/1024/390 截图验收未在本轮完成，不记为已验收。
 
 ## 0.57.0 (2026-11-19) — 移除平台会话检索工具依赖
 
