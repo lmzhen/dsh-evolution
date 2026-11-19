@@ -1649,6 +1649,20 @@
       ]
     },
     {
+      "id": "gate-84",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/verify-cohort-host.mjs --dist packages/evolution/dist --version <cohort-member> --source ci",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "command": "node packages/evolution/scripts/verify-cohort-host.mjs --dist packages/evolution/dist --version <cohort-member> --source ci",
+      "runBy": "action",
+      "reason": "action step — per-cohort clean install, boot and row-survival reading",
+      "lanes": [
+        "ci-release"
+      ]
+    },
+    {
       "id": "gate-74",
       "kind": "step",
       "human": "node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --assets-only",

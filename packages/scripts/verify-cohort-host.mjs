@@ -72,8 +72,11 @@ if (install.status !== 0) {
   process.exit(1)
 }
 
-const host = spawn(process.execPath, [cli, '--profile', profile, '--no-open', '--port', String(port)], {
-  cwd: ROOT,
+const host = spawn(process.execPath, [
+  ...(cli.endsWith('.ts') ? [join(installerCwd, 'node_modules', 'tsx', 'dist', 'cli.mjs'), cli] : [cli]),
+  '--profile', profile, '--no-open', '--port', String(port),
+], {
+  cwd: installerCwd,
   env: { ...process.env, DSH_HOME: home },
   stdio: ['ignore', 'pipe', 'pipe'],
 })

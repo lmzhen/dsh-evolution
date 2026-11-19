@@ -27,7 +27,7 @@ The canonical fact table is `packages/scripts/family-facts.json`. If you move a 
 - Run a single spec by file; an entire directory can exceed the default timeout for reasons unrelated to the change.
 - A green process is not a pass by itself: the declared criterion must be evaluated. An unevaluated criterion is not a pass.
 
-## The gate: all 83 steps
+## The gate: all 84 steps
 
 The local profile runs the family gate runner (see [docs/developer/development.md](docs/developer/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from the gate registry (`packages/scripts/gates/registry.mjs`); do not hand-edit it. If a row moves tier or command, change the registry and regenerate the views.
 
@@ -118,6 +118,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 81 | node packages/scripts/verify-health-admission.mjs | mirror |
 | 82 | `node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、全部 UI key、119 个参数文案、68 个 command-help key、31 个 host error，8 语言 key/占位符/生成物一致；**每个 UI key 必须有生产读者**：字面量、`.one` 派生或 `'prefix.' + value` 动态前缀，否则死键必红。`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；留一个无读者 key ⇒ 必红；重跑生成器即绿） | mirror |
 | 83 | node packages/evolution/scripts/verify-platform-envelope.mjs --manifest-dir packages/evolution/.release-staging --line platform-line.json | overlay |
+| 84 | node packages/evolution/scripts/verify-cohort-host.mjs --dist packages/evolution/dist --version <cohort-member> --source ci | overlay |
 
 ## Pull request checklist
 

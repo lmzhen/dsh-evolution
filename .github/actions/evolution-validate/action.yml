@@ -38,6 +38,10 @@ inputs:
     description: Upload the packed dist/scripts artifacts for publish.
     required: false
     default: 'true'
+  upload_cohort_reading:
+    description: Run the live host acceptance and upload this cohort's reading.
+    required: false
+    default: 'false'
 
   npm_scope:
     description: >-
@@ -290,6 +294,33 @@ runs:
         PLATFORM_DIR="$(node packages/evolution/scripts/prepare-packed-platform.mjs packages/evolution/dist "$PLATFORM_VERSION" | tail -n 1)"
         test -d "$PLATFORM_DIR"
         node packages/evolution/scripts/smoke-packed-install.mjs packages/evolution/dist --platform-node-modules "$PLATFORM_DIR"
+
+    - name: Host acceptance (cohort)
+      if: ${{ inputs.upload_cohort_reading == 'true' }}
+      shell: bash
+      working-directory: upstream
+      env:
+        PLATFORM_VERSION: ${{ inputs.platform_version }}
+      run: |
+        CLI_DIR="${RUNNER_TEMP}/dsh-cli-${PLATFORM_VERSION}"
+        npm install --prefix "$CLI_DIR" --ignore-scripts --no-package-lock --no-save \
+          "@deepseek-ai/dsh@${PLATFORM_VERSION}"
+        node packages/evolution/scripts/verify-cohort-host.mjs \
+          --dist packages/evolution/dist \
+          --home "${RUNNER_TEMP}/cohort-home-${PLATFORM_VERSION}" \
+          --version "$PLATFORM_VERSION" \
+          --cli "$CLI_DIR/node_modules/@deepseek-ai/dsh/lib/bin.js" \
+          --port 3299 --source ci \
+          --out "${RUNNER_TEMP}/cohort-reading-${PLATFORM_VERSION}.json" \
+          --installer packages/evolution/scripts/install-layered.mjs --installer-cwd .
+
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: ${{ inputs.upload_cohort_reading == 'true' }}
+      with:
+        name: cohort-reading-${{ inputs.platform_version }}
+        path: ${{ runner.temp }}/cohort-reading-${{ inputs.platform_version }}.json
+        if-no-files-found: error
+        retention-days: 14
 
     - name: Source-overlay installer guard (Windows install path)
       if: inputs.install_smoke == 'true'

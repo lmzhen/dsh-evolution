@@ -322,7 +322,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 83 steps",
+          "text": "all 84 steps",
           "unique": true
         }
       ],
@@ -613,7 +613,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "c824b7893b1e01c120446856fb051ec55abcf83a33ef5426cd8d47e6cff73e6e",
+        "sha256": "22ac7567293ae649769e7b3695990a84ff22a0b4df27e2b51311b572aa3f6043",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -1051,8 +1051,8 @@
             {
               "mutate": {
                 "file": "CONTRIBUTING.md",
-                "find": "## The gate: all 83 steps",
-                "replace": "## The gate: all 82 steps"
+                "find": "## The gate: all 84 steps",
+                "replace": "## The gate: all 83 steps"
               },
               "expect": "red",
               "note": "a stale step count in a doc the table feeds: the meta-gate names the file and the number (its count-word check)",

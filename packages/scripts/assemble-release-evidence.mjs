@@ -26,13 +26,14 @@ const flag = (name) => { const index = argv.indexOf(name); const value = index >
 // P2-39: a positional is any token that is neither a flag nor the VALUE of a
 // value-taking flag. The previous list missed --gates-from-manifest, so a
 // flags-first invocation read its profile ("ci") as the evidence path.
-const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest', '--gates-report', '--commit', '--tag', '--version'])
+const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest', '--gates-report', '--cohort-evidence', '--commit', '--tag', '--version'])
 const file = argv.find((arg, index) => !arg.startsWith('--') && !VALUE_FLAGS.has(argv[index - 1]))
 const rehearsalPath = flag('--rehearsal')
 const ciFace = flag('--ci-face') || process.env.GITHUB_WORKFLOW_REF || ''
 const os = flag('--os') || process.env.RUNNER_OS || ''
 const gatesFromManifest = flag('--gates-from-manifest')
 const gatesReport = flag('--gates-report')
+const cohortEvidence = flag('--cohort-evidence')
 const commit = flag('--commit')
 const tag = flag('--tag')
 const version = (flag('--version') || process.env.RELEASE_VERSION || '').replace(/^v/, '')
@@ -47,6 +48,11 @@ let rehearsal = { spikes: [], gates: [], traceability: null }
 if (rehearsalPath !== '') {
   if (!existsSync(resolve(rehearsalPath))) { console.error('assemble-release-evidence: no rehearsal snapshot at ' + resolve(rehearsalPath) + ' (cannot decide)'); process.exit(2) }
   try { rehearsal = JSON.parse(readFileSync(resolve(rehearsalPath), 'utf8')) } catch (error) { console.error('assemble-release-evidence: unreadable inputs (' + (error instanceof Error ? error.message : String(error)) + ')'); process.exit(2) }
+}
+let cohort = evidence.cohort
+if (cohortEvidence !== '') {
+  if (!existsSync(resolve(cohortEvidence))) { console.error('assemble-release-evidence: no cohort evidence at ' + resolve(cohortEvidence) + ' (cannot decide)'); process.exit(2) }
+  try { cohort = JSON.parse(readFileSync(resolve(cohortEvidence), 'utf8')) } catch (error) { console.error('assemble-release-evidence: unreadable cohort evidence (' + (error instanceof Error ? error.message : String(error)) + ')'); process.exit(2) }
 }
 const problems = []
 let gates = Array.isArray(rehearsal.gates) ? rehearsal.gates : []
@@ -77,7 +83,7 @@ if (gates.length === 0 && gatesFromManifest === '') problems.push('rehearsal.gat
 if (rehearsal.traceability === undefined || rehearsal.traceability === null) problems.push('rehearsal.traceability must carry the W11 reading')
 const assembled = {
   ...evidence,
-  cohort: rehearsal.cohort ?? evidence.cohort,
+  cohort: cohort ?? evidence.cohort,
   spikes: Array.isArray(rehearsal.spikes) ? rehearsal.spikes : evidence.spikes,
   gates: gates.length > 0 ? gates : evidence.gates,
   traceability: rehearsal.traceability ?? evidence.traceability,

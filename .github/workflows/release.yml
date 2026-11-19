@@ -157,7 +157,43 @@ jobs:
           node_version: '24'
           artifact_suffix: cohort-${{ matrix.version }}
           upload_artifacts: 'false'
+          upload_cohort_reading: 'true'
           npm_scope: ${{ env.NPM_SCOPE }}
+
+  cohort-evidence:
+    name: cohort evidence
+    needs: [platform-line, cohort-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: cohort-reading-*
+          path: ${{ runner.temp }}/cohort-readings
+          merge-multiple: true
+
+      - name: Merge per-member readings
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const path = require('node:path')
+          const dir = process.env.RUNNER_TEMP + '/cohort-readings'
+          const files = fs.readdirSync(dir).filter((name) => name.endsWith('.json'))
+          if (files.length === 0) throw new Error('no cohort readings')
+          const readings = files.map((name) => JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')))
+          readings.sort((a, b) => a.version.localeCompare(b.version, undefined, { numeric: true }))
+          const versions = readings.map((reading) => reading.version)
+          const output = process.env.RUNNER_TEMP + '/cohort-evidence.json'
+          fs.writeFileSync(output, JSON.stringify({ versions, readings }, null, 2) + '\n')
+          console.log('cohort evidence: ' + versions.join(', '))
+          NODE
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cohort-evidence
+          path: ${{ runner.temp }}/cohort-evidence.json
+          if-no-files-found: error
+          retention-days: 14
 
   # G7 §2.3 / W10 M1: the desktop plane. The Electron cold-boot assertion itself stays a
   # real-machine acceptance (it needs the signed app; recorded in the G2/G3 design docs with its
@@ -194,7 +230,7 @@ jobs:
   publish:
     name: publish
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [platform-line, compat-check, compat-check-node22, cohort-check, desktop-install]
+    needs: [platform-line, compat-check, compat-check-node22, cohort-check, cohort-evidence, desktop-install]
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
@@ -218,6 +254,11 @@ jobs:
         with:
           name: evolution-scripts-released
           path: packages/evolution/scripts
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cohort-evidence
+          path: ${{ runner.temp }}/cohort-evidence
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -249,6 +290,7 @@ jobs:
 
           node packages/evolution/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json \
             --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json \
+            --cohort-evidence "$RUNNER_TEMP/cohort-evidence/cohort-evidence.json" \
             --gates-report ci-gates.json \
             --ci-face "$GITHUB_WORKFLOW_REF" --os "$RUNNER_OS" \
             --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME" --release

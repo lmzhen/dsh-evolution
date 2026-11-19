@@ -81,6 +81,16 @@ export const release = [
     reason: "action step — every staged platform range must equal the cohort union before upload",
   }),
 
+  gate("gate-84", {
+    kind: "step",
+    runBy: "action",
+    tree: "overlay",
+    title: "node packages/evolution/scripts/verify-cohort-host.mjs --dist packages/evolution/dist --version <cohort-member> --source ci",
+    command: "node packages/evolution/scripts/verify-cohort-host.mjs --dist packages/evolution/dist --version <cohort-member> --source ci",
+    lanes: ["ci-release"],
+    reason: "action step — per-cohort clean install, boot and row-survival reading",
+  }),
+
   gate("gate-74", {
     kind: "step",
     runBy: "action",
