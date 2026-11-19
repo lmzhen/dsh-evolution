@@ -757,7 +757,11 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // turn is LATEST-relevance (last-trigger-wins) and covers both domains
       // when it crosses the second threshold (the old latch-first form
       // discarded a fresh 'combined' and delivered a stale single kind).
-      const pendingDebt = mergeDebt(pendingCadenceReviews.get(session.id), debt)
+      // Inject keeps v0.58's latest-trigger-wins semantics; only AUX merges the
+      // two debt domains (its tasks are independent).
+      const pendingDebt = params().reviewMode === 'inject'
+        ? (debt ?? pendingCadenceReviews.get(session.id))
+        : mergeDebt(pendingCadenceReviews.get(session.id), debt)
       if (pendingDebt !== undefined) {
         pendingCadenceReviews.delete(session.id)
         // Explicit 'inject' deployments also execute at the end (the user
@@ -810,8 +814,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // segment resets at the flush). A fire that arrives ON the completing turn
     // was already consumed by the flush (`?? kind`), so no latch is left.
     if (debt !== null && event.data.reason.kind !== 'completed') {
-      const merged = mergeDebt(pendingCadenceReviews.get(session.id), debt)!
-      pendingCadenceReviews.set(session.id, merged)
+      const pending = params().reviewMode === 'inject'
+        ? debt
+        : mergeDebt(pendingCadenceReviews.get(session.id), debt)!
+      pendingCadenceReviews.set(session.id, pending)
       if (!pendingCadenceWarned.has(session.id)) {
         pendingCadenceWarned.add(session.id)
         ctx.logger.warn(`dsh-evolution-review: ${kind} review threshold reached; the review runs at the end of the conversation (no mid-task execution)`)
@@ -1001,7 +1007,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   let inFlightControllers = new Set<AbortController>()
   const reviewWriteLocks = new ReviewWriteLocks()
-  const auxLimiter = new ReviewLimiter(4)
+  const auxLimiter = new ReviewLimiter(2)
   let ptcToolHost: PtcReviewToolHost | undefined
 
 /**

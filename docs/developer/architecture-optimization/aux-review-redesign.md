@@ -530,3 +530,9 @@ interface EvolutionReviewActivityRecordV3 {
 - 真实宿主 UI smoke：用平台 rc.5 checkout 起独立 profile（auxlab2，端口 3124），手动装入 0.58.0-dev.3 家族 tar 包，API 401 用启动输出的 token 进入 web UI；侧栏“技能整理 → 数据总览”实际渲染出新的“自动复查 / 最近一次复查结果”区块（空态“暂无复查记录”），证明 UI/activity 读数已接到真实宿主。
 - 该测试 profile 没有模型 API Key，因此只验证 UI 装载与区块渲染，没有触发真实 AUX review；真实 memory/skill/PTC cohort 验收仍未完成。
 - 测试 profile 与 Chrome 临时目录已清理。
+
+
+### Round 23（2026-11-20）
+
+- 修复复核 P2-7：inject 恢复 v0.58 latest-trigger-wins（只在 AUX 用 mergeDebt）；`ReviewLimiter` 默认值从 4 改成设计口径 2。
+- review 35 项通过，构建 0 error。
