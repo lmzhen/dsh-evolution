@@ -29,7 +29,23 @@
 - 目标：为 aux review 提供 PTC 传输适配，使 PTC 会话也能执行 memory/skill review，而不是空结果或失败。
 - 适配实现方式待设计；需要保持父会话 no-append 约束，不能把 review 工具结果写进父会话日志。
 
-## 2. 暂缓：多位置修改的完整性校验
+## 2. AUX 拆分与并行（必须做）
+
+用户决定（2026-11-20）：
+
+- **AUX 不再禁止 memory 与 skill 两个 review 并行。** 当前“每个 session 只允许一个 aux review，第二个只设 rerun，且 skill 触发时使用 combined prompt”的形态不是长期目标。
+- 后台的 memory 与 skill **提示词分开**；两者同时触发时各自独立运行，不再拼成一条 combined prompt。
+- 前台 inject 模式保持现状：它发生在同一个父会话/同一条上下文里，顺序或 combined 是合理的；本次不改前台提示词。
+- 原因：多会话同时进行时，family 自身的单飞/合并会让一个会话里的 memory/skill 互相等待，放大延迟和截断风险，也让两个提示词互相污染。
+
+实现边界：
+
+- 分析/LLM 调用可以并行；**写入提交仍由 mutation authority / per-file lock 串行**，不能假设并行写是安全的。
+- pending/running 状态按 `(session, kind)` 区分，使用独立的 runId / lease；activity 记录也按 kind 分开，便于判断 memory 和 skill 各自的成功/失败。
+- 当前 `auxRunning` 是 per-session 的，不是全局锁；但 combined prompt 和 `rerun` 仍是 family 层的串行策略，需要一起移除。
+- 并行后仍需保持父会话 no-append，并保留各自的 timeout、cancel、`partial` 和 `review_done` 完成语义。
+
+## 3. 暂缓：多位置修改的完整性校验
 
 用户判断：
 
@@ -37,14 +53,14 @@
 - 等未来获得更丰富的运行信息后，再决定是否增加语义完整性验证。
 - 当前不因“可能漏改多个位置”而阻塞上述三项；上述三项先解决“截断被误报成功”和“PTC 不可用”的问题。
 
-## 3. 现状证据（只用于说明问题，不是实现验收）
+## 4. 现状证据（只用于说明问题，不是实现验收）
 
 - 桌面端 `activity.json` 当前保留 200 条：completed 86、failed 113、timeout 1。
 - 113 条失败中 112 条是历史 `review requires an idle parent`，发生在 2026-11-17/18；之后未复发。
 - 现有成功记录没有 `requests` / `hitRoundLimit` / `partial` 字段；`skill_manage:ok` 的次数也不等于真实文件 mutation 次数，因此“成功”不能作为“所有修改完整完成”的证据。
 - 当前代码默认值：`DEFAULT_REVIEW_MAX_ROUNDS = 12`（review 包）、`DEFAULT_REVIEW_TIMEOUT_MS = 120_000`（core）；桌面 profile 只覆盖了两个 cadence interval，未覆盖上限。
 
-## 4. 未来实现的验收口径
+## 5. 未来实现的验收口径
 
 1. 构造“最后一轮仍在改技能”的测试：记录必须为 `partial`，不能是 `completed`。
 2. 构造“模型没有调用 `review_done` 就结束”的测试：记录必须为 `partial`/`failed`。
@@ -52,7 +68,7 @@
 4. PTC 会话下：能完成至少一次 memory/skill review；父会话事件序列不增加 review 工具消息。
 5. 活动记录和 UI 能区分 `completed` / `partial` / `failed` / `timeout`，并显示 partial/timeout 原因。
 
-## 5. 非目标
+## 6. 非目标
 
 - 本轮不实现“多位置修改”的逐项校验或模型自检协议。
 - 本轮不改变前台 inject 模式的提示词内容；只处理 aux 的完成语义与 PTC 通道。
