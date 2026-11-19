@@ -34,7 +34,11 @@ let nextChild = 0
  */
 export function createReviewChildAgent(parent: unknown, taskId: string): ReviewChildAgent {
   const safe = taskId.replace(/[^A-Za-z0-9_.:-]/g, '_')
-  const child = Session.create(SessionId(`review-child:${safe}:${nextChild++}`))
+  const childId = SessionId(`review-child:${safe}:${nextChild++}`)
+  const parentSession = (parent as { session?: { header?: { cwd?: unknown } } }).session
+  const sessions = (parent as { ctx?: { sessions?: { create(id?: SessionId, options?: { meta?: { cwd?: string } }): Session } } }).ctx?.sessions
+  const cwd = typeof parentSession?.header?.cwd === 'string' ? parentSession.header.cwd : undefined
+  const child = sessions?.create(childId, cwd === undefined ? undefined : { meta: { cwd } }) ?? Session.create(childId)
   const agent = new Proxy(parent as object, {
     get(target, property, receiver) {
       if (property === 'session') return child

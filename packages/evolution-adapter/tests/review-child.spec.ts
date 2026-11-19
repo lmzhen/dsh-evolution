@@ -13,3 +13,16 @@ it('replaces only the session and keeps parent methods bound', () => {
   expect(parentSession.seq).toBe(0)
   review.dispose()
 })
+
+it('uses the live session store when the parent exposes one', () => {
+  const created: unknown[] = []
+  const live = { id: 'live-child', header: { cwd: 'D:/workspace' } }
+  const parent = {
+    id: 'parent', session: { header: { cwd: 'D:/workspace' } },
+    ctx: { sessions: { create: (id: unknown, options: unknown) => { created.push([id, options]); return live } } },
+  }
+  const review = createReviewChildAgent(parent, 'task-live')
+  expect((review.agent as typeof parent).session).toBe(live)
+  expect(created).toHaveLength(1)
+  expect((created[0] as [unknown, { meta?: { cwd?: string } }])[1].meta?.cwd).toBe('D:/workspace')
+})

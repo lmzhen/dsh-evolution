@@ -41,10 +41,10 @@ function filterToolSet(full: unknown, allowed: ReadonlySet<string>): unknown {
   const view = (full as { view(scope: unknown): unknown }).view.bind(full)
   return {
     view(scope: unknown) {
-      const source = view(scope)
-      if (!(source instanceof Map)) return new Map()
+      const source = view(scope) as { entries?: () => Iterable<[string, unknown]> } | null
+      if (source === null || typeof source.entries !== 'function') return new Map()
       const out = new Map<string, unknown>()
-      for (const [name, definition] of source) if (allowed.has(name)) out.set(name, definition)
+      for (const [name, definition] of source.entries()) if (allowed.has(name)) out.set(name, definition)
       return out
     },
     ...(typeof (full as { dispose?: unknown }).dispose === 'function' ? { dispose: () => (full as { dispose(): void }).dispose() } : {}),
