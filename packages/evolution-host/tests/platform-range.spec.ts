@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url'
 
 const run = promisify(execFile)
 const guard = fileURLToPath(new URL('../../scripts/verify-platform-ranges.mjs', import.meta.url))
-const PEERS = '0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5'
-const ENGINES = '0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5'
+const PEERS = '0.2.2-rc.5'
+const ENGINES = '0.2.2-rc.5'
 
 async function stagedDir(packages: Array<Record<string, unknown>>) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-platform-range-'))

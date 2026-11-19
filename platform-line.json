@@ -1,7 +1,9 @@
 {
   "$comment": "ONE home of the platform envelope: version = the current platform release this family line targets; floor = the oldest admitted release; cohort = the exact release set this artifact admits (no untested versions); contract = family-facing platform contract generation. peers and engines are the same exact union of cohort entries. previousAnchor is derived from version+floor for release notes only.",
   "version": "0.2.2-rc.5",
-  "floor": "0.2.2-rc.2",
-  "cohort": ["0.2.2-rc.2", "0.2.2-rc.3", "0.2.2-rc.4", "0.2.2-rc.5"],
+  "floor": "0.2.2-rc.5",
+  "cohort": [
+    "0.2.2-rc.5"
+  ],
   "contract": 1
 }

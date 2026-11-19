@@ -12,7 +12,7 @@ It does not modify or train the model, and it does not provide a hosted model se
 
 **Validated platform line: DSH `0.2.2-rc.5`.**
 
-The family targets DeepSeek Harness `0.2.2-rc.5` and admits the exact cohort `0.2.2-rc.2` through `0.2.2-rc.5`. Published packages declare the same peer and engine union, `0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`; the 0.2.2 final is not claimed until it is separately validated. The 0.2.1 line is not admitted; install 0.55.x if your host is still on that line. The single host edge is the `evolutionPlatform` service; features reach it through the family's platform ports, never by importing host internals. The family's own write authority is `evolutionMutationAuthority`: one lease/fence service above the IO seam, shared by merge, review, curator and the knowledge stores.
+The family targets DeepSeek Harness `0.2.2-rc.5` and admits the exact cohort `0.2.2-rc.5`. Published packages declare the same peer and engine union, `0.2.2-rc.5`; the 0.2.2 final is not claimed until it is separately validated. The 0.2.1 line is not admitted; install 0.55.x if your host is still on that line. The single host edge is the `evolutionPlatform` service; features reach it through the family's platform ports, never by importing host internals. The family's own write authority is `evolutionMutationAuthority`: one lease/fence service above the IO seam, shared by merge, review, curator and the knowledge stores.
 
 ## What is a skill?
 
@@ -93,7 +93,7 @@ See [docs/commands.md](docs/commands.md) for the command reference and [docs/con
 | Item | Current requirement |
 |---|---|
 | Validated platform line | **`0.2.2-rc.5`** |
-| Published dependency window | `0.2.2-rc.3 \|\| 0.2.2-rc.5` |
+| Published dependency window | `0.2.2-rc.5` |
 | Family version | `0.57.0` |
 | Node | `^22.19.0` or `>=24.0.0` |
 
