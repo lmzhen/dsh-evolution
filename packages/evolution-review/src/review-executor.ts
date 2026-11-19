@@ -9,7 +9,7 @@
  */
 import { BlockAssembler, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import { recordReviewRead } from '@deepseek-ai/dsh-evolution-core'
-import type { ContentBlock, ContextFormed, GenerateOptions, Message, RequestMessage, StreamChunk, ToolCallBlock, ToolCallId, ToolHistory, ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { ContentBlock, ContextFormed, GenerateOptions, Message, RequestMessage, StreamChunk, ToolCallBlock, ToolCallId, ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { ReviewToolChannel } from './review-tool-channel.ts'
 import type { ReviewWriteLocks } from './review-write-locks.ts'
@@ -29,7 +29,6 @@ export interface ReviewParent {
     readonly seq: number
     requestHeader(): EpochHeader | undefined
     deriveMessages(): readonly Message[]
-    toolHistory(): ToolHistory | undefined
   }
 }
 
@@ -247,7 +246,6 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
       source: { kind: 'evolution-review' },
     }),
   ]
-  const toolHistory = parent.session.toolHistory()
   const maxRounds = input.maxRounds ?? 4
   const maxToolCalls = input.maxToolCalls ?? 50
   const actions: ReviewAction[] = []
@@ -276,7 +274,6 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
           ...(input.channel?.visibleTools ?? header.tools ?? []),
           ...(input.channel?.mode === 'ptc' ? [] : [REVIEW_WAIT_TOOL, REVIEW_DONE_TOOL]),
         ] as ToolSchema[],
-        ...(toolHistory === undefined ? {} : { toolHistory }),
         signal,
       }, signal)
       requests += 1

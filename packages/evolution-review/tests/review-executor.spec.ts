@@ -316,6 +316,17 @@ describe('runReview', () => {
     expect(result.report?.summary).toBe('ptc done')
   })
 
+
+  it('offers review_done to the native aux model call', async () => {
+    const model = llm([textChunks])
+    await runReview({
+      parent: parent(), llm: model, tools: tools({}), instruction: 'review', toolAllow: allowed(),
+      signal: new AbortController().signal, markReview: () => {}, clearReview: () => {},
+    })
+    const first = model.requests[0] as { tools?: readonly { name: string }[] }
+    expect(first.tools?.map(tool => tool.name)).toContain('review_done')
+  })
+
   it('rejects review_done mixed with other calls', async () => {
     const mixed: StreamChunk[] = [
       { type: 'block-start', index: 0, blockType: 'tool-call' },
