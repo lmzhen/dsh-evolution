@@ -418,3 +418,9 @@ interface EvolutionReviewActivityRecordV3 {
 ### Round 7（2026-11-20）
 
 - `ReviewWriteLocks` 增加 `dispose()`：插件 unload 时清空 holder 并唤醒等待者；cleanup 调用它，避免 HMR/卸载后 waiter 永久悬挂。新增 dispose 测试。
+
+
+### Round 8（2026-11-20）
+
+- PTC detached-child 原型验证：用公开 `Session.create` 建一个真实但未注册的 review child Session，并把父 agent 的 session 代理成 child，PTC `run_code` 的 `tool/ptc-dispatch*` 只写入 child；实测父 Session seq 保持 0、child seq 增长。该原型证明无需伪造 session，也无需 `SubagentActivation`（不会进 parent catalog）。
+- 仍缺：把该原型产品化到 adapter 的 review-child port、在 child 上提供 review 工具集（含 review_done/review_wait）、从 `RunCodeOutput.result` 取 ReviewReport；当前未把它接到真实 AUX，避免半成品。
