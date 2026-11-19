@@ -163,13 +163,15 @@ export function validateReleaseEvidence(evidence, options = {}) {
         if (gate.synthetic === true) problems.push('release: gate ' + gate.id + ' is a synthetic manifest reading; pass --gates-report with the run-gates ledger')
       }
     }
+    const measuredCommit = evidence.measuredCommit
+    if (!nonEmptyString(measuredCommit) || !GIT_SHA.test(measuredCommit)) problems.push('release: measuredCommit must be the git sha the family tree was measured on')
     const byId = new Map((evidence.spikes ?? []).map((spike) => [spike?.spike, spike]))
     for (const id of SPIKE_IDS) {
       const spike = byId.get(id)
       if (spike === undefined) problems.push('release: missing spike ' + id)
       else if (spike.verdict !== 'pass') problems.push('release: spike ' + id + ' is ' + String(spike.verdict) + ' (blocked/fail are not passes)')
       if (spike !== undefined && spike.familyVersion !== evidence.familyVersion) problems.push('release: spike ' + id + ' was measured on ' + String(spike.familyVersion) + ', not ' + String(evidence.familyVersion))
-      if (spike !== undefined && spike.commit !== evidence.commit) problems.push('release: spike ' + id + ' was measured on commit ' + String(spike.commit) + ', not the evidence commit ' + String(evidence.commit))
+      if (spike !== undefined && spike.commit !== measuredCommit) problems.push('release: spike ' + id + ' was measured on commit ' + String(spike.commit) + ', not the measured family commit ' + String(measuredCommit))
     }
     if (evidence.traceability === undefined || evidence.traceability === null) problems.push('release: traceability reading is required')
     else if (evidence.traceability.covered !== TRACEABILITY_TOTAL) problems.push('release: traceability must cover all ' + String(TRACEABILITY_TOTAL) + ' items')

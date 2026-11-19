@@ -26,7 +26,7 @@ const flag = (name) => { const index = argv.indexOf(name); const value = index >
 // P2-39: a positional is any token that is neither a flag nor the VALUE of a
 // value-taking flag. The previous list missed --gates-from-manifest, so a
 // flags-first invocation read its profile ("ci") as the evidence path.
-const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest', '--gates-report', '--cohort-evidence', '--commit', '--tag', '--version'])
+const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest', '--gates-report', '--cohort-evidence', '--measured-commit', '--commit', '--tag', '--version'])
 const file = argv.find((arg, index) => !arg.startsWith('--') && !VALUE_FLAGS.has(argv[index - 1]))
 const rehearsalPath = flag('--rehearsal')
 const ciFace = flag('--ci-face') || process.env.GITHUB_WORKFLOW_REF || ''
@@ -34,6 +34,7 @@ const os = flag('--os') || process.env.RUNNER_OS || ''
 const gatesFromManifest = flag('--gates-from-manifest')
 const gatesReport = flag('--gates-report')
 const cohortEvidence = flag('--cohort-evidence')
+const measuredCommitArg = flag('--measured-commit')
 const commit = flag('--commit')
 const tag = flag('--tag')
 const version = (flag('--version') || process.env.RELEASE_VERSION || '').replace(/^v/, '')
@@ -81,8 +82,10 @@ if (gatesReport !== '') {
 if (!Array.isArray(rehearsal.spikes) || rehearsal.spikes.length === 0) problems.push('rehearsal.spikes must carry the S1-S4 rehearsal evidence')
 if (gates.length === 0 && gatesFromManifest === '') problems.push('rehearsal.gates must carry the rehearsal gate readings (or pass --gates-from-manifest <profile>)')
 if (rehearsal.traceability === undefined || rehearsal.traceability === null) problems.push('rehearsal.traceability must carry the W11 reading')
+const measuredCommit = measuredCommitArg !== '' ? measuredCommitArg : (Array.isArray(rehearsal.spikes) && rehearsal.spikes.length > 0 ? rehearsal.spikes[0]?.commit : undefined)
 const assembled = {
   ...evidence,
+  ...(typeof measuredCommit === 'string' ? { measuredCommit } : {}),
   cohort: cohort ?? rehearsal.cohort ?? evidence.cohort,
   spikes: Array.isArray(rehearsal.spikes) ? rehearsal.spikes : evidence.spikes,
   gates: gates.length > 0 ? gates : evidence.gates,

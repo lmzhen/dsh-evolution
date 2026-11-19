@@ -65,6 +65,7 @@ function releasable(): Record<string, unknown> {
       readings: PLATFORM_LINE.cohort.map(version => ({ version, install: 'clean', boot: 200, activeRows: 29, expectedActiveRows: 29, disabledRows: ['evolution-skill-health'], doctor: 'ok', smoke: 'pass', source: 'ci' })),
     },
     commit: 'a'.repeat(40),
+    measuredCommit: 'a'.repeat(40),
     tag: 'v' + FAMILY_VERSION,
     ciFace: { os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' },
     gates: [{ id: 'gate-01', ok: true, reading: 'passed', criterionEvaluated: true }],

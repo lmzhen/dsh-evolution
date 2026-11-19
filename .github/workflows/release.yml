@@ -274,6 +274,17 @@ jobs:
           # script resolves it — \`packages/evolution/node_modules\` is on that path.
           npm install --prefix packages/evolution --no-save --no-package-lock --ignore-scripts --no-audit --no-fund tar@7
 
+      - name: Bind the tag tree to the measured family tree
+        shell: bash
+        run: |
+          MEASURED_COMMIT="$(node -e "const r=require('./packages/evolution/scripts/release-evidence-rehearsal.json'); const c=[...new Set((r.spikes??[]).map(s=>s.commit))]; if(c.length!==1) { console.error('rehearsal spikes must share one measured commit'); process.exit(1) } process.stdout.write(c[0])")"
+          git fetch --no-tags --depth=1 origin "$MEASURED_COMMIT"
+          if ! git diff --quiet "$MEASURED_COMMIT" "$GITHUB_SHA" -- 'packages/evolution-*' package.json platform-line.json; then
+            echo "release: tag tree changed family sources since the measured commit $MEASURED_COMMIT" >&2
+            exit 1
+          fi
+          echo "MEASURED_COMMIT=$MEASURED_COMMIT" >> "$GITHUB_ENV"
+
       - name: Re-assemble release evidence with the real CI job ledger
         shell: bash
         env:
@@ -291,6 +302,7 @@ jobs:
           node packages/evolution/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json \
             --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json \
             --cohort-evidence "$RUNNER_TEMP/cohort-evidence/cohort-evidence.json" \
+            --measured-commit "$MEASURED_COMMIT" \
             --gates-report ci-gates.json \
             --ci-face "$GITHUB_WORKFLOW_REF" --os "$RUNNER_OS" \
             --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME" --release
