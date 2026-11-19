@@ -34,6 +34,22 @@ type PtcTools = {
   execute?: (input: unknown) => Promise<unknown>
 }
 
+
+/** Keep PTC's in-program SDK to the review allowlist instead of the parent preset's full tool set. */
+function filterToolSet(full: unknown, allowed: ReadonlySet<string>): unknown {
+  if (full === null || typeof full !== 'object' || typeof (full as { view?: unknown }).view !== 'function') return full
+  const view = (full as { view(scope: unknown): unknown }).view.bind(full)
+  return {
+    view(scope: unknown) {
+      const source = view(scope)
+      if (!(source instanceof Map)) return source
+      const out = new Map<string, unknown>()
+      for (const [name, definition] of source) if (allowed.has(name)) out.set(name, definition)
+      return out
+    },
+  }
+}
+
 const PTC_INSTRUCTION = 'You are reviewing in PTC mode. Write one or more run_code programs that call the available review tools. When the review is complete, call tools.review_done as the only review action of that program. A precise no-op is still completed: always finish with tools.review_done instead of stopping without it. If a write reports resource-busy, call tools.review_wait and then re-read before retrying.'
 
 function asObject(value: unknown): Record<string, unknown> | undefined {
@@ -123,7 +139,7 @@ export class PtcReviewToolHost {
   }
 
   /** Build one task channel over the shared registration. */
-  channel(taskId: string, parentHeaderTools: readonly { readonly name: string }[], childAgent: unknown, modelSelection: unknown): ReviewToolChannel & { control: PtcReviewControl; dispose(): void } {
+  channel(taskId: string, parentHeaderTools: readonly { readonly name: string }[], childAgent: unknown, modelSelection: unknown, allowedTools: ReadonlySet<string>): ReviewToolChannel & { control: PtcReviewControl; dispose(): void } {
     this.register()
     const control: PtcReviewControl = { done: false, waitCount: 0 }
     this.controls.set(taskId, control)
@@ -138,7 +154,7 @@ export class PtcReviewToolHost {
         host.active.add(taskId)
         try {
           if (host.tools.execute === undefined) throw new Error('PTC review channel requires tools.execute')
-          const toolSet = host.tools.resolve === undefined ? undefined : await host.tools.resolve({ agent: childAgent, modelSelection, signal })
+          const toolSet = host.tools.resolve === undefined ? undefined : filterToolSet(await host.tools.resolve({ agent: childAgent, modelSelection, signal }), allowedTools)
           return await host.tools.execute({ calls, signal, agent: childAgent, ...(toolSet === undefined ? {} : { toolSet }) }) as { readonly results: readonly ReviewToolOutcome[] }
         } finally {
           host.active.delete(taskId)

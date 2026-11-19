@@ -1073,11 +1073,12 @@ function snapshotReviewParent(agent: Agent): Agent {
     // any lease wait so later goal-loop turns can never leak into the review.
     const reviewParent = snapshotReviewParent(agent)
     const header = session.requestHeader()
-    if (header === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — parent has no request header'); return false }
+    if (header === undefined) { releaseKind(); ctx.logger.warn('dsh-evolution-review: aux review skipped — parent has no request header'); return false }
     const llm = llmPort(ctx)?.streamRaw
     const toolsService = toolsPort(ctx)
     const tools = toolsService?.execute
     if (llm === undefined || tools === undefined) {
+      releaseKind()
       ctx.logger.warn('dsh-evolution-review: aux review skipped — llm/tools service is not mounted')
       return false
     }
@@ -1114,7 +1115,7 @@ function snapshotReviewParent(agent: Agent): Agent {
     }
     const channel = reviewChild === undefined || ptcToolHost === undefined
       ? nativeChannel
-      : ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent, { provider: header.config.provider, model: header.config.model })
+      : ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent, { provider: header.config.provider, model: header.config.model }, new Set([...AUX_TOOL_ALLOW, 'run_code', 'review_done', 'review_wait']))
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
@@ -1190,7 +1191,7 @@ function snapshotReviewParent(agent: Agent): Agent {
             waitCount,
             hitRoundLimit,
             ...(report === undefined ? {} : { report }),
-            ...(status === 'partial' && error !== undefined ? { partialReason: error } : {}),
+            ...(status === 'partial' && error !== undefined ? { partialReason: error } : status === 'timeout' ? { partialReason: error ?? 'review-timeout' } : {}),
             ...(usage === undefined ? {} : { usage }),
             startedAt,
             finishedAt,

@@ -505,3 +505,13 @@ interface EvolutionReviewActivityRecordV3 {
 - 已修：native channel 工具执行改用真实 parent agent；runner 对 PTC 只允许 channel.visibleTools（run_code），不给 PTC 模型合成 review_done/wait，完成只认 channel completion；PTC resolve 传 modelSelection；AUX 消费 debt 后复位对应 counters；event 写 taskId/partialReason；UI/activity 展示 report/unresolved；activity 旧版本（v2）按 readable 原地升级而不是 quarantine；aux/PTC 提示明确 no-op 也必须 review_done。
 - 新增/调整测试：native channel execution agent、PTC run_code 经 runner、v2 升级可读；review+adapter+activity+UI 75 项通过，构建 0 error。
 - 复核 P2 仍列出：queue-timeout/可配置并发、PTC 写锁门禁、wait 语义/文案、report 体积上限、auxRunning 同 kind 竞态、真机 PTC/ALS/child 策略未验证。独立复核结论：修完 P0/P1 仍需真机 cohort 验收，不能直接发布。
+
+
+### Round 20（2026-11-20，第二轮独立复核后）
+
+- 复核结论：P0=0；上一轮 6 条 P1 在代码层已修；新增 P1-A：PTC `run_code` 程序 SDK 会拿到父 preset 全量工具集。
+- 已修 P1-A：`PtcReviewToolHost` 对 `tools.resolve` 的 toolSet 做 allowlist 过滤，PTC 程序只看到 `run_code` + review allowlist（`skill_manage/memory/skill/skill_search/read/glob/grep/review_wait/review_done`）；新增单测断言 forbidden `bash`/`skill_manage` 被过滤。
+- 修复 `auxRunning` sticky 泄漏：preflight 早退和 lease 失败路径现在都 `releaseKind()`。
+- timeout 也写 `partialReason`（`review-timeout`），UI 可显示原因。
+- 未修 P2：queue-timeout/可配置并发、PTC 嵌套写门禁/actions 计数、wait abort 语义、report 体积进一步压缩、真机 PTC/ALS/child 策略、inject latest-kind 语义、seq 空转、文档/测试生产路径缺口。
+- 当前 review/activity/UI 69 项通过，构建 0 error；真实宿主 cohort 验收仍未做。
