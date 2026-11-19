@@ -19,12 +19,12 @@ void raw
 describe('platform line single source (G1-S1/S2/S3)', () => {
   it('freezes the derived anchors and ranges', () => {
     expect(PLATFORM_LINE).toMatchObject({
-      version: '0.2.2-rc.3',
-      floor: '0.2.2-rc.3',
+      version: '0.2.2-rc.5',
+      floor: '0.2.2-rc.5',
       previousAnchor: '0.2.1-rc.2',
-      peersRange: '^0.2.2-rc.3',
-      enginesRange: '>=0.2.2-rc.3 <0.2.3-0',
-      upstreamRef: 'dsh-v0.2.2-rc.3',
+      peersRange: '^0.2.2-rc.5',
+      enginesRange: '>=0.2.2-rc.5 <0.2.3-0',
+      upstreamRef: 'dsh-v0.2.2-rc.5',
     })
   })
 
@@ -35,10 +35,10 @@ describe('platform line single source (G1-S1/S2/S3)', () => {
   it('freezes the window grid (both predicates, policy expected column)', () => {
     const grid = windowRows(PLATFORM_LINE)
     expect(grid.map((row: { version: string }) => row.version)).toEqual([
-      '0.2.0-rc.2', '0.2.1-rc.0', '0.2.1-rc.1', '0.2.1-rc.2', '0.2.1-rc.3', '0.2.1', '0.2.2-0', '0.2.2-rc.1', '0.2.2-rc.2', '0.2.2-rc.3', '0.2.2', '0.3.0-rc.1',
+      '0.2.0-rc.2', '0.2.1-rc.0', '0.2.1-rc.1', '0.2.1-rc.2', '0.2.1-rc.3', '0.2.1', '0.2.2-0', '0.2.2-rc.1', '0.2.2-rc.2', '0.2.2-rc.3', '0.2.2-rc.4', '0.2.2-rc.5', '0.2.2', '0.3.0-rc.1',
     ])
     const admits = grid.filter((row: { expected: boolean }) => row.expected).map((row: { version: string }) => row.version)
-    expect(admits).toEqual(['0.2.2-rc.3', '0.2.2'])
+    expect(admits).toEqual(['0.2.2-rc.5', '0.2.2'])
     const stable = grid.find((row: { version: string }) => row.version === '0.2.2')
     expect(stable).toMatchObject({ peersAdmits: true, enginesAdmits: true, expected: true })
   })

@@ -66,15 +66,21 @@ describe('platform port lifecycle', () => {
     await vi.waitFor(() => expect(projections.status()).toBe('ready'))
   })
 
-  it('EvolutionLlm resolves a late-mounted llm service per call', async () => {
+  it('classifies a CONTENT_REFUSED finish error as a decided content refusal', async () => {
     const ctx = new Context()
     await ctx.plugin(EvolutionPlatform)
     await ctx.plugin(EvolutionLlm)
-    const llm = ctx.get('evolutionLlm') as EvolutionLlm
-    expect(llm.available()).toBe(false)
     ctx.provide('llm', {
-      stream: () => (async function* () {})(),
+      stream: () => (async function* () {
+        // The rc5 LlmRuntime delivers a refusal in-band as finish(error), never as a thrown error.
+        yield { type: 'finish', reason: { kind: 'error', failure: { message: 'DeepSeek refused to answer', code: 'CONTENT_REFUSED' } } }
+      })(),
     })
-    expect(llm.available()).toBe(true)
+    const llm = ctx.get('evolutionLlm') as EvolutionLlm
+    await expect(llm.text({
+      purpose: 'evolution-curator',
+      route: { provider: 'deepseek', model: 'deepseek-chat' },
+      messages: [],
+    })).rejects.toMatchObject({ kind: 'content-refused' })
   })
 })

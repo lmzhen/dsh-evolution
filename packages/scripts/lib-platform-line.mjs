@@ -119,6 +119,8 @@ export function windowRows(platformLine) {
     '0.2.2-rc.1',
     '0.2.2-rc.2',
     '0.2.2-rc.3',
+    '0.2.2-rc.4',
+    '0.2.2-rc.5',
     '0.2.2',
     '0.3.0-rc.1',
   ]

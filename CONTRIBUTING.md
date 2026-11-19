@@ -52,7 +52,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 15 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | machine-local |
 | 16 | `node packages/scripts/verify-profile-bundles.mjs --self-test` | mirror |
 | 17 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
-| 18 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/_upstream/dsh-upstream-0.2.2-rc.3 --accept-recorded` | mirror |
+| 18 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/_upstream/dsh-upstream-0.2.2-rc.5 --accept-recorded` | mirror |
 | 19 | `node packages/scripts/verify-package-discovery.mjs packages --strict` | mirror |
 | 20 | `node packages/scripts/verify-family-tool-names.mjs packages --strict` | mirror |
 | 21 | `node packages/scripts/verify-skill-roots.mjs packages --strict` | mirror |

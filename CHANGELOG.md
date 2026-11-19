@@ -1,3 +1,11 @@
+## 0.56.0 (2026-11-19) — 适配 DSH 0.2.2-rc.5
+
+> **范围**：① 平台线从 rc.3 升到 **rc.5**，家族依赖与 peer/engines 同步到 rc.5；② 平台接口核对确认现有 port/anchor 无破坏性变化，不需要新增适配层；③ LLM 内容安全拒绝按 rc.5 的 in-band `finish(error)` 中的 `CONTENT_REFUSED` 错误码识别为 `content-refused`，不再误归为 `transport`；④ rc.5 的 `WebSearchRequest.llmProvider` 仅平台 web search 使用，家族当前没有 web 搜索调用，不引入依赖。
+>
+> **不迁移**：磁盘数据格式、配置字段和语义不变；运行时要求 DSH `0.2.2-rc.5`。
+>
+> **验证**：pre-tag gate **64 pass / 0 fail / 3 registered cannotDecide / 2 skipped**；定向 tests 32 项通过；独立复核首轮 P1（内容拒绝接缝 + 证据版本）修复后复验 **P0/P1=0**；S1/S2/S3 在 rc.5 web host 的 0.56.0 候选上实测（45 行、32,468 bytes、读耗时 1,187 / 755 / 558 ms、诊断 49 ms、schema 2 / facts 7 / runtime 8），S4 HMR spec 2 项通过。真实 npm web A→B 升级验收在发布后按 1440 / 1024 / 390 三档记录。
+
 ## 0.55.1 (2026-11-19) — 剩余债清理
 
 > **范围**：① history 回退成功但列表回读失败时不再误报“回退失败”，改为“已回退，版本列表没读出来”；② merge 批准/拒绝失败保留宿主原因码，8 语言按原因显示，原始详情只作诊断展开；③ 数据总览的 `unreadable` 独立显示“无法读取”并计入需要处理，不再退化成 Unknown；④ diff 4,000、review preview 2,000、memory preview 200、正文预览 20,000、merge body 65,536 bytes 统一从 `constants` 导出并登记到 `TEXT_BUDGETS`；⑤ 删除无生产读者的 UI key，`verify-i18n` 增加死键检查，`verify-client-ui-i18n` 扩到四个 client 半；⑥ 补齐 n=1 单数（确认年龄/数量/正常运行/运行中）、区分“并入内容”与“合并”、拆开“没有技能”与“筛选无结果”的空态、merge 正文截断显示 shown/total bytes，并把参数单位括号与健康页标点改走字典；⑦ 统一 8 语言旧版参数标签/提示，去掉标签与单位 chip 的双括号；⑧ 日文合并面板统一用“統合”，不再混用“マージ”。

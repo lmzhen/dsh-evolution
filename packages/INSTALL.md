@@ -25,7 +25,7 @@ The historical bundles share infrastructure rows; mounting two double-registers 
 
 ## Validation status
 
-Validated line: **DSH 0.2.2-rc.3** (DCR-2: 0.50.0 drops rc.1/rc.2 compatibility).
+Validated line: **DSH 0.2.2-rc.5** (0.56.0 moves from rc.3; install 0.55.x for rc.3).
 
 | Surface | Status | Basis |
 |---|---|---|

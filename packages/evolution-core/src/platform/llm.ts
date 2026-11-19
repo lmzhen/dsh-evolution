@@ -8,7 +8,7 @@
 import type { GenerateOptions, StreamChunk, UserMessage } from '@deepseek-ai/dsh-llm'
 import type { Context } from '@deepseek-ai/cordis'
 
-export type EvolutionLlmFailureKind = 'model-unavailable' | 'no-route' | 'timeout' | 'cancelled' | 'transport'
+export type EvolutionLlmFailureKind = 'model-unavailable' | 'no-route' | 'timeout' | 'cancelled' | 'content-refused' | 'transport'
 
 /** Typed auxiliary-LLM failure; callers may map these without parsing messages. */
 export class EvolutionLlmError extends Error {
@@ -87,11 +87,15 @@ export function llmPort(ctx: Context): LlmPort | undefined {
     async completeText(request) {
       let text = ''
       for await (const chunk of port.stream(request)) {
-        const frame = chunk as { type?: unknown; text?: unknown; reason?: { kind?: unknown; failure?: { message?: unknown } } }
+        const frame = chunk as { type?: unknown; text?: unknown; reason?: { kind?: unknown; failure?: { message?: unknown; code?: unknown } } }
         if (frame.type === 'text-delta' || frame.type === 'text') text += typeof frame.text === 'string' ? frame.text : ''
         if (frame.type === 'finish' && frame.reason?.kind === 'error') {
-          const message = frame.reason.failure?.message
-          throw new EvolutionLlmError('transport', 'model call failed: ' + (typeof message === 'string' ? message : 'unknown'))
+          const failure = frame.reason.failure
+          const message = failure?.message
+          // rc5 delivers a refusal as an in-band finish(error) chunk, not as a thrown LlmError.
+          // Preserve the decided code at the seam so callers do not retry it as transport.
+          const kind = failure?.code === 'CONTENT_REFUSED' ? 'content-refused' : 'transport'
+          throw new EvolutionLlmError(kind, 'model call failed: ' + (typeof message === 'string' ? message : 'unknown'))
         }
       }
       return text
