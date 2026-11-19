@@ -5,6 +5,8 @@
 > 目标架构：[26-architecture-optimization-plan.md](D:/dsh/_research/plugin-code-audit-2026-11-09/audit-2026-11-12/reports/26-architecture-optimization-plan.md)
 >
 > **DCR-2（2026-11-16）**：0.50.0 只适配 DSH `0.2.2-rc.3`，rc.1 兼容层删除，直接发 npm `latest`。本文中 rc.1 的测试/编译读数只作 0.49 历史基线。
+>
+> **多版本重构（2026-11-19）**：以 [multi-version-support.md](multi-version-support.md) 为唯一设计源，goal `goal-0eb89255-0cd9-46dd-8940-4d5524c2c6ed`；全部优化完成并通过全量验收/独立复核后才发布，过程中不发布中间版本。
 
 ## 1. 这个目录是什么
 
@@ -46,6 +48,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [multi-version-support.md](multi-version-support.md) | 多版本目标架构、全量问题台账、P0–P3 迁移与冻结不变量（当前设计源） |
 | [platform-ports.md](platform-ports.md) | 当前端口覆盖、直接 `ctx.get` 清单、目标 `PlatformPorts` |
 | [characterization.md](characterization.md) | 行为基线：spec/用例/不变量/命令 |
 | [26](D:/dsh/_research/plugin-code-audit-2026-11-09/audit-2026-11-12/reports/26-architecture-optimization-plan.md) | 目标架构（外部报告目录） |
