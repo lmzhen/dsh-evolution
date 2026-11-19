@@ -1,4 +1,4 @@
-# `@lmzhen/dsh-evolution-contract`
+# `@lmzhen/dsh-evolution-platform-contract`
 
 Pure family-facing platform contract for the dsh-evolution family.
 

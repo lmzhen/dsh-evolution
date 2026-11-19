@@ -9,7 +9,7 @@
  * in a way the adapter cannot hide; host releases do not change it by
  * themselves.
  *
- * @module @deepseek-ai/dsh-evolution-contract
+ * @module @deepseek-ai/dsh-evolution-platform-contract
  */
 
 export * from './result.ts'

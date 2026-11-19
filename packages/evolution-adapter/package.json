@@ -38,7 +38,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/dsh-evolution-contract": "workspace:^",
+    "@deepseek-ai/dsh-evolution-platform-contract": "workspace:^",
     "@deepseek-ai/dsh-atomic-write": "workspace:^",
     "zod": "^4.4.3"
   },

@@ -5,7 +5,7 @@
       "path": "../evolution-adapter"
     },
     {
-      "path": "../evolution-contract"
+      "path": "../evolution-platform-contract"
     },
     {
       "path": "../../../vendor/cordis"

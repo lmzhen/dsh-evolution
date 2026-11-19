@@ -2,9 +2,9 @@
  * The storage-domain implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { StorageDomainPort } from '@deepseek-ai/dsh-evolution-contract'
+import type { StorageDomainPort } from '@deepseek-ai/dsh-evolution-platform-contract'
 
-export type { StorageDomainPort } from '@deepseek-ai/dsh-evolution-contract'
+export type { StorageDomainPort } from '@deepseek-ai/dsh-evolution-platform-contract'
 
 interface StorageDomainServiceLike {
   open(spec: unknown): Promise<unknown>

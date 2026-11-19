@@ -2,7 +2,7 @@
 
 > 状态：设计基准（2026-11-19），尚未实现。实现期间以本文为**唯一设计源**；任何架构/范围变更先写 DCR，再改代码。
 >
-> 适用基线：family `0.57.0`、DSH `0.2.2-rc.5`、20 个发布包；下一发布窗口暂定 `0.58.0`。
+> 适用基线：family `0.57.0`、DSH `0.2.2-rc.5`、22 个发布包（P0 拆包后）；下一发布窗口暂定 `0.58.0`。
 >
 > 关联执行入口：[architecture-optimization/README.md](./README.md)
 > 端口清单：[platform-ports.md](./platform-ports.md)
@@ -23,7 +23,7 @@
 
 ## 1. 当前基线
 
-- 发布包：重构前 20 个；P0 拆出 `evolution-contract` 与 `evolution-adapter` 后 22 个（`packages/evolution-*`、`memory`、`tool-skill-manage`）；源码包 23 个（含一个退休 preset 目录）。
+- 发布包：重构前 20 个；P0 拆出 `evolution-platform-contract` 与 `evolution-adapter` 后 22 个（`packages/evolution-*`、`memory`、`tool-skill-manage`）；源码包 23 个（含一个退休 preset 目录）。
 - 版本事实源：`platform-line.json`，当前 `version=floor=0.2.2-rc.5`。
 - 生成结果：每个发布 manifest 的 `@deepseek-ai/dsh-*` peers = `^0.2.2-rc.5`，`engines.dsh` = `>=0.2.2-rc.5 <0.2.3-0`；`all` bundle 只带 engines，row 包同时带 peers/engines。
 - 平台耦合：`evolution-core` 直接 import 14 个平台包；其余 16 个包只 import Cordis/Schemastery 与家族服务。`ctx.get()` 的家族服务访问遍布各包，但平台包导入集中在 core。
@@ -97,7 +97,7 @@ DSH host
   │    ├─ contract generation (c1 / c2 …)
   │    └─ EvolutionPlatform 服务（现有 ports）
   │
-  ├─ evolution-contract      ← 纯类型/端口/能力名，零 host import
+  ├─ evolution-platform-contract      ← 纯类型/端口/能力名，零 host import
   │
   └─ feature packages        ← 只依赖 contract
        core / memory / skill / review / merge / ui …
@@ -111,7 +111,7 @@ bundle patch                 ← 只含家族 row
 1. **一个 artifact 一个包络**；包络只列明确验证过的版本，不写开放式 `>=`。
 2. **bundle 根、每个发布 manifest、每条 row 使用同一包络**，由生成器写入。
 3. **业务代码禁止读取平台版本**；版本只出现在 adapter 诊断和 release evidence。
-4. **只有 `evolution-adapter` import 平台包**；`evolution-contract` 零 host import；feature 包只认 contract。
+4. **只有 `evolution-adapter` import 平台包**；`evolution-platform-contract` 零 host import；feature 包只认 contract。
 5. **bundle patch 只拥有家族 row**；平台 row 配置不进入默认 bundle。
 6. **旧平台线用并行发行线**，不塞进同一个 all。
 7. **没有测过的版本不写进包络**；peers 和 engines 由同一 cohort 生成。
@@ -119,7 +119,7 @@ bundle patch                 ← 只含家族 row
 ### 3.2 包边界
 
 ```text
-evolution-contract/
+evolution-platform-contract/
   src/ports.ts        # EvolutionPlatform 端口接口
   src/capabilities.ts # PlatformCapability 枚举/能力集合
   src/types.ts        # 家族跨包数据类型
@@ -138,7 +138,7 @@ evolution-core/       # 只留域逻辑；import contract，不 import 平台包
 
 依赖规则：
 
-- `evolution-contract`：**零宿主 runtime import**；允许 type-only 平台类型，用于端口签名，但类型面必须由 cohort 矩阵编译覆盖。
+- `evolution-platform-contract`：**零宿主 runtime import**；允许 type-only 平台类型，用于端口签名，但类型面必须由 cohort 矩阵编译覆盖。
 - `evolution-adapter`：全仓唯一 import `@deepseek-ai/dsh-*` **运行时值** 的包；实现端口，并集中导出平台提供的运行时 helper（`defineTool`、`createUserMessage`、`escapeText`、`SessionId` 等）。
 - feature 包：类型/端口从 contract 取；平台提供的运行时 helper 从 adapter 取；**不直接 import `@deepseek-ai/dsh-*`**。
 - `Cordis`/`Schemastery` 继续作为框架 seam 直接 import；它们在兼容包络中单独声明，不混入 adapter 的宿主适配面。
@@ -154,7 +154,7 @@ evolution-core/       # 只留域逻辑；import contract，不 import 平台包
 
 ### 3.3 契约与适配
 
-`evolution-contract` 定义语义能力，不定义版本：
+`evolution-platform-contract` 定义语义能力，不定义版本：
 
 ```ts
 export const CONTRACT = 1 as const
@@ -258,7 +258,7 @@ export interface EvolutionPlatform {
 
 ### P0：边界，不改行为
 
-**P0a 状态（2026-11-19）**：完成。`evolution-contract`（能力/Result，无宿主 runtime import）与 `evolution-adapter`（`ports` / `values` / `service` 三个入口）已落地；core 的 17 个平台 port 文件迁入 adapter，core 只保留 `src/platform/index.ts` 兼容 re-export；core 全包不再直接 import `@deepseek-ai/dsh-*`。`verify-family-types` 0 错，104 项定向测试绿，rc.5 真实 web 启动 200、45 技能、doctor `platform-services: ok`。安装器 `--from-dist` 增加 family namespace 链接（core → adapter → contract），否则 packed composer 无法解析跨包依赖。P0b/P0c 仍待做。
+**P0a 状态（2026-11-19）**：完成。`evolution-platform-contract`（能力/Result，无宿主 runtime import）与 `evolution-adapter`（`ports` / `values` / `service` 三个入口）已落地；core 的 17 个平台 port 文件迁入 adapter，core 只保留 `src/platform/index.ts` 兼容 re-export；core 全包不再直接 import `@deepseek-ai/dsh-*`。`verify-family-types` 0 错，104 项定向测试绿，rc.5 真实 web 启动 200、45 技能、doctor `platform-services: ok`。安装器 `--from-dist` 增加 family namespace 链接（core → adapter → contract），否则 packed composer 无法解析跨包依赖。P0b/P0c 仍待做。
 
 - 按 §3.2 的 P0a/P0b/P0c 分三次落地：先 contract/adapter + 兼容桶，再逐包切 import，最后独立 row；
 - 把 `evolution-core/src/platform/*`、`runtime/platform.ts` 迁入 adapter；
@@ -339,6 +339,7 @@ export interface EvolutionPlatform {
 
 ### 8.2 变更控制
 
+- **DCR-1（2026-11-19，包名冲突）**：原计划的 `@lmzhen/dsh-evolution-contract` 在 npm 已存在 `0.44.0`，是历史上的**状态/事件跨包纯契约**包，已有公开版本；直接复用会让旧消费者升级到语义完全不同的新包。决定：新包改名为 `@lmzhen/dsh-evolution-platform-contract`；旧 `@lmzhen/dsh-evolution-contract@0.44.0` 不覆盖、不 deprecate（后续如需统一再单独处理）。影响：源码目录、imports、tsconfig 路径、包映射与发布占位名同步改名；设计目标不变（纯平台契约 + 单一 adapter）。
 - 本文 §3 的不变量、包边界、envelope 语义是**冻结面**；变更必须写 DCR（日期、原因、影响、回退），并重新评审。
 - 新发现先入 §2 台账或 §10 open questions；不擅自扩当前 Phase。
 - 代码、测试、生成器、文档、release evidence 同 PR 更新；文档滞后视为未完成。
@@ -356,7 +357,7 @@ export interface EvolutionPlatform {
 
 ## 10. Open Questions（未冻结）
 
-1. `evolution-contract` 是否独立 npm 包，还是 `evolution-core` 的纯子路径？倾向独立包（编译隔离更干净），但需评估 21→22 包的发布/依赖成本。
+1. `evolution-platform-contract` 是否独立 npm 包，还是 `evolution-core` 的纯子路径？倾向独立包（编译隔离更干净），但需评估 21→22 包的发布/依赖成本。
 2. 60 字符 catalog cap 的最终归属：家族 catalog 配置、可选 profile override，还是接受平台默认？需要产品/体验确认。
 3. cohort 首版是否包含 rc.3，还是只做 rc.4–rc.5？由 P1 矩阵/真机结果决定。
 4. 是否把 Cordis/Schemastery 也纳入 contract 包装？当前倾向保留直接 import（框架 seam，不随 DSH 版本面变化）。

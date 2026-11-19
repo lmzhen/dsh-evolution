@@ -2,9 +2,9 @@
  * The settings implementation half of the family's platform boundary.
  */
 import type { Context, Fiber } from '@deepseek-ai/cordis'
-import type { SettingsPort } from '@deepseek-ai/dsh-evolution-contract'
+import type { SettingsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
 
-export type { SettingsPort } from '@deepseek-ai/dsh-evolution-contract'
+export type { SettingsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
 
 interface SettingsServiceLike {
   configure(options: { auto: boolean }, owner: Fiber): () => void
