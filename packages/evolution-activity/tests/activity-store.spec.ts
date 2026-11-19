@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import { nodeEvolutionIo, transactIo, type EvolutionIoLike, type EvolutionPlanAppliedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, REVIEW_TEXT_PREVIEW_CHARS, activityFile, apply, applyActivityEvent, applyReviewActivityEvent, loadActivityState, parseActivityContent, serializeActivity, type EvolutionActivityRecord } from '../src/index.ts'
+import { ACTIVITY_FILE_VERSION, DEFAULT_MAX_ITEMS, REVIEW_TEXT_PREVIEW_CHARS, activityFile, apply, applyActivityEvent, applyReviewActivityEvent, loadActivityState, parseActivityContent, parseActivityReviews, serializeActivity, type EvolutionActivityRecord } from '../src/index.ts'
 import { tempHome } from '../../test-support/temp-home.ts'
 
 const loadActivity = async (root: string, io: EvolutionIoLike): Promise<EvolutionActivityRecord[]> => (await loadActivityState(root, io)).records
@@ -77,6 +77,30 @@ function fakeIo(withTransact: boolean): EvolutionIoLike {
 function serialize(items: EvolutionActivityRecord[]): string {
   return JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2)
 }describe('evolution-activity store', () => {
+it('keeps v3 review task fields and partial reason on the sidecar', () => {
+  const events = applyReviewActivityEvent([], {
+    version: 1,
+    reviewId: 'r1',
+    taskId: 't1',
+    sessionId: 's1',
+    kind: 'skill',
+    status: 'partial',
+    trigger: { reason: 'cadence', toolCalls: 3, userChars: 10, assistantChars: 20 },
+    finalText: 'half done',
+    requests: 2,
+    toolCalls: 4,
+    waitCount: 1,
+    partialReason: 'max tool calls reached before review_done',
+    actions: [],
+    startedAt: 1,
+    finishedAt: 2,
+    at: 3,
+  }, 10)
+  const record = events[0]!
+  expect(record).toMatchObject({ taskId: 't1', kind: 'skill', status: 'partial', requests: 2, toolCalls: 4, waitCount: 1, partialReason: 'max tool calls reached before review_done' })
+  expect(parseActivityReviews(serializeActivity([], events))[0]).toMatchObject({ taskId: 't1', status: 'partial', waitCount: 1 })
+})
+
   it('folds plan-applied payloads into a bounded record list (pure fold)', () => {
     let items: EvolutionActivityRecord[] = []
     items = applyActivityEvent(items, payload(), 20, 100)
