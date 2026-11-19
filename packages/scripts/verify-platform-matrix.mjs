@@ -83,6 +83,21 @@ function packageMapFromTypesRoot(typesRoot, recursive) {
       const dir = join(typesRoot, entry)
       if (statSync(dir).isDirectory()) add(dir)
     }
+    // An installed app can expose every platform package only through pnpm's
+    // content-addressed store (<root>/.pnpm/<hash>/node_modules/@deepseek-ai/*),
+    // not as flat @deepseek-ai/<name> entries. Read that store as the same
+    // single declaration tree; a flat installed layout wins when both exist.
+    const store = join(typesRoot, '.pnpm')
+    if (existsSync(store)) {
+      for (const entry of readdirSync(store)) {
+        const scope = join(store, entry, 'node_modules', '@deepseek-ai')
+        if (!existsSync(scope)) continue
+        for (const name of readdirSync(scope)) {
+          const dir = join(scope, name)
+          if (statSync(dir).isDirectory()) add(dir)
+        }
+      }
+    }
     return map
   }
   const walk = (dir) => {

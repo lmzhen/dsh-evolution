@@ -274,7 +274,7 @@ export interface EvolutionPlatform {
 - adapter 只补真实差异，不加 feature 层版本分支；
 - 移除 `tool-skill` 平台覆盖。
 
-**P1 状态（2026-11-19）**：envelope schema/生成器/门禁已落地，22 个 staged manifest 的 52 条平台范围与 engines 全部等于 `0.2.2-rc.3 || 0.2.2-rc.5`；rc.3 编译 0 error（矩阵）；用 cohort dist 干净安装到 rc.3 profile（未手改 manifest）后启动 200、doctor `platform-services: ok`；rc.5 同样干净安装并启动。新增 `verify-cohort-smoke.mjs` 通过平台 `pluginInventory/list` 校验：两个 cohort 成员都是家族 row **29/29 active**，唯一 disabled row 是设计上默认关闭的 `evolution-skill-health`。rc.4 未验证，故未加入 cohort。
+**P1 状态（2026-11-19）**：envelope schema/生成器/门禁已落地，22 个 staged manifest 的 52 条平台范围与 engines 全部等于 `0.2.2-rc.3 || 0.2.2-rc.5`；矩阵双行 **rc.3 / rc.5 均 0 error**（rc.5 从安装态 pnpm store 读单一声明树，rc.3 从干净源码树读）；用 cohort dist 干净安装到 rc.3 profile（未手改 manifest）后启动 200、doctor `platform-services: ok`；rc.5 同样干净安装并启动。新增 `verify-cohort-smoke.mjs` 通过平台 `pluginInventory/list` 校验：两个 cohort 成员都是家族 row **29/29 active**，唯一 disabled row 是设计上默认关闭的 `evolution-skill-health`。rc.4 未验证，故未加入 cohort。
 
 **验收**：矩阵每个 cohort 0 error；干净 profile 启动；所有家族 row active；doctor 报 cohort/能力；无平台 row 覆盖。
 
