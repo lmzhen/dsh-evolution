@@ -94,26 +94,29 @@ export interface PtcReviewChannelOptions {
  * the in-code review tools, runs the PTC calls against the child agent, and
  * removes the registrations before returning.
  */
-export function createPtcReviewToolChannel(options: PtcReviewChannelOptions): ReviewToolChannel & { control: PtcReviewControl } {
+export function createPtcReviewToolChannel(options: PtcReviewChannelOptions): ReviewToolChannel & { control: PtcReviewControl; dispose(): void } {
   const control: PtcReviewControl = { done: false, waitCount: 0 }
   const definitions = reviewDefinitions(control, options.locks)
-  const channel: ReviewToolChannel & { control: PtcReviewControl } = {
+  let active = false
+  const disposers = definitions.map(definition => options.tools.register(definition, {
+    when: () => active && currentReviewContext()?.reviewId === options.taskId,
+  }))
+  const channel: ReviewToolChannel & { control: PtcReviewControl; dispose(): void } = {
     mode: 'ptc',
     visibleTools: options.parentHeaderTools as ReviewToolChannel['visibleTools'],
     instruction: PTC_INSTRUCTION,
     control,
     completion: () => control.done && control.report !== undefined ? { done: true, report: control.report } : undefined,
     async execute(calls, signal) {
-      const disposers = definitions.map(definition => options.tools.register(definition, {
-        when: () => currentReviewContext()?.reviewId === options.taskId,
-      }))
+      active = true
       try {
         if (options.tools.execute === undefined) throw new Error('PTC review channel requires tools.execute')
         return await options.tools.execute({ calls, signal, agent: options.childAgent }) as { readonly results: readonly ReviewToolOutcome[] }
       } finally {
-        for (const dispose of disposers.reverse()) dispose()
+        active = false
       }
     },
+    dispose() { for (const dispose of disposers.reverse()) dispose() },
   }
   return channel
 }
