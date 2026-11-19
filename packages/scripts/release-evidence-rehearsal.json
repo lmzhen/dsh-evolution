@@ -1,15 +1,15 @@
 {
-  "note": "0.56.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host at 127.0.0.1:3088 (platform 0.2.2-rc.5, family 0.56.0, 45 skills); S4 s4-hmr-double-apply spec. Final CI face must be re-read before publish.",
-  "familyVersion": "0.56.0",
+  "note": "0.57.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host at 127.0.0.1:3088 (platform 0.2.2-rc.5, family 0.57.0, 45 skills, no platform session-query dependency); S4 s4-hmr-double-apply spec. Final CI face must be re-read before publish.",
+  "familyVersion": "0.57.0",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.56.0",
-      "startedAt": "2026-11-19T03:54:30.000Z",
-      "artifactSha256": "75c8044a554311e87b91edd58970a75d91434a326cb456bbdd99fd6d69271ad1",
-      "inputsSha256": "ee33c89b2514592519e9fbd7b12131bf4ccc06344d2972e9011659fb50380be4",
-      "commit": "6560de01",
+      "familyVersion": "0.57.0",
+      "startedAt": "2026-11-19T06:16:30.000Z",
+      "artifactSha256": "d0ce901cd9902462792c660c550f69ddf5f0beaade7213befdbc60ab36f8166e",
+      "inputsSha256": "6ebadadb81c7ab5a69e390a56c6586ad72ce8a2606c53064d2e8a12378620fb6",
+      "commit": "704b5fce",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
@@ -17,9 +17,9 @@
         "skillHistoryBytes": 32468,
         "threeReadsStable": true,
         "readMs": [
-          1187,
-          755,
-          558
+          708,
+          1162,
+          1008
         ],
         "ownerStatus": 200
       }
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.56.0",
-      "startedAt": "2026-11-19T03:54:30.000Z",
-      "artifactSha256": "75c8044a554311e87b91edd58970a75d91434a326cb456bbdd99fd6d69271ad1",
-      "inputsSha256": "ee33c89b2514592519e9fbd7b12131bf4ccc06344d2972e9011659fb50380be4",
-      "commit": "6560de01",
+      "familyVersion": "0.57.0",
+      "startedAt": "2026-11-19T06:16:30.000Z",
+      "artifactSha256": "d0ce901cd9902462792c660c550f69ddf5f0beaade7213befdbc60ab36f8166e",
+      "inputsSha256": "6ebadadb81c7ab5a69e390a56c6586ad72ce8a2606c53064d2e8a12378620fb6",
+      "commit": "704b5fce",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -39,7 +39,7 @@
         "anonymous": 401,
         "anonymousBody": "unauthorized",
         "diagnosticsReadMs": [
-          49
+          13
         ],
         "carrier": "connection.fetch"
       }
@@ -47,28 +47,28 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.56.0",
-      "startedAt": "2026-11-19T03:54:30.000Z",
-      "artifactSha256": "75c8044a554311e87b91edd58970a75d91434a326cb456bbdd99fd6d69271ad1",
-      "inputsSha256": "ee33c89b2514592519e9fbd7b12131bf4ccc06344d2972e9011659fb50380be4",
-      "commit": "6560de01",
+      "familyVersion": "0.57.0",
+      "startedAt": "2026-11-19T06:16:30.000Z",
+      "artifactSha256": "d0ce901cd9902462792c660c550f69ddf5f0beaade7213befdbc60ab36f8166e",
+      "inputsSha256": "6ebadadb81c7ab5a69e390a56c6586ad72ce8a2606c53064d2e8a12378620fb6",
+      "commit": "704b5fce",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
-        "familyVersion": "0.56.0"
+        "familyVersion": "0.57.0"
       }
     },
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.56.0",
-      "startedAt": "2026-11-19T03:54:30.000Z",
-      "artifactSha256": "75c8044a554311e87b91edd58970a75d91434a326cb456bbdd99fd6d69271ad1",
-      "inputsSha256": "ee33c89b2514592519e9fbd7b12131bf4ccc06344d2972e9011659fb50380be4",
-      "commit": "6560de01",
+      "familyVersion": "0.57.0",
+      "startedAt": "2026-11-19T06:16:30.000Z",
+      "artifactSha256": "d0ce901cd9902462792c660c550f69ddf5f0beaade7213befdbc60ab36f8166e",
+      "inputsSha256": "6ebadadb81c7ab5a69e390a56c6586ad72ce8a2606c53064d2e8a12378620fb6",
+      "commit": "704b5fce",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -87,7 +87,7 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on 6560de01 (OK 52/52)"
+    "source": "verify-traceability --strict on 704b5fce (OK 52/52)"
   },
-  "generatedAt": "2026-11-19T03:58:00.000Z"
+  "generatedAt": "2026-11-19T06:45:00.000Z"
 }
