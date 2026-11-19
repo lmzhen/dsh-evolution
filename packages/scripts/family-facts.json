@@ -1333,19 +1333,6 @@
               "provenSha": "2fdf663120459ba82a2906cfe2550ea41fc1cdc3956e5264fc9db5073d922944"
             }
           ],
-          "gate-32": [
-            {
-              "mutate": {
-                "file": "README.md",
-                "find": "The full source layout reports<!-- gen:install-counts --> 20 packages installed (the published list is 20; the agent preset is separate)<!-- /gen:install-counts -->.",
-                "replace": "The full source layout reports<!-- gen:install-counts --> 19 packages installed (the published list is 20; the agent preset is separate)<!-- /gen:install-counts -->."
-              },
-              "expect": "red",
-              "note": "a number changed INSIDE the marked install-counts region of README (one line carrying both markers): the generator owns exactly that region, and an earlier probe that edited the step count outside it was invisible",
-              "provenAt": "2026-11-14T06:13:11.726Z",
-              "provenSha": "09424295f281edbe0b3bdc81d0783d9104629681e4ee763579b38a48525ee807"
-            }
-          ],
           "gate-29": [
             {
               "mutate": {
@@ -2016,6 +2003,30 @@
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the command still lives outside this family tree and has no argv anchor; this is a registered debt, not a pass."
+          },
+          "gate-83": {
+            "reason": "action step: the envelope check has no single in-repo command row a mutation could execute; the range guard gate-27 owns the mutation proof",
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.58.0",
+            "plan": "delete this exemption if the envelope step gains a runnable gate row",
+            "condition": "the action step stays an action step",
+            "renewal": "registered at 0.58.0"
+          },
+          "gate-84": {
+            "reason": "action step: the host acceptance launches an external platform process and has no single in-repo command row a mutation could execute",
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.58.0",
+            "plan": "delete this exemption if host acceptance becomes a runnable gate row",
+            "condition": "the action step stays an action step",
+            "renewal": "registered at 0.58.0"
+          },
+          "gate-32": {
+            "reason": "the mutation fixture lives in the mirror README while verify-mutations runs the gate from the overlay tree, where that README does not exist; the local lane still executes gate-32 normally",
+            "owner": "scripts/verify-mutations",
+            "expiry": "0.58.0",
+            "plan": "move the marker region to a file present in both trees or make verify-mutations run mirror-tree gates from the mirror root",
+            "condition": "gate-32 remains a mirror-only local row",
+            "renewal": "registered at 0.58.0"
           }
         },
         "cannotDecideRegistered": {
