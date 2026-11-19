@@ -9,17 +9,17 @@ it('exposes review_done only while the PTC channel executes and reports completi
   const registered: ToolDefinition[] = []
   const host = new PtcReviewToolHost({
     register(definition) { registered.push(definition); return () => { registered.splice(registered.indexOf(definition), 1) } },
-    resolve: async () => ({ view: () => new Map([['run_code', {}], ['skill_manage', {}], ['bash', {}]]) }),
+    resolve: async () => ({ view: () => new Map([['run_code', {}], ['skill_manage', {}], ['review_done', {}], ['bash', {}]]) }),
     async execute(input: unknown) {
       const toolSet = (input as { toolSet?: { view(scope?: unknown): ReadonlyMap<string, unknown> } }).toolSet
-      expect(toolSet === undefined ? [] : [...toolSet.view(undefined).keys()]).toEqual(['run_code'])
+      expect(toolSet === undefined ? [] : [...toolSet.view(undefined).keys()]).toEqual(['run_code', 'skill_manage', 'review_done'])
       const done = registered.find(definition => definition.name === 'review_done')
       expect(done).toBeDefined()
       await done!.execute({ summary: 'done', memoryChanged: false, skillsChanged: ['probe'], unresolved: [] }, { signal: new AbortController().signal } as never)
       return { results: [] }
     },
   }, new ReviewWriteLocks())
-  const channel = host.channel('review-1', [{ name: 'run_code' }], {}, undefined, new Set(['run_code', 'review_done', 'review_wait']))
+  const channel = host.channel('review-1', [{ name: 'run_code' }], {}, undefined, new Set(['run_code', 'skill_manage', 'review_done', 'review_wait']))
   expect(channel.mode).toBe('ptc')
   expect(channel.visibleTools.map(tool => tool.name)).toEqual(['run_code'])
   expect(registered.map(definition => definition.name)).toEqual(['review_done', 'review_wait'])

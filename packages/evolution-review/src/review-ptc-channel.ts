@@ -37,16 +37,17 @@ type PtcTools = {
 
 /** Keep PTC's in-program SDK to the review allowlist instead of the parent preset's full tool set. */
 function filterToolSet(full: unknown, allowed: ReadonlySet<string>): unknown {
-  if (full === null || typeof full !== 'object' || typeof (full as { view?: unknown }).view !== 'function') return full
+  if (full === null || typeof full !== 'object' || typeof (full as { view?: unknown }).view !== 'function') return new Map()
   const view = (full as { view(scope: unknown): unknown }).view.bind(full)
   return {
     view(scope: unknown) {
       const source = view(scope)
-      if (!(source instanceof Map)) return source
+      if (!(source instanceof Map)) return new Map()
       const out = new Map<string, unknown>()
       for (const [name, definition] of source) if (allowed.has(name)) out.set(name, definition)
       return out
     },
+    ...(typeof (full as { dispose?: unknown }).dispose === 'function' ? { dispose: () => (full as { dispose(): void }).dispose() } : {}),
   }
 }
 
@@ -154,7 +155,8 @@ export class PtcReviewToolHost {
         host.active.add(taskId)
         try {
           if (host.tools.execute === undefined) throw new Error('PTC review channel requires tools.execute')
-          const toolSet = host.tools.resolve === undefined ? undefined : filterToolSet(await host.tools.resolve({ agent: childAgent, modelSelection, signal }), allowedTools)
+          if (host.tools.resolve === undefined) throw new Error('PTC review channel requires tools.resolve for the review allowlist')
+          const toolSet = filterToolSet(await host.tools.resolve({ agent: childAgent, modelSelection, signal }), allowedTools)
           return await host.tools.execute({ calls, signal, agent: childAgent, ...(toolSet === undefined ? {} : { toolSet }) }) as { readonly results: readonly ReviewToolOutcome[] }
         } finally {
           host.active.delete(taskId)

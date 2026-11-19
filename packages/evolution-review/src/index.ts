@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-platform-contract'
 import { AUX_COMPLETION_INSTRUCTION, ReviewPartialFailure, runReview } from './review-executor.ts'
-import { nativeReviewToolChannel } from './review-tool-channel.ts'
+import { nativeReviewToolChannel, type ReviewToolChannel } from './review-tool-channel.ts'
 import { PtcReviewToolHost } from './review-ptc-channel.ts'
 import { createReviewChildAgent } from '@deepseek-ai/dsh-evolution-adapter/review-child'
 import { ReviewWriteLocks } from './review-write-locks.ts'
@@ -1106,16 +1106,27 @@ function snapshotReviewParent(agent: Agent): Agent {
     const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
     const nativeChannel = nativeReviewToolChannel(reviewParent, toolAllow, { execute: tools }, agent)
     const ptcOnly = toolAllow.size === 0 && (header.tools ?? []).some(tool => tool.name === 'run_code')
-    const reviewChild = ptcOnly && toolsService !== undefined
-      ? createReviewChildAgent(agent, 'aux-' + reviewId)
-      : undefined
-    if (reviewChild !== undefined && toolsService !== undefined && ptcToolHost === undefined) {
-      ptcToolHost = new PtcReviewToolHost(toolsService, reviewWriteLocks)
-      ptcToolHost.register()
+    let reviewChild: ReturnType<typeof createReviewChildAgent> | undefined
+    let channel: ReviewToolChannel = nativeChannel
+    try {
+      reviewChild = ptcOnly && toolsService !== undefined ? createReviewChildAgent(agent, 'aux-' + reviewId) : undefined
+      if (reviewChild !== undefined && toolsService !== undefined && ptcToolHost === undefined) {
+        ptcToolHost = new PtcReviewToolHost(toolsService, reviewWriteLocks)
+        ptcToolHost.register()
+      }
+      if (reviewChild !== undefined && ptcToolHost !== undefined) {
+        channel = ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent, { provider: header.config.provider, model: header.config.model }, new Set([...AUX_TOOL_ALLOW, 'run_code', 'review_done', 'review_wait']))
+      }
+    } catch (error) {
+      reviewChild?.dispose()
+      releaseKind()
+      clearTimeout(timer)
+      if (leaseRenewTimer !== undefined) clearInterval(leaseRenewTimer)
+      inFlightControllers.delete(controller)
+      if (leaseToken !== undefined && authority?.lease !== undefined) await authority.lease.release(leaseToken).catch(() => {})
+      ctx.logger.warn('dsh-evolution-review: aux review setup failed: ' + (error instanceof Error ? error.message : String(error)))
+      return false
     }
-    const channel = reviewChild === undefined || ptcToolHost === undefined
-      ? nativeChannel
-      : ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent, { provider: header.config.provider, model: header.config.model }, new Set([...AUX_TOOL_ALLOW, 'run_code', 'review_done', 'review_wait']))
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
@@ -1191,7 +1202,7 @@ function snapshotReviewParent(agent: Agent): Agent {
             waitCount,
             hitRoundLimit,
             ...(report === undefined ? {} : { report }),
-            ...(status === 'partial' && error !== undefined ? { partialReason: error } : status === 'timeout' ? { partialReason: error ?? 'review-timeout' } : {}),
+            ...(status === 'partial' && error !== undefined ? { partialReason: error } : status === 'timeout' ? { partialReason: 'review-timeout' } : {}),
             ...(usage === undefined ? {} : { usage }),
             startedAt,
             finishedAt,

@@ -515,3 +515,11 @@ interface EvolutionReviewActivityRecordV3 {
 - timeout 也写 `partialReason`（`review-timeout`），UI 可显示原因。
 - 未修 P2：queue-timeout/可配置并发、PTC 嵌套写门禁/actions 计数、wait abort 语义、report 体积进一步压缩、真机 PTC/ALS/child 策略、inject latest-kind 语义、seq 空转、文档/测试生产路径缺口。
 - 当前 review/activity/UI 69 项通过，构建 0 error；真实宿主 cohort 验收仍未做。
+
+
+### Round 21（2026-11-20，第三轮独立复核后）
+
+- 第三轮复核结论：P0=0，P1=0（代码层）；P1-A 能力面已归零（PTC SDK 仅 review allowlist），残余为 P2 审计/写门禁。
+- 进一步 fail-closed：`tools.resolve` 缺失时 PTC review 直接报错，不再回落到父 scope 全量工具；`filterToolSet` 对非 Map view 返回空 Map；保留底层 `dispose`；测试改为断言 allowed 的 `skill_manage/review_done` 保留、`bash` 被删。
+- PTC setup（child/host/channel 构造）失败时释放 auxRunning/定时器/lease，避免 sticky；timeout 原因固定写 `review-timeout`。
+- 仍为 P2：PTC 嵌套写门禁/actions、queue-timeout/可配置并发、wait abort 语义、inject latest-kind、seq 空转、真机 PTC/ALS/child 策略；真实宿主 cohort 验收仍未执行。
