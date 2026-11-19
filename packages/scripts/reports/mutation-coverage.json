@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-19T06:48:37.428Z",
+  "generatedAt": "2026-11-19T09:01:31.348Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -23,8 +23,8 @@
     },
     {
       "probe": "beh-host-route-registration",
-      "signature": "30e51bd16ca52b4211ccc822e8d9603e6de8982a8335fc7e3ec25ed53e6efc65",
-      "provenAt": "2026-11-19T01:15:10.204Z",
+      "signature": "b28468fe0d9454e8b687d6b968f0d9464df3c235b0a1b77d2590c0b98b45ec92",
+      "provenAt": "2026-11-19T09:01:15.164Z",
       "tree": "overlay"
     },
     {
@@ -53,8 +53,8 @@
     },
     {
       "probe": "beh-restrictor-allowset",
-      "signature": "dd0673549f28c3ab07fa4f71ffd64a22145b9fed5dcd276c8d110b4b6872641e",
-      "provenAt": "2026-11-19T01:15:10.225Z",
+      "signature": "a7986243d6d17a908093b986ec34130ef005f5c8face5e8487698c51efedcd32",
+      "provenAt": "2026-11-19T09:01:31.336Z",
       "tree": "overlay"
     },
     {
@@ -107,8 +107,8 @@
     },
     {
       "probe": "decl-contracts-surface",
-      "signature": "3a2268489b95ac792e9feb40473857565b451ccf3f2dfcdeadb6bc38bfc224b6",
-      "provenAt": "2026-11-19T01:15:10.183Z",
+      "signature": "005b33624f4f0ef09f709cbe1cd60f70092d4abea529e3bb5d6aa8b7df641e91",
+      "provenAt": "2026-11-19T09:00:59.007Z",
       "tree": "overlay"
     },
     {
