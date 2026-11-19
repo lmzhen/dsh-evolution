@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { apply as mountRuntime } from '@deepseek-ai/dsh-evolution-core/runtime'
+import { EvolutionPlatform } from '@deepseek-ai/dsh-evolution-adapter/service'
 import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
@@ -55,6 +56,7 @@ type StateRecord = { lastRunAt: number; runCount: number; lastSummary: string; p
 type StateTransactTask = (current: StateRecord | null) => StateRecord | null
 
 async function provideLlm(ctx: Context, service: unknown): Promise<void> {
+  await ctx.plugin(EvolutionPlatform)
   ctx.provide('llm', service)
   await ctx.plugin(mountRuntime)
 }

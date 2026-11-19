@@ -8,6 +8,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 // the platform's base bundle mounts (a real host always has it).
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { apply as mountRuntime } from '@deepseek-ai/dsh-evolution-core/runtime'
+import { EvolutionPlatform } from '@deepseek-ai/dsh-evolution-adapter/service'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import EvolutionCurator from '../src/index.ts'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
@@ -40,6 +41,7 @@ async function mount(_home: string, config: SpecConfig = {}) {
   await ctx.plugin(EvolutionIoRegistry)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(EvolutionPlatform)
   await ctx.plugin(mountRuntime)
   await ctx.plugin(NodeIo)
   await ctx.plugin(EvolutionCurator, { enabled: true, curatorIntervalHours: 24, ...config })

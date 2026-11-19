@@ -49,7 +49,7 @@ if (rehearsalPath !== '') {
   if (!existsSync(resolve(rehearsalPath))) { console.error('assemble-release-evidence: no rehearsal snapshot at ' + resolve(rehearsalPath) + ' (cannot decide)'); process.exit(2) }
   try { rehearsal = JSON.parse(readFileSync(resolve(rehearsalPath), 'utf8')) } catch (error) { console.error('assemble-release-evidence: unreadable inputs (' + (error instanceof Error ? error.message : String(error)) + ')'); process.exit(2) }
 }
-let cohort = evidence.cohort
+let cohort
 if (cohortEvidence !== '') {
   if (!existsSync(resolve(cohortEvidence))) { console.error('assemble-release-evidence: no cohort evidence at ' + resolve(cohortEvidence) + ' (cannot decide)'); process.exit(2) }
   try { cohort = JSON.parse(readFileSync(resolve(cohortEvidence), 'utf8')) } catch (error) { console.error('assemble-release-evidence: unreadable cohort evidence (' + (error instanceof Error ? error.message : String(error)) + ')'); process.exit(2) }
@@ -83,7 +83,7 @@ if (gates.length === 0 && gatesFromManifest === '') problems.push('rehearsal.gat
 if (rehearsal.traceability === undefined || rehearsal.traceability === null) problems.push('rehearsal.traceability must carry the W11 reading')
 const assembled = {
   ...evidence,
-  cohort: cohort ?? evidence.cohort,
+  cohort: cohort ?? rehearsal.cohort ?? evidence.cohort,
   spikes: Array.isArray(rehearsal.spikes) ? rehearsal.spikes : evidence.spikes,
   gates: gates.length > 0 ? gates : evidence.gates,
   traceability: rehearsal.traceability ?? evidence.traceability,

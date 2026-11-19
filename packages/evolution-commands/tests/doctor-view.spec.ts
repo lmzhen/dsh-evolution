@@ -23,7 +23,7 @@ const UNAVAILABLE: ChannelState = { kind: 'unavailable', code: 'E-323', reason: 
 function inputs(overrides: Partial<DoctorInputs> = {}): DoctorInputs {
   return {
     now: new Date('2026-10-19T00:00:00.000Z'),
-    platformLine: { version: PLATFORM_LINE.version, floor: PLATFORM_LINE.floor },
+    platformLine: { version: PLATFORM_LINE.version, floor: PLATFORM_LINE.floor, cohort: PLATFORM_LINE.cohort },
     familyVersion: '0.27.0',
     hostVersion: PLATFORM_LINE.version,
     form: { id: 'human-gated', evidence: ['profile declares evolution-all'], confidence: 'declared' },
