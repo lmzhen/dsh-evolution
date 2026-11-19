@@ -392,3 +392,11 @@ interface EvolutionReviewActivityRecordV3 {
 - 新增 `packages/evolution-review/src/review-tool-channel.ts`：`ReviewToolChannel` 边界与 native 实现；`runReview` 优先使用 channel 的 visibleTools/execute，未提供 channel 时保留旧 header/tools 路径；`review_done` 仍由 runner 注入。native channel 测试通过（8 项 executor 测试）。
 - PTC 阻塞事实：平台 `SubagentActivation` 的 local child 会进入 parent catalog；`ctx.agents.create` 存在但需要 setup/seed 且没有现成的“review child 不向父 Session/catalog 发布”的公开语义。当前不伪造 session，PTC channel 暂不实现；先把平台 detached review child 作为前置能力登记。
 - `review_wait`/resource-busy 仍需在 native 工具结果上落地；当前 SkillLibrary 锁/CAS 作为最终防线保留。
+
+
+### Round 4（2026-11-20）
+
+- `review_wait` 已作为 review 专用合成工具接入 runner：模型可单独调用，工具侧 bounded sleep（1ms–60s），计入 `toolCalls`/`waitCount`，不改变父 Session；`review_wait` 夹带其他调用会 partial。
+- 当前 wait 还是**有界等待**，尚未把 SkillLibrary/HomeFence 的锁状态映射成 `resource-busy`；真正的“等待锁释放”仍依赖现有写工具自身阻塞 + CAS。该差距保留在台账，不把 bounded sleep 当完整锁协议。
+- `waitCount` 已写入 `ReviewExecutionResult`、event 与 activity v3；UI 展示仍未完成。
+- PTC channel 仍因平台 detached review child 能力未实现而阻塞。
