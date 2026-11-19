@@ -424,3 +424,9 @@ interface EvolutionReviewActivityRecordV3 {
 
 - PTC detached-child 原型验证：用公开 `Session.create` 建一个真实但未注册的 review child Session，并把父 agent 的 session 代理成 child，PTC `run_code` 的 `tool/ptc-dispatch*` 只写入 child；实测父 Session seq 保持 0、child seq 增长。该原型证明无需伪造 session，也无需 `SubagentActivation`（不会进 parent catalog）。
 - 仍缺：把该原型产品化到 adapter 的 review-child port、在 child 上提供 review 工具集（含 review_done/review_wait）、从 `RunCodeOutput.result` 取 ReviewReport；当前未把它接到真实 AUX，避免半成品。
+
+
+### Round 9（2026-11-20）
+
+- adapter 新增 `createReviewChildAgent`（`@deepseek-ai/dsh-evolution-adapter/review-child`）：用真实 `Session.create` 建 detached child，Proxy 只替换 `agent.session`，其余属性和方法保持父 agent 绑定；附单测验证父 Session seq 不变、child 为独立 Session。
+- 该 helper 是 PTC child 的产品化基础；尚未接到 PTC channel。
