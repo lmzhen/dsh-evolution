@@ -413,3 +413,8 @@ interface EvolutionReviewActivityRecordV3 {
 
 - 完成语义补齐 `maxToolCalls`（默认 50）：达到上限且尚未 review_done 时返回 `partial`，原因写入 event/activity；新增 runner 单测。
 - 当前仍有 `maxRounds` / `deadline` / `maxToolCalls` 三条预算；都不允许把截断标 completed。
+
+
+### Round 7（2026-11-20）
+
+- `ReviewWriteLocks` 增加 `dispose()`：插件 unload 时清空 holder 并唤醒等待者；cleanup 调用它，避免 HMR/卸载后 waiter 永久悬挂。新增 dispose 测试。
