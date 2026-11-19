@@ -400,3 +400,10 @@ interface EvolutionReviewActivityRecordV3 {
 - 当前 wait 还是**有界等待**，尚未把 SkillLibrary/HomeFence 的锁状态映射成 `resource-busy`；真正的“等待锁释放”仍依赖现有写工具自身阻塞 + CAS。该差距保留在台账，不把 bounded sleep 当完整锁协议。
 - `waitCount` 已写入 `ReviewExecutionResult`、event 与 activity v3；UI 展示仍未完成。
 - PTC channel 仍因平台 detached review child 能力未实现而阻塞。
+
+
+### Round 5（2026-11-20）
+
+- 新增 `ReviewWriteLocks`：按 `skill:<name>` / `memory:<target>` 做进程内可恢复锁；review 之间同资源冲突时，runner 不再执行后一个写调用，而是返回 `resource-busy` 工具结果；`review_wait` 可等待 holder 释放。锁只在 review task 的写调用期间持有，最终正确性仍由 SkillLibrary 锁 + CAS 兜底。
+- 该锁是进程内、只覆盖 review task，不覆盖前台写或其他进程；这是 §8 已确认的范围。
+- 新增 `review-write-locks.spec.ts`（释放唤醒、超时）与 runner busy 分支代码；当前仍未做同资源真实双 task 的宿主验收。
