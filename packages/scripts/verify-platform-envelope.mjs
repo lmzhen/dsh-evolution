@@ -14,7 +14,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
+import { parsePlatformLine, readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const args = process.argv.slice(2)
@@ -35,7 +35,7 @@ if (!existsSync(manifestDir)) {
 const linePath = valueOf('--line')
 const line = linePath === undefined
   ? readPlatformLine(resolvePlatformLineRoot(import.meta.url))
-  : JSON.parse(readFileSync(resolve(linePath), 'utf8'))
+  : parsePlatformLine(readFileSync(resolve(linePath), 'utf8'), resolve(linePath))
 const scope = valueOf('--our-scope') ?? '@lmzhen'
 const platformPrefix = '@deepseek-ai/dsh-'
 

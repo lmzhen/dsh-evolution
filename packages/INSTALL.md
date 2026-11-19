@@ -25,7 +25,7 @@ The historical bundles share infrastructure rows; mounting two double-registers 
 
 ## Validation status
 
-Validated cohort: **DSH 0.2.2-rc.3 / 0.2.2-rc.5** (exact union; rc.4 is not admitted until separately verified; 0.2.1 lines use 0.55.x).
+Validated cohort: **DSH 0.2.2-rc.1 through 0.2.2-rc.5** (exact union; the 0.2.2 final is not admitted until separately verified; 0.2.1 lines use 0.55.x).
 
 | Surface | Status | Basis |
 |---|---|---|

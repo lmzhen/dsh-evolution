@@ -79,7 +79,7 @@ Build, test, gates and layout rules are in [docs/developer/development.md](../do
 
 The family uses one naming rule for the services it provides: **every key is prefixed `evolution`**. The two registered exceptions are `memory` and `skillUsage`. Service keys: `evolutionPlatform`, `evolutionState`, `evolutionStateStorage`, `evolutionPolicy`, `evolutionIo`, `evolutionCurator`, `evolutionFeedback`, `evolutionReplay`, `evolutionApproval`, `evolutionMerge`, `evolutionMemoryBudget`, `evolutionProjections`, `evolutionLlm`.
 
-**Validated platform line: DSH `0.2.2-rc.5`.** Published `@deepseek-ai/dsh-*` ranges declare the exact cohort union `0.2.2-rc.3 || 0.2.2-rc.5`; prerelease ranges do not cross platform lines.
+**Validated platform line: DSH `0.2.2-rc.5`.** Published `@deepseek-ai/dsh-*` ranges declare the exact cohort union `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`; prerelease ranges do not cross platform lines.
 
 The 60-char catalog cap is applied only to the generated preset row: the composer injects the cap onto that preset row, which no profile patch can reach. No bundle patch overrides a platform row, so a profile-root `tool-skill` keeps the platform default; the one-click/layered preset is the supported path for the cap.
 

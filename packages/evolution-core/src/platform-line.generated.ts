@@ -3,14 +3,17 @@
 /** The frozen platform line this release targets (peers/engines/anchors derived from version+floor). */
 export const PLATFORM_LINE = {
   version: '0.2.2-rc.5',
-  floor: '0.2.2-rc.3',
+  floor: '0.2.2-rc.1',
   cohort: [
+    '0.2.2-rc.1',
+    '0.2.2-rc.2',
     '0.2.2-rc.3',
+    '0.2.2-rc.4',
     '0.2.2-rc.5',
   ],
   contract: 1,
   previousAnchor: '0.2.1-rc.2',
-  peersRange: '0.2.2-rc.3 || 0.2.2-rc.5',
-  enginesRange: '0.2.2-rc.3 || 0.2.2-rc.5',
+  peersRange: '0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5',
+  enginesRange: '0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5',
   upstreamRef: 'dsh-v0.2.2-rc.5',
 } as const

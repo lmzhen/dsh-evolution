@@ -4,7 +4,7 @@
 
 ## 先决条件
 
-- DeepSeek Harness 官方 **0.2.2-rc.5**（npm `next` 线；`latest` 尚未提升）。0.58.0 支持精确 cohort：`0.2.2-rc.3` 与 `0.2.2-rc.5`；`0.2.2-rc.4` 和 `0.2.2` 正式版验证前不声明。0.2.1 旧平台请继续用 0.55.x。
+- DeepSeek Harness 官方 **0.2.2-rc.5**（npm `next` 线；`latest` 尚未提升）。0.58.0 支持精确 cohort：`0.2.2-rc.1` 到 `0.2.2-rc.5`；`0.2.2` 正式版验证前不声明。0.2.1 旧平台请继续用 0.55.x。
 - Node.js `^22.19.0` 或 `>=24.0.0`。
 - 可用的 `pnpm`：`dsh plugin` 会把 add/remove 转发给 pnpm。
 - 一个能正常启动的 `dsh` profile。桌面 GUI 使用 `desktop`，Web/headless 通常使用 `web`。

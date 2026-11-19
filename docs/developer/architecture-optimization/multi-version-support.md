@@ -25,7 +25,7 @@
 
 - 发布包：重构前 20 个；P0 拆出 `evolution-platform-contract` 与 `evolution-adapter` 后 22 个（`packages/evolution-*`、`memory`、`tool-skill-manage`）；源码包 23 个（含一个退休 preset 目录）。
 - 版本事实源：`platform-line.json`（保留文件名，内部已升级为 envelope 语义），当前 `version=0.2.2-rc.5`、`floor=0.2.2-rc.3`、`cohort=[0.2.2-rc.3, 0.2.2-rc.5]`。
-- 生成结果：每个发布 manifest 的 `@deepseek-ai/dsh-*` peers 与 `engines.dsh` 都等于同一精确并集 `0.2.2-rc.3 || 0.2.2-rc.5`；`all` bundle 只带 engines，row 包同时带 peers/engines。
+- 生成结果：每个发布 manifest 的 `@deepseek-ai/dsh-*` peers 与 `engines.dsh` 都等于同一精确并集 `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`；`all` bundle 只带 engines，row 包同时带 peers/engines。
 - 平台耦合：`evolution-core` 直接 import 14 个平台包；其余 16 个包只 import Cordis/Schemastery 与家族服务。`ctx.get()` 的家族服务访问遍布各包，但平台包导入集中在 core。
 - bundle：`all`/`host`/`preset` 三份 patch 除家族 row 外，只剩一个平台 `tool-skill` 覆盖（60 字符 catalog cap）。
 - 验证：`verify-platform-matrix.mjs` 已存在但未进 gate；release evidence 是单平台线；`platform-line.generated.ts` 只导出常量，未被业务使用。
@@ -196,7 +196,7 @@ export interface EvolutionPlatform {
 
 生成器负责：
 
-- 每个发布 manifest 的 `@deepseek-ai/dsh-*` peers 与 `engines.dsh` 使用**同一精确并集**；当前即 `0.2.2-rc.3 || 0.2.2-rc.5`（不写成 `^0.2.2-rc.3`，避免把 rc.4/rc.6/0.2.2 终版悄悄放进来）。
+- 每个发布 manifest 的 `@deepseek-ai/dsh-*` peers 与 `engines.dsh` 使用**同一精确并集**；当前即 `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`（不写成 `^0.2.2-rc.1`，避免把 rc.6/0.2.2 终版悄悄放进来）。
 - `all` bundle 只带 `engines.dsh`；row 包同时带 peers/engines，但仍由同一 cohort 生成。
 - `platform-contract.generated.ts`：contract、cohort、能力名。
 - CI 矩阵轴、release evidence、README 兼容表。
@@ -269,12 +269,12 @@ export interface EvolutionPlatform {
 ### P1：包络 + cohort spike
 
 - `platform-line.json` 增加 cohort（DCR-2，保留文件名）；生成器写 peers/engines 同一精确并集；
-- cohort 当前为 `rc.3 / rc.5`；rc.4 未逐版本验证前不写入；
+- cohort 当前为 `rc.1 / rc.2 / rc.3 / rc.4 / rc.5`；五个版本均实测启动 + row 存活；
 - 修矩阵假阳性，rc.3 编译 + 启动；
 - adapter 只补真实差异，不加 feature 层版本分支；
 - 移除 `tool-skill` 平台覆盖。
 
-**P1 状态（2026-11-19）**：envelope schema/生成器/门禁已落地，22 个 staged manifest 的 52 条平台范围与 engines 全部等于 `0.2.2-rc.3 || 0.2.2-rc.5`；矩阵双行 **rc.3 / rc.5 均 0 error**（rc.5 从安装态 pnpm store 读单一声明树，rc.3 从干净源码树读）；用 cohort dist 干净安装到 rc.3 profile（未手改 manifest）后启动 200、doctor `platform-services: ok`；rc.5 同样干净安装并启动。新增 `verify-cohort-smoke.mjs` 通过平台 `pluginInventory/list` 校验：两个 cohort 成员都是家族 row **29/29 active**，唯一 disabled row 是设计上默认关闭的 `evolution-skill-health`。rc.4 未验证，故未加入 cohort。
+**P1 状态（2026-11-19）**：envelope schema/生成器/门禁已落地，22 个 staged manifest 的 54 条平台范围与 engines 全部等于 `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`；rc.1/rc.2/rc.4/rc.5 各自作为目标声明树、rc.3 作对照编译，**均 0 error**；五个版本都启动了 web host，`verify-cohort-smoke.mjs` 读平台 `pluginInventory/list` 均为家族 row **29/29 active**，唯一 disabled row 是设计上默认关闭的 `evolution-skill-health`。cohort 因此从 rc.3/rc.5 扩为 rc.1–rc.5；0.2.2 正式版未发布，不写入。
 
 **验收**：矩阵每个 cohort 0 error；干净 profile 启动；所有家族 row active；doctor 报 cohort/能力；无平台 row 覆盖。
 
@@ -362,7 +362,7 @@ export interface EvolutionPlatform {
 
 1. `evolution-platform-contract` 是否独立 npm 包，还是 `evolution-core` 的纯子路径？当前已按独立包落地（22 个发布包），后续只在有明确收益时再评估合并。
 2. 60 字符 catalog cap 的最终归属：家族 catalog 配置、可选 profile override，还是接受平台默认？需要产品/体验确认。
-3. cohort 当前为 rc.3 / rc.5；rc.4 未单独安装/启动验证，不写入 cohort。是否值得为 rc.4 单独跑一轮，取决于它是否在真实用户分布中出现。
+3. cohort 当前为 rc.1 / rc.2 / rc.3 / rc.4 / rc.5；五个 0.2.2 预发布均实测启动 + row 存活。0.2.2 正式版未发布，不写入。
 4. 是否把 Cordis/Schemastery 也纳入 contract 包装？当前倾向保留直接 import（框架 seam，不随 DSH 版本面变化）。
 5. 旧线采用 dist-tag 还是并行 major？按 npm 发布成本与用户升级路径定。
 6. **P1 前置发现（2026-11-19，已收敛 detector 假阳性）**：rc.3 平台树里仍然带着旧 family 包副本；原矩阵把它们当成平台声明，与 mirror 的 family source 形成两套类型身份，才报 4 个 `TS2717`（`evolutionApproval` / `skillUsage` / `evolutionState` / `evolutionStateStorage`）。`verify-platform-matrix.mjs` 现在先按 `packages/*/package.json` 的名字剔除本地 family 包，再做单一声明树编译；rc.3 编译已 **0 error**。rc.5 的干净源码树没有构建后的 `lib/types`，暂用当前 `verify-family-types` 覆盖 rc.5，等 rc.5 树可构建后再补同一矩阵行。
