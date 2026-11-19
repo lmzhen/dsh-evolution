@@ -2,25 +2,13 @@
   "extends": "../tsconfig.pkg.json",
   "references": [
     {
+      "path": "../evolution-adapter"
+    },
+    {
+      "path": "../evolution-contract"
+    },
+    {
       "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../../session/session-projection"
-    },
-    {
-      "path": "../../subagent/subagent"
-    },
-    {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
-      "path": "../../skill/skill"
     }
   ]
 }

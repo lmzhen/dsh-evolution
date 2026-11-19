@@ -1,6 +1,6 @@
 # 架构：36 个包如何叠起来
 
-> 2026-11-16：这里的“36 个包”是历史包组/逻辑行口径（含子路径与发布行）；当前 `packages/*` 物理源码包是 21 个。目标架构与包边界调整见 [架构优化执行入口](architecture-optimization/README.md)。Phase 7 完成后本页统一为物理包口径。
+> 2026-11-16：这里的“36 个包”是历史包组/逻辑行口径（含子路径与发布行）；当前 `packages/*` 物理源码包是 23 个（22 个发布包 + 一个退休的 preset 目录）。目标架构与包边界调整见 [架构优化执行入口](architecture-optimization/README.md)。Phase 7 完成后本页统一为物理包口径。
 
 ## 1. 一张图
 
@@ -28,7 +28,7 @@ $DSH_HOME 文件（memories / skills / evolution / merge）
 
 | 组 | 包 | 职责 |
 |---|---|---|
-| 基础 | contract/core/io/io-node/state-storage/state-json/state-domain/state/policy/threat/approval | 类型、IO、状态、事务、策略、威胁、技能/记忆底座与可暂存写审批 |
+| 基础 | contract/adapter/core/io/io-node/state-storage/state-json/state-domain/state/policy/threat/approval | 类型、宿主适配、IO、状态、事务、策略、威胁、技能/记忆底座与可暂存写审批 |
 | 合并 | merge/merge-engine | 合并域 + 引擎 |
 | 审查自动化 | review/maintenance/curator/learning-graph/activity/feedback/replay | 审查、维护、整理、图、账本、反馈、回放 |
 | 技能生态 | skill-catalog/skill-discovery/skill-health/skill-usage/tool-skill-manage | 目录、检索/域卡、健康、用量、写入工具 |

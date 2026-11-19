@@ -14,7 +14,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
-import { profileContextPort } from '../platform/profileContext.ts'
+import { profileContextPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 
 /** One family package as found in the profile. */
 export interface FamilyComponent {

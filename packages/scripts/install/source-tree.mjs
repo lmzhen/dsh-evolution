@@ -7,7 +7,7 @@
  * The installer used to answer them in three different branches; W11 C2 moves them here.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { familyVersion as familyVersionOf } from '../lib-family-version.mjs'
@@ -67,6 +67,18 @@ export function prepareDistSourceRoot(distDir) {
       const detail = error !== null && typeof error === 'object' && error.stderr !== undefined && error.stderr !== null ? String(error.stderr) : (error instanceof Error ? error.message : String(error))
       throw new Error('install-layered: cannot unpack ' + file + ' from --from-dist (' + detail.trim().slice(0, 240) + ')')
     }
+  }
+  // The packed composer is imported from the extracted core before the profile install exists.
+  // Family packages now have cross-package runtime dependencies (core -> adapter -> contract),
+  // so the extracted tree needs a resolvable family namespace just like a checkout's node_modules.
+  // These links are temporary, live beside the extraction, and are removed with it.
+  const familyScope = join(root, 'node_modules', distScope)
+  mkdirSync(familyScope, { recursive: true })
+  for (const name of Object.keys(manifest)) {
+    const bare = name.startsWith('@') ? (name.split('/')[1] ?? '') : name
+    const link = join(familyScope, bare)
+    if (existsSync(link)) continue
+    symlinkSync(join(root, bare), link, process.platform === 'win32' ? 'junction' : 'dir')
   }
   // The evidence describes the PACKED tree (a dev build packs RELEASE_VERSION=0.0.0-main while the
   // source checkout stays 0.46.0), so it is compared with the extracted tile — not with the source

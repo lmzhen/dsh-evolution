@@ -1,7 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
-import { modelRoute } from '../src/platform/llm.ts'
+import { modelRoute } from '@deepseek-ai/dsh-evolution-adapter'
 
 /**
  * `sessionProjections.snapshot()` hands out the projection's VIEW. For modelSelection that view is

@@ -1,0 +1,41 @@
+{
+  "extends": "../tsconfig.pkg.json",
+  "references": [
+    {
+      "path": "../evolution-contract"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../interaction/commands"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../skill/skill"
+    },
+    {
+      "path": "../../storage/storage-domain"
+    },
+    {
+      "path": "../../subagent/subagent"
+    },
+    {
+      "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../core/tools"
+    }
+  ]
+}

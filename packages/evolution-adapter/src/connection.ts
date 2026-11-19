@@ -7,7 +7,7 @@
  * the deployment fact, while registration fails loud at the call site.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { err, ok, type FamilyError, type Result } from '../result.ts'
+import { err, ok, type FamilyError, type Result } from '@deepseek-ai/dsh-evolution-contract/result'
 
 export interface ConnectionRoute {
   readonly path: string

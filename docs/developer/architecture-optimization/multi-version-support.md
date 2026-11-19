@@ -23,7 +23,7 @@
 
 ## 1. 当前基线
 
-- 发布包：20 个（`packages/evolution-*`、`memory`、`tool-skill-manage`）；源码包 21 个。
+- 发布包：重构前 20 个；P0 拆出 `evolution-contract` 与 `evolution-adapter` 后 22 个（`packages/evolution-*`、`memory`、`tool-skill-manage`）；源码包 23 个（含一个退休 preset 目录）。
 - 版本事实源：`platform-line.json`，当前 `version=floor=0.2.2-rc.5`。
 - 生成结果：每个发布 manifest 的 `@deepseek-ai/dsh-*` peers = `^0.2.2-rc.5`，`engines.dsh` = `>=0.2.2-rc.5 <0.2.3-0`；`all` bundle 只带 engines，row 包同时带 peers/engines。
 - 平台耦合：`evolution-core` 直接 import 14 个平台包；其余 16 个包只 import Cordis/Schemastery 与家族服务。`ctx.get()` 的家族服务访问遍布各包，但平台包导入集中在 core。
@@ -256,6 +256,8 @@ export interface EvolutionPlatform {
 ## 6. 迁移路线
 
 ### P0：边界，不改行为
+
+**P0a 状态（2026-11-19）**：完成。`evolution-contract`（能力/Result，无宿主 runtime import）与 `evolution-adapter`（`ports` / `values` / `service` 三个入口）已落地；core 的 17 个平台 port 文件迁入 adapter，core 只保留 `src/platform/index.ts` 兼容 re-export；core 全包不再直接 import `@deepseek-ai/dsh-*`。`verify-family-types` 0 错，104 项定向测试绿，rc.5 真实 web 启动 200、45 技能、doctor `platform-services: ok`。安装器 `--from-dist` 增加 family namespace 链接（core → adapter → contract），否则 packed composer 无法解析跨包依赖。P0b/P0c 仍待做。
 
 - 按 §3.2 的 P0a/P0b/P0c 分三次落地：先 contract/adapter + 兼容桶，再逐包切 import，最后独立 row；
 - 把 `evolution-core/src/platform/*`、`runtime/platform.ts` 迁入 adapter；

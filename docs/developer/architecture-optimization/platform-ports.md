@@ -2,10 +2,12 @@
 
 > 目标：所有平台服务只经 `evolution-platform` 的 `PlatformPorts` 进入功能层；功能层不再出现 `ctx.get('平台服务')`、结构断言、版本分支。
 > 本文是 26 §5.1 的执行清单；Phase 1 按此表逐项收编。
+>
+> **P0a（2026-11-19）**：端口实现已迁到 `packages/evolution-adapter/src/`（`ports.ts` / `values.ts` / `service.ts`）；`packages/evolution-core/src/platform/` 只保留兼容 re-export。全仓平台 runtime import 现已集中在 `evolution-adapter`，core 不再直接 import `@deepseek-ai/dsh-*`。下文的 `evolution-core/src/...` 路径是迁移前历史，目标状态见 [multi-version-support.md](multi-version-support.md) §3.2。
 
 ## 1. 当前端口覆盖（2026-11-16 Phase 1 第一切片后）
 
-`packages/evolution-core/src/runtime/platform.ts` 现在每次读取都重新解析（不缓存 undefined）：
+`packages/evolution-adapter/src/service.ts` 现在每次读取都重新解析（不缓存 undefined）：
 
 | 端口 | 平台服务 | 状态 |
 |---|---|---|

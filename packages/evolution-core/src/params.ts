@@ -14,7 +14,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { settingsPort } from './platform/settings.ts'
+import { settingsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 
 /** Deprecated alias (plugin-row name) -> canonical id (policy/snapshot name).
  * Retained for the one-time legacy-document migration and the doctor's old-key report;

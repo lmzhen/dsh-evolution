@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
-import { projectionPort, type EvolutionProjectionDefinition } from '../src/platform/projections.ts'
+import { projectionPort, type EvolutionProjectionDefinition } from '@deepseek-ai/dsh-evolution-adapter'
 
 const definition: EvolutionProjectionDefinition<'unit', { n: number }> = {
   key: 'unit',
