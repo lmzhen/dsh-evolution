@@ -544,3 +544,10 @@ interface EvolutionReviewActivityRecordV3 {
 - 发现并修复真实宿主上的关键缺口：aux LLM 请求带了父 session 的 `toolHistory`，平台 `projectToolUpdates` 会按历史声明重建 tools，导致合成 `review_done` 不在模型工具表中（模型明确报告“工具集中没有 review_done”，两轮 review 均为 partial）。修复：aux 请求不再传 `toolHistory`，显式工具表原样发出；新增单测断言 aux 请求 tools 含 `review_done`。
 - 真实宿主 UI 截图（截图路径 `D:/dsh/_e2e-ui-review.png`）显示 completed memory/skill 与旧 partial（missing review_done）并存，证明兼容与可观测性。
 - 仍未做：PTC 真机会话（本次 UI 里误在标准模式发了第三轮，未切到 PTC）；AUX 并行/同 skill 冲突/计数复位/父 seq 的逐项真机断言；最终 pre-tag/CI。
+
+
+### Round 25（2026-11-20，真实宿主 PTC 验收）
+
+- 真实 native 验收完成：隔离 home + rc.5 host + dev5 家族，普通会话触发 memory/skill 两个独立 task，均 `completed`；`memories/MEMORY.md` 实际写入；activity v3 有 requests/toolCalls/report/kind/status；UI 数据总览显示“已完成 记忆/技能”，旧 partial 与 `missing review_done` 原因并存。
+- 真实 PTC 验收未通过：UI 切到 PTC 模式后触发 AUX，`run_code` 调用返回 `unknown tool "run_code"`，review 只能 partial(missing review_done)。尝试过：detached Session.create（错误 `session is not live in this store`）→ 改为 live SessionStore child；随后过滤 toolSet（Map 迭代）仍未解决。
+- 结论：PTC 真实宿主仍是发布阻断项；native/default 路径已真机通过。下一步需从 PTC 模式下 child agent 的 scope/toolSet/run_code registration 入手，而不是继续堆 fake 测试。
