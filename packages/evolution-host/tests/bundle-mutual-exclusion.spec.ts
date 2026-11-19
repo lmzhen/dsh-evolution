@@ -13,10 +13,9 @@ import { cordisRows, rowId, type CordisRow } from '../../test-support/cordis-row
 // mutual exclusion: every row id present in BOTH bundles must carry a
 // byte-identical (id/name/config/disabled) definition, and the preset bundle
 // keeps the model-facing rows the host must never grow (their distinguishing
-// identities). V10-14 (P1-2): the `tool-skill` 60-char catalog cap override
-// became a SHARED row (identical in both patches), so the host row set is a
-// subset of the preset's — distinctness is pinned via the model tools, not via
-// a host-only row.
+// identities). The 60-char catalog cap is now applied only by the family preset
+// composer; no bundle patch overrides a platform row, so distinctness is pinned
+// via the model tools, not via a host-only row.
 // V10-14→0.3.54 (route B): `dsh-evolution-all` joins the matrix as the FULL
 // bundle — infra ∪ the three model rows. The guards below pin all.patch's row
 // bodies to host.patch (infra) and preset.patch (model rows), and the
@@ -81,9 +80,8 @@ describe('host/preset dual-bundle mutual exclusion (S7.2, E-33)', () => {
     for (const tool of ['tool-memory', 'tool-skill-manage']) {
       expect(presetOnly).toContain(tool)
     }
-    // V10-14 (P1-2): the tool-skill cap override is now carried by BOTH
-    // bundles, so the host plane is a strict subset of the preset's — pin that
-    // subset relationship instead of a host-only row.
+    // No platform row override survives in either bundle, so the host plane is
+    // a strict subset of the preset's — pin that subset relationship.
     expect(hostPatch.size).toBeGreaterThan(0)
     for (const id of hostPatch.keys()) expect(presetPatch.has(id)).toBe(true)
   })
@@ -116,10 +114,8 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
       loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-all/cordis.patch.yml', import.meta.url))),
     ]))
     const ids = merged.map(rowId).filter(id => id !== '')
-    // INSERT rows only: the root-level `tool-skill` config override patches an
-    // existing base row and is not duplicated — composition checks must not
-    // count it as a double mount.
-    const infraInsertIds = [...hostPatch.keys()].filter(id => id !== 'tool-skill')
+    // INSERT rows only; there is no root-level platform-row patch to exclude.
+    const infraInsertIds = [...hostPatch.keys()]
     for (const id of infraInsertIds) {
       expect(ids.filter(match => match === id), `infra row ${id} must mount TWICE`).toHaveLength(2)
     }
@@ -133,7 +129,7 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
       loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-all/cordis.patch.yml', import.meta.url))),
     ]))
     const ids = merged.map(rowId).filter(id => id !== '')
-    const infraInsertIds = [...hostPatch.keys()].filter(id => id !== 'tool-skill')
+    const infraInsertIds = [...hostPatch.keys()]
     for (const id of infraInsertIds) {
       expect(ids.filter(match => match === id), `infra row ${id} must mount TWICE`).toHaveLength(2)
     }

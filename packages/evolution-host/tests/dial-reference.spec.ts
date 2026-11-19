@@ -14,7 +14,7 @@ const dialFields: Array<[string, string]> = [
   ['curatorIntervalHours', '../../evolution-curator/src/index.ts'],
   ['minIdleHours', '../../evolution-curator/src/index.ts'],
   ['threatExemptLabels', '../../evolution-core/src/skill-store.ts'],
-  ['catalogDescriptionMaxLength', '../../evolution-host/cordis.patch.yml'],
+  ['catalogDescriptionMaxLength', '../../evolution-core/src/constants.ts'],
 ]
 
 describe('configuration dial reference (T-WC2, 0.3.56)', () => {

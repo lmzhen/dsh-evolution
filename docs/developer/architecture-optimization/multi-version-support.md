@@ -286,6 +286,8 @@ export interface EvolutionPlatform {
 - README/INSTALL 写 cohort 表与旧线指引；
 - 旧平台线冻结为 legacy 版本/ dist-tag，不再改 current。
 
+**P2 状态（2026-11-19，部分）**：`tool-skill` 平台 row 覆盖已从 all/host/preset 三个 patch 的 `tail` 删除；bundle patch 现在只有家族 row，符合“无平台 row 覆盖”。60 字符 cap 不再由 profile patch 提供，只由家族 preset composer 注入到生成的 preset 行；profile-root/headless 的 `tool-skill` 回到平台默认（web 根会话本就不启动该 row）。同批更新 bundle 测试、dial-reference 与 README。
+
 **验收**：npm 20/20 latest；真实 npm web 升级；release evidence 带 cohort；旧线文档可照做。
 
 ### P3（可选）：上游能力

@@ -30,13 +30,13 @@
 #     row (`name: '@deepseek-ai/dsh-evolution-maintenance/tools'`) itself. The
 #     package.json dependency on `dsh-evolution-maintenance` exists so that
 #     added row resolves without also editing dependencies. The standalone file
-#   - the `tool-skill` 60-char catalog cap override is carried by the one-click
-#     patch (V10-14) and by the host bundle as the identical root-level row;
-#     this STANDALONE file does not list it — a manual compose wanting the cap
-#     adds the override itself, and preset-scope sessions need the
-#     install-layered injection (V10-14) regardless. `host` and the preset are
-#     ALTERNATIVE install targets: never install both (either form), or shared
-#     rows would mount twice (E-33).
+#   - the 60-char catalog cap is applied only by the family preset composer
+#     (`injectCatalogDescriptionCap`, V10-14). No bundle patch overrides a
+#     platform row: `tool-skill` belongs to the platform, and a profile patch
+#     must not re-declare its config. A manual compose that wants the cap adds
+#     the override itself; preset-scope sessions get it from the composer.
+#     `host` and the preset are ALTERNATIVE install targets: never install both
+#     (either form), or shared rows would mount twice (E-33).
 #   - `evolution-capability` was retired in 0.3.66 (source removed): approval
 #     that does not gate execution is only a log, and the dynamic-package
 #     lifecycle belongs to the platform Creator mode.

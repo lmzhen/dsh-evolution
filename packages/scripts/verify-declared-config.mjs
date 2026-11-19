@@ -3,15 +3,14 @@
  * G3.1 declared-config reach guard: every config key the family DECLARES must
  * have a plane that actually reads it.
  *
- * Root cause this closes (v27 T-1): the bundles declare
+ * Root cause this guard was built for (v27 T-1): the bundles used to declare
  * `tool-skill.catalogDescriptionMaxLength: 60` as a profile-root override, but
- * the platform's `web-app` bundle disables the profile-root `tool-skill` row
- * (`packages/bundle/web-app/cordis.patch.yml:405`) because presets own the
- * per-agent skill rows. A patch layer only overrides keys of a row that exists
- * AND is enabled in the plane below it, so "my patch file has the row" was
- * never evidence that the key takes effect — in the default web install the
- * override reached nothing and the session-visible catalog kept the platform
- * default (500).
+ * the platform's `web-app` bundle disables that row. A patch layer only
+ * overrides keys of a row that exists AND is enabled in the plane below it, so
+ * "my patch file has the row" was never evidence that the key took effect.
+ * The 60-char cap now lives only in the generated preset composer; no bundle
+ * patch overrides a platform row. The guard still checks every family row
+ * config key for a real plane that reads it.
  *
  * Three reach classes, all mechanical:
  *   - row-mounted:  the declaration sits on a row THIS bundle mounts
@@ -143,38 +142,18 @@ const UPSTREAM_PLANES = {
  * Overrides replace a row's `config` wholesale, so an unnamed key silently
  * falls back to its schema default.
  */
-const PLATFORM_ROW_CONFIG_KEYS = {
-  'tool-skill': ['catalogDescriptionMaxLength'],
-}
+const PLATFORM_ROW_CONFIG_KEYS = {}
 
 /** Platform sources carrying each row's `Config` interface: the row's own
- * module. */
-const PLATFORM_ROW_CONFIG_SOURCES = {
-  'tool-skill': ['packages/skill/tool-skill/src/index.ts'],
-}
+ * module. Empty because no bundle patch overrides a platform row. */
+const PLATFORM_ROW_CONFIG_SOURCES = {}
 
 /**
- * Declarations whose only reach is the preset composer, because the profile
- * root of at least one target profile disables their row. Every `anchors` entry
- * must still contain its needle, so the reach cannot be claimed without the
- * code that provides it.
+ * Declarations whose only reach is the preset composer. Empty because the
+ * family no longer declares platform-row config in a bundle patch; the 60-char
+ * cap lives only in the generated preset (evolution-core/row-overrides.json).
  */
-const COMPOSER_REACHED = [
-  {
-    row: 'tool-skill',
-    key: 'catalogDescriptionMaxLength',
-    reach: 'the preset composer injects this key onto the `- id: tool-skill` row of the preset it composes — that row is the session-visible instance under the web plane',
-    anchors: [
-      // 0.3.77 (G1): ONE table, two generation paths — the composer
-      // (evolution-core/src/preset-composition.ts) and the source installer
-      // (scripts/install-layered.mjs) both read this file, so it is the anchor
-      // that proves the reach. The former per-file needles are gone with the
-      // copies they used to pin.
-      { file: 'evolution-core/row-overrides.json', needle: 'catalogDescriptionMaxLength: 60' },
-    ],
-    limits: 'a session running a preset the evolution composer did NOT generate (a platform preset, or one anchored before the composer ran) keeps the platform default until the preset is recomposed or the upstream default changes (F12)',
-  },
-]
+const COMPOSER_REACHED = []
 
 /**
  * Parse a patch layer into its items: `{ id, line, name, disabled, configKeys }`.

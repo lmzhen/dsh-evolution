@@ -81,7 +81,7 @@ The family uses one naming rule for the services it provides: **every key is pre
 
 **Validated platform line: DSH `0.2.2-rc.5`.** Published `@deepseek-ai/dsh-*` ranges declare the exact cohort union `0.2.2-rc.3 || 0.2.2-rc.5`; prerelease ranges do not cross platform lines.
 
-The 60-char catalog cap is applied to the generated preset row: the composer injects the cap onto that preset row, while a profile-root tool-skill row is a different row, which no profile patch can reach for this purpose.
+The 60-char catalog cap is applied only to the generated preset row: the composer injects the cap onto that preset row, which no profile patch can reach. No bundle patch overrides a platform row, so a profile-root `tool-skill` keeps the platform default; the one-click/layered preset is the supported path for the cap.
 
 The install-form semantics and the variant command-face difference are single-sourced in [INSTALL.md](INSTALL.md); this section cites that home instead of restating it. The root publish/install details are in the repository [INSTALL.md](../INSTALL.md).
 
