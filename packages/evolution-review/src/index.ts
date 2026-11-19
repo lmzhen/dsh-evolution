@@ -1193,6 +1193,7 @@ function snapshotReviewParent(agent: Agent): Agent {
     // this clear only covers locks still pending at unload.
     for (const controller of inFlightControllers) controller.abort()
     inFlightControllers = new Set<AbortController>()
+    reviewWriteLocks.dispose()
     sessionState.dispose()
   }, 'dsh-evolution-review.cleanup')
 }

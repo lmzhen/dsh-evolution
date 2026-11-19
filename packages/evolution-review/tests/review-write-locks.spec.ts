@@ -20,3 +20,12 @@ it('returns false when the wait times out', async () => {
   expect(await locks.wait('memory:user', 5, new AbortController().signal)).toBe(false)
   release!()
 })
+
+it('dispose releases holders and wakes waiters', async () => {
+  const locks = new ReviewWriteLocks()
+  locks.tryAcquire('skill:probe', 'owner-a')
+  const waiting = locks.wait('skill:probe', 5_000, new AbortController().signal)
+  locks.dispose()
+  await expect(waiting).resolves.toBe(true)
+  expect(locks.tryAcquire('skill:probe', 'owner-b')).toBeUndefined()
+})

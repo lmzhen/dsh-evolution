@@ -19,6 +19,7 @@ interface Holder {
 
 /** One process-local holder per resource plus its waiters. */
 export class ReviewWriteLocks {
+  private closed = false
   private readonly holders = new Map<string, Holder>()
   private readonly waiters = new Map<string, Set<() => void>>()
 
@@ -27,12 +28,20 @@ export class ReviewWriteLocks {
     return this.holders.get(resource)?.owner
   }
 
+  /** Drop all holders and wake waiters; used when the plugin fiber unloads. */
+  dispose(): void {
+    this.closed = true
+    this.holders.clear()
+    for (const waiting of this.waiters.values()) for (const wake of waiting) wake()
+    this.waiters.clear()
+  }
+
   /**
    * Try to become the holder.
    * @returns the release callback, or undefined when another owner holds it.
    */
   tryAcquire(resource: string, owner: string): (() => void) | undefined {
-    if (this.holders.has(resource)) return undefined
+    if (this.closed || this.holders.has(resource)) return undefined
     this.holders.set(resource, { owner })
     let released = false
     return () => {
@@ -51,6 +60,7 @@ export class ReviewWriteLocks {
    * @returns true when free, false on timeout/abort.
    */
   async wait(resource: string, timeoutMs: number, signal: AbortSignal): Promise<boolean> {
+    if (this.closed) return false
     if (!this.holders.has(resource)) return true
     if (signal.aborted) return false
     return await new Promise<boolean>((resolve) => {
