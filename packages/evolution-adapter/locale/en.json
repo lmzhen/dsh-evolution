@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Host platform adapter",
+    "description": "Connects family plugins to the host platform; the only package that imports host internals."
+  }
+}

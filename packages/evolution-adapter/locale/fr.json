@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Adaptateur de la plateforme hôte",
+    "description": "Relie les plugins de la famille à la plateforme hôte ; le seul paquet qui importe les entrailles de l’hôte."
+  }
+}

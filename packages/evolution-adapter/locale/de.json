@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Host-Plattform-Adapter",
+    "description": "Verbindet die Familien-Plugins mit der Host-Plattform; das einzige Paket, das Host-Interna importiert."
+  }
+}

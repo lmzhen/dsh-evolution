@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Plattformvertrag",
+    "description": "Reine Typen, Fähigkeitsnamen und Ports der Familien-Plugins; kein Host-Runtime-Import."
+  }
+}
