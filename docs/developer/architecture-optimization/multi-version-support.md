@@ -2,7 +2,7 @@
 
 > 状态：设计基准（2026-11-19），尚未实现。实现期间以本文为**唯一设计源**；任何架构/范围变更先写 DCR，再改代码。
 >
-> 适用基线：family `0.57.0`、DSH `0.2.2-rc.5`、22 个发布包（P0 拆包后）；下一发布窗口暂定 `0.58.0`。
+> 适用基线：family `0.58.0`、DSH `0.2.2-rc.5`、22 个发布包（P0 拆包后）；当前发布窗口 `0.58.0`。
 >
 > 关联执行入口：[architecture-optimization/README.md](./README.md)
 > 端口清单：[platform-ports.md](./platform-ports.md)

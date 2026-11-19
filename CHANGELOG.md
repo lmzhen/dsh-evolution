@@ -1,3 +1,11 @@
+## 0.58.0 (2026-11-20) — 多版本支持架构收口
+
+> **范围**：① 平台能力契约与单一适配包落地：新增 `@lmzhen/dsh-evolution-platform-contract` 与 `@lmzhen/dsh-evolution-adapter`，feature 只依赖契约，平台 runtime import 只出现在 adapter；② 发布包络收敛为用户指定的精确 `0.2.2-rc.5` 单成员 cohort，22 个发布 manifest 的 peers/engines 使用同一并集，不再声明未要求的额外版本；③ CI 每成员执行干净安装、启动、`pluginInventory/list` row 存活与 doctor，并产出 `source=ci` 的 cohort reading；④ release evidence 把 spike 绑定到被测家族树（`measuredCommit` + tag 树 diff），解决 tag 提交自指；⑤ bundle patch 只保留家族 row，不覆盖平台 row。
+>
+> **不迁移**：磁盘数据格式、配置字段和用户数据语义不变；平台线只声明 DSH `0.2.2-rc.5`。0.2.2 正式版未发布前不声明；0.2.1 继续使用 0.55.x legacy 线。
+>
+> **验证**：pre-tag gate **63 pass / 0 fail / 4 registered cannotDecide / 2 skipped**；main CI run `44555354419` 全绿（rc.5 单成员 cohort、host acceptance、cohort evidence）；独立复核最终 **P0/P1=0**。S1/S2/S3 在 rc.5 web host 的 0.58.0 候选上实测（skill-history 26 行、21,069 bytes、三次读 567/210/329 ms、诊断 82 ms、schema 2 / facts 7 / runtime 8），S4 HMR coordination/reconciliation 16 项通过。真实 npm web A→B 升级验收在发布后按 1440 / 1024 / 390 三档记录。
+
 ## 0.57.0 (2026-11-19) — 移除平台会话检索工具依赖
 
 > **范围**：① 从 `evolution-all`、`evolution-agent`、`evolution-preset` 删除对平台 `@deepseek-ai/dsh-tool-session-query` 的依赖和默认挂载；② 删除家族围绕它的 `sessionQuery` port、`/evolution doctor` 语料探针、`session-query-sqlite` 索引覆盖与 `DSH_EVOLUTION_SESSION_QUERY*` 环境变量；③ 同步删除相关测试、生成物、bundle 行、行清单与文档。平台能力归平台；家族不再重复分发。
