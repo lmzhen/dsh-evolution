@@ -322,7 +322,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 82 steps",
+          "text": "all 83 steps",
           "unique": true
         }
       ],
@@ -1051,8 +1051,8 @@
             {
               "mutate": {
                 "file": "CONTRIBUTING.md",
-                "find": "## The gate: all 82 steps",
-                "replace": "## The gate: all 81 steps"
+                "find": "## The gate: all 83 steps",
+                "replace": "## The gate: all 82 steps"
               },
               "expect": "red",
               "note": "a stale step count in a doc the table feeds: the meta-gate names the file and the number (its count-word check)",
