@@ -16,3 +16,7 @@ There is no direct command or panel. `evolution-replay` reads plan records, whil
 Persistence starts after an `evolutionIo` provider mounts. Appends are best effort: a write failure is logged after the upstream operation has already completed. Before an append replaces unreadable or foreign-version bytes, the writer attempts to preserve them in a `.corrupt` copy and refuses the append if that rescue fails.
 
 The concurrency guarantee comes from the selected IO backend. The shipped Node backend is single-process; see [evolution-io-node](../evolution-io-node/README.md).
+
+### Review schema v3
+
+Review records now carry `taskId`, `kind`, `status` (including `partial`), `requests`, `toolCalls`, `waitCount`, and `partialReason` in addition to the original action/usage fields. Readers still accept v2 bytes; writers always emit v3.

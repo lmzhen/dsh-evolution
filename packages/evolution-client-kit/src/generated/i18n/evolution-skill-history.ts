@@ -165,7 +165,17 @@ export const dictionaries = {
     "undo.reloaded": "已回退，但版本列表没读出来；刷新一下就能看到。",
     "stats.verdict.unreadable": "无法读取",
     "stats.emptyFilter": "没有匹配的技能",
-    "stats.filterHint": "调整筛选或搜索词再试。"
+    "stats.filterHint": "调整筛选或搜索词再试。",
+    "stats.reviews.title": "自动复查",
+    "stats.reviews.hint": "最近一次复查结果",
+    "stats.reviews.empty": "暂无复查记录",
+    "stats.review.kind.memory": "记忆",
+    "stats.review.kind.skill": "技能",
+    "stats.review.status.completed": "已完成",
+    "stats.review.status.partial": "部分完成",
+    "stats.review.status.failed": "失败",
+    "stats.review.status.timeout": "超时",
+    "stats.review.status.aborted": "已中止"
   },
   en: {
     "action.archive": "Archived",
@@ -328,7 +338,17 @@ export const dictionaries = {
     "undo.reloaded": "Reverted, but the version list didn’t load. Refresh to see it.",
     "stats.verdict.unreadable": "Unreadable",
     "stats.emptyFilter": "No matching skills",
-    "stats.filterHint": "Adjust the filter or search term and try again."
+    "stats.filterHint": "Adjust the filter or search term and try again.",
+    "stats.reviews.title": "Automatic reviews",
+    "stats.reviews.hint": "Latest review outcomes",
+    "stats.reviews.empty": "No reviews yet",
+    "stats.review.kind.memory": "Memory",
+    "stats.review.kind.skill": "Skills",
+    "stats.review.status.completed": "Completed",
+    "stats.review.status.partial": "Partial",
+    "stats.review.status.failed": "Failed",
+    "stats.review.status.timeout": "Timed out",
+    "stats.review.status.aborted": "Aborted"
   },
   ja: {
     "action.archive": "アーカイブ",
@@ -491,7 +511,17 @@ export const dictionaries = {
     "undo.reloaded": "元に戻しましたが、バージョン一覧を読み込めませんでした。更新すると表示されます。",
     "stats.verdict.unreadable": "読み取り不可",
     "stats.emptyFilter": "一致するスキルがありません",
-    "stats.filterHint": "絞り込みや検索語を変えてください。"
+    "stats.filterHint": "絞り込みや検索語を変えてください。",
+    "stats.reviews.title": "自動レビュー",
+    "stats.reviews.hint": "最新のレビュー結果",
+    "stats.reviews.empty": "レビュー履歴はありません",
+    "stats.review.kind.memory": "メモリ",
+    "stats.review.kind.skill": "スキル",
+    "stats.review.status.completed": "完了",
+    "stats.review.status.partial": "一部完了",
+    "stats.review.status.failed": "失敗",
+    "stats.review.status.timeout": "タイムアウト",
+    "stats.review.status.aborted": "中止"
   },
   es: {
     "action.archive": "archivado",
@@ -654,7 +684,17 @@ export const dictionaries = {
     "undo.reloaded": "Se revirtió, pero la lista de versiones no se cargó. Actualiza para verla.",
     "stats.verdict.unreadable": "Ilegible",
     "stats.emptyFilter": "Ningún skill coincide",
-    "stats.filterHint": "Ajusta el filtro o la búsqueda y vuelve a intentarlo."
+    "stats.filterHint": "Ajusta el filtro o la búsqueda y vuelve a intentarlo.",
+    "stats.reviews.title": "Revisiones automáticas",
+    "stats.reviews.hint": "Últimos resultados",
+    "stats.reviews.empty": "Aún no hay revisiones",
+    "stats.review.kind.memory": "Memoria",
+    "stats.review.kind.skill": "Habilidades",
+    "stats.review.status.completed": "Completada",
+    "stats.review.status.partial": "Parcial",
+    "stats.review.status.failed": "Fallida",
+    "stats.review.status.timeout": "Tiempo agotado",
+    "stats.review.status.aborted": "Cancelada"
   },
   fr: {
     "action.archive": "archivé",
@@ -817,7 +857,17 @@ export const dictionaries = {
     "undo.reloaded": "Annulé, mais la liste des versions ne s’est pas chargée. Actualisez pour la voir.",
     "stats.verdict.unreadable": "Illisible",
     "stats.emptyFilter": "Aucun skill ne correspond",
-    "stats.filterHint": "Modifiez le filtre ou la recherche, puis réessayez."
+    "stats.filterHint": "Modifiez le filtre ou la recherche, puis réessayez.",
+    "stats.reviews.title": "Revues automatiques",
+    "stats.reviews.hint": "Derniers résultats",
+    "stats.reviews.empty": "Aucune revue pour l’instant",
+    "stats.review.kind.memory": "Mémoire",
+    "stats.review.kind.skill": "Compétences",
+    "stats.review.status.completed": "Terminée",
+    "stats.review.status.partial": "Partielle",
+    "stats.review.status.failed": "Échouée",
+    "stats.review.status.timeout": "Expirée",
+    "stats.review.status.aborted": "Interrompue"
   },
   de: {
     "action.archive": "archiviert",
@@ -980,7 +1030,17 @@ export const dictionaries = {
     "undo.reloaded": "Rückgängig gemacht, aber die Versionsliste wurde nicht geladen. Aktualisiere, um sie zu sehen.",
     "stats.verdict.unreadable": "Nicht lesbar",
     "stats.emptyFilter": "Keine passenden Skills",
-    "stats.filterHint": "Ändere Filter oder Suchbegriff und versuche es erneut."
+    "stats.filterHint": "Ändere Filter oder Suchbegriff und versuche es erneut.",
+    "stats.reviews.title": "Automatische Prüfungen",
+    "stats.reviews.hint": "Letzte Ergebnisse",
+    "stats.reviews.empty": "Noch keine Prüfungen",
+    "stats.review.kind.memory": "Erinnerung",
+    "stats.review.kind.skill": "Fähigkeiten",
+    "stats.review.status.completed": "Abgeschlossen",
+    "stats.review.status.partial": "Teilweise",
+    "stats.review.status.failed": "Fehlgeschlagen",
+    "stats.review.status.timeout": "Zeitüberschreitung",
+    "stats.review.status.aborted": "Abgebrochen"
   },
   ru: {
     "action.archive": "заархивировано",
@@ -1143,7 +1203,17 @@ export const dictionaries = {
     "undo.reloaded": "Откат выполнен, но список версий не загрузился. Обновите страницу, чтобы увидеть его.",
     "stats.verdict.unreadable": "Нечитаемый",
     "stats.emptyFilter": "Подходящих навыков нет",
-    "stats.filterHint": "Измените фильтр или запрос и повторите."
+    "stats.filterHint": "Измените фильтр или запрос и повторите.",
+    "stats.reviews.title": "Автоматические проверки",
+    "stats.reviews.hint": "Последние результаты",
+    "stats.reviews.empty": "Пока нет проверок",
+    "stats.review.kind.memory": "Память",
+    "stats.review.kind.skill": "Навыки",
+    "stats.review.status.completed": "Завершено",
+    "stats.review.status.partial": "Частично",
+    "stats.review.status.failed": "Ошибка",
+    "stats.review.status.timeout": "Тайм-аут",
+    "stats.review.status.aborted": "Прервано"
   },
   pt: {
     "action.archive": "arquivamento",
@@ -1306,7 +1376,17 @@ export const dictionaries = {
     "undo.reloaded": "Revertido, mas a lista de versões não carregou. Atualize para vê-la.",
     "stats.verdict.unreadable": "Ilegível",
     "stats.emptyFilter": "Nenhuma skill corresponde",
-    "stats.filterHint": "Ajuste o filtro ou a busca e tente novamente."
+    "stats.filterHint": "Ajuste o filtro ou a busca e tente novamente.",
+    "stats.reviews.title": "Revisões automáticas",
+    "stats.reviews.hint": "Resultados recentes",
+    "stats.reviews.empty": "Ainda não há revisões",
+    "stats.review.kind.memory": "Memória",
+    "stats.review.kind.skill": "Habilidades",
+    "stats.review.status.completed": "Concluída",
+    "stats.review.status.partial": "Parcial",
+    "stats.review.status.failed": "Falhou",
+    "stats.review.status.timeout": "Tempo esgotado",
+    "stats.review.status.aborted": "Cancelada"
   },
 } as const
 

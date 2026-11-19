@@ -53,6 +53,8 @@ export interface RouteServices {
   readonly getGovernance?: () => Promise<unknown>
   /** Successful operation counts; absent or malformed stays null. */
   readonly getCounts?: () => Promise<unknown>
+  /** Recent automatic reviews; absent or malformed stays null. */
+  readonly getReviews?: () => Promise<unknown>
 }
 
 /**

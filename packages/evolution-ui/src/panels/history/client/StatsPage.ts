@@ -193,6 +193,31 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       }, sort.dir === 'asc' ? '↑' : '↓'))
     : null
 
+  const reviews = snapshot?.global.reviews ?? []
+  const reviewStatusKey = (status: string): string => status === 'completed'
+    ? 'stats.review.status.completed'
+    : status === 'partial'
+      ? 'stats.review.status.partial'
+      : status === 'timeout'
+        ? 'stats.review.status.timeout'
+        : status === 'aborted'
+          ? 'stats.review.status.aborted'
+          : 'stats.review.status.failed'
+  const reviewSection = snapshot === null
+    ? null
+    : createElement('section', { className: 'evo-stats-reviews', 'aria-label': face.t('stats.reviews.title') },
+      createElement('div', { className: 'evo-stats-reviews-head' },
+        createElement('h3', null, face.t('stats.reviews.title')),
+        createElement('span', null, face.t('stats.reviews.hint'))),
+      reviews.length === 0
+        ? createElement('p', { className: 'evo-stats-reviews-empty' }, face.t('stats.reviews.empty'))
+        : createElement('ul', { className: 'evo-stats-review-list' },
+          reviews.map(review => createElement('li', { key: review.reviewId, className: 'evo-stats-review' },
+            createElement('span', { className: 'evo-stats-pill ' + (review.status === 'completed' ? 'is-ok' : review.status === 'partial' ? 'is-warn' : 'is-muted') }, face.t(reviewStatusKey(review.status))),
+            createElement('span', { className: 'evo-stats-review-kind' }, face.t(review.kind === 'memory' ? 'stats.review.kind.memory' : 'stats.review.kind.skill')),
+            createElement('span', { className: 'evo-stats-review-time' }, lastAtText(new Date(review.finishedAt).toISOString())),
+            review.partialReason === undefined ? null : createElement('span', { className: 'evo-stats-review-reason' }, review.partialReason)))))
+
   return createElement('div', { className: 'evo-stats-page' },
     createElement('header', { className: 'evo-stats-hero' },
       createElement('div', null,
@@ -206,6 +231,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       createElement('div', { className: 'evo-stats-stat' }, createElement('span', null, face.t('stats.total.bodyTokens')), createElement('b', null, totals === undefined ? '—' : numberText(totals.bodyTokens))),
       createElement('div', { className: 'evo-stats-stat is-ok' }, createElement('span', null, face.t('stats.total.success')), createElement('b', null, totals?.successes === null || totals === undefined ? '—' : (totals.successes.offload + totals.successes.condense + totals.successes.extract).toLocaleString()))),
     activity,
+    reviewSection,
     createElement('div', { className: 'evo-stats-toolbar' },
       createElement('label', { className: 'evo-stats-search' },
         createElement('span', { className: 'evo-stats-search-mark', 'aria-hidden': 'true' }),
@@ -265,6 +291,16 @@ export const STATS_CSS = [
   '.evo-stats-stat b{font-size:16px;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary,#20261f)}',
   '.evo-stats-stat.is-warn b{color:var(--evo-warn,#b26a3c)}',
   '.evo-stats-stat.is-ok b{color:var(--evo-accent,#2f6b58)}',
+  '.evo-stats-reviews{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:10px;background:var(--dsw-alias-bg-layer-1,#fff)}',
+  '.evo-stats-reviews-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}',
+  '.evo-stats-reviews-head h3{margin:0;font-size:12.5px;font-weight:650;color:var(--dsw-alias-label-primary,#20261f)}',
+  '.evo-stats-reviews-head span,.evo-stats-reviews-empty{color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px}',
+  '.evo-stats-reviews-empty{margin:0}',
+  '.evo-stats-review-list{display:flex;flex-direction:column;gap:5px;margin:0;padding:0;list-style:none}',
+  '.evo-stats-review{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px;color:var(--dsw-alias-label-secondary,#6f766d)}',
+  '.evo-stats-review-kind{font-weight:600;color:var(--dsw-alias-label-primary,#20261f)}',
+  '.evo-stats-review-time{color:var(--dsw-alias-label-tertiary,#9aa096);font-variant-numeric:tabular-nums}',
+  '.evo-stats-review-reason{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--evo-warn,#b26a3c)}',
   '.evo-stats-activity{margin:-6px 0 0;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;line-height:1.5}',
   '.evo-stats-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
   '.evo-stats-search{display:flex;align-items:center;gap:7px;flex:1 1 240px;height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:9px;background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-tertiary,#9aa096)}',

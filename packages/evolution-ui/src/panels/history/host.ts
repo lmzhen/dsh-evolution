@@ -15,6 +15,7 @@ import type { Context } from '@deepseek-ai/cordis'
 // Activates the Context merges this row reads. Type-only: the platform packages stay dev-time edges.
 import type {} from '@deepseek-ai/dsh-evolution-curator'
 import { newRunRegistry, evolutionHome, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { join } from 'node:path'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { makeSkillHistoryRoutes } from './routes.ts'
 
@@ -86,6 +87,14 @@ export function apply(ctx: Context): void {
         })
       }
       return rows
+    },
+    getReviews: async () => {
+      const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+      if (ioRegistry === undefined) return null
+      const raw = await ioRegistry.provider().readText(join(evolutionHome(), 'activity.json'))
+      if (raw === null) return null
+      const parsed: unknown = JSON.parse(raw)
+      return parsed !== null && typeof parsed === 'object' && Array.isArray((parsed as { reviews?: unknown }).reviews) ? (parsed as { reviews: unknown[] }).reviews : null
     },
     getCounts: async () => {
       const curator = ctx.get('evolutionCurator') as {

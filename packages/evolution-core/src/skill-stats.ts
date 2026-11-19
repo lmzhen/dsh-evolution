@@ -127,11 +127,23 @@ export interface SkillStatsGovernance {
   readonly resultRef: string | null
 }
 
+/** One recent automatic review, as the activity sidecar records it. */
+export interface SkillStatsReview {
+  readonly reviewId: string
+  readonly kind: 'memory' | 'skill' | 'combined'
+  readonly status: 'completed' | 'partial' | 'failed' | 'timeout' | 'aborted'
+  readonly startedAt: number
+  readonly finishedAt: number
+  readonly partialReason?: string
+}
+
 /** Library-wide facts. These never belong in a single-skill detail view. */
 export interface SkillStatsGlobal {
   readonly totals: SkillStatsTotals
   readonly counts: SkillStatsCounts | null
   readonly governance: readonly SkillStatsGovernance[]
+  /** Recent automatic reviews; absent means this deployment did not report them. */
+  readonly reviews?: readonly SkillStatsReview[]
   /** Label keys for the three success counters; the browser never imports core runtime. */
   readonly operations?: readonly { readonly id: SkillOperationId; readonly labelKey: string }[]
 }

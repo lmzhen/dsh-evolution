@@ -6,3 +6,7 @@ The UI has one workbench page with four visible tabs — skill history, data ove
 
 Pending decisions, merge commands, and health findings are read-only in the browser except for the approval decisions the host routes expose. Headless or TUI sessions do not gain a separate panel surface.
 
+
+### Recent automatic reviews
+
+The skill library overview reads the activity sidecar through the stats route and renders the latest eight reviews separately from the skill table. Each row shows kind (memory/skill), status (completed/partial/failed/timeout/aborted), finish time, and the partial reason when present. Reviews are read-only facts; the panel never edits them.

@@ -12,6 +12,7 @@
 import { latestVersionAt } from '@deepseek-ai/dsh-evolution-core/skills'
 import type {
   SkillErrorNote,
+  SkillStatsReview,
   SkillHealthFacts,
   SkillStatsCounts,
   SkillStatsGovernance,
@@ -145,6 +146,31 @@ function feedbackWindowOf(value: unknown): Map<string, { positive: number; negat
 }
 
 /** Normalize the optional recent-governance read; a malformed row is skipped, not invented. */
+
+function reviewsOf(value: unknown): SkillStatsReview[] {
+  if (!Array.isArray(value)) return []
+  const rows: SkillStatsReview[] = []
+  for (const raw of value) {
+    const source = objectOf(raw)
+    if (source === null) continue
+    const reviewId = typeof source.reviewId === 'string' ? source.reviewId : ''
+    const kind = source.kind === 'memory' || source.kind === 'skill' || source.kind === 'combined' ? source.kind : undefined
+    const status = source.status === 'completed' || source.status === 'partial' || source.status === 'failed' || source.status === 'timeout' || source.status === 'aborted' ? source.status : undefined
+    const startedAt = numberOrNull(source.startedAt)
+    const finishedAt = numberOrNull(source.finishedAt)
+    if (reviewId === '' || kind === undefined || status === undefined || startedAt === null || finishedAt === null) continue
+    rows.push({
+      reviewId,
+      kind,
+      status,
+      startedAt,
+      finishedAt,
+      ...(typeof source.partialReason === 'string' && source.partialReason !== '' ? { partialReason: source.partialReason } : {}),
+    })
+  }
+  return rows.slice(-8).reverse()
+}
+
 function governanceOf(value: unknown): SkillStatsGovernance[] {
   if (!Array.isArray(value)) return []
   const rows: SkillStatsGovernance[] = []
@@ -195,6 +221,7 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
   const feedbackWindow = feedbackWindowOf(feedbackWindowRead)
   const counts = countsOf(await services.getCounts?.().catch(() => null) ?? null)
   const governance = governanceOf(await services.getGovernance?.().catch(() => null) ?? null)
+  const reviews = reviewsOf(await services.getReviews?.().catch(() => null) ?? null)
 
   const rows: SkillStatsRow[] = index.map(row => {
     const usage = usageOf(usageByName?.get(row.name))
@@ -233,6 +260,7 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
       totals,
       counts,
       governance,
+      reviews,
       operations: SKILL_OPERATIONS.map(operation => ({ id: operation.id, labelKey: operation.labelKey })),
     },
     generatedAt: new Date().toISOString(),

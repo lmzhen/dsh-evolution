@@ -1611,6 +1611,106 @@
       "de": "Ändere Filter oder Suchbegriff und versuche es erneut.",
       "pt": "Ajuste o filtro ou a busca e tente novamente.",
       "ru": "Измените фильтр или запрос и повторите."
+    },
+    "stats.reviews.title": {
+      "zh": "自动复查",
+      "en": "Automatic reviews",
+      "ja": "自動レビュー",
+      "es": "Revisiones automáticas",
+      "fr": "Revues automatiques",
+      "de": "Automatische Prüfungen",
+      "pt": "Revisões automáticas",
+      "ru": "Автоматические проверки"
+    },
+    "stats.reviews.hint": {
+      "zh": "最近一次复查结果",
+      "en": "Latest review outcomes",
+      "ja": "最新のレビュー結果",
+      "es": "Últimos resultados",
+      "fr": "Derniers résultats",
+      "de": "Letzte Ergebnisse",
+      "pt": "Resultados recentes",
+      "ru": "Последние результаты"
+    },
+    "stats.reviews.empty": {
+      "zh": "暂无复查记录",
+      "en": "No reviews yet",
+      "ja": "レビュー履歴はありません",
+      "es": "Aún no hay revisiones",
+      "fr": "Aucune revue pour l’instant",
+      "de": "Noch keine Prüfungen",
+      "pt": "Ainda não há revisões",
+      "ru": "Пока нет проверок"
+    },
+    "stats.review.kind.memory": {
+      "zh": "记忆",
+      "en": "Memory",
+      "ja": "メモリ",
+      "es": "Memoria",
+      "fr": "Mémoire",
+      "de": "Erinnerung",
+      "pt": "Memória",
+      "ru": "Память"
+    },
+    "stats.review.kind.skill": {
+      "zh": "技能",
+      "en": "Skills",
+      "ja": "スキル",
+      "es": "Habilidades",
+      "fr": "Compétences",
+      "de": "Fähigkeiten",
+      "pt": "Habilidades",
+      "ru": "Навыки"
+    },
+    "stats.review.status.completed": {
+      "zh": "已完成",
+      "en": "Completed",
+      "ja": "完了",
+      "es": "Completada",
+      "fr": "Terminée",
+      "de": "Abgeschlossen",
+      "pt": "Concluída",
+      "ru": "Завершено"
+    },
+    "stats.review.status.partial": {
+      "zh": "部分完成",
+      "en": "Partial",
+      "ja": "一部完了",
+      "es": "Parcial",
+      "fr": "Partielle",
+      "de": "Teilweise",
+      "pt": "Parcial",
+      "ru": "Частично"
+    },
+    "stats.review.status.failed": {
+      "zh": "失败",
+      "en": "Failed",
+      "ja": "失敗",
+      "es": "Fallida",
+      "fr": "Échouée",
+      "de": "Fehlgeschlagen",
+      "pt": "Falhou",
+      "ru": "Ошибка"
+    },
+    "stats.review.status.timeout": {
+      "zh": "超时",
+      "en": "Timed out",
+      "ja": "タイムアウト",
+      "es": "Tiempo agotado",
+      "fr": "Expirée",
+      "de": "Zeitüberschreitung",
+      "pt": "Tempo esgotado",
+      "ru": "Тайм-аут"
+    },
+    "stats.review.status.aborted": {
+      "zh": "已中止",
+      "en": "Aborted",
+      "ja": "中止",
+      "es": "Cancelada",
+      "fr": "Interrompue",
+      "de": "Abgebrochen",
+      "pt": "Cancelada",
+      "ru": "Прервано"
     }
   }
 }

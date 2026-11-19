@@ -15,6 +15,7 @@ import type {
   SkillStatsCounts,
   SkillStatsGovernance,
   SkillStatsRow,
+  SkillStatsReview,
   SkillStatsSnapshot,
   SkillStatsTotals,
   SkillUsageFacts,
@@ -143,6 +144,24 @@ function totalsOf(value: unknown, rows: readonly SkillStatsRow[]): SkillStatsTot
   }
 }
 
+
+function reviewsOf(value: unknown): SkillStatsReview[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const rows: SkillStatsReview[] = []
+  for (const raw of value) {
+    const source = recordOf(raw)
+    if (source === null) continue
+    const reviewId = typeof source.reviewId === 'string' && source.reviewId !== '' ? source.reviewId : undefined
+    const kind = source.kind === 'memory' || source.kind === 'skill' || source.kind === 'combined' ? source.kind : undefined
+    const status = source.status === 'completed' || source.status === 'partial' || source.status === 'failed' || source.status === 'timeout' || source.status === 'aborted' ? source.status : undefined
+    const startedAt = numberOrNull(source.startedAt)
+    const finishedAt = numberOrNull(source.finishedAt)
+    if (reviewId === undefined || kind === undefined || status === undefined || startedAt === null || finishedAt === null) continue
+    rows.push({ reviewId, kind, status, startedAt, finishedAt, ...(typeof source.partialReason === 'string' && source.partialReason !== '' ? { partialReason: source.partialReason } : {}) })
+  }
+  return rows
+}
+
 function governanceOf(value: unknown): SkillStatsGovernance[] {
   if (!Array.isArray(value)) return []
   const rows: SkillStatsGovernance[] = []
@@ -180,11 +199,13 @@ export function parseSkillStats(value: unknown): SkillStatsSnapshot {
   const globalSource = recordOf(source?.global)
   const globalGovernance = governanceOf(globalSource?.governance)
   const operations = operationsOf(globalSource?.operations)
+  const reviews = reviewsOf(globalSource?.reviews)
   const global = {
     totals: globalSource?.totals === undefined ? totals : totalsOf(globalSource.totals, rows),
     counts: countsOf(globalSource?.counts) ?? counts,
     governance: globalGovernance.length > 0 ? globalGovernance : governance,
     ...(operations === undefined ? {} : { operations }),
+    ...(reviews === undefined ? {} : { reviews }),
   }
   return {
     rows,
