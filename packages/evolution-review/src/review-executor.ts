@@ -81,7 +81,7 @@ const REVIEW_WAIT_TOOL: ToolSchema = {
       resource: { type: 'string' },
       timeoutMs: { type: 'number' },
     },
-    required: ['timeoutMs'],
+    required: ['resource', 'timeoutMs'],
   } as ToolSchema['parameters'],
 }
 
@@ -309,7 +309,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         actions.push({ type: 'tool', action: REVIEW_WAIT_TOOL_NAME, target: parsed.resource ?? 'resource', status: released === false ? 'error' : 'ok' })
         messages.push(assistant)
         messages.push(createToolResultMessage({ callId: waitCalls[0]!.id, content: [{ type: 'text', text: released === false ? 'review_wait timed out' : 'review_wait released' }], isError: released === false }))
-        if (released === false) { partialReason = 'review_wait timed out'; break }
+        if (released === false) { partialReason = 'lock-wait-exhausted'; break }
         if (toolCalls >= maxToolCalls) { partialReason = 'max tool calls reached before review_done'; break }
         continue
       }

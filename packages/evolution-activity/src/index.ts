@@ -132,6 +132,21 @@ export function applyActivityEvent(
 }
 
 /** Fold one review-completed payload into a bounded review list (pure). */
+
+const REVIEW_REPORT_ITEMS = 32
+const REVIEW_REPORT_ITEM_CHARS = 240
+const REVIEW_REPORT_SUMMARY_CHARS = 2_000
+
+function boundedReport(report: NonNullable<EvolutionReviewActivityRecord['report']>): NonNullable<EvolutionReviewActivityRecord['report']> {
+  const bounded = (value: string, limit: number): string => graphemeCount(value) <= limit ? value : truncateGraphemes(value, limit, '')
+  return {
+    summary: bounded(report.summary, REVIEW_REPORT_SUMMARY_CHARS),
+    memoryChanged: report.memoryChanged,
+    skillsChanged: report.skillsChanged.slice(0, REVIEW_REPORT_ITEMS).map(value => bounded(value, REVIEW_REPORT_ITEM_CHARS)),
+    unresolved: report.unresolved.slice(0, REVIEW_REPORT_ITEMS).map(value => bounded(value, REVIEW_REPORT_ITEM_CHARS)),
+  }
+}
+
 export function applyReviewActivityEvent(
   reviews: EvolutionReviewActivityRecord[],
   event: EvolutionReviewCompletedEvent,
@@ -152,7 +167,7 @@ export function applyReviewActivityEvent(
     ...event.toolCalls === undefined ? {} : { toolCalls: event.toolCalls },
     ...event.waitCount === undefined ? {} : { waitCount: event.waitCount },
     ...event.hitRoundLimit === undefined ? {} : { hitRoundLimit: event.hitRoundLimit },
-    ...event.report === undefined ? {} : { report: event.report },
+    ...event.report === undefined ? {} : { report: boundedReport(event.report) },
     ...event.partialReason === undefined ? {} : { partialReason: event.partialReason },
     actions: event.actions,
     ...event.usage === undefined ? {} : { usage: event.usage },

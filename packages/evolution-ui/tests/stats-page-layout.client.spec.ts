@@ -78,7 +78,7 @@ describe('stats page presentation', () => {
       ...snapshot(),
       global: {
         ...snapshot().global,
-        reviews: [{ reviewId: 'r1', kind: 'skill', status: 'partial', startedAt: 1, finishedAt: 2, partialReason: 'max tool calls reached before review_done' }],
+        reviews: [{ reviewId: 'r1', kind: 'skill', status: 'partial', startedAt: 1, finishedAt: 2, partialReason: 'max tool calls reached before review_done', report: { summary: 'half', memoryChanged: false, skillsChanged: [], unresolved: ['left skill'] } }],
       },
     }
     const view = render(createElement(StatsPage, { ...face('wide'), loadStats: async () => withReviews }))
@@ -86,6 +86,7 @@ describe('stats page presentation', () => {
     expect(view.container.textContent).toContain('stats.review.kind.skill')
     expect(view.container.textContent).toContain('stats.review.status.partial')
     expect(view.container.textContent).toContain('max tool calls reached before review_done')
+    expect(view.container.textContent).toContain('left skill')
   })
 
   it('distinguishes an empty library from a filter with no matches', async () => {

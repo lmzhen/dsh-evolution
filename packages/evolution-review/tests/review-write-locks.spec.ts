@@ -26,6 +26,6 @@ it('dispose releases holders and wakes waiters', async () => {
   locks.tryAcquire('skill:probe', 'owner-a')
   const waiting = locks.wait('skill:probe', 5_000, new AbortController().signal)
   locks.dispose()
-  await expect(waiting).resolves.toBe(true)
+  await expect(waiting).resolves.toBe(false)
   expect(locks.tryAcquire('skill:probe', 'owner-b')).toBeUndefined()
 })

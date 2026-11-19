@@ -1059,9 +1059,16 @@ function snapshotReviewParent(agent: Agent): Agent {
   }
 
   async function tryAuxReview(session: Session, agent: Agent, kind: 'memory' | 'skill', signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
-    const runningByKind = auxRunning.get(session.id)
-    const running = runningByKind?.get(kind)
+    let runningByKind = auxRunning.get(session.id)
+    if (runningByKind === undefined) { runningByKind = new Map(); auxRunning.set(session.id, runningByKind) }
+    const running = runningByKind.get(kind)
     if (running !== undefined) { running.rerun = kind; return true }
+    const state: { rerun?: 'memory' | 'skill' } = {}
+    runningByKind.set(kind, state)
+    const releaseKind = (): void => {
+      runningByKind!.delete(kind)
+      if (runningByKind!.size === 0) auxRunning.delete(session.id)
+    }
     // Cutoff is the caller's boundary (turn/end), taken synchronously before
     // any lease wait so later goal-loop turns can never leak into the review.
     const reviewParent = snapshotReviewParent(agent)
@@ -1078,13 +1085,10 @@ function snapshotReviewParent(agent: Agent): Agent {
     let leaseToken: { id: string; owner: string; runId: string; epoch: number } | undefined
     if (authority?.lease !== undefined) {
       const lease = await authority.lease.acquire('background_review', 'review:' + session.id + ':' + kind, Math.max(config.reviewTimeoutMs + 30_000, 60_000)).catch(() => undefined)
-      if (lease === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — lease acquire failed'); return false }
-      if (!lease.ok) { ctx.logger.warn('dsh-evolution-review: aux review already leased (' + lease.reason + ')'); return false }
+      if (lease === undefined) { releaseKind(); ctx.logger.warn('dsh-evolution-review: aux review skipped — lease acquire failed'); return false }
+      if (!lease.ok) { releaseKind(); ctx.logger.warn('dsh-evolution-review: aux review already leased (' + lease.reason + ')'); return false }
       leaseToken = lease.token
     }
-    const state: { rerun?: 'memory' | 'skill' } = {}
-    if (runningByKind === undefined) auxRunning.set(session.id, new Map([[kind, state]]))
-    else runningByKind.set(kind, state)
     const reviewId = 'aux-' + randomUUID()
     const startedAt = Date.now()
     const controller = new AbortController()

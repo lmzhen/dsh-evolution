@@ -75,7 +75,8 @@ export class ReviewWriteLocks {
         resolve(value)
       }
       const wake = (): void => {
-        if (!this.holders.has(resource)) finish(true)
+        if (this.closed) finish(false)
+        else if (!this.holders.has(resource)) finish(true)
       }
       const waiting = this.waiters.get(resource) ?? new Set<() => void>()
       waiting.add(wake)
