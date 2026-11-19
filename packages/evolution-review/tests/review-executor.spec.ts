@@ -65,6 +65,13 @@ function tools(seen: { agent?: ReviewParent }): ReviewToolPort {
   }
 }
 
+const runCodeCall = { type: 'tool-call' as const, id: ToolCallId('run-code-1'), name: 'run_code', arguments: JSON.stringify({ code: 'review', description: 'review' }) }
+const runCodeChunks: StreamChunk[] = [
+  { type: 'block-start', index: 0, blockType: 'tool-call' },
+  { type: 'block-end', index: 0, block: runCodeCall },
+  { type: 'finish', reason: { kind: 'tool-calls' } },
+]
+
 const waitCall = { type: 'tool-call' as const, id: ToolCallId('wait-1'), name: 'review_wait', arguments: JSON.stringify({ resource: 'skill:probe', timeoutMs: 1 }) }
 const waitChunks: StreamChunk[] = [
   { type: 'block-start', index: 0, blockType: 'tool-call' },
@@ -208,7 +215,8 @@ describe('runReview', () => {
 
   it('executes a native review channel without bypassing the runner', async () => {
     const seen: { agent?: ReviewParent } = {}
-    const channel = nativeReviewToolChannel(parent(), allowed(), tools(seen))
+    const execution = parent()
+    const channel = nativeReviewToolChannel(parent(), allowed(), tools(seen), execution)
     expect(channel.mode).toBe('native')
     expect(channel.visibleTools.map(tool => tool.name)).toEqual(['skill_manage'])
     const result = await runReview({
@@ -224,6 +232,7 @@ describe('runReview', () => {
     })
     expect(result.done).toBe(true)
     expect(result.actions[0]).toMatchObject({ action: 'skill_manage', status: 'ok' })
+    expect(seen.agent).toBe(execution)
   })
 
   it('lets the model wait for a lock and continue to review_done', async () => {
@@ -283,6 +292,28 @@ describe('runReview', () => {
     })
     expect(result.done).toBe(false)
     expect(result.partialReason).toBe('max tool calls reached before review_done')
+  })
+
+
+  it('lets a PTC channel execute run_code without the native allowlist or synthetic tools', async () => {
+    let callsSeen = 0
+    const channel = {
+      mode: 'ptc' as const,
+      visibleTools: [{ name: 'run_code' }] as never,
+      async execute(calls: readonly { readonly id: unknown }[]) {
+        callsSeen = calls.length
+        return { results: calls.map(call => ({ callId: call.id, result: { content: [{ type: 'text' as const, text: 'ok' }], isError: false } })) }
+      },
+      completion: () => ({ done: true, report: { summary: 'ptc done', memoryChanged: false, skillsChanged: [], unresolved: [] } }),
+    }
+    const result = await runReview({
+      parent: parent(), llm: llm([runCodeChunks]), tools: tools({}), channel, instruction: 'review',
+      toolAllow: new Set<string>(), signal: new AbortController().signal,
+      markReview: () => {}, clearReview: () => {},
+    })
+    expect(callsSeen).toBe(1)
+    expect(result.done).toBe(true)
+    expect(result.report?.summary).toBe('ptc done')
   })
 
   it('rejects review_done mixed with other calls', async () => {

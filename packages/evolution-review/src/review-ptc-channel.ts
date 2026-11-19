@@ -34,7 +34,7 @@ type PtcTools = {
   execute?: (input: unknown) => Promise<unknown>
 }
 
-const PTC_INSTRUCTION = 'You are reviewing in PTC mode. Write one or more run_code programs that call the available review tools. When the review is complete, call tools.review_done as the only review action of that program; if a write reports resource-busy, call tools.review_wait and then re-read before retrying.'
+const PTC_INSTRUCTION = 'You are reviewing in PTC mode. Write one or more run_code programs that call the available review tools. When the review is complete, call tools.review_done as the only review action of that program. A precise no-op is still completed: always finish with tools.review_done instead of stopping without it. If a write reports resource-busy, call tools.review_wait and then re-read before retrying.'
 
 function asObject(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' ? value as Record<string, unknown> : undefined
@@ -123,7 +123,7 @@ export class PtcReviewToolHost {
   }
 
   /** Build one task channel over the shared registration. */
-  channel(taskId: string, parentHeaderTools: readonly { readonly name: string }[], childAgent: unknown): ReviewToolChannel & { control: PtcReviewControl; dispose(): void } {
+  channel(taskId: string, parentHeaderTools: readonly { readonly name: string }[], childAgent: unknown, modelSelection: unknown): ReviewToolChannel & { control: PtcReviewControl; dispose(): void } {
     this.register()
     const control: PtcReviewControl = { done: false, waitCount: 0 }
     this.controls.set(taskId, control)
@@ -138,7 +138,7 @@ export class PtcReviewToolHost {
         host.active.add(taskId)
         try {
           if (host.tools.execute === undefined) throw new Error('PTC review channel requires tools.execute')
-          const toolSet = host.tools.resolve === undefined ? undefined : await host.tools.resolve({ agent: childAgent, signal })
+          const toolSet = host.tools.resolve === undefined ? undefined : await host.tools.resolve({ agent: childAgent, modelSelection, signal })
           return await host.tools.execute({ calls, signal, agent: childAgent, ...(toolSet === undefined ? {} : { toolSet }) }) as { readonly results: readonly ReviewToolOutcome[] }
         } finally {
           host.active.delete(taskId)

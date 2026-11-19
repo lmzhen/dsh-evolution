@@ -29,11 +29,12 @@ export function nativeReviewToolChannel(
   parent: ReviewParent,
   toolAllow: ReadonlySet<string>,
   tools: ReviewToolPort,
+  executionAgent: unknown = parent,
 ): ReviewToolChannel {
   const header = parent.session.requestHeader()
   return {
     mode: 'native',
     visibleTools: (header?.tools ?? []).filter(tool => toolAllow.has(tool.name)) as readonly ToolSchema[],
-    execute: (calls, signal) => tools.execute({ calls, signal, agent: parent }),
+    execute: (calls, signal) => tools.execute({ calls, signal, agent: executionAgent as ReviewParent }),
   }
 }

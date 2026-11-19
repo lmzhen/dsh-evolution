@@ -69,7 +69,7 @@ export const REVIEW_DONE_TOOL_NAME = 'review_done'
 export const REVIEW_WAIT_TOOL_NAME = 'review_wait'
 
 /** Extra instruction appended to aux prompts only; foreground prompts stay unchanged. */
-export const AUX_COMPLETION_INSTRUCTION = 'When all durable changes for this review are complete, call review_done as the only tool call in your final batch. Do not call it while more edits remain. If a write is locked, call review_wait once, then re-read the target and retry; never reapply a stale patch.'
+export const AUX_COMPLETION_INSTRUCTION = 'When all durable changes for this review are complete, call review_done as the only tool call in your final batch. Do not call it while more edits remain. A precise no-op is still a completed review: always finish with review_done and an unchanged report instead of stopping without it. If a write is locked, call review_wait once, then re-read the target and retry; never reapply a stale patch.'
 
 
 const REVIEW_WAIT_TOOL: ToolSchema = {
@@ -272,7 +272,10 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         ...(header.config.temperature === undefined ? {} : { temperature: header.config.temperature }),
         ...(header.config.maxTokens === undefined ? {} : { maxTokens: header.config.maxTokens }),
         messages,
-        tools: [...(input.channel?.visibleTools ?? header.tools ?? []), REVIEW_WAIT_TOOL, REVIEW_DONE_TOOL] as ToolSchema[],
+        tools: [
+          ...(input.channel?.visibleTools ?? header.tools ?? []),
+          ...(input.channel?.mode === 'ptc' ? [] : [REVIEW_WAIT_TOOL, REVIEW_DONE_TOOL]),
+        ] as ToolSchema[],
         ...(toolHistory === undefined ? {} : { toolHistory }),
         signal,
       }, signal)
@@ -294,7 +297,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
       if (text !== '') finalText = text
       const calls = assistant.content.filter((block): block is ToolCallBlock => block.type === 'tool-call')
       if (calls.length === 0) break
-      const waitCalls = calls.filter(call => call.name === REVIEW_WAIT_TOOL_NAME)
+      const waitCalls = input.channel?.mode === 'ptc' ? [] : calls.filter(call => call.name === REVIEW_WAIT_TOOL_NAME)
       if (waitCalls.length > 0) {
         if (calls.length !== 1) { partialReason = 'review_wait must be the only tool call in its batch'; break }
         toolCalls += 1
@@ -310,7 +313,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         if (toolCalls >= maxToolCalls) { partialReason = 'max tool calls reached before review_done'; break }
         continue
       }
-      const doneCalls = calls.filter(call => call.name === REVIEW_DONE_TOOL_NAME)
+      const doneCalls = input.channel?.mode === 'ptc' ? [] : calls.filter(call => call.name === REVIEW_DONE_TOOL_NAME)
       if (doneCalls.length > 0) {
         toolCalls += calls.length
         if (calls.length !== 1) {
@@ -328,7 +331,8 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         break
       }
       messages.push(assistant)
-      const allowedCalls = calls.filter(call => toolAllow.has(call.name))
+      const allowedNames = input.channel === undefined ? toolAllow : new Set(input.channel.visibleTools.map(tool => tool.name))
+      const allowedCalls = calls.filter(call => allowedNames.has(call.name))
       const releases: (() => void)[] = []
       const held = new Set<string>()
       const busy = new Map<string, string>()
@@ -361,7 +365,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         break
       }
       const byCall = new Map(batch.results.map(item => [item.callId, item]))
-      const allowedNames = [...toolAllow].sort().join(', ')
+      const allowedLabel = [...allowedNames].sort().join(', ')
       for (const call of calls) {
         const item = byCall.get(call.id)
         const busyResource = busy.get(call.id)
@@ -375,7 +379,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
           continue
         }
         if (item === undefined) {
-          if (toolAllow.has(call.name)) throw new Error('review tool result has no matching call')
+          if (allowedNames.has(call.name)) throw new Error('review tool result has no matching call')
           actions.push({
             type: actionType(call.name),
             action: call.name,
@@ -384,7 +388,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
           })
           messages.push(createToolResultMessage({
             callId: call.id,
-            content: [{ type: 'text', text: `review tool not allowed: ${call.name}; PTC is unavailable in auxiliary review. Use these parent-visible tools directly: ${allowedNames}` }] as ContentBlock[],
+            content: [{ type: 'text', text: `review tool not allowed: ${call.name}; PTC is unavailable in auxiliary review. Use these parent-visible tools directly: ${allowedLabel}` }] as ContentBlock[],
             isError: true,
           }))
           continue

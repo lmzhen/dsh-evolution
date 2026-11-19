@@ -764,6 +764,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // decision: BOTH modes complete after the task — the old immediate
         // 'inject' contract is superseded, 0.3.39).
         if (params().reviewMode === 'aux') {
+          await consumeReviewDebt(session.id, pendingDebt)
           await scheduleAuxDebt(session, agent, pendingDebt, signal, 'cadence')
           return
         }
@@ -1045,6 +1046,18 @@ function snapshotReviewParent(agent: Agent): Agent {
     await Promise.all(tasks)
   }
 
+
+  async function consumeReviewDebt(sessionId: SessionId, debt: ReviewDebt): Promise<void> {
+    await withReviewStateLock(sessionId, async () => {
+      const service = ctx.get('evolutionState')
+      const state = await service?.loadReviewState(sessionId)
+      if (state === undefined || state === null) return
+      if (debt.memory) state.turnsSinceMemory = 0
+      if (debt.skill) state.turnsSinceSkill = 0
+      await service?.saveReviewState(sessionId, state)
+    })
+  }
+
   async function tryAuxReview(session: Session, agent: Agent, kind: 'memory' | 'skill', signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
     const runningByKind = auxRunning.get(session.id)
     const running = runningByKind?.get(kind)
@@ -1086,7 +1099,7 @@ function snapshotReviewParent(agent: Agent): Agent {
     }
     const AUX_TOOL_ALLOW = new Set(['skill_manage', 'memory', 'skill', 'skill_search', 'read', 'glob', 'grep'])
     const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
-    const nativeChannel = nativeReviewToolChannel(reviewParent, toolAllow, { execute: tools })
+    const nativeChannel = nativeReviewToolChannel(reviewParent, toolAllow, { execute: tools }, agent)
     const ptcOnly = toolAllow.size === 0 && (header.tools ?? []).some(tool => tool.name === 'run_code')
     const reviewChild = ptcOnly && toolsService !== undefined
       ? createReviewChildAgent(agent, 'aux-' + reviewId)
@@ -1097,7 +1110,7 @@ function snapshotReviewParent(agent: Agent): Agent {
     }
     const channel = reviewChild === undefined || ptcToolHost === undefined
       ? nativeChannel
-      : ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent)
+      : ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent, { provider: header.config.provider, model: header.config.model })
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
@@ -1146,7 +1159,7 @@ function snapshotReviewParent(agent: Agent): Agent {
         }
         status = result.done && result.partialReason === undefined ? 'completed' : 'partial'
         if (result.partialReason !== undefined) error = result.partialReason
-        if (toolAllow.size === 0) { status = 'failed'; error = 'aux review has no allowed tools for this parent (PTC-only header); refusing to report completed' }
+        if (toolAllow.size === 0 && reviewChild === undefined) { status = 'failed'; error = 'aux review has no allowed tools for this parent; refusing to report completed' }
       } catch (caught) {
         error = caught instanceof Error ? caught.message : String(caught)
         if (caught instanceof ReviewPartialFailure && caught.actions.length > 0) actions = caught.actions
@@ -1161,6 +1174,7 @@ function snapshotReviewParent(agent: Agent): Agent {
           ctx.emit('evolution/review-completed', {
             version: 1,
             reviewId,
+            taskId: reviewId,
             sessionId: String(session.id),
             kind,
             status,
@@ -1172,6 +1186,7 @@ function snapshotReviewParent(agent: Agent): Agent {
             waitCount,
             hitRoundLimit,
             ...(report === undefined ? {} : { report }),
+            ...(status === 'partial' && error !== undefined ? { partialReason: error } : {}),
             ...(usage === undefined ? {} : { usage }),
             startedAt,
             finishedAt,
