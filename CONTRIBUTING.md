@@ -27,7 +27,7 @@ The canonical fact table is `packages/scripts/family-facts.json`. If you move a 
 - Run a single spec by file; an entire directory can exceed the default timeout for reasons unrelated to the change.
 - A green process is not a pass by itself: the declared criterion must be evaluated. An unevaluated criterion is not a pass.
 
-## The gate: all 82 steps
+## The gate: all 83 steps
 
 The local profile runs the family gate runner (see [docs/developer/development.md](docs/developer/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from the gate registry (`packages/scripts/gates/registry.mjs`); do not hand-edit it. If a row moves tier or command, change the registry and regenerate the views.
 
@@ -93,7 +93,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 56 | `node packages/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json`（W2/W3/W10/W11 发布证据：schemaVersion=2、platformLine 与 platform-line.json 逐字、manifests 范围一致；`--release` 时另要求 ciFace/gates/S1–S4 全 pass/52 项 traceability 全覆——blocked 不算 pass。缺文件/不可解析→**exit 2**） | mirror |
 | 57 | `node packages/scripts/assemble-release-evidence.mjs packages/evolution/dist/release-evidence.json --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json --gates-from-manifest ci --ci-face ci --os ci`（W3/W10 发布证据装配：把 pack 写出的 schema-2 骨架与本仓演练快照（S1–S4 spike 证据 + W11 52 项 traceability）合并，并写入 CI face 与本次 compat-check 已执行的 gate 台账；`--release` 在 publish 前复验；缺输入/不合格→exit 1/2） | mirror |
 | 58 | `node packages/evolution-merge-engine/verify-upstream.mjs`（engine 发布 parity：UPSTREAM.json 的逐文件 bytes/sha256 与 testPatchSet 的 patchedBytes/patchedSha256 必须全等；缺文件/不匹配→exit 1。GAP-P0-05 的发布门禁） | mirror |
-| 59 | node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "^$RANGE" | overlay |
+| 59 | node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "$RANGE" | overlay |
 | 60 | node packages/evolution/scripts/gen-about.mjs packages/evolution --check | overlay |
 | 61 | node packages/evolution/scripts/gen-bundle-patches.mjs packages/evolution --check | overlay |
 | 62 | node packages/evolution/scripts/gen-client-guards.mjs packages/evolution --check | overlay |
@@ -117,6 +117,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 80 | node packages/evolution/scripts/verify-graph-edges.mjs --report | overlay |
 | 81 | node packages/scripts/verify-health-admission.mjs | mirror |
 | 82 | `node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、全部 UI key、119 个参数文案、68 个 command-help key、31 个 host error，8 语言 key/占位符/生成物一致；**每个 UI key 必须有生产读者**：字面量、`.one` 派生或 `'prefix.' + value` 动态前缀，否则死键必红。`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；留一个无读者 key ⇒ 必红；重跑生成器即绿） | mirror |
+| 83 | node packages/evolution/scripts/verify-platform-envelope.mjs --manifest-dir packages/evolution/.release-staging --line platform-line.json | overlay |
 
 ## Pull request checklist
 

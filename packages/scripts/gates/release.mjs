@@ -71,6 +71,16 @@ export const release = [
     reason: "action step — executed by its lane/action step, not by run-gates",
   }),
 
+  gate("gate-83", {
+    kind: "step",
+    runBy: "action",
+    tree: "overlay",
+    title: "node packages/evolution/scripts/verify-platform-envelope.mjs --manifest-dir packages/evolution/.release-staging --line platform-line.json",
+    command: "node packages/evolution/scripts/verify-platform-envelope.mjs --manifest-dir packages/evolution/.release-staging --line platform-line.json",
+    lanes: ["ci-release"],
+    reason: "action step — every staged platform range must equal the cohort union before upload",
+  }),
+
   gate("gate-74", {
     kind: "step",
     runBy: "action",

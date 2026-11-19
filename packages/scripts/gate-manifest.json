@@ -1623,13 +1623,27 @@
     {
       "id": "gate-59",
       "kind": "step",
-      "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
+      "human": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"$RANGE\"",
       "argv": null,
       "tree": "overlay",
       "profiles": [],
-      "command": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"^$RANGE\"",
+      "command": "node packages/evolution/scripts/audit-release-tarballs.mjs packages/evolution/dist --version \"${RELEASE_VERSION#v}\" --platform-range \"$RANGE\"",
       "runBy": "action",
       "reason": "action step — executed by its lane/action step, not by run-gates",
+      "lanes": [
+        "ci-release"
+      ]
+    },
+    {
+      "id": "gate-83",
+      "kind": "step",
+      "human": "node packages/evolution/scripts/verify-platform-envelope.mjs --manifest-dir packages/evolution/.release-staging --line platform-line.json",
+      "argv": null,
+      "tree": "overlay",
+      "profiles": [],
+      "command": "node packages/evolution/scripts/verify-platform-envelope.mjs --manifest-dir packages/evolution/.release-staging --line platform-line.json",
+      "runBy": "action",
+      "reason": "action step — every staged platform range must equal the cohort union before upload",
       "lanes": [
         "ci-release"
       ]
