@@ -1,5 +1,5 @@
 {
-  "note": "0.57.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host; cohort smoke measured on rc.1/rc.2/rc.3/rc.4/rc.5 clean installs (29/29 active rows, doctor ok); S4 spec. Final CI face must be re-read before publish.",
+  "note": "0.57.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host; cohort smoke measured on the exact rc.5 clean install (29/29 active rows, doctor ok); S4 spec. Final CI face must be re-read before publish.",
   "familyVersion": "0.57.0",
   "spikes": [
     {

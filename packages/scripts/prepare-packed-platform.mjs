@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const dist = process.argv[2]
-const platformVersion = process.argv[3] ?? '0.2.2-rc.1'
+const platformVersion = process.argv[3] ?? '0.2.2-rc.5'
 if (!dist) { console.error('usage: prepare-packed-platform.mjs <dist-dir> [platform-version]'); process.exit(2) }
 const manifest = JSON.parse(await readFile(join(dist, 'manifest.json'), 'utf8'))
 const tarballs = Object.values(manifest)

@@ -16,7 +16,7 @@ inputs:
   platform_version:
     description: Platform package version the packed consumer installs against
     required: false
-    default: '0.2.2-rc.1'
+    default: '0.2.2-rc.5'
   version:
     description: The release version the workflow packs with (RELEASE_VERSION); 'v' prefix is stripped
     required: true
