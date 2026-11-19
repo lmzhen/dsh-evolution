@@ -240,3 +240,42 @@ PTC 不能复用父 agent 执行工具，因为平台 `run_code` 的嵌套 dispa
 - 不改变前台 inject 的 combined 语义。
 - 不把 PTC 的 nested dispatch 写进父 Session。
 - 不为并行而放弃写安全；分析并行不等于写入并行。
+
+## 8. 多会话同时触发 skill 总结的可靠性补强
+
+§7 的调度骨架是有效方向，但“多个会话同时触发 skill review”还需要资源级并发协议，不能只靠每个 task 一个 lease。
+
+### 8.1 现有风险
+
+- 不同会话的 review 可以并行分析，但可能选中同一个 skill。只把 task 调度并行、写入队列化，仍会遇到“读旧内容 → 另一个 task 写入 → 本 task 用旧锚写”的冲突。
+- 现有 SkillLibrary 有 CAS/锚点，冲突通常会被拒绝而不是静默覆盖；这保证不写坏，但不保证两个会话的总结都能落地。
+- 现有 per-runId lease 只能表示“这个 review 正在跑”，不能表示“这个 skill 正被写”；同一 skill 的资源互斥需要独立资源锁。
+- desktop 与 web 可能共用同一个 DSH_HOME；进程内的 ReviewWriteGate 不够，必须复用跨进程的 HomeFence / skill-store 锁 / CAS。
+- 多会话同时触发会产生突发队列；没有全局并发上限、每会话上限、队列上限、合并策略和公平调度时，容易出现延迟膨胀、排队超时和单会话饥饿。
+
+### 8.2 必须增加的协议
+
+1. **资源提交协调器**：
+   - 写前按资源域获取 durable 锁：`memory`、`skills`、`skill:<name>`；锁的 key 不是 task/run，而是资源。
+   - 在锁内重新读取当前内容，再把 patch 的 stage-time anchor 交给 SkillLibrary 的 CAS；drift 时返回结构化冲突，不盲写。
+   - 冲突后允许一次“重读 → 重试/重放”的 rebase；超过重试或轮数预算则 `partial`，并记录 `conflict` 原因。
+   - 只读工具不占写锁；分析阶段可以并行。
+2. **多会话调度边界**：
+   - 全局并发上限（按 provider/CPU 预算）；
+   - 每会话最多 memory+skill 两个 running，每 kind 一个 pending；
+   - 有界队列 + 同 kind 合并；公开 `queued` 状态和排队超时；
+   - 公平调度（至少避免单个 session 连续占满全局槽位）；
+   - provider 限流/退避由 adapter 层处理，review 状态如实记录。
+3. **跨进程一致性**：
+   - 资源锁和 CAS 必须落在 DSH_HOME 的共享锁协议上，不能只存在内存；
+   - 进程内队列只负责调度，不承担最终互斥；
+   - activity 写入继续走 HomeFence/transact，避免并发丢记录。
+4. **活动与观测**：
+   - 每个 task 记录 `queued/running/completed/partial/failed/timeout`、资源冲突、重试次数、目标 skill；
+   - 同一 skill 的多次并发 review 能在 UI 看到“已合并 / 被拒绝 / 重试后完成”，而不是只看到成功数。
+
+### 8.3 结论
+
+- 只要补上资源级锁 + CAS 重试 + 有界公平队列 + 跨进程一致性，§7 的拆分会话/拆分 kind 方案在多会话同时触发的场景下是**有效且可靠**的。
+- 只按当前 §7 的“per-task lease + 单一 write gate”实现，结论是：**能防止静默写坏，但不足以保证每个会话的 skill 总结都完整落地**；会遇到可解释的冲突失败和队列饥饿。
+- 验收要增加：同一 skill 被两个会话同时总结、不同 skill 并发、N 会话突发、desktop/web 共享 home、冲突重试耗尽后的 `partial` 记录。
