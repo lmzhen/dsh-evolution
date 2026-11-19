@@ -83,11 +83,15 @@ if (!Array.isArray(rehearsal.spikes) || rehearsal.spikes.length === 0) problems.
 if (gates.length === 0 && gatesFromManifest === '') problems.push('rehearsal.gates must carry the rehearsal gate readings (or pass --gates-from-manifest <profile>)')
 if (rehearsal.traceability === undefined || rehearsal.traceability === null) problems.push('rehearsal.traceability must carry the W11 reading')
 const measuredCommit = measuredCommitArg !== '' ? measuredCommitArg : (Array.isArray(rehearsal.spikes) && rehearsal.spikes.length > 0 ? rehearsal.spikes[0]?.commit : undefined)
+const rawSpikes = Array.isArray(rehearsal.spikes) ? rehearsal.spikes : evidence.spikes
+const spikes = Array.isArray(rawSpikes) && typeof measuredCommit === 'string'
+  ? rawSpikes.map((spike) => typeof spike?.commit === 'string' && /^[a-f0-9]{7,40}$/.test(spike.commit) && measuredCommit.startsWith(spike.commit) ? { ...spike, commit: measuredCommit } : spike)
+  : rawSpikes
 const assembled = {
   ...evidence,
   ...(typeof measuredCommit === 'string' ? { measuredCommit } : {}),
   cohort: cohort ?? rehearsal.cohort ?? evidence.cohort,
-  spikes: Array.isArray(rehearsal.spikes) ? rehearsal.spikes : evidence.spikes,
+  spikes,
   gates: gates.length > 0 ? gates : evidence.gates,
   traceability: rehearsal.traceability ?? evidence.traceability,
   faces: rehearsal.faces ?? evidence.faces,

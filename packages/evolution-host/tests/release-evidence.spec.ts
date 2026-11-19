@@ -259,6 +259,19 @@ describe('release-evidence assembly (W3 injection)', () => {
     } finally { await rm(dir, { recursive: true, force: true }) }
   })
 
+  it('normalizes an abbreviated rehearsal spike commit to the measured full sha', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'assemble-measured-sha-'))
+    const report = join(dir, 'gates.json')
+    await writeFile(report, JSON.stringify({ gates: [{ id: 'gate-01', verdict: 'pass', reading: 'run-gates local', criterionEvaluated: true }] }), 'utf8')
+    const inputs = rehearsalInputs()
+    inputs.spikes = inputs.spikes.map(entry => ({ ...entry, commit: 'a'.repeat(8) }))
+    try {
+      const result = await runAssemble(staging(), inputs, ['--measured-commit', 'a'.repeat(40), '--gates-report', report, '--ci-face', 'release.yml@refs/tags/v' + FAMILY_VERSION, '--os', 'linux', '--commit', 'a'.repeat(40), '--tag', 'v' + FAMILY_VERSION])
+      expect(result.code).toBe(0)
+      expect((result.doc.spikes as Array<Record<string, unknown>>).every(entry => entry.commit === 'a'.repeat(40))).toBe(true)
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+
   it('P2-39: flags-first invocation still finds the evidence file', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'assemble-evidence-order-'))
     const evidencePath = join(dir, 'release-evidence.json')
