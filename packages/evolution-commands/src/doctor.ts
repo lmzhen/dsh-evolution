@@ -10,7 +10,7 @@
  */
 import { hostCommandText } from './host-locale.ts'
 import type { Context } from '@deepseek-ai/cordis'
-import { sessionQueryPort, settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
+import { settingsPort } from '@deepseek-ai/dsh-evolution-core/platform'
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
 import { readFileSync } from 'node:fs'
 import { scopedPackageName, asRecord } from '@deepseek-ai/dsh-evolution-core'
@@ -261,10 +261,6 @@ export interface DoctorReport {
    * list is what makes that difference visible instead of mysterious. */
   foreignProfiles: string[]
   conflicts: string[]
-  /** S4/P-1+P-2 (platform gap, family mitigation): the session-query corpus
-   * listing failed — reported verbatim, with the isolation recipe. Empty when the
-   * service is absent or answering. */
-  queryIssues: string[]
   /** S2-12③ (FLOW5-4): the memory budget's two configuration surfaces disagree —
    * `memory-files`' store limit vs `evolution-policy`'s planning value. Empty
    * when either surface is absent (nothing to compare) or they agree. */
@@ -605,8 +601,8 @@ function probePresetFreshness(home: string, servicePresent: (name: string) => bo
  * @returns the row the report renders.
  */
 async function legacyMigrationRow(ctx: { get(name: string): unknown }, home: string): Promise<LegacyMigrationRow> {
-// platform-declaration anchor: the platform’s `settings` and `sessionQuery` services
-//(both optional; undefined ⇒ the corresponding check is skipped)
+// platform-declaration anchor: the platform’s `settings` service
+//(optional; undefined ⇒ the corresponding check is skipped)
   const settings = settingsPort(ctx as Context)
   const io = (ctx.get('evolutionIo') as { provider?(): EvolutionIoLike } | undefined)?.provider?.()
   if (settings?.describe === undefined || io === undefined) return { state: 'unavailable', source: undefined, pending: [] }
@@ -698,9 +694,9 @@ export async function diagnose(
   // layers, and the preset loader does not fail on it: shadowing semantics
   // hand the session to the nearest layer, so the duplication is swallowed
   // silently instead of failing loud like the bundle×bundle infra rows above.
-  if (full && presetDirInstalled) conflicts.push(`evolution-all and the layered Evolution preset (${layeredArtifactLabel}) are both present — the four model rows AND the systemPrompt sections double-instance across the profile and preset layers; the preset loader does not fail on it, shadowing semantics take the nearest layer, so an Evolution-preset session silently runs the preset's copies of everything. Keep ONE (use layered without all, or drop the preset).`)
-  // V24-11 (v24): the preset BUNDLE mounts the same four model rows as `all`
-  // (tool-memory / tool-skill-manage / tool-session-query / skill-catalog),
+  if (full && presetDirInstalled) conflicts.push(`evolution-all and the layered Evolution preset (${layeredArtifactLabel}) are both present — the three model rows AND the systemPrompt sections double-instance across the profile and preset layers; the preset loader does not fail on it, shadowing semantics take the nearest layer, so an Evolution-preset session silently runs the preset's copies of everything. Keep ONE (use layered without all, or drop the preset).`)
+  // V24-11 (v24): the preset BUNDLE mounts the same three model rows as `all`
+  // (tool-memory / tool-skill-manage / skill-catalog),
   // so bundle × layered preset dir is the same double-mount as all × layered
   // — but `layered` requires `host`, so this combination used to pass the
   // matrix silently (installForm even reports the healthy 'preset') and a
@@ -743,8 +739,8 @@ export async function diagnose(
   const approvalList = (approvalService?.listReadonly ?? approvalService?.list)?.bind(approvalService)
   if (approvalList !== undefined) {
     try {
-      // R-1 (same class as the session-query probe): a wedged approval service
-      // must render as "unknown", not hang the command.
+      // R-1: a wedged approval service must render as "unknown", not hang the
+      // command.
       const pendingProbe = await probeBounded(() => approvalList('pending'), 'approval pending listing')
       const rows = pendingProbe.ok ? pendingProbe.value : undefined
       pendingCount = Array.isArray(rows) ? rows.length : null
@@ -823,8 +819,6 @@ export async function diagnose(
   }
   const budgetIssues = memoryBudgetIssues(ctx)
   const paramIssues = paramDivergences(platform)
-  const queryIssues = await sessionQueryIssues(ctx)
-  if (queryIssues.length > 0) actions.push('Session search is degraded: isolate the session named above (or wait for the platform fix described in the family maintenance notes) before retrying the same query')
   if (paramIssues.length > 0) actions.push('Review the parameter divergences above: /evolution params shows every row with its source, /evolution policy set writes a user value, and a declared-but-unreachable row needs its owning plugin row mounted in this profile.')
   if (budgetIssues.length > 0) actions.push('Align the memory budget: leave memory-files memoryChars/userChars UNSET so the store follows evolution-policy, or set both surfaces to the same value (the review plans against the policy value while the store enforces its own)')
   // S0-4 (v43 G-1 / J-1): the one state a user cannot see for themselves. The gate
@@ -869,7 +863,7 @@ export async function diagnose(
     .map(({ profile }) => profile)
   return {
     installForm, bundles, foreignProfiles, conflicts, budgetIssues,
-    paramIssues, queryIssues, services, capabilityAbsence,
+    paramIssues, services, capabilityAbsence,
     pendingCount, executingCount, presetFreshness, scopedProbe, legacy,
     runtimeBundles: runtimeBundles ?? null,
     formSource: runtimeFlags === undefined ? 'aggregate' : 'platform',
@@ -952,37 +946,6 @@ async function probeBounded<T>(work: () => Promise<T>, label: string): Promise<{
   const outcome = await Promise.race([settled, timeout])
   if (timer !== undefined) clearTimeout(timer)
   return outcome
-}
-
-/**
- * S4/P-1+P-2 (platform report P-1/P-2, family mitigation) — the session-query
- * index can fail AS A WHOLE: a concurrent writer leaves the persistence
- * observation unstable ('did not stabilize after one retry') and ONE
- * header-conflicting session aborts the same try block, which the tool surface
- * folds into 'storage is unavailable'. Doctor cannot read the index's row count
- * or the last stabilization result (the platform exposes no such API — recorded
- * in the platform report), but it CAN exercise the corpus listing and report the
- * verbatim failure with the actionable half: isolate the offending session.
- *
- * @param ctx - the runtime service view (`get(name)`).
- * @returns one or two messages; empty when the service is absent or healthy.
- */
-async function sessionQueryIssues(ctx: { get(name: string): unknown }): Promise<string[]> {
-  const service = sessionQueryPort(ctx as Context)
-  const list = service?.listSessions
-  if (list === undefined) return []
-  // R-1: bounded — the listing path is precisely what a concurrent writer stalls,
-  // so an unbounded await here would hang the command on the state it reports.
-  const outcome = await probeBounded(() => list(), 'session-query listing')
-  if (!outcome.ok) {
-    return [
-      outcome.message,
-      'isolate the offending session — move it OUT of the corpus with a manifest (never delete it) and re-run; the platform already retries the observation once, so retrying first is not the answer',
-    ]
-  }
-  return Array.isArray(outcome.value)
-    ? []
-    : ['session-query answered a listing with a non-list value — the service is mounted but not honouring its read contract']
 }
 
 function memoryBudgetIssues(ctx: { get(name: string): unknown }): string[] {
@@ -1110,7 +1073,6 @@ export function renderDoctorText(report: DoctorReport, locale: HostLocale = 'zh'
   if (report.conflicts.length > 0) extras.push('conflicts:', ...report.conflicts.map(line => `  ! ${line}`))
   if (report.budgetIssues.length > 0) extras.push('memory budget:', ...report.budgetIssues.map(line => `  ! ${line}`))
   if (report.paramIssues.length > 0) extras.push('parameters:', ...report.paramIssues.map(line => `  ! ${line}`))
-  if (report.queryIssues.length > 0) extras.push('session search:', ...report.queryIssues.map(line => `  ! ${line}`))
   if (report.actions.length > 0) extras.push('next steps:', ...report.actions.map(line => `  → ${line}`))
   return renderDiagnosticsText(report.view, locale).trimEnd() + '\n\n' + hostCommandText(locale, 'doctor.supplement') + '\n' + extras.join('\n')
 }

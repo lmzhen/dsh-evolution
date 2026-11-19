@@ -4,10 +4,10 @@
  * Every `DSH_EVOLUTION_*` value the PLUGIN code reads goes through this module
  * so the trim/whitelist patterns (v10 P2-12/13) live in exactly one place and
  * the generated env reference can point at one behavior. Configuration-layer
- * reads inside patch YAML `!!js` expressions (session-query path/openAt) stay
- * in the profile config evaluation — they are NOT migrated (they are resolved
- * at cordis config time, not plugin time) but are documented in the README
- * env table. `EVOLUTION_SCOPE` is read by the source installers only
+ * reads inside patch YAML `!!js` expressions stay in the profile config
+ * evaluation — they are NOT migrated (they are resolved at cordis config time,
+ * not plugin time) but are documented in the README env table. `EVOLUTION_SCOPE`
+ * is read by the source installers only
  * (`packages/scripts/install-layered.mjs`, `packages/test-support/row-contract.ts`),
  * never by plugin runtime code.
  *

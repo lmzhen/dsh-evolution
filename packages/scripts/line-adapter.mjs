@@ -189,8 +189,8 @@ export function resolveEntries(env = process.env) {
   }
   // 3. profile-hoisted platform packages — ONLY the ones the policy declares (MACHINE STATE).
   //    Whitelist on purpose: schemastery 3.18.4 carries the runtime .volatile() the closure's
-  //    3.18.2 lacks; dsh-tool-session-query exists only in the profile. Anything else must NOT be
-  //    hoisted (it would shadow the closure's copy — the cosmokit/dsh-brand case the gate flagged).
+  //    3.18.2 lacks. Anything else must NOT be hoisted (it would shadow the closure's copy —
+  //    the cosmokit/dsh-brand case the gate flagged).
   const hoistPolicy = readPolicy(env).profileHoist ?? {}
   const mayHoist = (id) => hoistPolicy[id] !== undefined && hoistPolicy[id].status !== 'undeclared'
   if (existsSync(p.profileDir)) {

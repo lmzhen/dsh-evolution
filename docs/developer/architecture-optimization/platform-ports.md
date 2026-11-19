@@ -40,7 +40,6 @@ Phase 1 完成（2026-11-16）：生产直接访问只剩 `packages/evolution-co
 | `skills` | `EvolutionPlatform.ports` + `skillsPort` | tool catalog 已迁移 | 完成 |
 | `systemPrompt` | `EvolutionPlatform.ports` | tool guidance 已迁移 | 完成 |
 | `storageDomain` | `EvolutionPlatform.ports` + `storageDomainPort` | state storage 已迁移 | 完成 |
-| `sessionQuery` | `EvolutionPlatform.ports` + `sessionQueryPort` | doctor 已迁移 | 完成 |
 | `workingDirectory` | `EvolutionPlatform.ports` + `workingDirectoryPort` | skill-discovery 已迁移 | 完成 |
 | `pluginManager` | `EvolutionPlatform.ports` + `pluginManagerPort` | doctor platform view 已迁移 | 完成 |
 | `pluginInventory` | `EvolutionPlatform.ports` + `pluginInventoryPort` | doctor platform view 已迁移 | 完成 |
@@ -70,7 +69,6 @@ interface PlatformPorts {
   readonly skills: SkillsPort | undefined
   readonly systemPrompt: SystemPromptPort | undefined
   readonly storageDomain: StorageDomainPort | undefined
-  readonly sessionQuery: SessionQueryPort | undefined
   readonly workingDirectory: WorkingDirectoryPort | undefined
 
   readonly pluginManager: PluginManagerPort | undefined

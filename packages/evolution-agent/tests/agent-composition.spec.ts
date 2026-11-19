@@ -48,7 +48,6 @@ describe('evolution-agent composition', () => {
     expect(ids).toEqual([
       'tool-memory',
       'tool-skill-manage',
-      'tool-session-query',
       'evolution-skill-catalog',
       'evolution-skill-discovery',
     ])

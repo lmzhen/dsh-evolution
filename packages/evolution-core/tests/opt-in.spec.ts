@@ -75,9 +75,6 @@ describe('sessionSeesFamilyTools', () => {
     const ctx = probeContext({ tools: { get: (name) => { asked.push(name); return undefined } } })
     sessionSeesFamilyTools(ctx, 's1')
     expect(asked).toEqual([...FAMILY_SESSION_TOOL_NAMES])
-    // The platform's own session-query tool is deliberately NOT a probe: a
-    // session can carry it without ever mounting a family row.
-    expect(asked).not.toContain('session_search')
   })
 })
 

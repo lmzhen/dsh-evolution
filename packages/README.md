@@ -57,7 +57,7 @@ User-facing surfaces are documented once in [docs/commands.md](../docs/commands.
 |---|---|
 | `/evolution doctor` | Check installation form, versions and service state |
 
-Summary: `/evolution` (27 table entries), `/graph`, and `/skill-domain` (mode:on). Family model-tool entries are `memory`, `skill_manage`, `skill_search`, `maintenance_probe`, and the merge-child-only `merge_stage`; the bundles also mount the platform session-query tools.
+Summary: `/evolution` (27 table entries), `/graph`, and `/skill-domain` (mode:on). Family model-tool entries are `memory`, `skill_manage`, `skill_search`, `maintenance_probe`, and the merge-child-only `merge_stage`; the bundles mount only family-owned model tools.
 
 ## State and IO
 

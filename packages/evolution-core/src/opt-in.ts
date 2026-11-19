@@ -46,9 +46,8 @@ import type { OpaqueScopeKey } from './scope.ts'
 /**
  * Tool names only a session that mounted the family's MODEL rows can see.
  *
- * Both are family packages (`tool-skill-manage`, `tool-memory`), so a session
- * that merely carries the platform's own session-query tool is not mistaken for
- * a family session. Two names, not one: a deployment may disable either row.
+ * Both are family packages (`tool-skill-manage`, `tool-memory`); two names, not
+ * one, because a deployment may disable either row.
  */
 export const FAMILY_SESSION_TOOL_NAMES: readonly string[] = ['skill_manage', 'memory']
 

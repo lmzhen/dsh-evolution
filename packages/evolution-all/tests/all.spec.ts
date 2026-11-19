@@ -19,7 +19,7 @@ const manifest = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8
 it('evolution-all aggregates the host entry, the mounted row packages and the shipped bundles (0.3.54)', () => {
   expect(manifest.name).toBe('@deepseek-ai/dsh-evolution-all')
   // The row set is the contract: every family package the patch mounts must be declared, and the
-  // bundles/tools that carry no row (agent preset container, session-query, core resolver) too.
+  // packages/tools that carry no row (agent preset container, core resolver) too.
   const declared = new Set(Object.keys(manifest.dependencies))
   const rows = insertedRows(loadOverlayPatches('test', fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))))
   const rowPackages = new Set<string>()
@@ -30,10 +30,9 @@ it('evolution-all aggregates the host entry, the mounted row packages and the sh
     rowPackages.add(parts.length > 2 ? parts.slice(0, 2).join('/') : name)
   }
   for (const name of rowPackages) expect(declared.has(name), 'mounted row package ' + name + ' must be a dependency of evolution-all').toBe(true)
-  for (const name of ['@deepseek-ai/dsh-evolution-agent-preset', '@deepseek-ai/dsh-evolution-core', '@deepseek-ai/dsh-tool-session-query']) {
+  for (const name of ['@deepseek-ai/dsh-evolution-agent-preset', '@deepseek-ai/dsh-evolution-core']) {
     expect(declared.has(name), name + ' must be a dependency of evolution-all').toBe(true)
   }
-  expect(manifest.dependencies['@deepseek-ai/dsh-tool-session-query']).toBe('^0.2.2-rc.5')
 })
 
 it('G-C: every model row package named by the all.patch resolves in the dependency closure (0.3.54)', () => {
@@ -41,9 +40,9 @@ it('G-C: every model row package named by the all.patch resolves in the dependen
   const rows = insertedRows(loadOverlayPatches('test', fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))))
   // The infra rows are evolution-host's own contract (G-A pins the row bodies
   // to host.patch, whose dependency-contract covers them); all's OWN closure
-  // must cover the four model rows plus the host package itself.
+  // must cover the three model rows plus the host package itself.
   const declared = new Set([...Object.keys(manifest.dependencies), ...Object.keys(manifest.devDependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})])
-  const modelNames = ['@deepseek-ai/dsh-memory/tools', '@deepseek-ai/dsh-tool-skill-manage', '@deepseek-ai/dsh-tool-session-query', '@deepseek-ai/dsh-evolution-skill-discovery/catalog', '@deepseek-ai/dsh-evolution-skill-discovery']
+  const modelNames = ['@deepseek-ai/dsh-memory/tools', '@deepseek-ai/dsh-tool-skill-manage', '@deepseek-ai/dsh-evolution-skill-discovery/catalog', '@deepseek-ai/dsh-evolution-skill-discovery']
   for (const row of rows) {
     const name = rowName(row)
     if (name.startsWith('@deepseek-ai/') && modelNames.includes(name)) {

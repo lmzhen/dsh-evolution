@@ -64,7 +64,6 @@ export const HOST_ROW_NAMES = {
 export const AGENT_EVOLUTION_ROW_IDS = [
   'tool-memory',
   'tool-skill-manage',
-  'tool-session-query',
   'evolution-skill-catalog',
   'evolution-skill-discovery',
 ] as const
@@ -72,7 +71,6 @@ export const AGENT_EVOLUTION_ROW_IDS = [
 export const AGENT_EVOLUTION_ROW_NAMES = {
   'tool-memory': scoped('@deepseek-ai/dsh-memory/tools'),
   'tool-skill-manage': scoped('@deepseek-ai/dsh-tool-skill-manage'),
-  'tool-session-query': scoped('@deepseek-ai/dsh-tool-session-query'),
   'evolution-skill-catalog': scoped('@deepseek-ai/dsh-evolution-skill-discovery/catalog'),
   'evolution-skill-discovery': scoped('@deepseek-ai/dsh-evolution-skill-discovery'),
 } as const

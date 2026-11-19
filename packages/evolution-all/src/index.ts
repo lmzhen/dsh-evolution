@@ -3,8 +3,8 @@
  * (DEFAULT install target, 0.3.54).
  *
  * This package carries its own `dsh.bundle.patch` (`cordis.patch.yml`) whose
- * row set is the evolution-host infrastructure plane ∪ the four model-facing
- * tool rows (`tool-memory`, `tool-skill-manage`, `tool-session-query`,
+ * row set is the evolution-host infrastructure plane ∪ the three model-facing
+ * tool rows (`tool-memory`, `tool-skill-manage`,
  * `evolution-skill-catalog`), all mounted at PROFILE-ROOT level:
  * `dsh plugin add @lmzhen/dsh-evolution-all` is the "most complete first"
  * install — every session gets the background automation AND the memory /

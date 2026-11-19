@@ -613,7 +613,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "2859f2858521a04aa407fa38bb9dd40c1414608cfa42530d11b2d51e7de66bbd",
+        "sha256": "55f1089b8c46fd1bb20d34769ba3ae1056dbf2992ec996b21ae6e8d012dcbd30",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -986,7 +986,7 @@
             "axis": "falsifiability-carrier",
             "rows": 4,
             "reason": "four rows lack a carrier or noDrillReason after the gate-table pass | 0.44.0 renewal: this release changes the product surface, diagnostics read path and localization, not the gate table this debt names.",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "owner": "scripts",
             "reasonRef": "scripts/family-facts.json checks.pendingAxes",
             "plan": "0.50 must reduce or close the pending axis; 0.48 kept the rows unchanged by the explicit W11 §30.87 exception (not a pass).",
@@ -1428,13 +1428,13 @@
             {
               "mutate": {
                 "file": "packages/scripts/line-policy.json",
-                "find": "    \"@deepseek-ai/schemastery\": { \"status\": \"declared\", \"reason\": \"closure pins 3.18.2 whose .volatile() is types-only; the profile hoist (3.18.4) is what the family’s volatile tests exercise\" },",
-                "replace": "    \"@deepseek-ai/schemastery\": { \"status\": \"declared\", \"reason\": 0 },"
+                "find": "    \"@deepseek-ai/schemastery\": { \"status\": \"declared\", \"reason\": \"closure pins 3.18.2 whose .volatile() is types-only; the profile hoist (3.18.4) is what the family’s volatile tests exercise\" }",
+                "replace": "    \"@deepseek-ai/schemastery\": { \"status\": \"declared\", \"reason\": 0 }"
               },
               "expect": "red",
               "note": "the CI row runs the same script in the same policy-only form, so the same non-string-reason mutation is its red too; two rows sharing one script still carry their own proof",
-              "provenAt": "2026-10-14T08:33:45.995Z",
-              "provenSha": "b2c6b521079b008d3ae4d70b52f8d150cab0305f41991f04f15f13fda6643eca"
+              "provenAt": "2026-11-19T06:34:27.435Z",
+              "provenSha": "49e40f96b4d38720021040e1208c187d862ae7167c2b4022a718f4c7ea82c74f"
             }
           ],
           "gate-28": [
@@ -1780,265 +1780,265 @@
           "gate-33": {
             "reason": "this row declares no single command (composite cell: several commands in one table row), so there is no argv a mutation could run - it cannot be mutation-proven",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: either split the row into real argv rows or keep the exemption; the executability axis already counts it",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the stated condition is still unmet in 0.49; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the stated condition is still unmet in 0.49; this is a registered debt, not a pass."
           },
           "gate-13": {
             "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the three audit-v37 helpers still run outside packages/scripts; the S1.8 port has not happened; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the three audit-v37 helpers still run outside packages/scripts; the S1.8 port has not happened; this is a registered debt, not a pass."
           },
           "gate-14": {
             "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the three audit-v37 helpers still run outside packages/scripts; the S1.8 port has not happened; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the three audit-v37 helpers still run outside packages/scripts; the S1.8 port has not happened; this is a registered debt, not a pass."
           },
           "gate-15": {
             "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the three audit-v37 helpers still run outside packages/scripts; the S1.8 port has not happened; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the three audit-v37 helpers still run outside packages/scripts; the S1.8 port has not happened; this is a registered debt, not a pass."
           },
           "gate-16": {
             "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still runs its guard over synthetic --self-test fixtures, not repo content; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still runs its guard over synthetic --self-test fixtures, not repo content; this is a registered debt, not a pass."
           },
           "gate-45": {
             "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still runs its guard over synthetic --self-test fixtures, not repo content; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still runs its guard over synthetic --self-test fixtures, not repo content; this is a registered debt, not a pass."
           },
           "ci-only-08": {
             "reason": "its TARGET path (upstream/tsconfig.base.json) exists only in the CI overlay job, never in this repo: the row injects alias lines into the upstream tree that the compat job checks out, so no mutation inside this repo can change what it judges",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row ever names an in-repo target, delete this exemption and prove it by mutation",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): upstream/tsconfig.base.json still exists only in the CI overlay, not in this repo; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): upstream/tsconfig.base.json still exists only in the CI overlay, not in this repo; this is a registered debt, not a pass."
           },
           "gate-18": {
             "reason": "its subject is the PLATFORM tree outside this repo: the receipts name packages/core/... files and the argv points at an out-of-repo upstream checkout, so the reviewed repo carries neither the files it judges nor a way to change them",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row ever judges in-repo files, delete this exemption and prove it by mutation",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the platform receipts and upstream checkout still live outside this repo; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the platform receipts and upstream checkout still live outside this repo; this is a registered debt, not a pass."
           },
           "gate-01": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
           },
           "gate-02": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
           },
           "gate-03": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
           },
           "gate-04": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
           },
           "gate-05": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
           },
           "ci-only-13": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still aggregates a compiler/linter/build over the whole tree; no targeted per-rule gate has replaced it; this is a registered debt, not a pass."
           },
           "gate-27": {
             "reason": "BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mutation in this repo can red it without first building",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row gains a source-level subject or dist becomes part of the reviewed tree, delete this exemption and prove it by mutation",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): packages/evolution/dist is still a built artifact, not reviewed source; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): packages/evolution/dist is still a built artifact, not reviewed source; this is a registered debt, not a pass."
           },
           "gate-50": {
             "reason": "PRODUCER ROW, NOT A CHECK: its registered argv carries no --check, and the script only READS the machine skill corpora and WRITES scripts/reports/health-baseline.json through the engine - it has no verdict to turn red, and its corpus is machine state (the reader that judges the artifact is health-admission, registered separately and cannot-decide without a platform corpus)",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if this row ever gains a --check form (the drift check the other generators carry), delete this exemption and prove it by hand-editing the artifact",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still has no --check form and only writes the health baseline; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still has no --check form and only writes the health baseline; this is a registered debt, not a pass."
           },
           "gate-81": {
             "reason": "the health-admission gate is a registered local cannot: a bare overlay has no health-baseline corpora, so it exits cannot-decide before any mutation; a mutation cannot flip a missing input",
             "owner": "scripts/gates",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "run the row on a build line that carries the health baseline and replace this exemption with a proven record; the row stays counted until then",
             "condition": "release gate: revisit when the CI lane supplies the baseline",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): a bare overlay still has no health-baseline corpora, so the row cannot decide before mutation; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): a bare overlay still has no health-baseline corpora, so the row cannot decide before mutation; this is a registered debt, not a pass."
           },
           "gate-75": {
             "reason": "the layout-sync row is localSafe=false: its argv uses a CI workspace-relative path (../packages/scripts) that does not resolve on a dev machine, so the baseline is red before any mutation",
             "owner": "scripts/gates",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "prove the row in the CI workspace where the relative path resolves, or replace the argv with a layout-neutral pair; the row stays counted until then",
             "condition": "release gate: revisit when the path is layout-neutral or the CI lane runs it",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the argv still uses the CI-relative ../packages/scripts pair; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the argv still uses the CI-relative ../packages/scripts pair; this is a registered debt, not a pass."
           },
           "gate-59": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
           },
           "gate-74": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
           },
           "gate-67": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
           },
           "gate-68": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
           },
           "gate-69": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
           },
           "gate-70": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
           },
           "gate-71": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
           },
           "gate-73": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
           },
           "ci-only-18": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row is still a release/CI shell step with no family test anchor; this is a registered debt, not a pass."
           },
           "gate-56": {
             "reason": "external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the command still lives outside this family tree and has no argv anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the command still lives outside this family tree and has no argv anchor; this is a registered debt, not a pass."
           },
           "gate-57": {
             "reason": "external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the command still lives outside this family tree and has no argv anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the command still lives outside this family tree and has no argv anchor; this is a registered debt, not a pass."
           },
           "gate-78": {
             "reason": "external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor",
             "owner": "scripts/release",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the command still lives outside this family tree and has no argv anchor; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the command still lives outside this family tree and has no argv anchor; this is a registered debt, not a pass."
           }
         },
         "cannotDecideRegistered": {
           "gate-29": {
             "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
             "owner": "scripts/gate-manifest",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): the row still needs the CI-only $RUNNER_TEMP/plane-home argument; a dev tree has no such home; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): the row still needs the CI-only $RUNNER_TEMP/plane-home argument; a dev tree has no such home; this is a registered debt, not a pass."
           },
           "gate-81": {
             "reason": "the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge",
             "owner": "scripts/gates",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "the CI lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): a bare overlay still has no health-baseline corpora, so the row cannot decide before mutation; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): a bare overlay still has no health-baseline corpora, so the row cannot decide before mutation; this is a registered debt, not a pass."
           },
           "gate-05": {
             "reason": "smoke-built-entries needs built lib artifacts that a source checkout does not carry",
             "owner": "scripts/gates",
-            "expiry": "0.57.0",
+            "expiry": "0.58.0",
             "plan": "run after build-lib on the build line",
-            "renewal": "Renewed at 0.56.0 (expiry 0.57.0): a source checkout still carries no built lib artifacts; the row runs only after build-lib on the build line; this is a registered debt, not a pass."
+            "renewal": "Renewed at 0.57.0 (expiry 0.58.0): a source checkout still carries no built lib artifacts; the row runs only after build-lib on the build line; this is a registered debt, not a pass."
           }
         }
       }

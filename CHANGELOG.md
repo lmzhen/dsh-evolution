@@ -1,3 +1,11 @@
+## 0.57.0 (2026-11-19) — 移除平台会话检索工具依赖
+
+> **范围**：① 从 `evolution-all`、`evolution-agent`、`evolution-preset` 删除对平台 `@deepseek-ai/dsh-tool-session-query` 的依赖和默认挂载；② 删除家族围绕它的 `sessionQuery` port、`/evolution doctor` 语料探针、`session-query-sqlite` 索引覆盖与 `DSH_EVOLUTION_SESSION_QUERY*` 环境变量；③ 同步删除相关测试、生成物、bundle 行、行清单与文档。平台能力归平台；家族不再重复分发。
+>
+> **不迁移**：磁盘数据格式、配置字段和平台线不变；`session_search` 等模型工具不再由家族默认提供，需要时由平台插件提供。
+>
+> **验证**：pre-tag gate **64 pass / 0 fail / 3 registered cannotDecide / 2 skipped**；定向 tests 101 项通过；独立复核 P0/P1=0（含 gate-23 mutation anchor 与 memory mutation ledger 两项修复）；S1/S2/S3 在 rc.5 web host 的 0.57.0 候选上实测（45 行、32,468 bytes、读耗时 708 / 1,162 / 1,008 ms、诊断 13 ms、schema 2 / facts 7 / runtime 8），S4 HMR spec 2 项通过。真实 npm web A→B 升级验收在发布后按 1440 / 1024 / 390 三档记录。
+
 ## 0.56.0 (2026-11-19) — 适配 DSH 0.2.2-rc.5
 
 > **范围**：① 平台线从 rc.3 升到 **rc.5**，家族依赖与 peer/engines 同步到 rc.5；② 平台接口核对确认现有 port/anchor 无破坏性变化，不需要新增适配层；③ LLM 内容安全拒绝按 rc.5 的 in-band `finish(error)` 中的 `CONTENT_REFUSED` 错误码识别为 `content-refused`，不再误归为 `transport`；④ rc.5 的 `WebSearchRequest.llmProvider` 仅平台 web search 使用，家族当前没有 web 搜索调用，不引入依赖。

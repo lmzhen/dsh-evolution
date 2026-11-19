@@ -97,8 +97,8 @@ const UPSTREAM_PLANES = {
     // 0.2.1-rc.2 re-record (`--upstream` recompute): `hmr` stays mounted ENABLED; the base plane
     // disables `tool-plugin-manager` ONLY — `skill-badge` and `tool-ralph` are mounted enabled again.
     disabled: ['tool-plugin-manager', 'fs-observation-policy', 'tool-executor-ptc'],
-    mounted: ['session-query-sqlite', 'tool-skill'],
-    source: 'packages/bundle/base/cordis.patch.yml (session-query-sqlite and tool-skill mounted; tool-plugin-manager disabled:true)',
+    mounted: ['tool-skill'],
+    source: 'packages/bundle/base/cordis.patch.yml (tool-skill mounted; tool-plugin-manager disabled:true)',
   },
   'web-app': {
     // 0.2.x re-record: `ui-schedule` and `workflow-worker-thread` are mounted ENABLED now,
@@ -144,28 +144,12 @@ const UPSTREAM_PLANES = {
  * falls back to its schema default.
  */
 const PLATFORM_ROW_CONFIG_KEYS = {
-  'session-query-sqlite': [
-    'path',
-    'openAt',
-    'journalMode',
-    'defaultLimit',
-    'maxLimit',
-    'snippetChars',
-    'readWindowMax',
-    'persistedReadConcurrency',
-    'preparedSessionCacheSize',
-  ],
   'tool-skill': ['catalogDescriptionMaxLength'],
 }
 
 /** Platform sources carrying each row's `Config` interface: the row's own
- * module plus any base `Config` it extends (`session-query-sqlite` extends the
- * backend-independent session-query Config). */
+ * module. */
 const PLATFORM_ROW_CONFIG_SOURCES = {
-  'session-query-sqlite': [
-    'packages/session-query/session-query-sqlite/src/index.ts',
-    'packages/session-query/session-query/src/config.ts',
-  ],
   'tool-skill': ['packages/skill/tool-skill/src/index.ts'],
 }
 

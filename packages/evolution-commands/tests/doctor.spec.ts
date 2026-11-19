@@ -322,7 +322,7 @@ describe('doctor (WB2, 0.3.55)', () => {
     }
   })
 
-  // T-WB2 removed: the family no longer owns DSH_EVOLUTION_SESSION_QUERY.
+  // T-WB2 removed: the family no longer owns session-search index policy.
   it('reports the legacy settings document, and what is still unmigrated (G3)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'doctor-legacy-'))
     try {
@@ -858,11 +858,10 @@ describe('doctor (WB2, 0.3.55)', () => {
 
 describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surfaces', () => {
   /** The runtime view doctor reads: memory-files\u2019 published budget + the policy. */
-  const runtime = (budget: unknown, policy: unknown, listSessions?: () => unknown) => ({
+  const runtime = (budget: unknown, policy: unknown) => ({
     get: (name: string) => {
       if (name === 'evolutionMemoryBudget') return budget
       if (name === 'evolutionPolicy') return policy
-      if (name === 'sessionQuery' && listSessions !== undefined) return { listSessions: async () => listSessions() }
       return undefined
     },
   })
@@ -883,75 +882,6 @@ describe('S2-12③ (FLOW5-4): the memory budget\u2019s two configuration surface
       const text = renderDoctorText(report)
       expect(text).toContain('memory budget:')
       expect(text).toContain('source: config')
-    } finally {
-      await rm(home, { recursive: true, force: true })
-    }
-  })
-
-  it('S4 review R-1: a WEDGED probe is a finding, not a hang', async () => {
-    // Source-first review finding: the probe awaited the very path a concurrent
-    // writer stalls, so /evolution doctor could hang on the state it reports.
-    vi.useFakeTimers()
-    const home = await mkdtemp(join(tmpdir(), 'doctor-wedged-'))
-    try {
-      const reportPromise = diagnose(runtime(undefined, undefined, () => new Promise(() => {})), { home })
-      // Let the probe register its bound, then fire it (fs IO resolves on the real
-      // event loop, so interleave the advances).
-      for (let step = 0; step < 3; step += 1) await vi.advanceTimersByTimeAsync(2_000)
-      const report = await reportPromise
-      expect(report.queryIssues).toHaveLength(2)
-      expect(report.queryIssues[0]).toContain('在 5000ms 内没有应答')
-      expect(report.queryIssues[1]).toContain('isolate the offending session')
-      expect(renderDoctorText(report)).toContain('session search:')
-    } finally {
-      vi.useRealTimers()
-      await rm(home, { recursive: true, force: true })
-    }
-  })
-
-  it('R-2 (source-first review): a probe that THROWS synchronously is a finding, not a crash', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'doctor-syncthrow-'))
-    try {
-      // A mounted-but-broken service can throw before it ever returns a promise;
-      // the probe must capture that exactly like a rejection (the eager
-      // `Promise.resolve(service.list())` form let it escape and crash doctor).
-      // A TRUE synchronous throw: the service object's method itself throws,
-      // before any promise exists (the async-arrow stub form would only produce a
-      // rejection, which the eager `Promise.resolve(service.list())` shape already
-      // handled — see the discriminating check in the commit).
-      const throwingView = {
-        get: (name: string) => name === 'sessionQuery'
-          ? { listSessions: (): never => { throw new Error('session-query service is not initialised') } }
-          : undefined,
-      }
-      const report = await diagnose(throwingView, { home })
-      expect(report.queryIssues).toHaveLength(2)
-      expect(report.queryIssues[0]).toContain('session-query service is not initialised')
-      expect(renderDoctorText(report)).toContain('session search:')
-    } finally {
-      await rm(home, { recursive: true, force: true })
-    }
-  })
-
-  it('S4 (P-1/P-2): a degraded session-query corpus is reported with the isolation recipe', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'doctor-query-'))
-    try {
-      // The platform folds both platform gaps into this one failure; doctor's job
-      // is to surface it verbatim next to what an operator can actually do.
-      const degraded = await diagnose(runtime(undefined, undefined, () => {
-        throw new Error('session-search persistence observation did not stabilize after one retry')
-      }), { home })
-      expect(degraded.queryIssues).toHaveLength(2)
-      expect(degraded.queryIssues[0]).toContain('did not stabilize after one retry')
-      expect(degraded.queryIssues[1]).toContain('isolate the offending session')
-      expect(degraded.actions.some(action => action.includes('Session search is degraded'))).toBe(true)
-      const text = renderDoctorText(degraded)
-      expect(text).toContain('session search:')
-      // A healthy corpus (and an absent service) stay silent.
-      const healthy = await diagnose(runtime(undefined, undefined, () => []), { home })
-      expect(healthy.queryIssues).toEqual([])
-      expect(renderDoctorText(healthy)).not.toContain('session search:')
-      expect((await diagnose(stub, { home })).queryIssues).toEqual([])
     } finally {
       await rm(home, { recursive: true, force: true })
     }

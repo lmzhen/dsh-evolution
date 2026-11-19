@@ -1,5 +1,5 @@
 {
-  "pin": "8dcbda6e",
+  "pin": "5bba8285",
   "bed": {
     "mono": "overlay"
   },
@@ -98,10 +98,6 @@
       "id": "@lmzhen/dsh-evolution-client-kit",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-client-kit"
-    },
-    {
-      "id": "@deepseek-ai/dsh-tool-session-query",
-      "kind": "profile-hoist"
     },
     {
       "id": "@deepseek-ai/schemastery",

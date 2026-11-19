@@ -22,8 +22,6 @@ import { workingDirectoryPort } from '../platform/workingDirectory.ts'
 import type { WorkingDirectoryPort } from '../platform/workingDirectory.ts'
 import { skillsPort } from '../platform/skills.ts'
 import type { SkillsPort } from '../platform/skills.ts'
-import { sessionQueryPort } from '../platform/sessionQuery.ts'
-import type { SessionQueryPort } from '../platform/sessionQuery.ts'
 import { storageDomainPort } from '../platform/storageDomain.ts'
 import type { SettingsPort } from '../platform/settings.ts'
 import type { StorageDomainPort } from '../platform/storageDomain.ts'
@@ -56,7 +54,6 @@ export interface HostPlatformPorts {
   readonly configEditor: ConfigEditorPort | undefined
   readonly profileContext: ProfileContextPort | undefined
   readonly skills: SkillsPort | undefined
-  readonly sessionQuery: SessionQueryPort | undefined
   readonly commands: CommandsPort | undefined
   readonly systemPrompt: SystemPromptPort | undefined
   readonly subagents: SubagentsPort | undefined
@@ -92,7 +89,6 @@ export class EvolutionPlatform extends Service {
       configEditor: configEditorPort(this.ctx),
       profileContext: profileContextPort(this.ctx),
       skills: skillsPort(this.ctx),
-      sessionQuery: sessionQueryPort(this.ctx),
       commands: commandsPort(this.ctx),
       systemPrompt: systemPromptPort(this.ctx),
       subagents: subagentsPort(this.ctx),

@@ -18,7 +18,7 @@ import { cordisRows, rowId, type CordisRow } from '../../test-support/cordis-row
 // subset of the preset's — distinctness is pinned via the model tools, not via
 // a host-only row.
 // V10-14→0.3.54 (route B): `dsh-evolution-all` joins the matrix as the FULL
-// bundle — infra ∪ the four model rows. The guards below pin all.patch's row
+// bundle — infra ∪ the three model rows. The guards below pin all.patch's row
 // bodies to host.patch (infra) and preset.patch (model rows), and the
 // composition check proves that mounting all + host (or all + preset) composes
 // DUPLICATE infra rows — the precondition for the startup fail-loud (upstream
@@ -50,7 +50,7 @@ const allPatch = rowMap(
 )
 
 const sharedIds = [...hostPatch.keys()].filter(id => presetPatch.has(id))
-const MODEL_TOOLS = ['tool-memory', 'tool-skill-manage', 'tool-session-query', 'evolution-skill-catalog']
+const MODEL_TOOLS = ['tool-memory', 'tool-skill-manage', 'evolution-skill-catalog']
 
 /** Rows that are neither host infra nor model-facing: the UI umbrella makes its
  * own host registration but stays out of the host-only and preset bundles; the
@@ -78,7 +78,7 @@ describe('host/preset dual-bundle mutual exclusion (S7.2, E-33)', () => {
   it('keeps the preset the only bundle exposing model-facing tools (V10-14: host rows are a subset)', () => {
     const presetOnly = [...presetPatch.keys()].filter(id => !hostPatch.has(id))
     // The preset bundle is the one that exposes the model-facing tools.
-    for (const tool of ['tool-memory', 'tool-skill-manage', 'tool-session-query']) {
+    for (const tool of ['tool-memory', 'tool-skill-manage']) {
       expect(presetOnly).toContain(tool)
     }
     // V10-14 (P1-2): the tool-skill cap override is now carried by BOTH
@@ -96,13 +96,13 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
     }
   })
 
-  it('G-B: the four all.patch model rows are byte-identical to preset.patch', () => {
+  it('G-B: the three all.patch model rows are byte-identical to preset.patch', () => {
     for (const id of MODEL_TOOLS) {
       expect(normalize(allPatch.get(id)), `all model row ${id}`).toEqual(normalize(presetPatch.get(id)))
     }
   })
 
-  it('all row set = host infra ∪ 4 model rows ∪ the all-only UI rows', () => {
+  it('all row set = host infra ∪ 3 model rows ∪ the all-only UI rows', () => {
     expect(allPatch.size).toBe(hostPatch.size + MODEL_TOOLS.length + ALL_ONLY_ROWS.length + ALL_EXTRA_INFRA.length)
     for (const id of ALL_EXTRA_INFRA) expect(hostPatch.has(id), `${id} must stay all-only`).toBe(false)
     for (const id of MODEL_TOOLS) expect(hostPatch.has(id)).toBe(false)
@@ -116,10 +116,10 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
       loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-all/cordis.patch.yml', import.meta.url))),
     ]))
     const ids = merged.map(rowId).filter(id => id !== '')
-    // INSERT rows only: the two root-level config OVERRIDES (session-query-
-    // sqlite, tool-skill) patch an existing base row and are not duplicated —
-    // composition checks must not count them as double mounts.
-    const infraInsertIds = [...hostPatch.keys()].filter(id => id !== 'session-query-sqlite' && id !== 'tool-skill')
+    // INSERT rows only: the root-level `tool-skill` config override patches an
+    // existing base row and is not duplicated — composition checks must not
+    // count it as a double mount.
+    const infraInsertIds = [...hostPatch.keys()].filter(id => id !== 'tool-skill')
     for (const id of infraInsertIds) {
       expect(ids.filter(match => match === id), `infra row ${id} must mount TWICE`).toHaveLength(2)
     }
@@ -133,7 +133,7 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
       loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-all/cordis.patch.yml', import.meta.url))),
     ]))
     const ids = merged.map(rowId).filter(id => id !== '')
-    const infraInsertIds = [...hostPatch.keys()].filter(id => id !== 'session-query-sqlite' && id !== 'tool-skill')
+    const infraInsertIds = [...hostPatch.keys()].filter(id => id !== 'tool-skill')
     for (const id of infraInsertIds) {
       expect(ids.filter(match => match === id), `infra row ${id} must mount TWICE`).toHaveLength(2)
     }

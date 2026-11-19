@@ -42,9 +42,9 @@ describe('composePresetComposition (0.3.15)', () => {
     // this guard while every other check stayed green. The extractor is
     // indent-agnostic now (twin of `rowIds` in scripts/install-layered.mjs;
     // installer.spec pins the cross-side parity).
-    const standard = 'groups:\n  - id: tool-session-query\n    name: "@deepseek-ai/dsh-tool-session-query"\n'
-    const delta = '- id: tool-session-query\n'
-    expect(() => composePresetComposition(standard, delta)).toThrow(/collide with runtime standard rows: tool-session-query/)
+    const standard = 'groups:\n  - id: tool-memory\n    name: "@deepseek-ai/dsh-memory/tools"\n'
+    const delta = '- id: tool-memory\n'
+    expect(() => composePresetComposition(standard, delta)).toThrow(/collide with runtime standard rows: tool-memory/)
   })
 
   it('PLAN S5.9 (2026-09-16): boundary pin — detection covers nested rows, injection anchoring is still top-level only', () => {

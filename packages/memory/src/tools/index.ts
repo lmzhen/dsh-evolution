@@ -38,9 +38,8 @@ export const MEMORY_GUIDANCE =
   + 'Imperative phrasing is re-read as a directive in later sessions and can '
   + 'override the user\u2019s current request.\n'
   + 'Do NOT save task progress, session outcomes, completed-work logs, PR/issue '
-  + 'numbers, commit SHAs, or anything stale within a week — use the session '
-  + 'query tool to recall past sessions instead. Reusable procedures belong in '
-  + 'a skill, not memory.'
+  + 'numbers, commit SHAs, or anything stale within a week — those belong to '
+  + 'the session log, not memory. Reusable procedures belong in a skill, not memory.'
 
 /**
  * Tool-schema description for `memory`, aligned with Hermes `MEMORY_SCHEMA`.
