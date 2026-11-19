@@ -30,6 +30,10 @@
       "types": "./lib/types/values.d.ts",
       "default": "./lib/values.js"
     },
+    "./review-child": {
+      "types": "./lib/types/review-child.d.ts",
+      "default": "./lib/review-child.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
