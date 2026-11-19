@@ -6,16 +6,13 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { warnIfFamilyMixed } from './coherence.ts'
 import { EvolutionLlm } from './llm.ts'
-import { EvolutionPlatform } from './platform.ts'
 import { EvolutionProjections } from './projections.ts'
 
 export const name = 'evolution-core-runtime'
 
 /** @param ctx - the composition context that owns the runtime services. */
 export async function apply(ctx: Context): Promise<void> {
-  // Ports resolve from the platform service now, so the platform must be mounted
-  // before the consumers initialize; sequential plugin mounts make that order real.
-  await ctx.plugin(EvolutionPlatform)
+  // The adapter row owns `evolutionPlatform` and mounts before this row.
   await ctx.plugin(EvolutionProjections)
   await ctx.plugin(EvolutionLlm)
   warnIfFamilyMixed(ctx)

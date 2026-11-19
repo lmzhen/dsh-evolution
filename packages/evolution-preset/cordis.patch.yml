@@ -13,6 +13,8 @@
 # overlay pins `config: { provider: ... }` on the `evolution-state` row.
 - insert:
     # ── runtime services: one projection owner per composition ───────────────
+    - id: evolution-adapter
+      name: '@deepseek-ai/dsh-evolution-adapter'
     - id: evolution-core-runtime
       name: '@deepseek-ai/dsh-evolution-core/runtime'
 

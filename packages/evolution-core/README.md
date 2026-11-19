@@ -4,7 +4,7 @@ Shared library for the evolution family: skill and memory stores, write kernels 
 
 The root entry is a library, not a user-facing command. The package also exposes `./composition`, `./subagent`, `./http-routes`, `./restrictor`, `./platform`, and `./runtime` subpaths.
 
-`./platform` is now a compatibility re-export: the host port implementations and the `EvolutionPlatform` service live in `@lmzhen/dsh-evolution-adapter`, the only package that imports `@deepseek-ai/dsh-*` runtime values. `./runtime` still mounts that service while the adapter row is split out.
+`./platform` is now a compatibility re-export: the host port implementations and the `EvolutionPlatform` service live in `@lmzhen/dsh-evolution-adapter`, the only package that imports `@deepseek-ai/dsh-*` runtime values. `./runtime` no longer mounts that service; the bundle's `evolution-adapter` row owns it and mounts before core/runtime.
 
 `./runtime` is a function plugin. It provides `evolutionProjections`, the single owner of the five host-only session units (`evolutionActivity`, `evolutionEvidence`, `evolutionReads`, `evolutionProjectionHistory`, `evolutionSignals`); readers ask that service and degrade to `undefined` when the platform registry is absent. It also provides `evolutionLlm`, the single route/purpose/transport owner for auxiliary model calls (curator, merge judge, domain generation). A granular composition that mounts feature rows without a family bundle must mount this row too.
 

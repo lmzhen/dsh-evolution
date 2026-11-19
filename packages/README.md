@@ -47,8 +47,8 @@ This directory holds the 22 packages of the dsh-evolution family. For the user g
 
 | Package | Role |
 |---|---|
-| `evolution-host` | Infrastructure bundle (21 rows + 2 overrides) |
-| `evolution-all` | Full bundle (28 rows + 2 overrides); default |
+| `evolution-host` | Infrastructure bundle (23 rows + 1 override) |
+| `evolution-all` | Full bundle (30 rows + 1 override); default |
 | `evolution-agent` | Agent preset delta (5 rows) + 4 base table; not a bundle |
 
 ## Command and tool entry points
