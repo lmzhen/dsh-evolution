@@ -63,6 +63,13 @@ function tools(seen: { agent?: ReviewParent }): ReviewToolPort {
   }
 }
 
+const doneCall = { type: 'tool-call' as const, id: ToolCallId('done-1'), name: 'review_done', arguments: JSON.stringify({ summary: 'done', memoryChanged: false, skillsChanged: ['probe'], unresolved: [] }) }
+const doneChunks: StreamChunk[] = [
+  { type: 'block-start', index: 0, blockType: 'tool-call' },
+  { type: 'block-end', index: 0, block: doneCall },
+  { type: 'finish', reason: { kind: 'tool-calls' } },
+]
+
 function allowed(): ReadonlySet<string> {
   return new Set(['skill_manage'])
 }
@@ -139,6 +146,77 @@ describe('runReview', () => {
       })
     })
     expect(reads.has('read-skill')).toBe(true)
+  })
+
+  it('completes only after an explicit review_done tool call', async () => {
+    const result = await runReview({
+      parent: parent(),
+      llm: llm([toolCallChunks, doneChunks]),
+      tools: tools({}),
+      instruction: 'review',
+      toolAllow: allowed(),
+      signal: new AbortController().signal,
+      markReview: () => {},
+      clearReview: () => {},
+    })
+    expect(result.done).toBe(true)
+    expect(result.partialReason).toBeUndefined()
+    expect(result.report).toEqual({ summary: 'done', memoryChanged: false, skillsChanged: ['probe'], unresolved: [] })
+    expect(result.toolCalls).toBe(2)
+  })
+
+  it('marks a review without review_done partial', async () => {
+    const result = await runReview({
+      parent: parent(),
+      llm: llm([textChunks]),
+      tools: tools({}),
+      instruction: 'review',
+      toolAllow: allowed(),
+      signal: new AbortController().signal,
+      markReview: () => {},
+      clearReview: () => {},
+    })
+    expect(result.done).toBe(false)
+    expect(result.partialReason).toBe('missing review_done')
+  })
+
+  it('marks round exhaustion partial instead of completed', async () => {
+    const result = await runReview({
+      parent: parent(),
+      llm: llm([toolCallChunks]),
+      tools: tools({}),
+      instruction: 'review',
+      toolAllow: allowed(),
+      maxRounds: 1,
+      signal: new AbortController().signal,
+      markReview: () => {},
+      clearReview: () => {},
+    })
+    expect(result.done).toBe(false)
+    expect(result.hitRoundLimit).toBe(true)
+    expect(result.partialReason).toBe('max review rounds reached before review_done')
+  })
+
+  it('rejects review_done mixed with other calls', async () => {
+    const mixed: StreamChunk[] = [
+      { type: 'block-start', index: 0, blockType: 'tool-call' },
+      { type: 'block-end', index: 0, block: call },
+      { type: 'block-start', index: 1, blockType: 'tool-call' },
+      { type: 'block-end', index: 1, block: doneCall },
+      { type: 'finish', reason: { kind: 'tool-calls' } },
+    ]
+    const result = await runReview({
+      parent: parent(),
+      llm: llm([mixed]),
+      tools: tools({}),
+      instruction: 'review',
+      toolAllow: allowed(),
+      signal: new AbortController().signal,
+      markReview: () => {},
+      clearReview: () => {},
+    })
+    expect(result.done).toBe(false)
+    expect(result.partialReason).toBe('review_done must be the only tool call in its batch')
   })
 })
 

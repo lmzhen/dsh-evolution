@@ -51,6 +51,49 @@ export interface ReviewLlmPort {
   stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 }
 
+
+/** Structured completion report required by the aux review protocol. */
+export interface ReviewReport {
+  readonly summary: string
+  readonly memoryChanged: boolean
+  readonly skillsChanged: readonly string[]
+  readonly unresolved: readonly string[]
+}
+
+/** The only terminal tool call in an aux review. */
+export const REVIEW_DONE_TOOL_NAME = 'review_done'
+
+/** Extra instruction appended to aux prompts only; foreground prompts stay unchanged. */
+export const AUX_COMPLETION_INSTRUCTION = 'When all durable changes for this review are complete, call review_done as the only tool call in your final batch. Do not call it while more edits remain.'
+
+
+const REVIEW_DONE_TOOL: ToolSchema = {
+  name: REVIEW_DONE_TOOL_NAME,
+  description: 'Signal that this review is complete. Call it alone, only after all memory/skill edits for this review are finished.',
+  parameters: {
+    type: 'object',
+    properties: {
+      summary: { type: 'string' },
+      memoryChanged: { type: 'boolean' },
+      skillsChanged: { type: 'array', items: { type: 'string' } },
+      unresolved: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['summary', 'memoryChanged', 'skillsChanged', 'unresolved'],
+  } as ToolSchema['parameters'],
+}
+
+function parseReviewReport(raw: string): ReviewReport | undefined {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (parsed === null || typeof parsed !== 'object') return undefined
+    const value = parsed as Record<string, unknown>
+    if (typeof value.summary !== 'string' || typeof value.memoryChanged !== 'boolean') return undefined
+    if (!Array.isArray(value.skillsChanged) || !value.skillsChanged.every(item => typeof item === 'string')) return undefined
+    if (!Array.isArray(value.unresolved) || !value.unresolved.every(item => typeof item === 'string')) return undefined
+    return { summary: value.summary, memoryChanged: value.memoryChanged, skillsChanged: value.skillsChanged, unresolved: value.unresolved }
+  } catch { return undefined }
+}
+
 export class ReviewModelError extends Error {
   constructor(message: string, readonly code: 'timeout' | 'cancelled' | 'transport') { super(message); this.name = 'ReviewModelError' }
 }
@@ -85,6 +128,10 @@ export interface ReviewExecutionResult {
   readonly usage?: ReviewUsage
   readonly requests: number
   readonly toolCalls: number
+  readonly done: boolean
+  readonly hitRoundLimit: boolean
+  readonly report?: ReviewReport
+  readonly partialReason?: string
 }
 
 
@@ -148,6 +195,10 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
   let usage: ReviewUsage | undefined
   let requests = 0
   let toolCalls = 0
+  let done = false
+  let hitRoundLimit = false
+  let partialReason: string | undefined
+  let report: ReviewReport | undefined
   markReview()
   try {
     for (let round = 0; round < maxRounds; round += 1) {
@@ -160,7 +211,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         ...(header.config.temperature === undefined ? {} : { temperature: header.config.temperature }),
         ...(header.config.maxTokens === undefined ? {} : { maxTokens: header.config.maxTokens }),
         messages,
-        ...(header.tools === undefined ? {} : { tools: [...header.tools] as ToolSchema[] }),
+        tools: [...(header.tools ?? []), REVIEW_DONE_TOOL] as ToolSchema[],
         ...(toolHistory === undefined ? {} : { toolHistory }),
         signal,
       }, signal)
@@ -182,6 +233,23 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
       if (text !== '') finalText = text
       const calls = assistant.content.filter((block): block is ToolCallBlock => block.type === 'tool-call')
       if (calls.length === 0) break
+      const doneCalls = calls.filter(call => call.name === REVIEW_DONE_TOOL_NAME)
+      if (doneCalls.length > 0) {
+        toolCalls += calls.length
+        if (calls.length !== 1) {
+          partialReason = 'review_done must be the only tool call in its batch'
+          break
+        }
+        const parsed = parseReviewReport(doneCalls[0]!.arguments)
+        if (parsed === undefined) {
+          partialReason = 'review_done report is invalid'
+          break
+        }
+        report = parsed
+        done = true
+        actions.push({ type: 'tool', action: REVIEW_DONE_TOOL_NAME, target: 'review', status: 'ok' })
+        break
+      }
       messages.push(assistant)
       const allowedCalls = calls.filter(call => toolAllow.has(call.name))
       const batch = allowedCalls.length === 0 ? { results: [] as ReviewToolOutcome[] } : await tools.execute({ calls: allowedCalls, signal, agent: parent })
@@ -227,17 +295,24 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         }))
       }
       toolCalls += calls.length
+      if (round === maxRounds - 1) hitRoundLimit = true
       if (parent.session.seq !== beforeSeq) throw new ReviewPartialFailure('review tool mutated the parent Session', actions)
     }
   } finally {
     clearReview()
   }
   if (parent.session.seq !== beforeSeq) throw new ReviewPartialFailure('review mutated the parent Session', actions)
+  if (!done && partialReason === undefined) partialReason = 'missing review_done'
+  if (hitRoundLimit) partialReason = 'max review rounds reached before review_done'
   return {
     finalText,
     actions,
     ...(usage === undefined ? {} : { usage }),
     requests,
     toolCalls,
+    done,
+    hitRoundLimit,
+    ...(report === undefined ? {} : { report }),
+    ...(partialReason === undefined ? {} : { partialReason }),
   }
 }

@@ -9,7 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-platform-contract'
-import { ReviewPartialFailure, runReview } from './review-executor.ts'
+import { AUX_COMPLETION_INSTRUCTION, ReviewPartialFailure, runReview } from './review-executor.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).
@@ -1055,14 +1055,14 @@ function snapshotReviewParent(agent: Agent): Agent {
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
-      let status: 'completed' | 'failed' | 'timeout' | 'aborted' = 'failed'
+      let status: 'completed' | 'partial' | 'failed' | 'timeout' | 'aborted' = 'failed'
       let actions: readonly { type: 'skill' | 'memory' | 'tool'; action: string; target: string; status: 'ok' | 'staged' | 'error' }[] = []
       let usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | undefined
       let requests = 0
       let toolCalls = 0
       let error: string | undefined
       try {
-        const prompt = reviewPrompt(kind, 'aux')
+        const prompt = reviewPrompt(kind, 'aux') + '\n\n' + AUX_COMPLETION_INSTRUCTION
         const result = await withReviewContext({ reviewId, runId: reviewId, reads: new Set<string>() }, () => runReview({
           parent: reviewParent,
           llm: { stream: options => llm(options) },
@@ -1086,10 +1086,9 @@ function snapshotReviewParent(agent: Agent): Agent {
             cacheWriteTokens: 0,
           }
         }
-        status = toolAllow.size === 0
-          ? 'failed'
-          : 'completed'
-        if (toolAllow.size === 0) error = 'aux review has no allowed tools for this parent (PTC-only header); refusing to report completed'
+        status = result.done && result.partialReason === undefined ? 'completed' : 'partial'
+        if (result.partialReason !== undefined) error = result.partialReason
+        if (toolAllow.size === 0) { status = 'failed'; error = 'aux review has no allowed tools for this parent (PTC-only header); refusing to report completed' }
       } catch (caught) {
         error = caught instanceof Error ? caught.message : String(caught)
         if (caught instanceof ReviewPartialFailure && caught.actions.length > 0) actions = caught.actions

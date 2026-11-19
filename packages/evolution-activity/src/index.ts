@@ -56,6 +56,7 @@ export interface EvolutionReviewActivityRecord {
   status: EvolutionReviewCompletedEvent['status']
   trigger: EvolutionReviewCompletedEvent['trigger']
   finalText: string
+  partialReason?: string | undefined
   /** Full final-text length before the review preview was bounded. */
   finalTextChars?: number | undefined
   actions: EvolutionReviewCompletedEvent['actions']
@@ -140,6 +141,7 @@ export function applyReviewActivityEvent(
     trigger: event.trigger,
     finalText: graphemeCount(event.finalText) <= REVIEW_TEXT_PREVIEW_CHARS ? event.finalText : truncateGraphemes(event.finalText, REVIEW_TEXT_PREVIEW_CHARS, ''),
     finalTextChars: event.finalText.length,
+    ...event.partialReason === undefined ? {} : { partialReason: event.partialReason },
     actions: event.actions,
     ...event.usage === undefined ? {} : { usage: event.usage },
     startedAt: event.startedAt,

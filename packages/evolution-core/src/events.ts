@@ -54,13 +54,14 @@ export interface EvolutionReviewCompletedEvent {
   readonly sessionId: string
   readonly branchSessionId?: string | undefined
   readonly kind: ReviewKind
-  readonly status: 'completed' | 'failed' | 'timeout' | 'aborted'
+  readonly status: 'completed' | 'partial' | 'failed' | 'timeout' | 'aborted'
   readonly trigger: { readonly reason: string; readonly toolCalls: number; readonly userChars: number; readonly assistantChars: number }
   readonly finalText: string
   readonly actions: readonly EvolutionReviewAction[]
   /** Model requests actually spent, and tool calls issued inside them. */
   readonly requests?: number | undefined
   readonly toolCalls?: number | undefined
+  readonly partialReason?: string | undefined
   readonly usage?: { readonly inputTokens: number; readonly outputTokens: number; readonly cacheReadTokens: number; readonly cacheWriteTokens: number } | undefined
   readonly startedAt: number
   readonly finishedAt: number
