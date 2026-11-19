@@ -73,3 +73,170 @@
 - 本轮不实现“多位置修改”的逐项校验或模型自检协议。
 - 本轮不改变前台 inject 模式的提示词内容；只处理 aux 的完成语义与 PTC 通道。
 - 不把 PTC 的 `run_code` 结果写进父会话日志。
+
+
+## 7. 综合优化方案（目标形态）
+
+### 7.1 结论
+
+把问题拆成四个正交层，而不是在 `tryAuxReview` 里继续加分支：
+
+1. **触发与调度**：谁到期、memory/skill 是否分别排队、并发上限。
+2. **执行与工具通道**：native 直接工具 / PTC `run_code`，两者都通过同一个 review runner。
+3. **完成语义**：`completed` / `partial` / `failed` / `timeout` / `aborted`，由 runner 统一判定。
+4. **写入与记录**：修改提交串行化，activity/review 记录可审计。
+
+前台 inject 只使用第 1 层的“合并提示词”和第 4 层的记录，不引入后台调度器。
+
+### 7.2 插件侧目标架构
+
+#### A. Review 触发数据
+
+把 `advanceReview` 的返回值从 `memory | skill | combined` 改成“到期集合”：
+
+```ts
+interface ReviewDebt {
+  memory: boolean
+  skill: boolean
+  trigger: 'cadence' | 'completion'
+}
+```
+
+- `inject` 通道保留现状：两者都到期时组合成 combined prompt，一次注入父会话。
+- `aux` 通道：memory 和 skill 各自生成独立 task；**不再使用 combined prompt**。
+- 计数复位在“成功入队”时执行，而不是在 `advanceReview` 内隐式绑定通道；这样前台/后台的语义不再互相污染。
+
+#### B. ReviewTask 状态机
+
+```ts
+type ReviewKind = 'memory' | 'skill'
+type ReviewStatus = 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'timeout' | 'aborted'
+
+interface ReviewTask {
+  id: string
+  sessionId: string
+  kind: ReviewKind
+  trigger: ReviewDebt['trigger']
+  toolMode: 'native' | 'ptc'
+  status: ReviewStatus
+  startedAt: number
+  deadlineAt: number
+  limits: { maxRounds: number; maxToolCalls: number }
+  requests: number
+  toolCalls: number
+  hitRoundLimit: boolean
+  partialReason?: string
+  actions: ReviewAction[]
+  done: boolean
+  result?: ReviewReport
+}
+```
+
+- 每个 task 使用独立 `runId`（例如 `review:<session>:<kind>:<task>`）。
+- 旧 `auxRunning: Map<session, {rerun}>` 删除，改为 `Map<session, Map<kind, ReviewTask>>` 加有界队列。
+- 同一 session 的 memory/skill 可以并行；不同 session 也并行，受全局并发上限约束。
+- 同一 kind 的重复触发只合并为一次 queued/running，不覆盖另一个 kind。
+
+#### C. 执行器统一
+
+`runReview` 保留为一个执行内核，但接收：
+
+- `ReviewToolTransport`：native 或 PTC；
+- `ReviewCompletion`：显式完成协议；
+- `ReviewWriteGate`：写入串行化；
+- 预算（轮数/时间/工具调用数）。
+
+执行循环：
+
+1. 生成 prompt（memory 或 skill 独立）。
+2. 调 LLM；收集 tool calls。
+3. 只读工具可并行；**写工具进入 write gate** 串行执行。
+4. 每轮结束检查：完成工具是否调用、轮数/时间/调用数是否超限。
+5. 收到 `review_done` 且无未完成调用 → `completed`；否则 `partial` / `failed` / `timeout`。
+
+#### D. 完成协议 `review_done`
+
+`review_done` 是 review 专用工具，native 和 PTC 都必须可见：
+
+```ts
+review_done({
+  summary: string,
+  memoryChanged: boolean,
+  skillsChanged: string[],
+  unresolved: string[],
+})
+```
+
+规则：
+
+- 模型必须在完成本轮所有修改后显式调用。
+- `review_done` 是**终止调用**：必须单独出现在一个 assistant 批次里；runner 执行它后停止本轮，不再请求模型。若同一批还夹带其他工具调用，按 `partial` 记录，不执行后续轮次。
+- 未调用就结束：`partial`，`partialReason='missing review_done'`。
+- 达到 `maxRounds` 或 deadline 时仍收到工具调用：`partial`，记录 `hitRoundLimit` / `timeout`。
+- `unresolved` 非空仍可标 `completed`，但活动记录和 UI 必须显示未解决项；这是给“信任模型 agent 能力”保留的语义出口。
+- 不要求按位置逐项校验；多位置修改的完整性仍由模型负责，`review_done` 只要求模型显式声明完成状态。
+
+#### E. 读写分离与并行安全
+
+并行的是**分析/LLM 推理**，不是无约束写入：
+
+- 只读：`read`、`glob`、`grep`、`skill`、`skill_search` 可并行。
+- 写入：`skill_manage`、`memory` 通过 `ReviewWriteGate` 进入串行队列。
+- `evolutionMutationAuthority` 从“整个 review 一个 lease”改为**写事务 lease**：每次写操作获取资源域（memory / skills / skill:<name>）的租约；review 整体不再长时间占着 lease。
+- 现有 per-file skill-store 锁、memory store serial queue 保留作为最后防线；写 gate 负责跨 memory/skill 的顺序和冲突可观测性。
+- 任何 task 都不得 append 父 Session；父前缀冻结与 seq 校验保持。
+
+#### F. PTC 工具通道
+
+PTC 不能复用父 agent 执行工具，因为平台 `run_code` 的嵌套 dispatch 会 append 到 `exec.agent.session`（`packages/core/tool-executor-ptc/src/ptc.ts:560,587`），而 review 要求父 Session no-append。
+
+目标 `PtcReviewToolTransport`：
+
+- 为 review 创建一个**独立 review-scoped agent/session**（review 专用 child），父前缀只提供 prompt 快照；
+- 把 `run_code` 工具挂在 review child 上执行；PTC 的 `tool/ptc-dispatch*` 只进 child 日志；
+- prompt 只暴露 PTC 的真实能力：`run_code` + review SDK；模型用 `await tools.skill_manage(...)` / `await tools.memory(...)` 完成修改，最后 `await tools.review_done(...)`；
+- runner 从 `RunCodeOutput.result` 读取结构化 `ReviewReport`，不解析自由文本；
+- 父 Session 的 seq 不变，review action 仍写入 activity。
+- `review_done` 在 PTC 中既是 SDK 调用，也是 runner 的完成信号；不同 transport 用同一个完成校验。
+
+**若平台暂时没有创建 review-scoped agent 的公开入口**，PTC 适配需要先补一个平台能力（例如受控 `review session` 或子代理工具通道）；不要在插件里用假 parent/session 绕过日志边界。
+
+#### G. 触发器与通道解耦
+
+- `inject`：继续使用父会话注入；memory/skill/combined prompt 保持现状。
+- `aux`：使用独立 scheduler；没有 combined prompt；没有 `rerun` 覆盖；memory/skill 各自有 timeout、cancel、activity。
+- 业务代码不按平台版本/工具模式分支；工具模式由 adapter 的 `ReviewToolTransport` 决定。
+
+### 7.3 平台侧代码依据
+
+- 无 `aux` 服务：aux 是 family 自己的 review 调度，不是平台模式。
+- `LlmRuntime.stream()` 每次调用独立，没有全局队列；并行 LLM 调用在平台原语层可行。
+- `executeToolBatch` 支持 `maxParallelToolCalls`，读写并行由 tool 的 `isConcurrencySafe` 决定；但 review 的写安全必须由 `ReviewWriteGate` 和 mutation authority 保证，不能把平台并行当写入安全。
+- `Agent.status` 只是 turn 状态；aux 使用冻结父前缀，不依赖状态机做全局互斥。
+- PTC `run_code` 的 nested dispatch 会 append 到 `exec.agent.session`；这是 PTC review 必须使用独立 review session 的直接原因。
+- `SessionStore.create()` / subagent 类能力可以作为 review-scoped session 的实现路径；具体 API 以平台当前版本为准，但边界是“review 工具日志进 child，不进 parent”。
+
+### 7.4 迁移顺序
+
+1. **先做完成语义**：task 状态机、`review_done`、partial/timeout/round 字段、activity schema v3、native transport。
+2. **拆 AUX 调度**：`ReviewDebt` + memory/skill 两个 task + 写 gate；先允许并行分析、写串行，验证同一 session 和跨 session。
+3. **PTC transport**：review-scoped child session + run_code SDK + structured report；补父 seq 不变测试。
+4. **删除兼容层**：旧 `auxRunning`/`rerun`、AUX combined prompt、旧 activity 读取兜底；保留必要的历史数据只读迁移。
+
+### 7.5 验收重点
+
+- 达到轮数/时间上限且仍有 tool call：`partial`，不能 `completed`。
+- 没有 `review_done` 就结束：`partial`。
+- `review_done` + 所有工具成功：`completed`，带 round/tool 计数。
+- 同一 session 同时触发 memory+skill：两个 task 独立，分析并行、写入串行。
+- 两个 session 同时跑 review：互不阻塞。
+- PTC：能完成 memory/skill review；父 session seq 不变；嵌套 dispatch 只在 child。
+- activity/UI：`completed/partial/failed/timeout` 和 kind 可分；历史 activity 可读。
+- 前台 inject：提示词和投递行为不变。
+
+### 7.6 非目标
+
+- 不实现逐位置技能修改校验；由模型 agent 负责，未来有更丰富信息再评估。
+- 不改变前台 inject 的 combined 语义。
+- 不把 PTC 的 nested dispatch 写进父 Session。
+- 不为并行而放弃写安全；分析并行不等于写入并行。
