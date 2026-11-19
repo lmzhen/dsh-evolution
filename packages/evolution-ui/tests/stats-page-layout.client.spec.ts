@@ -72,6 +72,22 @@ describe('stats page presentation', () => {
     expect(view.container.querySelector('.evo-stats-pill')?.className).toContain('is-warn')
   })
 
+
+  it('renders recent review kind, status and partial reason', async () => {
+    const withReviews = {
+      ...snapshot(),
+      global: {
+        ...snapshot().global,
+        reviews: [{ reviewId: 'r1', kind: 'skill', status: 'partial', startedAt: 1, finishedAt: 2, partialReason: 'max tool calls reached before review_done' }],
+      },
+    }
+    const view = render(createElement(StatsPage, { ...face('wide'), loadStats: async () => withReviews }))
+    await waitFor(() => { expect(view.container.textContent).toContain('stats.reviews.title') })
+    expect(view.container.textContent).toContain('stats.review.kind.skill')
+    expect(view.container.textContent).toContain('stats.review.status.partial')
+    expect(view.container.textContent).toContain('max tool calls reached before review_done')
+  })
+
   it('distinguishes an empty library from a filter with no matches', async () => {
     const filtered = render(createElement(StatsPage, { ...face('wide'), view: { ...face('wide').view, query: 'zzz' } }))
     await waitFor(() => { expect(filtered.container.textContent).toContain('stats.emptyFilter') })
