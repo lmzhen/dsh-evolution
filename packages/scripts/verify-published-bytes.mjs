@@ -73,7 +73,12 @@ async function verifyOne(file) {
     attempt += 1
     const scratch = mkdtempSync(join(tmpdir(), 'published-bytes-'))
     try {
-      const response = await fetch(url)
+      // The registry edge caches a 404 for the tarball URL while the origin
+      // already has the bytes (observed: origin Last-Modified 02:22:29, edge
+      // first served the object at 02:27:07 with a 5-minute Age). A unique
+      // query makes this request a cache MISS so a fresh publish is checked
+      // against the origin instead of waiting out the edge's negative window.
+      const response = await fetch(url + '?probe=' + attempt + '-' + Date.now(), { cache: 'no-store' })
       if (!response.ok) throw new Error('HTTP ' + response.status)
       const fetched = short + '-' + version + '.tgz'
       writeFileSync(join(scratch, fetched), Buffer.from(await response.arrayBuffer()))

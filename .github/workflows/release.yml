@@ -289,4 +289,4 @@ jobs:
           # difference (exit 2 = cannot decide, never a pass); a real mismatch exits 1.
           node packages/evolution/scripts/verify-published-bytes.mjs \
             packages/evolution/dist --version "${RELEASE_VERSION#v}" \
-            --budget-ms 360000 --concurrency 4
+            --budget-ms 360000 --concurrency 8
