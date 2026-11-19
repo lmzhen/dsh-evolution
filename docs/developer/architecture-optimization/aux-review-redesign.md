@@ -489,3 +489,11 @@ interface EvolutionReviewActivityRecordV3 {
 - PTC review 工具改为**每插件实例注册一次**的 `PtcReviewToolHost`：`review_done`/`review_wait` 用 active+reviewId 守卫，handlers 从 `currentReviewContext` 查 control；支持多个 PTC review 并行，不再每个 task 重复注册同名工具。
 - channel 只在 host 上打开/关闭 task 的 active 窗口；老的单 channel 构造器移除。
 - review + adapter 35 项通过，构建 0 error；真实 PTC runtime 验证仍以之前 run_code 复现为准（host 重构后未重新跑临时 live test，列为待复验）。
+
+
+### Round 18（2026-11-20）
+
+- 全量本地 gates 最终读数：pass=58 fail=0 cannotDecide=3（gate-05 平台 scope、gate-29 profile home、gate-81 health corpora），skipped=1（gate-75 CI layout）。之前 gate-46 taxonomy 失败已修复。
+- PTC review 工具改为每插件一次注册的 `PtcReviewToolHost`，避免同一进程中多个 PTC review 并发时重复注册 `review_done`/`review_wait`；task 通过 active+reviewId 守卫。
+- post-refactor 重跑 gate-01/02/17/30/46/82 全部通过；review+adapter 35 项通过；构建 0 error。
+- 仍缺真实宿主验收与独立复核。
