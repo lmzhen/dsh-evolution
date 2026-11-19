@@ -383,4 +383,5 @@ interface EvolutionReviewActivityRecordV3 {
 ### Round 2（2026-11-20）
 
 - activity 升到 v3：review record 增加 `taskId`、`requests`、`toolCalls`、`waitCount`、`partialReason`；`evolution-review` 的 aux event 写 `taskId`。旧 v2 bytes 仍按既有 foreign/legacy 规则可读，写入统一 v3。
+- 同一边界多次触发时 `pendingCadenceReviews` 用 `mergeDebt` 合并 memory/skill，不覆盖另一域。
 - 未完成仍是 PTC 工具通道、detached review child、`review_wait`/resource-busy、UI 展示与真实 PTC/多会话验收。
