@@ -201,6 +201,7 @@ export interface RunReviewInput {
   readonly toolAllow: ReadonlySet<string>
   readonly signal: AbortSignal
   readonly maxRounds?: number
+  readonly maxToolCalls?: number
   readonly markReview: () => void
   readonly clearReview: () => void
 }
@@ -248,6 +249,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
   ]
   const toolHistory = parent.session.toolHistory()
   const maxRounds = input.maxRounds ?? 4
+  const maxToolCalls = input.maxToolCalls ?? 50
   const actions: ReviewAction[] = []
   let finalText = ''
   let usage: ReviewUsage | undefined
@@ -305,6 +307,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         messages.push(assistant)
         messages.push(createToolResultMessage({ callId: waitCalls[0]!.id, content: [{ type: 'text', text: released === false ? 'review_wait timed out' : 'review_wait released' }], isError: released === false }))
         if (released === false) { partialReason = 'review_wait timed out'; break }
+        if (toolCalls >= maxToolCalls) { partialReason = 'max tool calls reached before review_done'; break }
         continue
       }
       const doneCalls = calls.filter(call => call.name === REVIEW_DONE_TOOL_NAME)
@@ -402,6 +405,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         }))
       }
       toolCalls += calls.length
+      if (toolCalls >= maxToolCalls) { partialReason = 'max tool calls reached before review_done'; break }
       if (round === maxRounds - 1) hitRoundLimit = true
       if (parent.session.seq !== beforeSeq) throw new ReviewPartialFailure('review tool mutated the parent Session', actions)
     }

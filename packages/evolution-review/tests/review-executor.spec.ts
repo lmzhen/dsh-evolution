@@ -275,6 +275,16 @@ describe('runReview', () => {
     expect(calls).toBe(1)
   })
 
+  it('marks tool-call budget exhaustion partial', async () => {
+    const result = await runReview({
+      parent: parent(), llm: llm([toolCallChunks]), tools: tools({}), instruction: 'review',
+      toolAllow: allowed(), maxToolCalls: 1, signal: new AbortController().signal,
+      markReview: () => {}, clearReview: () => {},
+    })
+    expect(result.done).toBe(false)
+    expect(result.partialReason).toBe('max tool calls reached before review_done')
+  })
+
   it('rejects review_done mixed with other calls', async () => {
     const mixed: StreamChunk[] = [
       { type: 'block-start', index: 0, blockType: 'tool-call' },
