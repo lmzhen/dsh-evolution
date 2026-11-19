@@ -25,7 +25,7 @@
 
 - 发布包：重构前 20 个；P0 拆出 `evolution-platform-contract` 与 `evolution-adapter` 后 22 个（`packages/evolution-*`、`memory`、`tool-skill-manage`）；源码包 23 个（含一个退休 preset 目录）。
 - 版本事实源：`platform-line.json`（保留文件名，内部已升级为 envelope 语义），当前 `version=0.2.2-rc.5`、`floor=0.2.2-rc.3`、`cohort=[0.2.2-rc.3, 0.2.2-rc.5]`。
-- 生成结果：每个发布 manifest 的 `@deepseek-ai/dsh-*` peers 与 `engines.dsh` 都等于同一精确并集 `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`；`all` bundle 只带 engines，row 包同时带 peers/engines。
+- 生成结果：每个发布 manifest 的 `@deepseek-ai/dsh-*` peers 与 `engines.dsh` 都等于同一精确并集 `0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`；`all` bundle 只带 engines，row 包同时带 peers/engines。
 - 平台耦合：`evolution-core` 直接 import 14 个平台包；其余 16 个包只 import Cordis/Schemastery 与家族服务。`ctx.get()` 的家族服务访问遍布各包，但平台包导入集中在 core。
 - bundle：`all`/`host`/`preset` 三份 patch 除家族 row 外，只剩一个平台 `tool-skill` 覆盖（60 字符 catalog cap）。
 - 验证：`verify-platform-matrix.mjs` 已存在但未进 gate；release evidence 是单平台线；`platform-line.generated.ts` 只导出常量，未被业务使用。
@@ -196,7 +196,7 @@ export interface EvolutionPlatform {
 
 生成器负责：
 
-- 每个发布 manifest 的 `@deepseek-ai/dsh-*` peers 与 `engines.dsh` 使用**同一精确并集**；当前即 `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`（不写成 `^0.2.2-rc.1`，避免把 rc.6/0.2.2 终版悄悄放进来）。
+- 每个发布 manifest 的 `@deepseek-ai/dsh-*` peers 与 `engines.dsh` 使用**同一精确并集**；当前即 `0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`（不写成 `^0.2.2-rc.1`，避免把 rc.6/0.2.2 终版悄悄放进来）。
 - `all` bundle 只带 `engines.dsh`；row 包同时带 peers/engines，但仍由同一 cohort 生成。
 - `platform-contract.generated.ts`：contract、cohort、能力名。
 - CI 矩阵轴、release evidence、README 兼容表。
@@ -269,12 +269,12 @@ export interface EvolutionPlatform {
 ### P1：包络 + cohort spike
 
 - `platform-line.json` 增加 cohort（DCR-2，保留文件名）；生成器写 peers/engines 同一精确并集；
-- cohort 当前为 `rc.1 / rc.2 / rc.3 / rc.4 / rc.5`；五个版本均实测启动 + row 存活；
+- cohort 当前为 `rc.2 / rc.3 / rc.4 / rc.5`；四个版本均实测启动 + row 存活；
 - 修矩阵假阳性，rc.3 编译 + 启动；
 - adapter 只补真实差异，不加 feature 层版本分支；
 - 移除 `tool-skill` 平台覆盖。
 
-**P1 状态（2026-11-19）**：envelope schema/生成器/门禁已落地，22 个 staged manifest 的 54 条平台范围与 engines 全部等于 `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`；rc.1/rc.2/rc.4/rc.5 各自作为目标声明树、rc.3 作对照编译，**均 0 error**；五个版本都启动了 web host，`verify-cohort-smoke.mjs` 读平台 `pluginInventory/list` 均为家族 row **29/29 active**，唯一 disabled row 是设计上默认关闭的 `evolution-skill-health`。cohort 因此从 rc.3/rc.5 扩为 rc.1–rc.5；0.2.2 正式版未发布，不写入。新增 `verify-cohort-host.mjs` 把“干净 home 安装 → 启动 → smoke → reading”自动化，五个成员均产出 `activeRows=expectedActiveRows=29`、`doctor=ok`、`smoke=pass`。
+**P1 状态（2026-11-19）**：envelope schema/生成器/门禁已落地，22 个 staged manifest 的 54 条平台范围与 engines 全部等于 `0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`；rc.2/rc.4/rc.5 各自作为目标声明树、rc.3 作对照编译，**均 0 error**；四个版本都启动了 web host，`verify-cohort-smoke.mjs` 读平台 `pluginInventory/list` 均为家族 row **29/29 active**，唯一 disabled row 是设计上默认关闭的 `evolution-skill-health`。cohort 因此从 rc.3/rc.5 扩为 rc.2–rc.5；rc.1 因 packed platform 安装缺少 `@deepseek-ai/dsh-error@0.2.2-rc.1` 被排除；0.2.2 正式版未发布，不写入。新增 `verify-cohort-host.mjs` 把“干净 home 安装 → 启动 → smoke → reading”自动化，四个成员均产出 `activeRows=expectedActiveRows=29`、`doctor=ok`、`smoke=pass`。
 
 **验收**：矩阵每个 cohort 0 error；干净 profile 启动；所有家族 row active；doctor 报 cohort/能力；无平台 row 覆盖。
 
@@ -343,7 +343,7 @@ export interface EvolutionPlatform {
 
 - **DCR-1（2026-11-19，包名冲突）**：原计划的 `@lmzhen/dsh-evolution-contract` 在 npm 已存在 `0.44.0`，是历史上的**状态/事件跨包纯契约**包，已有公开版本；直接复用会让旧消费者升级到语义完全不同的新包。决定：新包改名为 `@lmzhen/dsh-evolution-platform-contract`；旧 `@lmzhen/dsh-evolution-contract@0.44.0` 不覆盖、不 deprecate（后续如需统一再单独处理）。影响：源码目录、imports、tsconfig 路径、包映射与发布占位名同步改名；设计目标不变（纯平台契约 + 单一 adapter）。
 - **DCR-2（2026-11-19，envelope 承载文件）**：envelope 语义不新建 `platform-envelope.json`，而是扩展唯一的 `platform-line.json`（新增 `cohort`/`contract`，保留 `version`/`floor` 兼容字段）。原因：release/audit/CI 已有大量路径依赖该文件名；再建一个文件会形成第二事实源。影响：peers/engines 改为 cohort 精确并集；workflow 输出/审计参数改用 `peers_range`；release evidence 仍读同一文件。回退：若需要新文件名，必须先改所有 reader 再删除旧文件，不能双写。
-- **DCR-3（2026-11-19，cohort 扩为 rc.1–rc.5）**：用户要求按“无需改代码即可支持的版本”声明，而不是只写 rc.3/rc.5。五个 0.2.2 预发布版本均完成双线编译、干净安装、启动 200、家族 row 29/29 active、doctor ok 的实测；因此 cohort 从候选 rc.3–rc.5 扩为 `rc.1 / rc.2 / rc.3 / rc.4 / rc.5`。0.2.2 正式版未发布、不写；0.2.1 实测启动但 `platform-services=warn`，不跨 minor 纳入。回退：移除未通过复验的成员并同步重生成所有 manifest/evidence。
+- **DCR-3（2026-11-19，cohort 扩为 rc.2–rc.5）**：用户要求按“无需改代码即可支持的版本”声明，而不是只写 rc.3/rc.5。四个 0.2.2 预发布版本均完成双线编译、干净安装、启动 200、家族 row 29/29 active、doctor ok 的实测；因此 cohort 从候选 rc.3–rc.5 扩为 `rc.2 / rc.3 / rc.4 / rc.5`。rc.1 因 packed platform 安装缺少 `@deepseek-ai/dsh-error@0.2.2-rc.1` 被排除，**不为 rc.1 改代码**。0.2.2 正式版未发布、不写；0.2.1 实测启动但 `platform-services=warn`，不跨 minor 纳入。**长期策略：用户指定的平台版本是必选；其他版本只在 CI 顺带验证，能一起就一起，不为额外版本改业务代码，也不让额外版本阻塞发布。** 回退：移除未通过复验的成员并同步重生成所有 manifest/evidence。
 - 本文 §3 的不变量、包边界、envelope 语义是**冻结面**；变更必须写 DCR（日期、原因、影响、回退），并重新评审。
 - 新发现先入 §2 台账或 §10 open questions；不擅自扩当前 Phase。
 - 代码、测试、生成器、文档、release evidence 同 PR 更新；文档滞后视为未完成。
@@ -363,10 +363,11 @@ export interface EvolutionPlatform {
 
 1. `evolution-platform-contract` 是否独立 npm 包，还是 `evolution-core` 的纯子路径？当前已按独立包落地（22 个发布包），后续只在有明确收益时再评估合并。
 2. 60 字符 catalog cap 的最终归属：家族 catalog 配置、可选 profile override，还是接受平台默认？需要产品/体验确认。
-3. cohort 当前为 rc.1 / rc.2 / rc.3 / rc.4 / rc.5；五个 0.2.2 预发布均实测启动 + row 存活。0.2.2 正式版未发布，不写入。
+3. cohort 当前为 rc.2 / rc.3 / rc.4 / rc.5；四个 0.2.2 预发布均实测启动 + row 存活。0.2.2 正式版未发布，不写入。
 4. 是否把 Cordis/Schemastery 也纳入 contract 包装？当前倾向保留直接 import（框架 seam，不随 DSH 版本面变化）。
 5. 旧线采用 dist-tag 还是并行 major？按 npm 发布成本与用户升级路径定。
 6. **P1 前置发现（2026-11-19，已收敛 detector 假阳性）**：rc.3 平台树里仍然带着旧 family 包副本；原矩阵把它们当成平台声明，与 mirror 的 family source 形成两套类型身份，才报 4 个 `TS2717`（`evolutionApproval` / `skillUsage` / `evolutionState` / `evolutionStateStorage`）。`verify-platform-matrix.mjs` 现在先按 `packages/*/package.json` 的名字剔除本地 family 包，再做单一声明树编译；rc.3 编译已 **0 error**。rc.5 的干净源码树没有构建后的 `lib/types`，暂用当前 `verify-family-types` 覆盖 rc.5，等 rc.5 树可构建后再补同一矩阵行。
-7. **独立复核（2026-11-19）**：P0=0，P1=8。已修：audit 范围改为 cohort 精确并集（action + gate-59）；evidence 的 platformLine.cohort/contract 与根文件逐项比较；spike commit 必须等于 evidence commit；cohort reading 增加 source，release 只接受 CI 读数；窗口网格改用真正的 semver 两谓词并加错误范围负例；smoke 增加 `--expect-platform`；新增 `verify-platform-envelope.mjs` 并接入 validate action（gate-83）；workflow 增加按 cohort 展开的 `cohort-check` matrix；action 新增 host acceptance（gate-84）产出 per-member reading，`cohort-evidence` job 合并 artifact，publish 用 `--cohort-evidence` 注入并复验。pre-tag 现为 63 pass / 0 fail / 4 registered cannot-decide；本地 `verify-cohort-host.mjs` 已在五个成员上实测 29/29 active。仍未闭合：`verify-platform-matrix` 与 `verify-cohort-smoke` 尚未注册为强制 gate；host acceptance/CI artifact 仅在本地脚本验证，尚未在真实 GitHub Actions 跑过。**结论：仍不能发布。**
+7. **独立复核（2026-11-19）**：P0=0，P1=8。已修：audit 范围改为 cohort 精确并集（action + gate-59）；evidence 的 platformLine.cohort/contract 与根文件逐项比较；spike commit 必须等于 evidence commit；cohort reading 增加 source，release 只接受 CI 读数；窗口网格改用真正的 semver 两谓词并加错误范围负例；smoke 增加 `--expect-platform`；新增 `verify-platform-envelope.mjs` 并接入 validate action（gate-83）；workflow 增加按 cohort 展开的 `cohort-check` matrix；action 新增 host acceptance（gate-84）产出 per-member reading，`cohort-evidence` job 合并 artifact，publish 用 `--cohort-evidence` 注入并复验。pre-tag 现为 63 pass / 0 fail / 4 registered cannot-decide；本地 `verify-cohort-host.mjs` 已在四个成员上实测 29/29 active。仍未闭合：`verify-platform-matrix` 与 `verify-cohort-smoke` 尚未注册为强制 gate；host acceptance/CI artifact 仅在本地脚本验证，尚未在真实 GitHub Actions 跑过。**结论：仍不能发布。**
 8. **0.2.1 兼容性实测（2026-11-19）**：`0.2.1-rc.5` 能启动并 29/29 active，但 doctor `platform-services` 为 `warn`；按“不把一个 artifact 横跨 0.2.1/0.2.2”的不变量不纳入 cohort，0.2.1 用户继续使用 0.55.x legacy 线。
 9. **真实 CI 阻塞（2026-11-19）**：run `44536592601` 的 unit 失败已修（curator/review 测试补挂 `EvolutionPlatform`、doctor-view 补 cohort、release-evidence 装配顺序修正）；复跑后 release lane 的 `gate-49 verify-mutations --coverage` 仍 exit 2：92 gate 中 recorded=59、redProven=58、cannotDecide=3。该 gate 在 cohort host acceptance 之前执行，导致 host/evidence 仍被 skip。必须补齐/重新证明 mutation records，或把该 gate 明确登记为 cannot-decide 且 release 仍拒绝；当前 no-go。
+10. **多版本开发策略（2026-11-19）**：开发只保证用户明确指定的平台版本（本次为 rc.5）。其他版本只在 CI 顺带跑兼容矩阵：能一起就一起，不一起也无所谓；**不为额外版本修改业务代码，也不让额外版本阻塞发布**。兼容声明只列实际通过验证且不增加维护负担的版本。

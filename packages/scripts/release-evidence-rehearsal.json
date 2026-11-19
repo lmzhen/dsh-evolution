@@ -92,26 +92,12 @@
   "generatedAt": "2026-11-19T06:45:00.000Z",
   "cohort": {
     "versions": [
-      "0.2.2-rc.1",
       "0.2.2-rc.2",
       "0.2.2-rc.3",
       "0.2.2-rc.4",
       "0.2.2-rc.5"
     ],
     "readings": [
-      {
-        "version": "0.2.2-rc.1",
-        "install": "clean",
-        "boot": 200,
-        "activeRows": 29,
-        "expectedActiveRows": 29,
-        "disabledRows": [
-          "evolution-skill-health"
-        ],
-        "doctor": "ok",
-        "smoke": "pass",
-        "source": "rehearsal"
-      },
       {
         "version": "0.2.2-rc.2",
         "install": "clean",

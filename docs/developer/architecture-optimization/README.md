@@ -8,7 +8,7 @@
 >
 > **多版本重构（2026-11-19）**：以 [multi-version-support.md](multi-version-support.md) 为唯一设计源，goal `goal-0eb89255-0cd9-46dd-8940-4d5524c2c6ed`；全部优化完成并通过全量验收/独立复核后才发布，过程中不发布中间版本。
 >
-> **当前进度（2026-11-19）**：P0/P0b/P0c 完成；P1 envelope/cohort、rc.3/rc.5 双线矩阵、cohort smoke、release evidence cohort 读数完成；P2 的 bundle 平台 row 覆盖清理、doctor cohort 显示完成。发布包 22、源码包 23；cohort 为 `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`（rc.1–rc.5 已实测）；剩余发布门禁全量执行、独立复核与唯一一次正式发布。
+> **当前进度（2026-11-19）**：P0/P0b/P0c 完成；P1 envelope/cohort、rc.3/rc.5 双线矩阵、cohort smoke、release evidence cohort 读数完成；P2 的 bundle 平台 row 覆盖清理、doctor cohort 显示完成。发布包 22、源码包 23；cohort 为 `0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`（rc.2–rc.5 已实测）；剩余发布门禁全量执行、独立复核与唯一一次正式发布。
 
 ## 1. 这个目录是什么
 
