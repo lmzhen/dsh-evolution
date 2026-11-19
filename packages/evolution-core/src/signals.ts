@@ -12,6 +12,13 @@ import { graphemeCount } from './text-metrics.ts'
 
 export type ReviewKind = 'memory' | 'skill' | 'combined'
 
+/** Review work due at one turn boundary. The delivery channel decides whether
+ * to combine memory/skill (foreground) or schedule them independently (aux). */
+export interface ReviewDebt {
+  readonly memory: boolean
+  readonly skill: boolean
+}
+
 export interface SignalConfig {
   memoryInterval: number
   skillInterval: number
@@ -191,7 +198,7 @@ export function advanceReview(
   turn: number,
   signal: TurnSignals,
   config: SignalConfig,
-): ReviewKind | null {
+): ReviewDebt | null {
   if (turn === state.lastTurn) return null
   state.lastTurn = turn
   signal.substantive = signal.toolCalls >= config.substantiveMinToolCalls
@@ -213,25 +220,14 @@ export function advanceReview(
 
   const memoryDue = state.turnsSinceMemory >= config.memoryInterval
   const skillDue = state.turnsSinceSkill >= config.skillInterval
+  if (!memoryDue && !skillDue) return null
   // 0.3.40: with resetOnFire=false the counters stay monotonic — the caller
-  // resets them at its injection point (the counting window is inject→inject).
-  const zero = (): void => {
-    state.turnsSinceMemory = 0
-    state.turnsSinceSkill = 0
+  // resets them at its consumption point (the counting window is consume→consume).
+  if (config.resetOnFire !== false) {
+    if (memoryDue) state.turnsSinceMemory = 0
+    if (skillDue) state.turnsSinceSkill = 0
   }
-  if (memoryDue && skillDue) {
-    if (config.resetOnFire !== false) zero()
-    return 'combined'
-  }
-  if (memoryDue) {
-    if (config.resetOnFire !== false) state.turnsSinceMemory = 0
-    return 'memory'
-  }
-  if (skillDue) {
-    if (config.resetOnFire !== false) state.turnsSinceSkill = 0
-    return 'skill'
-  }
-  return null
+  return { memory: memoryDue, skill: skillDue }
 }
 
 /**

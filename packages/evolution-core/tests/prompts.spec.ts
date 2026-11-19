@@ -133,8 +133,8 @@ it('reviewPrompt keeps inject kind-specific and includes memory in background sk
   expect(reviewPrompt('skill')).toBe(SKILL_REVIEW_PROMPT)
   expect(reviewPrompt('combined')).toBe(COMBINED_REVIEW_PROMPT)
   expect(reviewPrompt('memory', 'aux')).toBe(MEMORY_REVIEW_PROMPT)
-  expect(reviewPrompt('skill', 'aux')).toBe(COMBINED_REVIEW_PROMPT)
-  expect(reviewPrompt('combined', 'aux')).toBe(COMBINED_REVIEW_PROMPT)
+  expect(reviewPrompt('skill', 'aux')).toBe(SKILL_REVIEW_PROMPT)
+  expect(reviewPrompt('combined', 'aux')).toBe(SKILL_REVIEW_PROMPT)
   expect(COMBINED_REVIEW_PROMPT).toContain('## Memory')
 })
 

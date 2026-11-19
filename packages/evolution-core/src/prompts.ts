@@ -277,7 +277,7 @@ export const SKILLS_GUIDANCE = `Skills guidance:
 export type ReviewSurface = 'inject' | 'aux'
 
 export function reviewPrompt(kind: 'memory' | 'skill' | 'combined', surface: ReviewSurface = 'inject'): string {
-  if (surface === 'aux') return kind === 'memory' ? INJECT_MEMORY_REVIEW_PROMPT : INJECT_COMBINED_REVIEW_PROMPT
+  if (surface === 'aux') return kind === 'memory' ? INJECT_MEMORY_REVIEW_PROMPT : INJECT_SKILL_REVIEW_PROMPT
   if (kind === 'memory') return INJECT_MEMORY_REVIEW_PROMPT
   if (kind === 'skill') return INJECT_SKILL_REVIEW_PROMPT
   return INJECT_COMBINED_REVIEW_PROMPT

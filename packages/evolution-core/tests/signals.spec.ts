@@ -65,9 +65,18 @@ describe('advanceReview (activity-weighted memory counter, G4.6)', () => {
     const config = cfg({ skillInterval: 999 })
     advanceReview(state, 1, sig(4), config)
     advanceReview(state, 2, sig(4), config)
-    const kind = advanceReview(state, 3, sig(4), config)
-    expect(kind).toBe('memory')
+    const debt = advanceReview(state, 3, sig(4), config)
+    expect(debt).toEqual({ memory: true, skill: false })
     expect(state.turnsSinceMemory).toBe(0)
+  })
+
+  it('returns both domains when both counters are due', () => {
+    const state = freshState()
+    const config = cfg()
+    advanceReview(state, 1, sig(10), config)
+    expect(advanceReview(state, 2, sig(10), config)).toEqual({ memory: true, skill: true })
+    expect(state.turnsSinceMemory).toBe(0)
+    expect(state.turnsSinceSkill).toBe(0)
   })
 
   it('keeps the skill counter activity-weighted (symmetry lock)', () => {

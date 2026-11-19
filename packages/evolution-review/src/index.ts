@@ -20,7 +20,7 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 import { SessionId } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-evolution-platform-contract'
-import { advanceReview, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, withReviewContext, type EvolutionReviewScheduledEvent, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
+import { advanceReview, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, withReviewContext, type EvolutionReviewScheduledEvent, type ReviewDebt, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import { assertSkillsRootAliasRetired } from '@deepseek-ai/dsh-evolution-core/skills'
 import type {} from '@deepseek-ai/dsh-evolution-state'
 import { liveBool, unwrapLive, PROMPT_BUNDLE, reviewPrompt, verifyPromptBundle, INJECT_COMPLETION_SKILL_REVIEW_PROMPT, MAX_TIMER_DELAY_MS, DEFAULT_REVIEW_MEMORY_INTERVAL, DEFAULT_REVIEW_SKILL_INTERVAL, DEFAULT_REVIEW_TIMEOUT_MS, DEFAULT_SKILL_REVIEW_TRIGGER, DEFAULT_SKILL_REVIEW_COMPLETION_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, DEFAULT_SUBSTANTIVE_MIN_TOOL_CALLS, DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, clampOnce, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
@@ -226,6 +226,13 @@ interface PendingMessageLike {
  */
 const cadenceSummary = (kind: ReviewKind): string => `auto-review:${kind}`
 
+/** Foreground delivery still combines both due domains into one prompt. */
+function injectKind(debt: ReviewDebt | null): ReviewKind | null {
+  if (debt === null) return null
+  if (debt.memory && debt.skill) return 'combined'
+  return debt.memory ? 'memory' : debt.skill ? 'skill' : null
+}
+
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
 // authoritative consumer shape) instead of this local view.
 
@@ -375,7 +382,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // interrupting the task (and invalidating the prefix cache from that point
   // on). Same in-memory discipline as the completion channel: a restart is a
   // fresh conversation boundary, and the deferred review is a light loss.
-  const pendingCadenceReviews = sessionState.add('pendingCadenceReviews', new Map<SessionId, ReviewKind>())
+  const pendingCadenceReviews = sessionState.add('pendingCadenceReviews', new Map<SessionId, ReviewDebt>())
   const pendingCadenceWarned = sessionState.add('pendingCadenceWarned', new Set<SessionId>())
   // C 组（未结窗口）：投递后的「抑制接下来那个回合」表（skipNextCadenceFire）与它依赖的
   // lastTurnStart 已删除。V7-02 要挡的是「我们自己的提示词唤起的那个回合」，而 pendingReviewNotices
@@ -407,7 +414,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // the rollback path. Accepted + documented (plan v20 C-3①); the same
   // statement lives on evolution-curator's acquireMutex.
   /** Aux mode runs at most one plugin-side review per parent session; a second trigger only sets rerun. */
-  const auxRunning = sessionState.add('auxRunning', new Map<SessionId, { rerun?: ReviewKind }>())
+  const auxRunning = sessionState.add('auxRunning', new Map<SessionId, Map<'memory' | 'skill', { rerun?: 'memory' | 'skill' }>>())
   const policy = () => (ctx.get('evolutionPolicy') as { get(): PolicySnapshot } | undefined)?.get()
 
   /**
@@ -692,12 +699,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // control-flow analysis (which cannot see the lock-callback's assignment,
     // the same reason the v22 drift flag is a holder) does not narrow it to
     // the literal `null` initializer.
-    const advanced: { kind: ReviewKind | null } = { kind: null }
+    const advanced: { debt: ReviewDebt | null } = { debt: null }
     if (settlesHere) {
       await settleNotice(session.id, 'turn-end')
     } else await withReviewStateLock(session.id, async () => {
       state = await stateService?.loadReviewState(session.id) ?? { turnsSinceMemory: 0, turnsSinceSkill: 0, lastTurn: -1 }
-      advanced.kind = advanceReview(state, event.data.turn, signal, {
+      advanced.debt = advanceReview(state, event.data.turn, signal, {
         memoryInterval: params().reviewMemoryInterval,
         skillInterval: params().reviewSkillInterval,
         // V27 G2.4: the fallbacks are the SAME core constants the policy schema
@@ -714,7 +721,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       })
       await stateService?.saveReviewState(session.id, state)
     })
-    const kind = advanced.kind
+    const debt = advanced.debt
+    const kind = injectKind(debt)
     // Cumulative tool-call counter updates on EVERY turn/end — including turns
     // that fired a cadence review — so the completion channel's long-session
     // gate reflects the whole conversation, not only cadence-free turns.
@@ -738,23 +746,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // turn is LATEST-relevance (last-trigger-wins) and covers both domains
       // when it crosses the second threshold (the old latch-first form
       // discarded a fresh 'combined' and delivered a stale single kind).
-      const pendingKind = kind ?? pendingCadenceReviews.get(session.id) ?? undefined
-      if (pendingKind !== undefined) {
+      const pendingDebt = debt ?? pendingCadenceReviews.get(session.id) ?? undefined
+      if (pendingDebt !== undefined) {
         pendingCadenceReviews.delete(session.id)
         // Explicit 'inject' deployments also execute at the end (the user
         // decision: BOTH modes complete after the task — the old immediate
         // 'inject' contract is superseded, 0.3.39).
         if (params().reviewMode === 'aux') {
-          if (!(await tryAuxReview(session, agent, pendingKind, signal, 'cadence'))) {
-            pendingCadenceReviews.set(session.id, pendingKind)
-          }
+          await scheduleAuxDebt(session, agent, pendingDebt, signal, 'cadence')
           return
         }
+        const pendingKind = injectKind(pendingDebt)
+        if (pendingKind === null) return
         if (params().reviewMode === 'inject') {
           // 0.3.73: a refused delivery restores the latch and returns BEFORE the
           // reset below, so the segment's review retries instead of vanishing.
           if (!deliverMessage(agent, reviewPrompt(pendingKind), cadenceSummary(pendingKind), true)) {
-            pendingCadenceReviews.set(session.id, pendingKind)
+            pendingCadenceReviews.set(session.id, pendingDebt)
             return
           }
           // V24-15 (v24): the inject-mode cadence delivery previously did
@@ -789,8 +797,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // repeated threshold fires before the task ends still inject once; the
     // segment resets at the flush). A fire that arrives ON the completing turn
     // was already consumed by the flush (`?? kind`), so no latch is left.
-    if (kind && event.data.reason.kind !== 'completed') {
-      pendingCadenceReviews.set(session.id, kind)
+    if (debt !== null && event.data.reason.kind !== 'completed') {
+      pendingCadenceReviews.set(session.id, debt)
       if (!pendingCadenceWarned.has(session.id)) {
         pendingCadenceWarned.add(session.id)
         ctx.logger.warn(`dsh-evolution-review: ${kind} review threshold reached; the review runs at the end of the conversation (no mid-task execution)`)
@@ -1014,8 +1022,17 @@ function snapshotReviewParent(agent: Agent): Agent {
   })
 }
 
-  async function tryAuxReview(session: Session, agent: Agent, kind: ReviewKind, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
-    const running = auxRunning.get(session.id)
+
+  async function scheduleAuxDebt(session: Session, agent: Agent, debt: ReviewDebt, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<void> {
+    const tasks: Promise<boolean>[] = []
+    if (debt.memory) tasks.push(tryAuxReview(session, agent, 'memory', signal, reason))
+    if (debt.skill) tasks.push(tryAuxReview(session, agent, 'skill', signal, reason))
+    await Promise.all(tasks)
+  }
+
+  async function tryAuxReview(session: Session, agent: Agent, kind: 'memory' | 'skill', signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<boolean> {
+    const runningByKind = auxRunning.get(session.id)
+    const running = runningByKind?.get(kind)
     if (running !== undefined) { running.rerun = kind; return true }
     // Cutoff is the caller's boundary (turn/end), taken synchronously before
     // any lease wait so later goal-loop turns can never leak into the review.
@@ -1031,13 +1048,14 @@ function snapshotReviewParent(agent: Agent): Agent {
     const authority = ctx.get('evolutionMutationAuthority') as { lease?: { acquire(owner: 'background_review', runId: string, ttlMs?: number): Promise<{ ok: true; token: { id: string; owner: string; runId: string; epoch: number } } | { ok: false; reason: string }>; release(token: { id: string; owner: string; runId: string; epoch: number }): Promise<void>; renew(token: { id: string; owner: string; runId: string; epoch: number }): Promise<unknown | null> } } | undefined
     let leaseToken: { id: string; owner: string; runId: string; epoch: number } | undefined
     if (authority?.lease !== undefined) {
-      const lease = await authority.lease.acquire('background_review', 'review:' + session.id, Math.max(config.reviewTimeoutMs + 30_000, 60_000)).catch(() => undefined)
+      const lease = await authority.lease.acquire('background_review', 'review:' + session.id + ':' + kind, Math.max(config.reviewTimeoutMs + 30_000, 60_000)).catch(() => undefined)
       if (lease === undefined) { ctx.logger.warn('dsh-evolution-review: aux review skipped — lease acquire failed'); return false }
       if (!lease.ok) { ctx.logger.warn('dsh-evolution-review: aux review already leased (' + lease.reason + ')'); return false }
       leaseToken = lease.token
     }
-    const state: { rerun?: ReviewKind } = {}
-    auxRunning.set(session.id, state)
+    const state: { rerun?: 'memory' | 'skill' } = {}
+    if (runningByKind === undefined) auxRunning.set(session.id, new Map([[kind, state]]))
+    else runningByKind.set(kind, state)
     const reviewId = 'aux-' + randomUUID()
     const startedAt = Date.now()
     const controller = new AbortController()
@@ -1133,7 +1151,9 @@ function snapshotReviewParent(agent: Agent): Agent {
         } catch (emitError) {
           ctx.logger.warn('dsh-evolution-review: aux plan-applied emit failed: ' + (emitError instanceof Error ? emitError.message : String(emitError)))
         }
-        auxRunning.delete(session.id)
+        const active = auxRunning.get(session.id)
+        active?.delete(kind)
+        if (active !== undefined && active.size === 0) auxRunning.delete(session.id)
         inFlightControllers.delete(controller)
         if (leaseToken !== undefined && authority?.lease !== undefined) await authority.lease.release(leaseToken).catch(() => {})
         if (state.rerun !== undefined) void tryAuxReview(session, agent, state.rerun, signal, reason)
