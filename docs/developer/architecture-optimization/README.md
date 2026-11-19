@@ -51,6 +51,7 @@
 | 文档 | 用途 |
 |---|---|
 | [multi-version-support.md](multi-version-support.md) | 多版本目标架构、全量问题台账、P0–P3 迁移与冻结不变量（当前设计源） |
+| [aux-review-completion.md](aux-review-completion.md) | aux 后台 review 的 partial/truncated、`review_done` 完成契约与 PTC 适配决策 |
 | [platform-ports.md](platform-ports.md) | 当前端口覆盖、直接 `ctx.get` 清单、目标 `PlatformPorts` |
 | [characterization.md](characterization.md) | 行为基线：spec/用例/不变量/命令 |
 | [26](D:/dsh/_research/plugin-code-audit-2026-11-09/audit-2026-11-12/reports/26-architecture-optimization-plan.md) | 目标架构（外部报告目录） |
