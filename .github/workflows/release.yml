@@ -237,6 +237,11 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
       # D-10 (v19): the published bytes are the `-released` set built and chain-validated by
       # `compat-check` in THIS run — the same composite action the local gate runs, anchored on
       # the released upstream tag. The v18 wording named a BASELINE set whose producing job was
@@ -278,8 +283,8 @@ jobs:
         shell: bash
         run: |
           MEASURED_COMMIT="$(node -e "const r=require('./packages/evolution/scripts/release-evidence-rehearsal.json'); const c=[...new Set((r.spikes??[]).map(s=>s.commit))]; if(c.length!==1) { console.error('rehearsal spikes must share one measured commit'); process.exit(1) } process.stdout.write(c[0])")"
-          git fetch --no-tags --depth=1 origin "$MEASURED_COMMIT"
-          if ! git diff --quiet "$MEASURED_COMMIT" "$GITHUB_SHA" -- 'packages/evolution-*' package.json platform-line.json; then
+          MEASURED_COMMIT="$(git rev-parse --verify "$MEASURED_COMMIT^{commit}")"
+          if ! git diff --quiet "$MEASURED_COMMIT" "$GITHUB_SHA" -- 'packages/evolution-*' packages/memory packages/tool-skill-manage package.json platform-line.json; then
             echo "release: tag tree changed family sources since the measured commit $MEASURED_COMMIT" >&2
             exit 1
           fi
