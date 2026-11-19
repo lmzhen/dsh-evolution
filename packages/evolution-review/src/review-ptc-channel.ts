@@ -3,10 +3,13 @@
  *
  * PTC runs tools through `run_code`; its nested dispatch appends to
  * `exec.agent.session`. The review executor therefore passes a detached child
- * agent created by `@deepseek-ai/dsh-evolution-adapter/review-child`. The review
- * completion tools (`review_done`, `review_wait`) are registered only while this
- * channel executes and only inside the matching review context, so the parent
- * model never sees them and the parent Session is never touched.
+ * agent created by `@deepseek-ai/dsh-evolution-adapter/review-child`.
+ *
+ * The review completion tools (`review_done`, `review_wait`) are registered
+ * ONCE per plugin instance by {@link PtcReviewToolHost}. Their `when` guard only
+ * admits them while one of the host's review tasks is executing, and their
+ * handlers resolve the control record from the active review context. This
+ * avoids duplicate global registrations when two PTC reviews run at once.
  *
  * @module @deepseek-ai/dsh-evolution-review/review-ptc-channel
  */
@@ -25,13 +28,24 @@ export interface PtcReviewControl {
   waitCount: number
 }
 
+type PtcTools = {
+  register(definition: ToolDefinition, options?: { when?: () => boolean }): () => void
+  resolve?: (context: unknown) => Promise<unknown>
+  execute?: (input: unknown) => Promise<unknown>
+}
+
 const PTC_INSTRUCTION = 'You are reviewing in PTC mode. Write one or more run_code programs that call the available review tools. When the review is complete, call tools.review_done as the only review action of that program; if a write reports resource-busy, call tools.review_wait and then re-read before retrying.'
 
 function asObject(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' ? value as Record<string, unknown> : undefined
 }
 
-function reviewDefinitions(control: PtcReviewControl, locks: ReviewWriteLocks): ToolDefinition[] {
+function controlFor(controls: ReadonlyMap<string, PtcReviewControl>): PtcReviewControl | undefined {
+  const reviewId = currentReviewContext()?.reviewId
+  return reviewId === undefined ? undefined : controls.get(reviewId)
+}
+
+function reviewDefinitions(controls: ReadonlyMap<string, PtcReviewControl>, locks: ReviewWriteLocks): ToolDefinition[] {
   const done = defineTool({
     name: REVIEW_DONE_TOOL_NAME,
     description: 'Finish the review. Must be the only review action in its program.',
@@ -49,7 +63,8 @@ function reviewDefinitions(control: PtcReviewControl, locks: ReviewWriteLocks): 
       const raw = asObject(args)
       if (raw === undefined) return { ok: false }
       const parsed = parseReviewReport(JSON.stringify(raw))
-      if (parsed === undefined) return { ok: false }
+      const control = controlFor(controls)
+      if (parsed === undefined || control === undefined) return { ok: false }
       control.report = parsed
       control.done = true
       return { ok: true }
@@ -70,6 +85,8 @@ function reviewDefinitions(control: PtcReviewControl, locks: ReviewWriteLocks): 
       const raw = asObject(args)
       const resource = typeof raw?.resource === 'string' ? raw.resource : ''
       const timeoutMs = typeof raw?.timeoutMs === 'number' && Number.isFinite(raw.timeoutMs) ? raw.timeoutMs : 1_000
+      const control = controlFor(controls)
+      if (control === undefined) return { ok: false }
       control.waitCount += 1
       if (resource === '') return { ok: true }
       return { ok: await locks.wait(resource, timeoutMs, exec.signal) }
@@ -78,47 +95,68 @@ function reviewDefinitions(control: PtcReviewControl, locks: ReviewWriteLocks): 
   return [done, wait]
 }
 
-export interface PtcReviewChannelOptions {
-  readonly taskId: string
-  readonly parentHeaderTools: readonly { readonly name: string; readonly description?: string; readonly parameters?: unknown }[]
-  readonly tools: {
-    register(definition: ToolDefinition, options?: { when?: () => boolean }): () => void
-    resolve?: (context: unknown) => Promise<unknown>
-    execute?: (input: unknown) => Promise<unknown>
-  }
-  readonly childAgent: unknown
-  readonly locks: ReviewWriteLocks
-}
-
 /**
- * Build a PTC channel. The returned channel's `execute` temporarily registers
- * the in-code review tools, runs the PTC calls against the child agent, and
- * removes the registrations before returning.
+ * One shared registration surface for all PTC review channels in this plugin
+ * instance. Construct once, `register()` once, then `channel()` per task.
  */
-export function createPtcReviewToolChannel(options: PtcReviewChannelOptions): ReviewToolChannel & { control: PtcReviewControl; dispose(): void } {
-  const control: PtcReviewControl = { done: false, waitCount: 0 }
-  const definitions = reviewDefinitions(control, options.locks)
-  let active = false
-  const disposers = definitions.map(definition => options.tools.register(definition, {
-    when: () => active && currentReviewContext()?.reviewId === options.taskId,
-  }))
-  const channel: ReviewToolChannel & { control: PtcReviewControl; dispose(): void } = {
-    mode: 'ptc',
-    visibleTools: options.parentHeaderTools as ReviewToolChannel['visibleTools'],
-    instruction: PTC_INSTRUCTION,
-    control,
-    completion: () => control.done && control.report !== undefined ? { done: true, report: control.report } : undefined,
-    async execute(calls, signal) {
-      active = true
-      try {
-        if (options.tools.execute === undefined) throw new Error('PTC review channel requires tools.execute')
-        const toolSet = options.tools.resolve === undefined ? undefined : await options.tools.resolve({ agent: options.childAgent, signal })
-        return await options.tools.execute({ calls, signal, agent: options.childAgent, ...(toolSet === undefined ? {} : { toolSet }) }) as { readonly results: readonly ReviewToolOutcome[] }
-      } finally {
-        active = false
-      }
-    },
-    dispose() { for (const dispose of disposers.reverse()) dispose() },
+export class PtcReviewToolHost {
+  private readonly controls = new Map<string, PtcReviewControl>()
+  private readonly active = new Set<string>()
+  private disposers: (() => void)[] = []
+  private registered = false
+
+  constructor(
+    private readonly tools: PtcTools,
+    private readonly locks: ReviewWriteLocks,
+  ) {}
+
+  /** Register the review-only tools once; idempotent. */
+  register(): void {
+    if (this.registered) return
+    this.registered = true
+    this.disposers = reviewDefinitions(this.controls, this.locks).map(definition => this.tools.register(definition, {
+      when: () => {
+        const reviewId = currentReviewContext()?.reviewId
+        return reviewId !== undefined && this.active.has(reviewId)
+      },
+    }))
   }
-  return channel
+
+  /** Build one task channel over the shared registration. */
+  channel(taskId: string, parentHeaderTools: readonly { readonly name: string }[], childAgent: unknown): ReviewToolChannel & { control: PtcReviewControl; dispose(): void } {
+    this.register()
+    const control: PtcReviewControl = { done: false, waitCount: 0 }
+    this.controls.set(taskId, control)
+    const host = this
+    return {
+      mode: 'ptc',
+      visibleTools: parentHeaderTools as ReviewToolChannel['visibleTools'],
+      instruction: PTC_INSTRUCTION,
+      control,
+      completion: () => control.done && control.report !== undefined ? { done: true, report: control.report } : undefined,
+      async execute(calls, signal) {
+        host.active.add(taskId)
+        try {
+          if (host.tools.execute === undefined) throw new Error('PTC review channel requires tools.execute')
+          const toolSet = host.tools.resolve === undefined ? undefined : await host.tools.resolve({ agent: childAgent, signal })
+          return await host.tools.execute({ calls, signal, agent: childAgent, ...(toolSet === undefined ? {} : { toolSet }) }) as { readonly results: readonly ReviewToolOutcome[] }
+        } finally {
+          host.active.delete(taskId)
+        }
+      },
+      dispose() {
+        host.active.delete(taskId)
+        host.controls.delete(taskId)
+      },
+    }
+  }
+
+  /** Remove the global registrations; used when the plugin fiber unloads. */
+  dispose(): void {
+    for (const dispose of this.disposers.reverse()) dispose()
+    this.disposers = []
+    this.controls.clear()
+    this.active.clear()
+    this.registered = false
+  }
 }

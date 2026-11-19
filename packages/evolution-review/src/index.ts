@@ -11,7 +11,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-platform-contract'
 import { AUX_COMPLETION_INSTRUCTION, ReviewPartialFailure, runReview } from './review-executor.ts'
 import { nativeReviewToolChannel } from './review-tool-channel.ts'
-import { createPtcReviewToolChannel } from './review-ptc-channel.ts'
+import { PtcReviewToolHost } from './review-ptc-channel.ts'
 import { createReviewChildAgent } from '@deepseek-ai/dsh-evolution-adapter/review-child'
 import { ReviewWriteLocks } from './review-write-locks.ts'
 import { ReviewLimiter } from './review-limiter.ts'
@@ -1001,6 +1001,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   let inFlightControllers = new Set<AbortController>()
   const reviewWriteLocks = new ReviewWriteLocks()
   const auxLimiter = new ReviewLimiter(4)
+  let ptcToolHost: PtcReviewToolHost | undefined
 
 /**
  * Freeze the parent prefix for an aux review.
@@ -1090,9 +1091,13 @@ function snapshotReviewParent(agent: Agent): Agent {
     const reviewChild = ptcOnly && toolsService !== undefined
       ? createReviewChildAgent(agent, 'aux-' + reviewId)
       : undefined
-    const channel = reviewChild === undefined
+    if (reviewChild !== undefined && toolsService !== undefined && ptcToolHost === undefined) {
+      ptcToolHost = new PtcReviewToolHost(toolsService, reviewWriteLocks)
+      ptcToolHost.register()
+    }
+    const channel = reviewChild === undefined || ptcToolHost === undefined
       ? nativeChannel
-      : createPtcReviewToolChannel({ taskId: reviewId, parentHeaderTools: header.tools ?? [], tools: toolsService!, childAgent: reviewChild.agent, locks: reviewWriteLocks })
+      : ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent)
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
@@ -1218,6 +1223,7 @@ function snapshotReviewParent(agent: Agent): Agent {
     inFlightControllers = new Set<AbortController>()
     reviewWriteLocks.dispose()
     auxLimiter.dispose()
+    ptcToolHost?.dispose()
     sessionState.dispose()
   }, 'dsh-evolution-review.cleanup')
 }

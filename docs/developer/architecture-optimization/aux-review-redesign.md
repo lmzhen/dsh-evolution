@@ -482,3 +482,10 @@ interface EvolutionReviewActivityRecordV3 {
 - UI 回归测试补齐：`stats-page-layout.client.spec.ts` 覆盖 review 区块的 kind/status/partialReason 渲染；history-panel/stats-layout 均通过。
 - 本地门禁扫描：gate-01/02/06/08–12/17/19–22/24–28/30–46 等通过；gate-05（smoke-built-entries）与 gate-29（write inventory）因本机没有默认平台 scope/profile home 为 `cannot-decide`，不是代码失败；gate-46 初次因新增 review specs 的 taxonomy 过期失败，已运行生成器刷新 `packages/scripts/reports/check-taxonomy.json` 并复跑通过。
 - 仍未开始最终 pre-tag/CI 与独立复核。
+
+
+### Round 17（2026-11-20）
+
+- PTC review 工具改为**每插件实例注册一次**的 `PtcReviewToolHost`：`review_done`/`review_wait` 用 active+reviewId 守卫，handlers 从 `currentReviewContext` 查 control；支持多个 PTC review 并行，不再每个 task 重复注册同名工具。
+- channel 只在 host 上打开/关闭 task 的 active 窗口；老的单 channel 构造器移除。
+- review + adapter 35 项通过，构建 0 error；真实 PTC runtime 验证仍以之前 run_code 复现为准（host 重构后未重新跑临时 live test，列为待复验）。
