@@ -242,6 +242,12 @@ runs:
         # stays green is a real defect and fails here. This is the half CI never ran, which is why a
         # stale probe signature could only be discovered by hand.
         node packages/evolution/scripts/verify-mutations.mjs --probes --no-stamp --baseline=json:"$RUNNER_TEMP/probe-baseline.json" --json
+    - name: Verify the cohort envelope
+      shell: bash
+      working-directory: upstream
+      run: |
+        node packages/evolution/scripts/verify-platform-envelope.mjs \
+          --manifest-dir packages/evolution/.release-staging --line platform-line.json
     - name: "Release tarball audit"
       shell: bash
       working-directory: upstream

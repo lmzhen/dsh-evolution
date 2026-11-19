@@ -53,6 +53,7 @@ jobs:
       version: ${{ steps.line.outputs.version }}
       floor: ${{ steps.line.outputs.floor }}
       peers_range: ${{ steps.line.outputs.peers_range }}
+      cohort: ${{ steps.line.outputs.cohort }}
       upstream_ref: ${{ steps.line.outputs.upstream_ref }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -61,7 +62,7 @@ jobs:
       - id: line
         shell: bash
         run: |
-          node -e "const fs=require('node:fs'); const line=require('./platform-line.json'); const peers=line.cohort.join(' || '); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'version='+line.version+'\nfloor='+line.cohort[0]+'\npeers_range='+peers+'\nupstream_ref=dsh-v'+line.version+'\n')"
+          node -e "const fs=require('node:fs'); const line=require('./platform-line.json'); const peers=line.cohort.join(' || '); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'version='+line.version+'\nfloor='+line.cohort[0]+'\npeers_range='+peers+'\ncohort='+JSON.stringify(line.cohort)+'\nupstream_ref=dsh-v'+line.version+'\n')"
   # G7 §2.2 (single-line release): the dev-baseline job is GONE. It validated the family against
   # the pinned 0.1.5-era tree (`UPSTREAM_SHA`), which has no `.volatile()` in its vendored
   # schemastery — the run after 0.17.0 failed there with 39 `Property 'volatile' does not exist`
@@ -134,6 +135,30 @@ jobs:
           upload_artifacts: 'false'
           npm_scope: ${{ env.NPM_SCOPE }}
 
+  cohort-check:
+    name: cohort validate (${{ matrix.version }})
+    needs: platform-line
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.platform-line.outputs.cohort) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/evolution-validate
+        with:
+          upstream_repo: ${{ env.UPSTREAM_REPO }}
+          upstream_ref: dsh-v${{ matrix.version }}
+          platform_version: ${{ matrix.version }}
+          node_version: '24'
+          artifact_suffix: cohort-${{ matrix.version }}
+          upload_artifacts: 'false'
+          npm_scope: ${{ env.NPM_SCOPE }}
+
   # G7 §2.3 / W10 M1: the desktop plane. The Electron cold-boot assertion itself stays a
   # real-machine acceptance (it needs the signed app; recorded in the G2/G3 design docs with its
   # evidence). What a runner owns is the WINDOWS half of the INSTALL — the same install guards as
@@ -169,7 +194,7 @@ jobs:
   publish:
     name: publish
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [platform-line, compat-check, compat-check-node22, desktop-install]
+    needs: [platform-line, compat-check, compat-check-node22, cohort-check, desktop-install]
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
