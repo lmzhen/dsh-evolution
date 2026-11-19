@@ -233,6 +233,12 @@ function injectKind(debt: ReviewDebt | null): ReviewKind | null {
   return debt.memory ? 'memory' : debt.skill ? 'skill' : null
 }
 
+function mergeDebt(a: ReviewDebt | null | undefined, b: ReviewDebt | null | undefined): ReviewDebt | undefined {
+  if (a === null || a === undefined) return b ?? undefined
+  if (b === null || b === undefined) return a
+  return { memory: a.memory || b.memory, skill: a.skill || b.skill }
+}
+
 // 0.3.19 (W1.2): ApprovalLike is imported from evolution-approval (the one
 // authoritative consumer shape) instead of this local view.
 
@@ -746,7 +752,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // turn is LATEST-relevance (last-trigger-wins) and covers both domains
       // when it crosses the second threshold (the old latch-first form
       // discarded a fresh 'combined' and delivered a stale single kind).
-      const pendingDebt = debt ?? pendingCadenceReviews.get(session.id) ?? undefined
+      const pendingDebt = mergeDebt(pendingCadenceReviews.get(session.id), debt)
       if (pendingDebt !== undefined) {
         pendingCadenceReviews.delete(session.id)
         // Explicit 'inject' deployments also execute at the end (the user
@@ -798,7 +804,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // segment resets at the flush). A fire that arrives ON the completing turn
     // was already consumed by the flush (`?? kind`), so no latch is left.
     if (debt !== null && event.data.reason.kind !== 'completed') {
-      pendingCadenceReviews.set(session.id, debt)
+      const merged = mergeDebt(pendingCadenceReviews.get(session.id), debt)!
+      pendingCadenceReviews.set(session.id, merged)
       if (!pendingCadenceWarned.has(session.id)) {
         pendingCadenceWarned.add(session.id)
         ctx.logger.warn(`dsh-evolution-review: ${kind} review threshold reached; the review runs at the end of the conversation (no mid-task execution)`)
