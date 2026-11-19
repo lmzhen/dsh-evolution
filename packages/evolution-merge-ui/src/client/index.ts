@@ -44,11 +44,11 @@ export function apply(ctx: ClientContext): void {
         settings: { ...(seat?.get('evolution-merge') === undefined ? {} : { merge: seat?.get('evolution-merge')! }), ...(seat?.get('evolution-approval') === undefined ? {} : { platform: seat?.get('evolution-approval')! }) },
         decide: async (rowId: string, verb: 'approve' | 'reject') => {
           const sessionId = currentSessionId(ctx)
-          if (sessionId === undefined) return { ok: false, message: t('session.missing') }
+          if (sessionId === undefined) return { ok: false, message: t('session.missing'), code: 'session-missing' }
           const result = await api.decide(rowId, verb, sessionId)
           if (result.ok) return result.payload
           const failure = result.failure
-          return { ok: false, message: 'message' in failure && typeof failure.message === 'string' ? failure.message : t('decide.failed') }
+          return { ok: false, message: 'message' in failure && typeof failure.message === 'string' ? failure.message : t('decide.failed'), ...(failure.kind === 'problem' && failure.code !== undefined ? { code: failure.code } : {}) }
         },
         ...(workspaceId === undefined ? {} : { workspaceId }),
       }

@@ -56,8 +56,11 @@ export interface HealthFace {
   readAt?: number
   scan?: { status: 'complete' | 'unavailable' | 'truncated' }
   /** The seat's translator for this bundle's dictionary — the panel never reaches for a service. */
-  t: (key: string) => string
+  t: HealthTranslate
 }
+
+/** Translator shape the panel needs: keys plus `.one`/placeholder values. */
+type HealthTranslate = (key: string, values?: Readonly<Record<string, string | number>>) => string
 
 /** Kinds in the order the summary reads them. */
 const KINDS = ['healthy', 'warn', 'needs-restructure', 'error', 'unreadable'] as const
@@ -124,10 +127,10 @@ function skillRowNode(face: HealthFace, t: (key: string) => string, row: HealthR
   return createElement('div', { key: row.name, 'data-role': 'skill-row', 'data-tone': row.verdict },
     createElement('span', { 'data-role': 'skill-name' }, row.name),
     createElement('span', { 'data-role': 'skill-verdict' }, t('verdict.' + row.verdict)),
-    createElement('span', { 'data-role': 'skill-findings' }, row.findings.length === 0 ? t('findings.none') : row.findings.map(finding => ruleName(t, finding.rule)).join(' / ')),
+    createElement('span', { 'data-role': 'skill-findings' }, row.findings.length === 0 ? t('findings.none') : row.findings.map(finding => ruleName(t, finding.rule)).join(t('punct.slash'))),
     row.verdict === 'unreadable' ? createElement('span', { 'data-role': 'skill-unreadable-note' }, t('unreadable.note')) : null,
-    row.protection === undefined || row.protection === null ? null : createElement('span', { 'data-role': 'skill-protection' }, t('protected') + ': ' + row.protection),
-    createElement('span', { 'data-role': 'skill-dims' }, t('dims.body') + ': ' + String(row.dims?.bodyChars ?? t('dims.unknown')) + ' · ' + t('dims.support') + ': ' + String(row.dims?.supportFiles ?? t('dims.unknown'))),
+    row.protection === undefined || row.protection === null ? null : createElement('span', { 'data-role': 'skill-protection' }, t('protected') + t('punct.colon') + row.protection),
+    createElement('span', { 'data-role': 'skill-dims' }, t('dims.body') + t('punct.colon') + String(row.dims?.bodyChars ?? t('dims.unknown')) + t('punct.dot') + t('dims.support') + t('punct.colon') + String(row.dims?.supportFiles ?? t('dims.unknown'))),
     createElement('span', { 'data-role': 'skill-row-actions' },
       createElement('button', { type: 'button', 'data-role': 'action-history', disabled: face.openHistory === undefined, onClick: () => { face.openHistory?.(row.name) } }, t('action.history')),
       compact
@@ -141,13 +144,13 @@ function skillRowNode(face: HealthFace, t: (key: string) => string, row: HealthR
 }
 
 /** H4: issues first, normal items folded behind one native details summary. */
-function skillQueue(face: HealthFace, t: (key: string) => string, model: ReturnType<typeof healthViewModel>): ReactNode {
+function skillQueue(face: HealthFace, t: HealthTranslate, model: ReturnType<typeof healthViewModel>): ReactNode {
   return createElement('div', { 'data-role': 'skill-queue' },
     createElement('h3', { 'data-role': 'group-title' }, t('group.bySkill')),
     model.hasIssues ? null : createElement('div', { 'data-role': 'health-complete' }, t('health.complete')),
     ...model.issues.map(row => skillRowNode(face, t, row)),
     model.normal.length === 0 ? null : createElement('details', { 'data-role': 'health-normal', className: 'evo-health-normal' },
-      createElement('summary', null, t('health.normal').replace('{n}', String(model.normal.length))),
+      createElement('summary', null, t('health.normal', { n: model.normal.length })),
       ...model.normal.map(row => skillRowNode(face, t, row, true))),
   )
 }
@@ -299,17 +302,17 @@ export function SkillHealthPanel(face: HealthFace): ReactNode {
             createElement('p', { 'data-role': 'proposal-status' }, t('proposal.status.' + proposal.status)),
             createElement('details', { 'data-role': 'proposal-provenance' },
               createElement('summary', null, t('proposal.provenance')),
-              createElement('p', { 'data-role': 'proposal-owner' }, t('proposal.owner') + ': ' +
+              createElement('p', { 'data-role': 'proposal-owner' }, t('proposal.owner') + t('punct.colon') +
                 (proposal.owner.mode === 'covered'
                   ? t('proposal.owner.covered') + (proposal.owner.name === undefined ? '' : ': ' + proposal.owner.name)
                   : t('proposal.owner.owner-gap') + (proposal.owner.neededOwner === undefined ? '' : ': ' + proposal.owner.neededOwner))),
-              proposal.provenance === undefined ? null : createElement('p', null, proposal.provenance.promptVersion + (proposal.provenance.model === undefined ? '' : ' · ' + proposal.provenance.model) + ' · ' + proposal.provenance.runId + ' · ' + new Date(proposal.provenance.at).toLocaleString() + (proposal.provenance.promptHash === undefined ? '' : ' · #' + proposal.provenance.promptHash.slice(0, 8)))),
+              proposal.provenance === undefined ? null : createElement('p', null, proposal.provenance.promptVersion + (proposal.provenance.model === undefined ? '' : t('punct.dot') + proposal.provenance.model) + t('punct.dot') + proposal.provenance.runId + t('punct.dot') + new Date(proposal.provenance.at).toLocaleString() + (proposal.provenance.promptHash === undefined ? '' : t('punct.dot') + '#' + proposal.provenance.promptHash.slice(0, 8)))),
             proposal.residual === undefined || proposal.residual.trim() === '' ? null : createElement('p', { 'data-role': 'proposal-kept' },
-              t('proposal.kept') + ': ' + proposal.residual.trim().slice(0, 160)),
+              t('proposal.kept') + t('punct.colon') + proposal.residual.trim().slice(0, 160)),
             (proposal.parts ?? []).length === 0 ? null : createElement('p', { 'data-role': 'proposal-reusable' },
-              t('proposal.reusable') + ': ' + (proposal.parts ?? []).map(part => part.heading).join(t('punct.list'))),
+              t('proposal.reusable') + t('punct.colon') + (proposal.parts ?? []).map(part => part.heading).join(t('punct.list'))),
             (proposal.warnings ?? []).length === 0 ? null : createElement('p', { 'data-role': 'proposal-warnings' },
-              t('proposal.warnings') + ': ' + (proposal.warnings ?? []).join(t('punct.warning'))),
+              t('proposal.warnings') + t('punct.colon') + (proposal.warnings ?? []).join(t('punct.warning'))),
           )
         }),
       )

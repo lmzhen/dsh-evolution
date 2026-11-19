@@ -86,9 +86,11 @@ it('routes the runtime no-agent shape to code no-agent and missing parent to mer
   const service = runtime(v4.home, v4.io)
   const agentless = await service.execute({ verb: 'approve', id: 'p1' }, { agentless: true })
   expect(agentless.ok).toBe(false)
+  expect(agentless.code).toBe('e-305')
   expect(agentless.text).toContain('code: e-305')
   const parentOnly = await service.execute({ verb: 'approve', id: 'p1' })
   expect(parentOnly.ok).toBe(false)
+  expect(parentOnly.code).toBe('merge-parent-required')
   expect(parentOnly.text).toContain('code: merge-parent-required')
 })
 
@@ -110,6 +112,7 @@ it('every failing runtime verb answers exactly three code/hint/next lines', asyn
   ]
   for (const result of failures) {
     expect(result.ok).toBe(false)
+    expect(typeof result.code).toBe('string')
     expect(lines(result.text), result.text).toHaveLength(3)
     expect(result.text.startsWith('code: ')).toBe(true)
     expect(result.text.split('\n')[1]?.startsWith('hint: ')).toBe(true)

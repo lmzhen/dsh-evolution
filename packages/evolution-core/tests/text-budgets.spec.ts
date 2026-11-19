@@ -31,6 +31,14 @@ describe('text-budgets', () => {
     expect(compareTextBudget('😀'.repeat(21), TEXT_BUDGETS.feedbackNote)).toMatchObject({ value: 21, over: true })
   })
 
+  it('declares the display-only truncation caps in the same table', () => {
+    expect(TEXT_BUDGETS.diffWindow).toMatchObject({ id: 'history.diff-window', axis: 'display', unit: 'graphemes', limit: 4_000, severity: 'report' })
+    expect(TEXT_BUDGETS.reviewPreview).toMatchObject({ limit: 2_000, unit: 'graphemes' })
+    expect(TEXT_BUDGETS.memoryPreview).toMatchObject({ limit: 200, unit: 'graphemes' })
+    expect(TEXT_BUDGETS.versionBodyPreview).toMatchObject({ limit: 20_000, unit: 'graphemes' })
+    expect(TEXT_BUDGETS.mergeBodyPreview).toMatchObject({ axis: 'display', unit: 'utf8Bytes', limit: 65_536 })
+  })
+
   it('compares storage text by code points', () => {
     const budget = { ...TEXT_BUDGETS.skillName, limit: 4 }
     expect(compareTextBudget('中文ab', budget)).toMatchObject({ value: 4, over: false })

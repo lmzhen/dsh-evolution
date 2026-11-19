@@ -68,6 +68,11 @@ function mount(props: { t: (key: MessageKey) => string; api: ApprovalApi }): voi
 }
 
 describe('the pending card', () => {
+  it('uses the singular age and count copy at n=1', async () => {
+    mount(face({ pending: windowStub([row({ age: { unit: 'days', n: 1 } })]) }))
+    await waitFor(() => { expect(screen.getByText(message('approvalAgeDays.one'))).toBeDefined() })
+    expect(screen.getByText(message('approvalCount.one'))).toBeDefined()
+  })
   // ONE unmount point. The per-test `cleanup()` calls this file used to carry ran only on the success
   // path, so a failing case left its card mounted — and the next case then failed on a query that
   // matched two cards (the refresh control, a row) instead of on its own subject.
@@ -134,7 +139,7 @@ describe('the pending card', () => {
     mount(face({ pending: windowStub([row()]), preview: preview as never }))
     await waitFor(() => { expect(screen.getByText(message('approvalPreview'))).toBeDefined() })
     fireEvent.click(screen.getByText(message('approvalPreview')))
-    await waitFor(() => { expect(screen.getByText(message('approvalDiffAdded').replace('{n}', '1'))).toBeDefined() })
+    await waitFor(() => { expect(screen.getByText(formatText('approvalDiffAdded', { n: 1 }))).toBeDefined() })
     expect(preview).toHaveBeenCalledWith('p-1')
     expect(screen.getByText('- b')).toBeDefined()
     expect(screen.getByText('+ c')).toBeDefined()
@@ -159,7 +164,7 @@ describe('the pending card', () => {
     // was invisible here while /evolution pending and doctor both listed it.
     expect(pending.mock.calls.map(call => call[0])).toEqual([undefined, 'executing'])
     expect(screen.getByText(message('approvalExecuting'))).toBeDefined()
-    expect(screen.getByText(message('approvalRunningCount').replace('{n}', '1'))).toBeDefined()
+    expect(screen.getByText(formatText('approvalRunningCount', { n: 1 }))).toBeDefined()
     // A running write may already have landed: offering approve here is the double-approve the
     // CLI warns about, so neither decision is rendered for this row.
     expect(screen.queryByText(message('approvalApprove'))).toBeNull()
@@ -216,6 +221,7 @@ describe('the pending card', () => {
     expect(errors.filter(line => line.includes('unique'))).toEqual([])
   })
 })
+
 
 
 

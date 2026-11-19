@@ -18,6 +18,9 @@ it('bounds the body preview by bytes without splitting a surrogate pair', () => 
   const ref = { name: 'a', side: 'left' } as never
   const view = buildBodyView(snapshot, ref, text)
   expect(view.truncated).toBe(true)
+  expect(view.shownBytes).toBe(Buffer.byteLength(view.text, 'utf8'))
+  expect(view.shownBytes).toBeLessThanOrEqual(64 * 1024)
+  expect(view.shownBytes).toBeGreaterThan(0)
   expect(Buffer.byteLength(view.text, 'utf8')).toBeLessThanOrEqual(64 * 1024)
   expect(view.text).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/)
 })

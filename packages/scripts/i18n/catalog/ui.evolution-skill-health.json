@@ -62,16 +62,6 @@
       "pt": "Quantidade",
       "ru": "Количество"
     },
-    "col.findings": {
-      "zh": "证据",
-      "en": "Evidence",
-      "ja": "根拠",
-      "es": "Evidencia",
-      "fr": "Preuves",
-      "de": "Belege",
-      "pt": "Evidência",
-      "ru": "Свидетельства"
-    },
     "col.rule": {
       "zh": "规则",
       "en": "Rule",
@@ -81,16 +71,6 @@
       "de": "Regel",
       "pt": "Regra",
       "ru": "Правило"
-    },
-    "col.skill": {
-      "zh": "技能",
-      "en": "Skill",
-      "ja": "スキル",
-      "es": "Skill",
-      "fr": "Skill",
-      "de": "Skill",
-      "pt": "Skill",
-      "ru": "Навык"
     },
     "col.skills": {
       "zh": "涉及技能",
@@ -162,16 +142,6 @@
       "pt": "timestamps",
       "ru": "отметок времени"
     },
-    "counts": {
-      "zh": "{ok} 正常 · {warn} 警告 · {error} 错误 · {unreadable} 无法读取",
-      "en": "Healthy {ok} · Warning {warn} · Error {error} · Unreadable {unreadable}",
-      "ja": "{ok} 正常 · {warn} 警告 · {error} エラー · {unreadable} 読み取り不可",
-      "es": "{ok} correctos · {warn} avisos · {error} errores · {unreadable} ilegibles",
-      "fr": "{ok} ok · {warn} avertissement · {error} erreur · {unreadable} illisible",
-      "de": "{ok} OK · {warn} Warnung · {error} Fehler · {unreadable} nicht lesbar",
-      "pt": "{ok} ok · {warn} aviso · {error} erro · {unreadable} ilegível",
-      "ru": "{ok} в норме · {warn} с предупреждениями · {error} с ошибками · {unreadable} нечитаемых"
-    },
     "dims.body": {
       "zh": "正文",
       "en": "Body",
@@ -232,46 +202,6 @@
       "pt": "Saúde das skills",
       "ru": "Здоровье навыков"
     },
-    "failure.forbidden": {
-      "zh": "平台拒绝了这个请求（身份不是 owner）。",
-      "en": "The platform rejected this request (this identity isn't the owner).",
-      "ja": "プラットフォームがこのリクエストを拒否しました（owner 権限がありません）。",
-      "es": "La plataforma rechazó esta solicitud (la identidad no es la propietaria).",
-      "fr": "La plateforme a refusé cette requête (votre identité n’est pas owner).",
-      "de": "Die Plattform hat die Anfrage abgelehnt (die Identität ist nicht owner).",
-      "pt": "A plataforma recusou esta solicitação (a identidade não é o owner).",
-      "ru": "Платформа отклонила запрос (эта учётная запись не является владельцем)."
-    },
-    "failure.server": {
-      "zh": "读取失败，可以重试。",
-      "en": "Load failed. You can retry.",
-      "ja": "読み取りに失敗しました。再試行できます。",
-      "es": "La lectura falló; puedes reintentar.",
-      "fr": "La lecture a échoué ; vous pouvez réessayer.",
-      "de": "Lesen fehlgeschlagen; du kannst es erneut versuchen.",
-      "pt": "Falha na leitura; você pode tentar novamente.",
-      "ru": "Не удалось прочитать; можно повторить."
-    },
-    "failure.unauthorized": {
-      "zh": "需要登录：重新打开这个页面完成登录后再试。",
-      "en": "Sign-in required: reopen this page, sign in, then try again.",
-      "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。",
-      "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
-      "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
-      "de": "Anmeldung nötig: Seite neu öffnen, anmelden und erneut versuchen.",
-      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente.",
-      "ru": "Нужен вход: откройте страницу заново, войдите и повторите."
-    },
-    "failure.unmounted": {
-      "zh": "该功能没有挂载。",
-      "en": "This feature isn't mounted.",
-      "ja": "この機能はマウントされていません。",
-      "es": "Esta función no está montada.",
-      "fr": "Cette fonction n’est pas montée.",
-      "de": "Diese Funktion ist nicht eingebunden.",
-      "pt": "Este recurso não está montado.",
-      "ru": "Эта функция не подключена."
-    },
     "failureForbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
       "en": "The platform rejected this request (your current identity lacks permission).",
@@ -311,16 +241,6 @@
       "de": "Diese Funktion ist nicht aktiviert.",
       "pt": "Este recurso não está ativado.",
       "ru": "Эта функция не включена."
-    },
-    "fallback.hint": {
-      "zh": "可以改用命令：{command}",
-      "en": "Or run this command: {command}",
-      "ja": "代替コマンド：{command}",
-      "es": "Alternativa por comando: {command}",
-      "fr": "Commande de repli : {command}",
-      "de": "Alternativ per Befehl: {command}",
-      "pt": "Alternativa por comando: {command}",
-      "ru": "Запасной вариант — команда: {command}"
     },
     "fallbackHint": {
       "zh": "可以改用命令：{command}",
@@ -388,7 +308,7 @@
       "ja": "{n} 件は正常（展開して表示）",
       "es": "{n} en orden; despliega para ver",
       "fr": "{n} éléments normaux — développez pour voir",
-      "de": "{n} normal – zum Ansehen aufklappen",
+      "de": "{n} in Ordnung – zum Ansehen aufklappen",
       "pt": "{n} itens normais — expanda para ver",
       "ru": "{n} в норме — разверните, чтобы увидеть"
     },
@@ -402,26 +322,6 @@
       "pt": "Aqui, os resultados da verificação das skills ficam agrupados por regra. Regras sem padrão definido mostram só o nome, sem número; skills que não puderam ser lidas aparecem como “Ilegível” e não contam como saudáveis.",
       "ru": "Здесь результаты проверки навыков сгруппированы по правилам. Если для правила ещё нет общего эталона, показываем только его название, без цифр. Навыки, которые не удалось прочитать, помечаются отдельно как «Нечитаемый» и не считаются нормой."
     },
-    "line": {
-      "zh": "位置：{path}",
-      "en": "Location: {path}",
-      "ja": "位置：{path}",
-      "es": "línea: {path}",
-      "fr": "ligne : {path}",
-      "de": "Zeile: {path}",
-      "pt": "local: {path}",
-      "ru": "Позиция: {path}"
-    },
-    "line.unknown": {
-      "zh": "位置：未知",
-      "en": "Location: unknown",
-      "ja": "位置：不明",
-      "es": "línea: DESCONOCIDA",
-      "fr": "ligne : inconnue",
-      "de": "Zeile: unbekannt",
-      "pt": "local: desconhecido",
-      "ru": "Позиция: неизвестно"
-    },
     "loading": {
       "zh": "读取中…",
       "en": "Loading…",
@@ -431,16 +331,6 @@
       "de": "Wird gelesen…",
       "pt": "carregando…",
       "ru": "Читаем…"
-    },
-    "loading.failed": {
-      "zh": "读取失败——现在判断不了；点「刷新」重试。",
-      "en": "Couldn't load, so there's no verdict right now. Hit Refresh to retry.",
-      "ja": "読み取りに失敗したため、今は判断できません。「更新」を押して再試行してください。",
-      "es": "La lectura falló: ahora mismo no se puede juzgar; pulsa «Actualizar» para reintentar.",
-      "fr": "Lecture échouée : impossible de juger pour l’instant ; cliquez sur « Actualiser » pour réessayer.",
-      "de": "Lesen fehlgeschlagen – eine Aussage ist gerade nicht möglich; „Aktualisieren“ versucht es erneut.",
-      "pt": "A leitura falhou — não é possível avaliar agora; clique em Atualizar para tentar novamente.",
-      "ru": "Не удалось прочитать — сейчас судить нельзя; нажмите «Обновить» и повторите."
     },
     "proposal.kept": {
       "zh": "保留正文",
@@ -621,16 +511,6 @@
       "de": "Dieser Skill ist geschützt und lässt sich nicht direkt ändern.",
       "pt": "Esta skill é protegida e não pode ser alterada diretamente.",
       "ru": "Навык защищён, напрямую его не изменить."
-    },
-    "read.failed": {
-      "zh": "这次没读到数据（下面一行是原始信息）：",
-      "en": "No data this time (the raw message is on the line below):",
-      "ja": "今回の読み取りに失敗しました（下の行は元のメッセージです）：",
-      "es": "Esta lectura no devolvió datos (abajo está el mensaje original):",
-      "fr": "Cette lecture a échoué (le message brut est ci-dessous) :",
-      "de": "Dieses Lesen hat keine Daten geliefert (die Zeile darunter ist die Roh-Meldung):",
-      "pt": "Esta leitura falhou (a mensagem original está logo abaixo):",
-      "ru": "Данные прочитать не удалось (ниже исходное сообщение):"
     },
     "readAt.today": {
       "zh": "今天",
@@ -881,6 +761,46 @@
       "de": "; ",
       "pt": "; ",
       "ru": "; "
+    },
+    "health.normal.one": {
+      "zh": "1 项正常，展开查看",
+      "en": "1 healthy, expand to view",
+      "ja": "1 件は正常（展開して表示）",
+      "es": "1 en orden; despliega para ver",
+      "fr": "1 élément normal — développez pour voir",
+      "de": "1 in Ordnung – zum Ansehen aufklappen",
+      "pt": "1 item normal — expanda para ver",
+      "ru": "1 в норме — разверните, чтобы увидеть"
+    },
+    "punct.colon": {
+      "zh": "：",
+      "en": ": ",
+      "ja": "：",
+      "es": ": ",
+      "fr": " : ",
+      "de": ": ",
+      "pt": ": ",
+      "ru": ": "
+    },
+    "punct.dot": {
+      "zh": " · ",
+      "en": " · ",
+      "ja": " ・ ",
+      "es": " · ",
+      "fr": " · ",
+      "de": " · ",
+      "pt": " · ",
+      "ru": " · "
+    },
+    "punct.slash": {
+      "zh": " / ",
+      "en": " / ",
+      "ja": " / ",
+      "es": " / ",
+      "fr": " / ",
+      "de": " / ",
+      "pt": " / ",
+      "ru": " / "
     }
   }
 }

@@ -215,7 +215,7 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
       lastChangedAt: row.lastAt,
       lastActivityAt,
       recentlyUsed: recentlyUsedAt(lastActivityAt, now),
-      needsAttention: verdict === 'warn' || verdict === 'needs-restructure',
+      needsAttention: verdict === 'warn' || verdict === 'needs-restructure' || verdict === 'unreadable',
       health: healthByName.get(row.name) ?? null,
       usage,
       feedback: feedbackOf(feedbackRead, row.name),

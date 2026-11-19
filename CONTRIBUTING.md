@@ -64,7 +64,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 27 | `node packages/scripts/verify-platform-ranges.mjs --manifest-dir packages/evolution/.release-staging`（**发布期**：每个 staged manifest 的 `@deepseek-ai/dsh-*` 必须逐字等于 platform-line.json 派生的 peers 范围、`engines.dsh` 必须等于 engines 窗口；vendored 范围由 `lib-vendored-ranges.mjs` 单源钉住；同时打印双谓词窗口网格两表读数 ✓） | mirror |
 | 28 | `node packages/scripts/verify-release-artifacts.mjs .github --strict --self-test`（发布面产物：CI 工作流与发布脚本的一致性 + 检查器自检） | mirror |
 | 29 | `node packages/scripts/verify-write-inventory.mjs packages --strict --home <plane home>`（写清单落地：**CI 形态**用 `$RUNNER_TEMP/plane-home`） | mirror |
-| 30 | `node packages/scripts/verify-client-ui-i18n.mjs packages`（U-8/G5.9：客户端半的可见文案必须走字典——① 不许把裸字符串当子节点（任何实参位）；② 不许在字符串里写跨面指令 `dsh web`／`/evolution …`；注释先行剥离且**保留行号**。drill：注入一个第 4 实参裸串＋一个跨面串 ⇒ 必红，撤回即绿 ✓） | mirror |
+| 30 | `node packages/scripts/verify-client-ui-i18n.mjs packages`（U-8/G5.9：四个客户端半（settings / history / merge / skill-health）的可见文案必须走字典——① 不许把裸字符串当子节点（任何实参位）；② 不许在字符串里写跨面指令 `dsh web`／`/evolution …`（命令值行与 fallback 生成物除外）；注释先行剥离且**保留行号**。drill：注入一个第 4 实参裸串＋一个跨面串 ⇒ 必红，撤回即绿 ✓） | mirror |
 | 31 | `node packages/scripts/verify-error-codes.mjs packages`（G4.3/C5：错误码表与文档必须**同集**——源码新增码未入档、或文档留着一个已删除的码，都必红；并校验文档里的**区间**与表实际一致。drill：给源码塞一个 E-322 ⇒ 必红；删掉一行文档码 ⇒ 必红；撤回即绿 ✓） | mirror |
 | 32 | `node packages/scripts/gen-install-counts.mjs . --check`（G4.1/C5：README 的"装了几个包／发布了几个"必须由 `lib-family-packages.mjs` 派生——**本批纠出的真实漂移：原文写 29/30，树里是 31/32** ✓。drill：手改标记区内任一数字 ⇒ 必红，重跑生成器即还原 ✓） | mirror |
 | 33 | 生成物 `--check`（六件一起，CI 同款）：`node packages/scripts/gen-bundle-patches.mjs packages --check` ＋ `gen-client-tokens.mjs packages --check` ＋ `gen-param-client-view.mjs packages --check` ＋ `gen-param-docs.mjs packages --check` ＋ `gen-client-guards.mjs packages --check` ＋ `gen-about.mjs packages --check`（G5.10/U-10：版本与用途的生成物 ✓）（G4.1/C5：生成物与源不同步即红——四个生成器**都已支持 `--check`**，缺的只是"有人跑"。drill：给 PARAMETERS.md 动一个字符 ⇒ `gen-param-docs --check` 必红，撤回即绿 ✓） | mirror |
@@ -116,7 +116,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 79 | node packages/scripts/verify-line-identity.mjs --manifest packages/scripts/files/line-manifest.json --strict | mirror |
 | 80 | node packages/evolution/scripts/verify-graph-edges.mjs --report | overlay |
 | 81 | node packages/scripts/verify-health-admission.mjs | mirror |
-| 82 | `node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、601 个 key、119 个参数文案、68 个 command-help key、31 个 host error，8 语言 key/占位符/生成物一致；`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；重跑生成器即绿） | mirror |
+| 82 | `node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、全部 UI key、119 个参数文案、68 个 command-help key、31 个 host error，8 语言 key/占位符/生成物一致；**每个 UI key 必须有生产读者**：字面量、`.one` 派生或 `'prefix.' + value` 动态前缀，否则死键必红。`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；留一个无读者 key ⇒ 必红；重跑生成器即绿） | mirror |
 
 ## Pull request checklist
 

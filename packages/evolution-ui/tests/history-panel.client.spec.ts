@@ -22,12 +22,14 @@ import type { SkillRow, VersionRow, VersionsPayload } from '../src/panels/histor
 interface Deferred<T> {
   readonly promise: Promise<T>
   readonly resolve: (value: T) => void
+  readonly reject: (reason?: unknown) => void
 }
 
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((settle) => { resolve = settle })
-  return { promise, resolve }
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((settle, fail) => { resolve = settle; reject = fail })
+  return { promise, resolve, reject }
 }
 
 const skill = (name: string, versions: number, description: string, lastAt: string, age: { unit: string; n: number }): SkillRow => {
@@ -111,6 +113,31 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     reads[1]!.resolve(payload())
     await new Promise(resolve => setTimeout(resolve, 10))
     expect(screen.getByText('undo.success(2)')).toBeTruthy()
+  })
+
+  it('does not call a successful undo failed when the follow-up list read fails', async () => {
+    const reads: Array<Deferred<VersionsPayload>> = []
+    render(createElement(SkillHistoryPanel, makeFace({
+      loadVersions: () => {
+        const next = deferred<VersionsPayload>()
+        reads.push(next)
+        if (reads.length === 2) next.reject(new Error('offline'))
+        return next.promise
+      },
+      undo: async () => 'UNDONE',
+    })))
+    fireEvent.click(await screen.findByText('alpha'))
+    await waitFor(() => { expect(reads).toHaveLength(1) })
+    reads[0]!.resolve(payload())
+    await screen.findByRole('button', { name: 'undo' })
+    fireEvent.click(screen.getByRole('button', { name: 'undo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'undo.confirm' }))
+    await screen.findByText('undo.reloaded')
+    expect(screen.queryByText('undo.failed')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'refresh' }))
+    await waitFor(() => { expect(reads).toHaveLength(3) })
+    reads[2]!.resolve(payload())
+    await waitFor(() => { expect(screen.queryByText('undo.reloaded')).toBeNull() })
   })
 
   it('arms the undo on the first click, cancels on demand, and writes only on the confirm', async () => {

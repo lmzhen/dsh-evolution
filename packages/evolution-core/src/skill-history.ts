@@ -32,6 +32,7 @@ import { transactIo, type EvolutionIoLike } from './io.ts'
 import { isPresent, isUnknown, probeText } from './probe.ts'
 import { contentHash } from './mutations.ts'
 import { graphemeCount, truncateGraphemes } from './text-metrics.ts'
+import { TEXT_DIFF_MAX_GRAPHEMES } from './constants.ts'
 
 /** Root-level history directory. Dot-prefixed so skill discovery skips it. */
 export const HISTORY_DIR = '.history'
@@ -816,7 +817,7 @@ export interface TextDiffFacts {
 export const TEXT_DIFF_MAX_LINES = 40
 
 /** Characters one windowed side may carry, so a single enormous line cannot travel whole. */
-export const TEXT_DIFF_MAX_CHARS = 4_000
+export const TEXT_DIFF_MAX_CHARS = TEXT_DIFF_MAX_GRAPHEMES
 
 /**
  * The facts of one whole-body replacement: how many lines the changed region gained and lost, and

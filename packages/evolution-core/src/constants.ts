@@ -89,6 +89,16 @@ export const DEFAULT_SKILL_VERSION_KEEP = 20
  * ceiling hide a 99k body without a single signal saying "split me" (V3). */
 export const AUTHORING_SPLIT_LINE_CHARS = 20_000
 
+/** Display-only truncation caps. They are answers about what a reader gets, never
+ * write limits; every one is measured in graphemes and declared in TEXT_BUDGETS.
+ * Keeping them here is what lets the route, the activity store, the memory tool
+ * and the merge panel stop carrying private copies of the same number. */
+export const TEXT_DIFF_MAX_GRAPHEMES = 4_000
+export const REVIEW_TEXT_PREVIEW_GRAPHEMES = 2_000
+export const MEMORY_ENTRY_PREVIEW_GRAPHEMES = 200
+export const VERSION_BODY_PREVIEW_GRAPHEMES = 20_000
+export const MERGE_BODY_PREVIEW_BYTES = 64 * 1024
+
 /** Upstream's conversion basis for CHARACTER LIMITS: 2.75 chars/token, labelled
  * model-independent in the config template (\`cli-config.yaml.example:538\`), and the
  * basis behind every quoted token figure there — memory 2200 chars ≈ 800 tokens,

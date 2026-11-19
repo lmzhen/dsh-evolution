@@ -14,7 +14,7 @@ import { HistoryItemRow } from './HistoryItemRow.ts'
 import { FALLBACK_COMMANDS } from './fallbacks.ts'
 
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
-export interface MergeFace { store: MergeStore; t: Translate; doctorCommand?: string; settings?: SettingsFace; workspaceId?: string; decide?: (rowId: string, verb: 'approve' | 'reject') => Promise<{ ok: boolean; message: string }> }
+export interface MergeFace { store: MergeStore; t: Translate; doctorCommand?: string; settings?: SettingsFace; workspaceId?: string; decide?: (rowId: string, verb: 'approve' | 'reject') => Promise<{ ok: boolean; message: string; code?: string }> }
 const QUEUES: MergeQueue[] = ['verify', 'pending', 'fuse', 'skipped']
 const DOCTOR_COMMAND = '/evolution doctor'
 
@@ -95,7 +95,7 @@ function bodyNode(overlay: Extract<OverlayState, { kind: 'body' }>, t: Translate
     overlay.status === 'error' && overlay.failure !== undefined ? failureNode(t, overlay.failure, [], () => {}) : null,
     overlay.status === 'ready' && overlay.body !== undefined
       ? createElement('div', null,
-          overlay.body.truncated ? createElement('p', { 'data-role': 'body-truncated' }, t('body.truncated')) : null,
+          overlay.body.truncated ? createElement('p', { 'data-role': 'body-truncated' }, t('body.truncated', { shown: shownBytesOf(overlay.body), total: overlay.body.totalBytes })) : null,
           overlay.body.text === '' ? createElement('p', { 'data-role': 'body-empty' }, t('body.empty')) : createElement('pre', { 'data-role': 'body-text' }, overlay.body.text),
         )
       : null,
@@ -107,7 +107,7 @@ function pairNode(overlay: Extract<OverlayState, { kind: 'pair' }>, t: Translate
   const title = t('overlay.pair')
   const block = (target: { name: string; side: 'live' | 'archive' }, body: typeof overlay.aBody): ReactNode => createElement('section', { 'data-role': target === overlay.a ? 'body-a' : 'body-b', 'data-side': target.side },
     createElement('h4', { 'data-role': 'pair-name' }, target.name + ' · ' + t('body.' + target.side)),
-    body === undefined ? null : body.truncated ? createElement('p', { 'data-role': 'body-truncated' }, t('body.truncated')) : null,
+    body === undefined ? null : body.truncated ? createElement('p', { 'data-role': 'body-truncated' }, t('body.truncated', { shown: shownBytesOf(body), total: body.totalBytes })) : null,
     body === undefined ? null : body.text === '' ? createElement('p', { 'data-role': 'body-empty' }, t('body.empty')) : createElement('pre', { 'data-role': 'body-text' }, body.text),
   )
   const inner = createElement('section', {
@@ -149,6 +149,27 @@ function historyNode(overlay: Extract<OverlayState, { kind: 'history' }>, t: Tra
   return Modal === undefined ? inner : createElement(Modal, { open: true, onClose, title, closeLabel: t('close'), headless: true, className: 'evo-merge-modal' }, inner)
 }
 
+/** Bytes actually shown; older hosts omit `shownBytes`, so measure the returned text. */
+function shownBytesOf(body: { readonly text: string; readonly totalBytes: number; readonly shownBytes?: number }): number {
+  if (body.shownBytes !== undefined) return body.shownBytes
+  return new TextEncoder().encode(body.text).length
+}
+
+function decisionReasonKey(code: string | undefined): string | undefined {
+  if (code === undefined) return undefined
+  const normalized = code.toLowerCase()
+  if (normalized === 'e-305' || normalized === 'session-missing') return 'session.missing'
+  if (normalized === 'row-not-found' || normalized === 'approve-not-found') return 'decide.reason.not-found'
+  if (normalized === 'row-not-pending' || normalized === 'row-invalid' || normalized === 'approve-not-pending' || normalized === 'approve-invalid' || normalized === 'approve-expired') return 'decide.reason.not-pending'
+  if (normalized.startsWith('approve-')) return 'decide.reason.not-pending'
+  if (normalized === 'row-changed' || normalized === 'target-changed' || normalized === 'source-changed' || normalized === 'support-changed') return 'decide.reason.changed'
+  if (normalized === 'target-taken' || normalized === 'target-not-managed' || normalized === 'target-protected' || normalized === 'target-blocked') return 'decide.reason.target'
+  if (normalized === 'merge-target-busy') return 'decide.reason.busy'
+  if (normalized === 'merge-parent-required') return 'decide.reason.session-required'
+  if (normalized === 'merge-over-limit') return 'decide.reason.over-limit'
+  return undefined
+}
+
 export function MergePanel(face: MergeFace): ReactNode {
   const { store, t } = face
   const snapshot: StoreSnapshot = useSyncExternalStore(store.subscribe, store.read, store.read)
@@ -156,7 +177,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const [orders, setOrders] = useState<Record<string, readonly string[]>>({})
   const [dragId, setDragId] = useState<string | undefined>(undefined)
   const [deciding, setDeciding] = useState<string | undefined>(undefined)
-  const [decisionNotice, setDecisionNotice] = useState<{ rowId: string; verb: 'approve' | 'reject'; ok: boolean } | undefined>(undefined)
+  const [decisionNotice, setDecisionNotice] = useState<{ rowId: string; verb: 'approve' | 'reject'; ok: boolean; code?: string; message?: string } | undefined>(undefined)
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | undefined>(undefined)
   const returnFocus = useRef<HTMLElement | null>(null)
   const captureFocus = (): void => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }
@@ -171,10 +192,10 @@ export function MergePanel(face: MergeFace): ReactNode {
     void (async () => {
       try {
         const result = await face.decide!(rowId, verb)
-        setDecisionNotice({ rowId, verb, ok: result.ok })
+        setDecisionNotice({ rowId, verb, ok: result.ok, ...(result.code === undefined ? {} : { code: result.code }), message: result.message })
         store.refresh()
-      } catch {
-        setDecisionNotice({ rowId, verb, ok: false })
+      } catch (error) {
+        setDecisionNotice({ rowId, verb, ok: false, message: error instanceof Error ? error.message : String(error) })
       } finally {
         setDeciding(undefined)
       }
@@ -263,7 +284,14 @@ export function MergePanel(face: MergeFace): ReactNode {
   const expiredToggle = snapshot.queue === 'pending' ? createElement('button', {
     type: 'button', role: 'switch', 'aria-checked': snapshot.expiredOnly ? 'true' : 'false', 'data-role': 'expired-toggle', 'data-active': snapshot.expiredOnly ? 'true' : 'false', onClick: () => { store.toggleExpired() },
   }, t('tab.expired') + ' ' + String(view.expired)) : null
-  const notice = decisionNotice === undefined ? null : createElement('p', { 'data-role': 'decision-notice', 'data-ok': decisionNotice.ok ? 'true' : 'false' }, t(decisionNotice.ok ? (decisionNotice.verb === 'approve' ? 'decide.approved' : 'decide.rejected') : 'decide.failed'))
+  const decisionReason = decisionReasonKey(decisionNotice?.code?.toLowerCase())
+  const notice = decisionNotice === undefined ? null : createElement('div', { 'data-role': 'decision-notice', 'data-ok': decisionNotice.ok ? 'true' : 'false' },
+    createElement('span', null, t(decisionNotice.ok ? (decisionNotice.verb === 'approve' ? 'decide.approved' : 'decide.rejected') : (decisionReason ?? 'decide.failed'))),
+    !decisionNotice.ok && decisionNotice.message !== undefined && decisionNotice.message !== ''
+      ? createElement('details', { 'data-role': 'decision-detail' },
+        createElement('summary', null, t('blocked.detail')),
+        createElement('p', { 'data-role': 'decision-raw' }, decisionNotice.message))
+      : null)
   const taskBanner = view.counts.pending > 0
     ? createElement(TaskBanner, { count: view.counts.pending, text: t('task.pending') })
     : null

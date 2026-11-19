@@ -141,6 +141,7 @@
         "evolution-merge-ui::tests/MergeStore.client.spec.ts",
         "evolution-merge-ui::tests/api.client.spec.ts",
         "evolution-merge-ui::tests/copy-failure.client.spec.ts",
+        "evolution-merge-ui::tests/decision-notice.client.spec.ts",
         "evolution-merge-ui::tests/focus.client.spec.ts",
         "evolution-merge-ui::tests/lifecycle.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
@@ -517,6 +518,7 @@
         "evolution-merge-ui::tests/MergeStore.client.spec.ts",
         "evolution-merge-ui::tests/api.client.spec.ts",
         "evolution-merge-ui::tests/copy-failure.client.spec.ts",
+        "evolution-merge-ui::tests/decision-notice.client.spec.ts",
         "evolution-merge-ui::tests/focus.client.spec.ts",
         "evolution-merge-ui::tests/gates/rg7-ui-contract.spec.ts",
         "evolution-merge-ui::tests/lifecycle.client.spec.ts",
@@ -1162,6 +1164,7 @@
         "evolution-merge-ui::tests/MergeStore.client.spec.ts",
         "evolution-merge-ui::tests/api.client.spec.ts",
         "evolution-merge-ui::tests/copy-failure.client.spec.ts",
+        "evolution-merge-ui::tests/decision-notice.client.spec.ts",
         "evolution-merge-ui::tests/focus.client.spec.ts",
         "evolution-merge-ui::tests/gates/rg7-ui-contract.spec.ts",
         "evolution-merge-ui::tests/lifecycle.client.spec.ts",
@@ -1751,6 +1754,7 @@
         "evolution-merge-ui::tests/MergeStore.client.spec.ts",
         "evolution-merge-ui::tests/api.client.spec.ts",
         "evolution-merge-ui::tests/copy-failure.client.spec.ts",
+        "evolution-merge-ui::tests/decision-notice.client.spec.ts",
         "evolution-merge-ui::tests/focus.client.spec.ts",
         "evolution-merge-ui::tests/gates/rg7-ui-contract.spec.ts",
         "evolution-merge-ui::tests/lifecycle.client.spec.ts",
@@ -2089,11 +2093,11 @@
   "counts": {
     "fast": {
       "gates": 62,
-      "specs": 109
+      "specs": 110
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 417
+      "specs": 418
     },
     "ci-only": {
       "gates": 10,
@@ -2101,16 +2105,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 417
+      "specs": 418
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 489
+      "specs": 490
     }
   },
   "specs": {
-    "total": 489,
-    "marked": 489,
+    "total": 490,
+    "marked": 490,
     "unmarked": 0
   }
 }

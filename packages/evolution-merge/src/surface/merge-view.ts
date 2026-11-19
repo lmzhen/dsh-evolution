@@ -2,7 +2,7 @@
 import type { MergeSnapshot, SnapshotRow, SnapshotRun, BodyRef } from '../domain/merge-snapshot.ts'
 import type { Facts, QueuePage, RowFact, BodyView, HistoryView, RunView, RunDetail, RunsView, DoctorView, QueueId, MergeCounts, ActionRef, VerifySubState } from '../wire.ts'
 import { MERGE_COMMAND_SURFACE } from '../command-surface.ts'
-import { graphemeCount, truncateGraphemes } from '@deepseek-ai/dsh-evolution-core'
+import { graphemeCount, truncateGraphemes, MERGE_BODY_PREVIEW_BYTES } from '@deepseek-ai/dsh-evolution-core'
 
 const base = '/evolution merge '
 function counts(rows: readonly SnapshotRow[]): MergeCounts {
@@ -109,9 +109,9 @@ export function buildQueuePage(snapshot: MergeSnapshot, queue: QueueId, expiredO
   return { wireVersion: 1, readAt: snapshot.readAt, queue, expiredOnly, counts: counts(snapshot.rows), rows: page.map(toRowFact), ...(next === undefined ? {} : { nextCursor: next }), notes: snapshot.notes }
 }
 export function buildBodyView(snapshot: MergeSnapshot, ref: BodyRef, text: string): BodyView {
-  const max = 64 * 1024
+  const max = MERGE_BODY_PREVIEW_BYTES
   const totalBytes = Buffer.byteLength(text, 'utf8')
-  if (totalBytes <= max) return { wireVersion: 1, readAt: snapshot.readAt, name: ref.name, side: ref.side, text, markdown: true, truncated: false, totalBytes }
+  if (totalBytes <= max) return { wireVersion: 1, readAt: snapshot.readAt, name: ref.name, side: ref.side, text, markdown: true, truncated: false, totalBytes, shownBytes: totalBytes }
   // Cut on grapheme boundaries while keeping the encoded body within the byte
   // bound. A code-unit slice here could both exceed the stated byte cap and
   // split a surrogate pair.
@@ -122,7 +122,8 @@ export function buildBodyView(snapshot: MergeSnapshot, ref: BodyRef, text: strin
     if (Buffer.byteLength(truncateGraphemes(text, mid, ''), 'utf8') <= max) low = mid
     else high = mid - 1
   }
-  return { wireVersion: 1, readAt: snapshot.readAt, name: ref.name, side: ref.side, text: truncateGraphemes(text, low, ''), markdown: true, truncated: true, totalBytes }
+  const head = truncateGraphemes(text, low, '')
+  return { wireVersion: 1, readAt: snapshot.readAt, name: ref.name, side: ref.side, text: head, markdown: true, truncated: true, totalBytes, shownBytes: Buffer.byteLength(head, 'utf8') }
 }
 export function buildHistoryView(snapshot: MergeSnapshot): HistoryView { return { wireVersion: 1, readAt: snapshot.readAt, items: snapshot.history } }
 export function buildRunDetail(snapshot: MergeSnapshot, runId: string): RunDetail | null {

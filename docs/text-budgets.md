@@ -32,10 +32,12 @@ token 是写入前的保守估算：`max(ceil(codePoints / 4), ceil(UTF-8 bytes 
 | hard-cap hits | quality | count | 3 | soft |
 | support sprawl | quality | count | 60 files | report |
 | merge rationale | display | graphemes | 150 | prompt 约束，不硬拒 |
-| diff / preview / body | display | graphemes | 4,000 / 2,000 / 200 / 20,000 | 展示截断 |
+| diff / review preview / memory preview / body preview | display | graphemes | 4,000 / 2,000 / 200 / 20,000 | 展示截断；TEXT_BUDGETS 的 report 项 |
 | merge body preview | display | UTF-8 bytes | 65,536 | 按字节定界，但切在 grapheme 边界 |
 | fuzzy pattern | storage | codePoints | 4,096 | 内部保护 |
 | 安全扫描窗口 | storage | codePoints | 65,536 | 安全参数；重叠窗口覆盖全文 |
+
+以上截断上限从 `evolution-core/src/constants.ts` 单一导出（`TEXT_DIFF_MAX_GRAPHEMES`、`REVIEW_TEXT_PREVIEW_GRAPHEMES`、`MEMORY_ENTRY_PREVIEW_GRAPHEMES`、`VERSION_BODY_PREVIEW_GRAPHEMES`、`MERGE_BODY_PREVIEW_BYTES`），调用点不再各自写数字；`TEXT_BUDGETS` 中的 `diffWindow` / `reviewPreview` / `memoryPreview` / `versionBodyPreview` / `mergeBodyPreview` 是对应的声明。
 
 ## 迁移
 

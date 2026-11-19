@@ -230,7 +230,7 @@ function FieldControl(props: FieldBlockProps): ReactNode {
 function FieldBlock(props: FieldBlockProps): ReactNode {
   const { field, t, lang } = props
   const unitText = unitOf(field, lang)
-  const unit = unitText === '' ? null : createElement('span', { className: 'evolution-param-unit' }, (lang === 'zh' ? '（' : ' (') + unitText + (lang === 'zh' ? '）' : ')'))
+  const unit = unitText === '' ? null : createElement('span', { className: 'evolution-param-unit' }, t('paramUnitWrap', { unit: unitText }))
   return createElement('div', { className: 'evolution-param-field' },
     createElement('div', { className: 'evolution-param-label' },
       createElement('label', { htmlFor: controlId(field) }, labelOf(field, lang) === '' ? field.id : labelOf(field, lang)),

@@ -18,9 +18,10 @@ function verdictRank(verdict: string | undefined): number | null {
   if (verdict === undefined || verdict === '') return null
   if (verdict === 'needs-restructure') return 0
   if (verdict === 'warn') return 1
-  if (verdict === 'unknown') return 2
-  if (verdict === 'healthy') return 3
-  return 4
+  if (verdict === 'unreadable') return 2
+  if (verdict === 'unknown') return 3
+  if (verdict === 'healthy') return 4
+  return 5
 }
 
 function compareNames(left: string, right: string): number {

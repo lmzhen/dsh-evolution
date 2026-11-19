@@ -20,6 +20,7 @@ const DECLARED_CHILDREN = new Map([
   ['+ ', 'diff mark: the platform renders added lines with this prefix'],
   ['（', 'punctuation wrapper around a field unit'],
   ['）', 'punctuation wrapper around a field unit'],
+  ['—', 'absent-value marker, not a sentence'],
 ])
 
 /** Cross-face instructions: a GUI reader may not be sent to another surface. */
@@ -32,6 +33,7 @@ const CROSS_FACE = ['dsh web', '/evolution ']
  */
 const CROSS_FACE_EXEMPT = new Map([
   ['fallbacks.generated.ts', 'W7/E-325 fallback row — the command face IS the degraded UI choice (generated data)'],
+  ['fallbacks.ts', 'merge fallback command table — copied commands, not prose'],
 ])
 
 const NL = String.fromCharCode(10)
@@ -83,7 +85,7 @@ function literalChildren(text) {
 }
 
 const root = process.argv[2] ?? 'packages'
-const halves = ['evolution-ui/src/panels/settings', 'evolution-ui/src/panels/history/client']
+const halves = ['evolution-ui/src/panels/settings', 'evolution-ui/src/panels/history/client', 'evolution-merge-ui/src/client', 'evolution-skill-health/src/client']
 const problems = []
 let scanned = 0
 
@@ -107,8 +109,10 @@ for (const half of halves) {
       }
       lines(text).forEach((line, index) => {
         const exempt = CROSS_FACE_EXEMPT.get(path.split(/[\\/]/).pop() ?? '')
+        // A command VALUE is the feature (copy/fallback), not a prose instruction.
+        const commandValue = /command/i.test(line)
         for (const phrase of CROSS_FACE) {
-          if (!exempt && line.includes(phrase)) problems.push(path + ':' + (index + 1) + ' carries the cross-face instruction ' + JSON.stringify(phrase))
+          if (!exempt && !commandValue && line.includes(phrase)) problems.push(path + ':' + (index + 1) + ' carries the cross-face instruction ' + JSON.stringify(phrase))
         }
       })
     })

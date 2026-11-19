@@ -1,3 +1,11 @@
+## 0.55.1 (2026-11-19) — 剩余债清理
+
+> **范围**：① history 回退成功但列表回读失败时不再误报“回退失败”，改为“已回退，版本列表没读出来”；② merge 批准/拒绝失败保留宿主原因码，8 语言按原因显示，原始详情只作诊断展开；③ 数据总览的 `unreadable` 独立显示“无法读取”并计入需要处理，不再退化成 Unknown；④ diff 4,000、review preview 2,000、memory preview 200、正文预览 20,000、merge body 65,536 bytes 统一从 `constants` 导出并登记到 `TEXT_BUDGETS`；⑤ 删除无生产读者的 UI key，`verify-i18n` 增加死键检查，`verify-client-ui-i18n` 扩到四个 client 半；⑥ 补齐 n=1 单数（确认年龄/数量/正常运行/运行中）、区分“并入内容”与“合并”、拆开“没有技能”与“筛选无结果”的空态、merge 正文截断显示 shown/total bytes，并把参数单位括号与健康页标点改走字典；⑦ 统一 8 语言旧版参数标签/提示，去掉标签与单位 chip 的双括号；⑧ 日文合并面板统一用“統合”，不再混用“マージ”。
+>
+> **不迁移**：磁盘数据格式、token 估算值、门控默认值不变；无新增配置字段。
+>
+> **验证**：pre-tag gate **64 pass / 0 fail / 3 registered cannotDecide / 2 skipped**；定向 tests 242 项通过；独立 P5 复核 **GO（P0/P1=0）**；S1/S2/S3 在 0.55.1 候选上实测（45 行、32,468 bytes、诊断 schema 2 / facts 7 / runtime 8），S4 HMR spec 通过。真实 npm web A→B 升级验收在发布后按 1440 / 1024 / 390 三档记录。
+
 ## 0.55.0 (2026-11-19) — 文本口径统一与 UI 文案
 
 > **范围**：① 新增 `text-metrics` / `text-budgets` 单一来源，门控显式声明 storage / display / context / quality 轴与 hard / soft / report 严重度；② 正文**硬上限**改走 codePoints，description / 摘要 / 反馈 note / 行宽 / 预览截断改走 graphemes，文件大小保持 bytes；数据总览的正文字符事实仍保留原计数，另以估算 tokens 展示；③ 正文软线改为固定估算 token 预算（默认 7,273；2 倍判 needs-restructure），不再按 CJK/ASCII 字符权重折算；④ memory / user 默认预算改为 800 / 500 估算 token，旧 `memoryChars` / `userChars` 保留为字符模式迁移输入；⑤ 8 语言 UI 文案统一技能整理、待我确认、合并建议、健康状态与附带文件术语，并移除代码中硬编码的中文标点；⑥ 数据总览增加估算 token 列与总计，版本预览改 grapheme-safe 截断。

@@ -123,7 +123,7 @@ export interface BodyView {
   readonly wireVersion: 1; readonly readAt: number
   readonly name: string
   readonly side: 'live' | 'archive'; readonly text: string; readonly markdown: boolean
-  readonly truncated: boolean; readonly totalBytes: number
+  readonly truncated: boolean; readonly totalBytes: number; readonly shownBytes?: number
 }
 export interface HistoryItem {
   readonly name: string; readonly kind: 'merged' | 'deleted' | 'split' | 'other'

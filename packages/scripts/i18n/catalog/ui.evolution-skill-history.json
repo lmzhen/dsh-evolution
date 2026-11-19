@@ -33,14 +33,14 @@
       "ru": "первый снимок"
     },
     "action.consolidate": {
-      "zh": "合并",
+      "zh": "并入内容",
       "en": "Consolidated",
-      "ja": "マージ",
-      "es": "mergeado",
-      "fr": "fusionné",
-      "de": "gemergt",
-      "pt": "consolidação",
-      "ru": "объединено"
+      "ja": "取り込み",
+      "es": "consolidado",
+      "fr": "consolidé",
+      "de": "eingegliedert",
+      "pt": "consolidado",
+      "ru": "сведено"
     },
     "action.create": {
       "zh": "新建",
@@ -85,11 +85,11 @@
     "action.merge": {
       "zh": "合并",
       "en": "Merged",
-      "ja": "マージ",
-      "es": "mergeado",
+      "ja": "統合",
+      "es": "fusionado",
       "fr": "fusionné",
-      "de": "gemergt",
-      "pt": "merge",
+      "de": "zusammengeführt",
+      "pt": "mesclado",
       "ru": "объединено"
     },
     "action.other": {
@@ -362,46 +362,6 @@
       "pt": "O painel não consegue falar com o serviço interno: quase sempre é porque o plugin e o app estão em versões diferentes. Reinicie o DeepSeek Harness e tente de novo; se continuar falhando, avise na conversa.",
       "ru": "Панель не может достучаться до сервиса плагина: чаще всего версии плагина и приложения не совпадают. Перезапустите DeepSeek Harness и попробуйте ещё раз; если не поможет, напишите об этом в диалоге."
     },
-    "failure.forbidden": {
-      "zh": "平台拒绝了这个请求（当前身份没有权限）。",
-      "en": "The platform rejected this request (your current identity lacks permission).",
-      "ja": "プラットフォームがこのリクエストを拒否しました（現在のアカウントには権限がありません）。",
-      "es": "La plataforma rechazó esta solicitud (esta cuenta no tiene permiso).",
-      "fr": "La plateforme a refusé cette requête (votre compte n’a pas la permission).",
-      "de": "Die Plattform hat die Anfrage abgelehnt (dieses Konto hat keine Berechtigung).",
-      "pt": "A plataforma recusou esta solicitação (a identidade atual não tem permissão).",
-      "ru": "Платформа отклонила запрос (у текущей учётной записи нет прав)."
-    },
-    "failure.server": {
-      "zh": "读取失败，可以重试。",
-      "en": "Load failed. You can retry.",
-      "ja": "読み取りに失敗しました。再試行できます。",
-      "es": "La lectura falló; puedes reintentar.",
-      "fr": "La lecture a échoué ; vous pouvez réessayer.",
-      "de": "Lesen fehlgeschlagen; du kannst es erneut versuchen.",
-      "pt": "Falha na leitura; você pode tentar novamente.",
-      "ru": "Не удалось прочитать; можно повторить."
-    },
-    "failure.unauthorized": {
-      "zh": "需要登录：重新打开这个页面完成登录后再试。",
-      "en": "Sign-in required: reopen this page, sign in, then try again.",
-      "ja": "ログインが必要です。このページを開き直してログインしてから再試行してください。",
-      "es": "Hace falta iniciar sesión: vuelve a abrir esta página, inicia sesión y reintenta.",
-      "fr": "Connexion requise : rouvrez cette page, connectez-vous, puis réessayez.",
-      "de": "Anmeldung nötig: Seite neu öffnen, anmelden und erneut versuchen.",
-      "pt": "É preciso entrar: reabra esta página, faça login e tente novamente.",
-      "ru": "Нужен вход: откройте страницу заново, войдите и повторите."
-    },
-    "failure.unmounted": {
-      "zh": "这个功能没有启用。",
-      "en": "This feature isn't enabled.",
-      "ja": "この機能は有効になっていません。",
-      "es": "Esta función no está activada.",
-      "fr": "Cette fonction n’est pas activée.",
-      "de": "Diese Funktion ist nicht aktiviert.",
-      "pt": "Este recurso não está ativado.",
-      "ru": "Эта функция не включена."
-    },
     "failureForbidden": {
       "zh": "平台拒绝了这个请求（当前身份没有权限）。",
       "en": "The platform rejected this request (your current identity lacks permission).",
@@ -441,16 +401,6 @@
       "de": "Diese Funktion ist nicht aktiviert.",
       "pt": "Este recurso não está ativado.",
       "ru": "Эта функция не включена."
-    },
-    "fallback.hint": {
-      "zh": "可以改用命令：{command}",
-      "en": "Or run this command: {command}",
-      "ja": "代替コマンド：{command}",
-      "es": "Alternativa por comando: {command}",
-      "fr": "Commande de repli : {command}",
-      "de": "Alternativ per Befehl: {command}",
-      "pt": "Alternativa por comando: {command}",
-      "ru": "Запасной вариант — команда: {command}"
     },
     "fallbackHint": {
       "zh": "可以改用命令：{command}",
@@ -601,46 +551,6 @@
       "de": "Kopieren fehlgeschlagen",
       "pt": "Falha ao copiar",
       "ru": "Не удалось скопировать"
-    },
-    "governance.title": {
-      "zh": "最近治理",
-      "en": "Recent governance",
-      "ja": "最近の整備",
-      "es": "Gobernanza reciente",
-      "fr": "Gouvernance récente",
-      "de": "Letzte Pflege",
-      "pt": "Governança recente",
-      "ru": "Последнее управление"
-    },
-    "governance.line": {
-      "zh": "{mode} {target} — {state}",
-      "en": "{mode} {target} — {state}",
-      "ja": "{mode} {target} — {state}",
-      "es": "{mode} {target} — {state}",
-      "fr": "{mode} {target} — {state}",
-      "de": "{mode} {target} — {state}",
-      "pt": "{mode} {target} — {state}",
-      "ru": "{mode} {target} — {state}"
-    },
-    "governance.counts": {
-      "zh": "整理成功：拆分 {offload} · 精简 {condense} · 提取 {extract}",
-      "en": "Succeeded: split {offload} · condense {condense} · extract {extract}",
-      "ja": "成功：offload {offload} · condense {condense} · extract {extract}",
-      "es": "Correctas: offload {offload} · condense {condense} · extract {extract}",
-      "fr": "Réussies : offload {offload} · condense {condense} · extract {extract}",
-      "de": "Erfolgreich: offload {offload} · condense {condense} · extract {extract}",
-      "pt": "Bem-sucedidas: offload {offload} · condense {condense} · extract {extract}",
-      "ru": "Успешно: offload {offload} · condense {condense} · extract {extract}"
-    },
-    "governance.separator": {
-      "zh": " · ",
-      "en": " · ",
-      "ja": " · ",
-      "es": " · ",
-      "fr": " · ",
-      "de": " · ",
-      "pt": " · ",
-      "ru": " · "
     },
     "run.chip": {
       "zh": "运行 {id}",
@@ -801,26 +711,6 @@
       "de": "(+{n} Zeichen)",
       "pt": "(+{n} caracteres)",
       "ru": "(+{n} симв.)"
-    },
-    "row.first": {
-      "zh": "初始版本",
-      "en": "First version",
-      "ja": "初期バージョン",
-      "es": "Primera versión",
-      "fr": "Version initiale",
-      "de": "Erste Version",
-      "pt": "Primeira versão",
-      "ru": "Первая версия"
-    },
-    "row.summary.missing": {
-      "zh": "（未生成摘要）",
-      "en": "(no summary)",
-      "ja": "（要約未生成）",
-      "es": "(sin resumen)",
-      "fr": "(aucun résumé généré)",
-      "de": "(keine Zusammenfassung erzeugt)",
-      "pt": "(nenhum resumo gerado)",
-      "ru": "(сводка не создана)"
     },
     "row.version": {
       "zh": "v{n}",
@@ -1062,26 +952,6 @@
       "pt": "{n} versões",
       "ru": "Версий: {n}"
     },
-    "workbench.diagnostics": {
-      "zh": "诊断",
-      "en": "Diagnostics",
-      "ja": "診断",
-      "es": "Diagnóstico",
-      "fr": "Diagnostic",
-      "de": "Diagnose",
-      "pt": "Diagnóstico",
-      "ru": "Диагностика"
-    },
-    "workbench.health": {
-      "zh": "健康",
-      "en": "Health",
-      "ja": "健全性",
-      "es": "Salud",
-      "fr": "Santé",
-      "de": "Health",
-      "pt": "Saúde",
-      "ru": "Здоровье"
-    },
     "workbench.history": {
       "zh": "技能",
       "en": "Skills",
@@ -1095,7 +965,7 @@
     "workbench.merge": {
       "zh": "合并建议",
       "en": "Merge suggestions",
-      "ja": "統合の提案",
+      "ja": "統合候補",
       "es": "Sugerencias de fusión",
       "fr": "Suggestions de fusion",
       "de": "Merge-Vorschläge",
@@ -1121,16 +991,6 @@
       "de": "Skills aufräumen",
       "pt": "Organização de skills",
       "ru": "Упорядочивание навыков"
-    },
-    "stats.eyebrow": {
-      "zh": "技能库",
-      "en": "Skill library",
-      "ja": "スキルライブラリ",
-      "es": "Biblioteca de skills",
-      "fr": "Bibliothèque de skills",
-      "de": "Skill-Bibliothek",
-      "pt": "Biblioteca de skills",
-      "ru": "Библиотека навыков"
     },
     "stats.title": {
       "zh": "数据总览",
@@ -1283,14 +1143,14 @@
       "ru": "История навыков пока пуста"
     },
     "stats.emptyHint": {
-      "zh": "先去技能库看看",
-      "en": "Open the skill library first",
-      "ja": "先にスキルライブラリを開いてください",
-      "es": "Abre primero la biblioteca",
-      "fr": "Ouvrez d’abord la bibliothèque",
-      "de": "Zuerst die Skill-Bibliothek öffnen",
-      "pt": "Abra primeiro a biblioteca",
-      "ru": "Сначала откройте библиотеку"
+      "zh": "技能第一次被写入后，这里会显示它的数据和版本。",
+      "en": "After a skill is first written, its data and versions appear here.",
+      "ja": "スキルが最初に書き込まれると、ここにデータとバージョンが表示されます。",
+      "es": "Cuando un skill se escriba por primera vez, sus datos y versiones aparecerán aquí.",
+      "fr": "Une fois un skill écrit pour la première fois, ses données et versions apparaîtront ici.",
+      "de": "Sobald ein Skill zum ersten Mal geschrieben wird, erscheinen hier seine Daten und Versionen.",
+      "pt": "Quando uma skill for gravada pela primeira vez, os dados e as versões aparecerão aqui.",
+      "ru": "После первой записи навыка его данные и версии появятся здесь."
     },
     "stats.failed": {
       "zh": "数据读取失败",
@@ -1711,6 +1571,46 @@
       "de": "Das Rückgängigmachen ist nicht abgeschlossen. Prüfe die Fehlerdetails.",
       "pt": "A reversão não foi concluída. Confira os detalhes do erro.",
       "ru": "Отмена не завершилась. Проверьте подробности ошибки."
+    },
+    "undo.reloaded": {
+      "zh": "已回退，但版本列表没读出来；刷新一下就能看到。",
+      "en": "Reverted, but the version list didn’t load. Refresh to see it.",
+      "ja": "元に戻しましたが、バージョン一覧を読み込めませんでした。更新すると表示されます。",
+      "es": "Se revirtió, pero la lista de versiones no se cargó. Actualiza para verla.",
+      "fr": "Annulé, mais la liste des versions ne s’est pas chargée. Actualisez pour la voir.",
+      "de": "Rückgängig gemacht, aber die Versionsliste wurde nicht geladen. Aktualisiere, um sie zu sehen.",
+      "pt": "Revertido, mas a lista de versões não carregou. Atualize para vê-la.",
+      "ru": "Откат выполнен, но список версий не загрузился. Обновите страницу, чтобы увидеть его."
+    },
+    "stats.verdict.unreadable": {
+      "zh": "无法读取",
+      "en": "Unreadable",
+      "ja": "読み取り不可",
+      "es": "Ilegible",
+      "fr": "Illisible",
+      "de": "Nicht lesbar",
+      "pt": "Ilegível",
+      "ru": "Нечитаемый"
+    },
+    "stats.emptyFilter": {
+      "zh": "没有匹配的技能",
+      "en": "No matching skills",
+      "ja": "一致するスキルがありません",
+      "es": "Ningún skill coincide",
+      "fr": "Aucun skill ne correspond",
+      "de": "Keine passenden Skills",
+      "pt": "Nenhuma skill corresponde",
+      "ru": "Подходящих навыков нет"
+    },
+    "stats.filterHint": {
+      "zh": "调整筛选或搜索词再试。",
+      "en": "Adjust the filter or search term and try again.",
+      "ja": "絞り込みや検索語を変えてください。",
+      "es": "Ajusta el filtro o la búsqueda y vuelve a intentarlo.",
+      "fr": "Modifiez le filtre ou la recherche, puis réessayez.",
+      "de": "Ändere Filter oder Suchbegriff und versuche es erneut.",
+      "pt": "Ajuste o filtro ou a busca e tente novamente.",
+      "ru": "Измените фильтр или запрос и повторите."
     }
   }
 }

@@ -20,6 +20,11 @@ import {
   MAX_SKILL_CONTENT_CHARS,
   MAX_SKILL_FILE_BYTES,
   MAX_SKILL_NAME_LENGTH,
+  MERGE_BODY_PREVIEW_BYTES,
+  MEMORY_ENTRY_PREVIEW_GRAPHEMES,
+  REVIEW_TEXT_PREVIEW_GRAPHEMES,
+  TEXT_DIFF_MAX_GRAPHEMES,
+  VERSION_BODY_PREVIEW_GRAPHEMES,
 } from './constants.ts'
 import { DEFAULT_SKILL_WRITE_SUMMARY_CHARS } from './skill-history.ts'
 import { measureText, type TextUnit, type TokenEstimator } from './text-metrics.ts'
@@ -73,6 +78,11 @@ export const TEXT_BUDGETS = {
   substantiveUser: { id: 'review.substantive.user', axis: 'display', unit: 'graphemes', limit: DEFAULT_SUBSTANTIVE_MIN_USER_CHARS, severity: 'soft' },
   substantiveAgent: { id: 'review.substantive.agent', axis: 'display', unit: 'graphemes', limit: DEFAULT_SUBSTANTIVE_MIN_AGENT_CHARS, severity: 'soft' },
   retentionFeedback: { id: 'history.retention-feedback', axis: 'display', unit: 'graphemes', limit: 200, severity: 'report' },
+  diffWindow: { id: 'history.diff-window', axis: 'display', unit: 'graphemes', limit: TEXT_DIFF_MAX_GRAPHEMES, severity: 'report' },
+  reviewPreview: { id: 'history.review-preview', axis: 'display', unit: 'graphemes', limit: REVIEW_TEXT_PREVIEW_GRAPHEMES, severity: 'report' },
+  memoryPreview: { id: 'memory.entry-preview', axis: 'display', unit: 'graphemes', limit: MEMORY_ENTRY_PREVIEW_GRAPHEMES, severity: 'report' },
+  versionBodyPreview: { id: 'history.body-preview', axis: 'display', unit: 'graphemes', limit: VERSION_BODY_PREVIEW_GRAPHEMES, severity: 'report' },
+  mergeBodyPreview: { id: 'merge.body-preview', axis: 'display', unit: 'utf8Bytes', limit: MERGE_BODY_PREVIEW_BYTES, severity: 'report' },
   bodySoft: { id: 'skill.body.soft', axis: 'context', unit: 'tokens', limit: SOFT_BODY_TOKENS, severity: 'soft' },
   memory: { id: 'memory.budget', axis: 'context', unit: 'tokens', limit: MEMORY_TOKENS, severity: 'hard' },
   user: { id: 'user.budget', axis: 'context', unit: 'tokens', limit: USER_TOKENS, severity: 'hard' },

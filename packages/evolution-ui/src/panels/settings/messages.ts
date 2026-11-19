@@ -61,6 +61,8 @@ export { fill }
  * @returns the copy a reader sees.
  */
 export function formatText(key: MessageKey, values?: Readonly<Record<string, string | number>>, language: SupportedLocale = 'en'): string {
-  const text = message(key, language)
+  const oneKey = (key + '.one') as MessageKey
+  const singular = values?.n === 1 ? message(oneKey, language) : undefined
+  const text = singular !== undefined && singular !== oneKey ? singular : message(key, language)
   return values === undefined ? text : fill(text, values)
 }

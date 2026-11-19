@@ -382,7 +382,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         return { ok: false, code: 'E-305', message: '当前会话没有可用的 Agent；请在会话打开时操作，或复制命令到 CLI 执行' }
       }
       const result = await mergeService.run('/evolution merge ' + verb + ' ' + rowId, { agent })
-      return { ok: result.ok, message: result.text }
+      return { ok: result.ok, message: result.text, ...(result.code === undefined ? {} : { code: result.code }) }
     }
     const command = createMergeCommand(runtime)
     if (command !== null) scope.effect(() => commands.register(command), 'evolution-merge: command')

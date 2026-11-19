@@ -56,6 +56,32 @@ describe('stats page presentation', () => {
     expect(view.container.querySelector('.evo-data-table')).toBeNull()
   })
 
+  it('renders unreadable as its own actionable status, not Unknown', async () => {
+    const unreadable = {
+      ...snapshot(),
+      rows: [{
+        ...row('unreadable'),
+        needsAttention: true,
+        health: { ...row('unreadable').health!, verdict: 'unreadable' },
+      }],
+      global: { ...snapshot().global, totals: { ...snapshot().global.totals, skills: 1, needsAttention: 1 } },
+    }
+    const view = render(createElement(StatsPage, { ...face('wide'), loadStats: async () => unreadable }))
+    await waitFor(() => { expect(view.container.textContent).toContain('stats.verdict.unreadable') })
+    expect(view.container.textContent).not.toContain('stats.verdict.unknown')
+    expect(view.container.querySelector('.evo-stats-pill')?.className).toContain('is-warn')
+  })
+
+  it('distinguishes an empty library from a filter with no matches', async () => {
+    const filtered = render(createElement(StatsPage, { ...face('wide'), view: { ...face('wide').view, query: 'zzz' } }))
+    await waitFor(() => { expect(filtered.container.textContent).toContain('stats.emptyFilter') })
+    expect(filtered.container.textContent).toContain('stats.filterHint')
+    cleanup()
+    const empty = render(createElement(StatsPage, { ...face('wide'), loadStats: async () => ({ ...snapshot(), rows: [], global: { ...snapshot().global, totals: { ...snapshot().global.totals, skills: 0, needsAttention: 0 } } }) }))
+    await waitFor(() => { expect(empty.container.textContent).toContain('stats.emptyHint') })
+    expect(empty.container.textContent).not.toContain('stats.filterHint')
+  })
+
   it('keeps the table at wide and medium breaks and hides low-priority columns at medium', async () => {
     const wide = render(createElement(StatsPage, face('wide')))
     await waitFor(() => { expect(wide.container.querySelectorAll('thead th')).toHaveLength(11) })

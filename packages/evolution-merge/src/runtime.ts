@@ -45,10 +45,10 @@ import { inFlightPairRun, readRunMetas } from './domain/run-coordinator.ts'
 import { liveRowFactsOf } from './domain/live-facts.ts'
 
 function fail(stage: string, code: string, hint: string, next: string, runId?: string): MergeCommandResult {
-  return { ok: false, text: formatMergeError(commandError(stage, code, hint, next, runId)) }
+  return { ok: false, text: formatMergeError(commandError(stage, code, hint, next, runId)), code }
 }
 function failRun(stage: string, hint: string, next: string, result: { readonly message: string; readonly error?: MergeError; readonly runId?: string }): MergeCommandResult {
-  return result.error === undefined ? fail(stage, 'run-failed', hint, next, result.runId) : { ok: false, text: formatMergeError(result.error) }
+  return result.error === undefined ? fail(stage, 'run-failed', hint, next, result.runId) : { ok: false, text: formatMergeError(result.error), code: result.error.code }
 }
 
 async function hostOnlyFailure(verb: 'scan' | 'pair', capabilities: HostCapabilities | undefined): Promise<MergeCommandResult | undefined> {
@@ -166,7 +166,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         const signal = new AbortController().signal
         if (command.a === command.b) return fail('pair', 'pair-same-source', 'merge pair 需要两个不同技能源：' + command.a, '重新指定两个不同的 family-managed 技能')
         if ([command.a, command.b].some(name => name.includes('/') || name.includes(':'))) {
-          return { ok: false, text: 'merge: 技能名不能包含 provider/name 或 provider:name 语法：' + command.a + ' / ' + command.b + ' (provider-conflict)\nusage: /evolution merge pair <a> <b>' }
+          return { ok: false, text: 'merge: 技能名不能包含 provider/name 或 provider:name 语法：' + command.a + ' / ' + command.b + ' (provider-conflict)\nusage: /evolution merge pair <a> <b>', code: 'provider-conflict' }
         }
         // FR-RUN-03: a session-less invocation cannot host a merge child. Answer E-305 in
         // the three-line shape instead of opening a run that is guaranteed to fail.

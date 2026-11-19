@@ -12,6 +12,8 @@ import { commandError, formatMergeError } from './domain/errors.ts'
 export interface MergeCommandResult {
   readonly ok: boolean
   readonly text: string
+  /** Machine-readable failure code, when the failure has one. */
+  readonly code?: string
 }
 
 export interface MergeCommandContext {

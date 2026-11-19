@@ -9,13 +9,13 @@ import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evol
 import z from '@deepseek-ai/schemastery'
 import { defineTool, registerEvolutionTool } from '@deepseek-ai/dsh-evolution-core/platform'
 import type {} from '../index.ts'
-import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, truncateGraphemes } from '@deepseek-ai/dsh-evolution-core'
+import { clampedNumber, unwrapLive, MEMORY_GUIDANCE_SECTION_ORDER, payloadText, truncateGraphemes, MEMORY_ENTRY_PREVIEW_GRAPHEMES } from '@deepseek-ai/dsh-evolution-core'
 import { resolveExecOrigins } from '@deepseek-ai/dsh-evolution-core/skills'
 
 export const name = 'tool-memory'
 
 /** Max characters of each echoed memory entry (single source for the Config default and the runtime slice). */
-const DEFAULT_ENTRY_PREVIEW_CHARS = 200
+const DEFAULT_ENTRY_PREVIEW_CHARS = MEMORY_ENTRY_PREVIEW_GRAPHEMES
 
 
 export const inject = ['tools', 'memory']

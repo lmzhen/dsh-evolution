@@ -17,7 +17,7 @@ function row(name: string, body: number | null, verdict: string, lastAt: string 
     lastChangedAt: lastAt,
     lastActivityAt: null,
     recentlyUsed: null,
-    needsAttention: verdict === 'warn' || verdict === 'needs-restructure',
+    needsAttention: verdict === 'warn' || verdict === 'needs-restructure' || verdict === 'unreadable',
     health: {
       verdict,
       bodyChars: body,
@@ -43,6 +43,7 @@ const rows = [
   row('a-skill', null, 'warn'),
   row('m-skill', 0, 'needs-restructure', null),
   row('b-skill', 10, 'unknown'),
+  row('u-skill', null, 'unreadable'),
 ]
 
 describe('browser stats model parity', () => {
@@ -58,6 +59,10 @@ describe('browser stats model parity', () => {
   it('keeps the same attention filter', () => {
     const host = rows.filter(row => row.needsAttention).map(r => r.name)
     expect(filterRows(rows, 'attention').map(r => r.name)).toEqual(host)
+  })
+
+  it('keeps unreadable actionable and unknown non-actionable', () => {
+    expect(filterRows(rows, 'attention').map(r => r.name)).toEqual(['a-skill', 'm-skill', 'u-skill'])
   })
 
   it('keeps the same recent-use filter', () => {

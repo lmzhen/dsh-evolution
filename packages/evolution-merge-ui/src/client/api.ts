@@ -34,7 +34,7 @@ export interface MergeRowView {
   bodies?: { rowId?: string; name: string; side: 'live' | 'archive' }[]; actions: RowActionView[]
 }
 export interface QueuePage { queue: MergeQueue; items: MergeRowView[]; nextCursor?: string; counts: MergeCounts; expiredOnly: boolean }
-export interface MergeBody { name: string; side: 'live' | 'archive'; text: string; markdown: boolean; truncated: boolean; totalBytes: number }
+export interface MergeBody { name: string; side: 'live' | 'archive'; text: string; markdown: boolean; truncated: boolean; totalBytes: number; shownBytes?: number }
 export interface MergeHistoryItem {
   name: string; kind: 'merged' | 'deleted' | 'split' | 'other'; reason: string; reasonCode?: string
   lastVersion: number; archivedAt: string | null; sourceRunId?: string
@@ -84,7 +84,7 @@ interface WireRow {
   readonly attempts?: number; readonly createdAt: number; readonly updatedAt: number; readonly actions: readonly WireAction[]
 }
 interface WirePage { readonly wireVersion: 1; readonly queue: MergeQueue; readonly expiredOnly: boolean; readonly counts: unknown; readonly rows: readonly WireRow[]; readonly nextCursor?: string }
-interface WireBody { readonly wireVersion: 1; readonly name: string; readonly side: 'live' | 'archive'; readonly text: string; readonly markdown: boolean; readonly truncated: boolean; readonly totalBytes: number }
+interface WireBody { readonly wireVersion: 1; readonly name: string; readonly side: 'live' | 'archive'; readonly text: string; readonly markdown: boolean; readonly truncated: boolean; readonly totalBytes: number; readonly shownBytes?: number }
 interface WireHistory { readonly wireVersion: 1; readonly items: readonly { readonly name: string; readonly kind: 'merged' | 'deleted' | 'split' | 'other'; readonly reason: string; readonly reasonCode?: string; readonly lastVersion: number; readonly archivedAt: number | null; readonly sourceRunId?: string }[] }
 interface WireFailureBody { readonly wireVersion?: unknown; readonly code?: unknown; readonly message?: unknown; readonly readiness?: unknown }
 
@@ -221,7 +221,7 @@ export async function body(name: string, side: 'live' | 'archive', rowId?: strin
     }
     return answer
   }
-  return { ok: true, payload: { name: answer.payload.name, side: answer.payload.side, text: answer.payload.text, markdown: answer.payload.markdown, truncated: answer.payload.truncated, totalBytes: answer.payload.totalBytes } }
+  return { ok: true, payload: { name: answer.payload.name, side: answer.payload.side, text: answer.payload.text, markdown: answer.payload.markdown, truncated: answer.payload.truncated, totalBytes: answer.payload.totalBytes, ...(answer.payload.shownBytes === undefined ? {} : { shownBytes: answer.payload.shownBytes }) } }
 }
 
 export interface MergeDecisionOutcome { readonly ok: boolean; readonly message: string; readonly code?: string; readonly runId?: string }

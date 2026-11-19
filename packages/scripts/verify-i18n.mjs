@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Gate: one catalog source, eight locales, aligned keys and placeholders, fresh generated files. */
 import { readFile, readdir } from 'node:fs/promises'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { publishableDirs } from './lib-family-packages.mjs'
@@ -32,12 +33,16 @@ function checkRow(where, row, requireAll) {
 const uiFiles = (await readdir(CATALOG)).filter(name => name.startsWith('ui.') && name.endsWith('.json'))
 if (uiFiles.length !== 4) throw new Error('expected 4 ui.*.json catalogs, got ' + String(uiFiles.length))
 let uiKeys = 0
+const uiKeyFiles = new Map()
 for (const file of uiFiles) {
   const value = JSON.parse(await readFile(join(CATALOG, file), 'utf8'))
   if (typeof value.namespace !== 'string') throw new Error(file + ': namespace required')
   const keys = Object.keys(value.messages ?? {})
   if (keys.length === 0) throw new Error(file + ': no messages')
-  for (const key of keys) checkRow(file + '.' + key, value.messages[key], true)
+  for (const key of keys) {
+    checkRow(file + '.' + key, value.messages[key], true)
+    uiKeyFiles.set(key, file)
+  }
   uiKeys += keys.length
 }
 
@@ -86,6 +91,48 @@ for (const directory of [...catalogPackages].sort()) {
   const titles = Object.keys(pluginMeta.messages).filter(key => key.startsWith(directory + '.title'))
   const descriptions = Object.keys(pluginMeta.messages).filter(key => key.startsWith(directory + '.description'))
   if (titles.length !== 1 || descriptions.length !== 1) throw new Error(directory + ': plugin-meta needs exactly one title and one description row')
+}
+
+/**
+ * Dead-key census. A generated dictionary is not a reader: the catalog key must
+ * appear as a literal in production source, be derivable as `<base>.one`, or be
+ * selected by a `'prefix.' + value` expression. Tests and generated i18n files
+ * do not count, so a key that only a test pins is still dead.
+ */
+function deadUiKeys() {
+  const strings = new Set()
+  const prefixes = new Set()
+  const files = []
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (['node_modules', '.git', 'dist', 'lib', 'tests', '.release-staging', '.release-staging.next'].includes(entry.name)) continue
+        walk(full)
+      } else if ((entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) && !full.includes(join('generated', 'i18n'))) {
+        files.push(full)
+      }
+    }
+  }
+  for (const entry of readdirSync(EVOLUTION_ROOT, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === 'scripts' || entry.name === 'node_modules') continue
+    const src = join(EVOLUTION_ROOT, entry.name, 'src')
+    try { walk(src) } catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8')
+    for (const match of text.matchAll(/'([A-Za-z][A-Za-z0-9._-]*)'/g)) strings.add(match[1])
+    for (const match of text.matchAll(/'([A-Za-z][A-Za-z0-9._-]*\.)'\s*\+/g)) prefixes.add(match[1])
+  }
+  const used = (key) => strings.has(key)
+    || (key.endsWith('.one') && strings.has(key.slice(0, -4)))
+    || [...prefixes].some(prefix => key.startsWith(prefix))
+  return [...uiKeyFiles.keys()].filter(key => !used(key)).sort()
+}
+
+const dead = deadUiKeys()
+if (dead.length > 0) {
+  throw new Error('dead UI catalog key(s) — no production reader: ' + dead.map(key => key + ' (' + uiKeyFiles.get(key) + ')').join(', '))
 }
 
 const run = (script) => {

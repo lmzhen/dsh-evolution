@@ -231,7 +231,7 @@ export const guards = [
   gate("gate-30", {
     kind: "script",
     tree: "mirror",
-    title: "`node packages/scripts/verify-client-ui-i18n.mjs packages`（U-8/G5.9：客户端半的可见文案必须走字典——① 不许把裸字符串当子节点（任何实参位）；② 不许在字符串里写跨面指令 `dsh web`／`/evolution …`；注释先行剥离且**保留行号**。drill：注入一个第 4 实参裸串＋一个跨面串 ⇒ 必红，撤回即绿 ✓）",
+    title: "`node packages/scripts/verify-client-ui-i18n.mjs packages`（U-8/G5.9：四个客户端半（settings / history / merge / skill-health）的可见文案必须走字典——① 不许把裸字符串当子节点（任何实参位）；② 不许在字符串里写跨面指令 `dsh web`／`/evolution …`（命令值行与 fallback 生成物除外）；注释先行剥离且**保留行号**。drill：注入一个第 4 实参裸串＋一个跨面串 ⇒ 必红，撤回即绿 ✓）",
     argv: ["node","packages/scripts/verify-client-ui-i18n.mjs","packages"],
     lanes: ["local","ci-static"],
   }),
@@ -559,7 +559,7 @@ export const guards = [
   gate("gate-82", {
     kind: "script",
     tree: "mirror",
-    title: "`node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、601 个 key、119 个参数文案、68 个 command-help key、31 个 host error，8 语言 key/占位符/生成物一致；`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；重跑生成器即绿）",
+    title: "`node packages/scripts/verify-i18n.mjs`（B6：4 个 UI namespace、全部 UI key、119 个参数文案、68 个 command-help key、31 个 host error，8 语言 key/占位符/生成物一致；**每个 UI key 必须有生产读者**：字面量、`.one` 派生或 `'prefix.' + value` 动态前缀，否则死键必红。`gen-i18n`/`gen-param-i18n`/`gen-host-errors` 的 stale 输出必红。drill：删一个 UI key ⇒ 必红；改一个占位符 ⇒ 必红；留一个无读者 key ⇒ 必红；重跑生成器即绿）",
     argv: ["node","packages/scripts/verify-i18n.mjs"],
     lanes: ["local","ci-static"],
   }),

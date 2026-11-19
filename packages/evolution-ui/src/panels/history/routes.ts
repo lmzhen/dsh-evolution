@@ -15,7 +15,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { undoableFor, unitUndoableFlags } from './unit-undoable.ts'
 import { buildSkillStatsSnapshot } from './stats.ts'
-import { contentHash, displayBodyOf, errorText, graphemeCount, measureUnit, truncateGraphemes } from '@deepseek-ai/dsh-evolution-core'
+import { contentHash, displayBodyOf, errorText, graphemeCount, measureUnit, truncateGraphemes, VERSION_BODY_PREVIEW_GRAPHEMES } from '@deepseek-ai/dsh-evolution-core'
 import { elapsedSince, latestVersionAt, partitionVersions, skillRowCells, textDiffFacts, versionActionKind, versionRowCells } from '@deepseek-ai/dsh-evolution-core/skills'
 import { HOST_ROUTES, json, methodNotAllowed, readJsonObject } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import type { ConnectionFetchRouteLike, DecisionAudit } from '@deepseek-ai/dsh-evolution-core/http-routes'
@@ -27,7 +27,7 @@ export const SKILL_HISTORY_ROUTES = HOST_ROUTES.skillHistory
  * How much of one version's body the read route hands back. A bound on the ANSWER, not on what the
  * deployment may store: a long skill arrives as its head plus `truncated`, so the reader is told.
  */
-export const MAX_BODY_CHARS = 20_000
+export const MAX_BODY_CHARS = VERSION_BODY_PREVIEW_GRAPHEMES
 
 /** The curator surface the routes read: history() and the library listing, undo() as the only write. */
 export type CuratorFace = Pick<Context['evolutionCurator'], 'history' | 'undo' | 'undoUnit' | 'skills'>

@@ -19,7 +19,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { EvolutionIoLike, EvolutionPlanAppliedEvent, EvolutionReviewCompletedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, evolutionIoAdapter, transactIo, graphemeCount, truncateGraphemes } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, evolutionIoAdapter, transactIo, graphemeCount, truncateGraphemes, REVIEW_TEXT_PREVIEW_GRAPHEMES } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 /** One persisted plan outcome (payload v2 of `evolution/plan-applied`). */
@@ -76,7 +76,7 @@ export const ACTIVITY_FILE_VERSION = 2
 export const DEFAULT_MAX_ITEMS = 200
 
 /** Bound on the retained final review text; the full length stays in finalTextChars. */
-export const REVIEW_TEXT_PREVIEW_CHARS = 2000
+export const REVIEW_TEXT_PREVIEW_CHARS = REVIEW_TEXT_PREVIEW_GRAPHEMES
 
 export function activityFile(root: string): string {
   return join(root, 'activity.json')

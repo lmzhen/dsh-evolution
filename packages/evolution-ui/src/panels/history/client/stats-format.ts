@@ -16,12 +16,13 @@ export function lastAtText(value: string | null): string {
 
 export function statusKey(verdict: string | undefined): string {
   if (verdict === 'warn' || verdict === 'needs-restructure') return 'health.verdict.' + verdict
+  if (verdict === 'unreadable') return 'stats.verdict.unreadable'
   if (verdict === 'healthy') return 'stats.verdict.healthy'
   return 'stats.verdict.unknown'
 }
 
 export function statusTone(verdict: string | undefined): string {
-  if (verdict === 'warn' || verdict === 'needs-restructure') return 'is-warn'
+  if (verdict === 'warn' || verdict === 'needs-restructure' || verdict === 'unreadable') return 'is-warn'
   if (verdict === 'healthy') return 'is-ok'
   return 'is-muted'
 }

@@ -232,16 +232,6 @@
       "pt": "Alvo",
       "ru": "Объект"
     },
-    "approvalFailed": {
-      "zh": "待批项读取失败",
-      "en": "Couldn't load pending items",
-      "ja": "承認待ち項目の読み取りに失敗しました",
-      "es": "no se pudo leer la lista de pendientes",
-      "fr": "Lecture des éléments en attente impossible",
-      "de": "Die Pending-Einträge konnten nicht gelesen werden",
-      "pt": "falha ao ler os pendentes",
-      "ru": "Не удалось прочитать записи, ожидающие одобрения"
-    },
     "approvalHistory": {
       "zh": "查看技能历史",
       "en": "View skill history",
@@ -475,7 +465,7 @@
     "approvalVerbMerge": {
       "zh": "合并",
       "en": "Merge",
-      "ja": "マージ",
+      "ja": "統合",
       "es": "merge",
       "fr": "fusionner",
       "de": "mergen",
@@ -555,7 +545,7 @@
     "cardMerge": {
       "zh": "技能自动合并",
       "en": "Skill auto-merge",
-      "ja": "スキル自動マージ",
+      "ja": "スキル自動統合",
       "es": "Merge automático de skills",
       "fr": "Fusion automatique des skills",
       "de": "Skill-Auto-Merge",
@@ -1025,7 +1015,7 @@
     "mergeCardHint": {
       "zh": "两个技能被判重复后，第一轮结束先停下，等你批准再合并。",
       "en": "When two skills are judged duplicates, the first round stops and waits for your approval before merging.",
-      "ja": "2つのスキルが重複と判定されたときは、第1段階の終了後にいったん停止し、承認を待ってからマージします。",
+      "ja": "2つのスキルが重複と判定されたときは、第1段階の終了後にいったん停止し、承認を待ってから統合します。",
       "es": "Cuando dos skills parecen duplicados, la primera ronda se detiene y espera tu aprobación antes de hacer el merge.",
       "fr": "Quand deux skills sont jugés redondants, le premier tour s’arrête et attend votre approbation avant la fusion.",
       "de": "Wenn zwei Skills als doppelt erkannt werden, hält die erste Runde an und wartet auf deine Freigabe, bevor zusammengeführt wird.",
@@ -1202,16 +1192,6 @@
       "pt": "Todos os parâmetros editáveis aparecem abaixo, agrupados por recurso; o que não está listado vem da configuração de instalação.",
       "ru": "Все изменяемые параметры сгруппированы ниже по функциям; чего нет в списке, задаётся конфигурацией при установке."
     },
-    "timeToday": {
-      "zh": "今天",
-      "en": "Today",
-      "ja": "今日",
-      "es": "Hoy",
-      "fr": "Aujourd’hui",
-      "de": "Heute",
-      "pt": "Hoje",
-      "ru": "Сегодня"
-    },
     "title": {
       "zh": "能力进化",
       "en": "Capability evolution",
@@ -1231,16 +1211,6 @@
       "de": "Diese Funktion läuft nicht (das zugehörige Plugin ist nicht installiert)",
       "pt": "este recurso não está em execução (o plugin correspondente não está instalado)",
       "ru": "Функция не запущена (соответствующий плагин не установлен)"
-    },
-    "writeTargetHost": {
-      "zh": "保存位置：插件配置（对所有会话生效）",
-      "en": "Saved to: plugin config (applies to all sessions)",
-      "ja": "保存先：プラグイン設定（すべてのセッションに反映）",
-      "es": "Se guarda en: configuración del plugin (afecta a todas las sesiones)",
-      "fr": "Enregistré dans : config du plugin (s’applique à toutes les sessions)",
-      "de": "Gespeichert in: Plugin-Konfiguration (gilt für alle Sitzungen)",
-      "pt": "Salvo em: configuração do plugin (vale para todas as sessões)",
-      "ru": "Куда сохраняется: конфигурация плагина (действует на все сессии)"
     },
     "approvalDiffAdded.one": {
       "zh": "新增 1 行",
@@ -1271,6 +1241,56 @@
       "de": "Die Aktion wurde nicht angenommen: Der Eintrag ist eventuell bereits erledigt oder das Zeitfenster abgelaufen.",
       "pt": "A ação não foi aceita: o registro pode já ter sido tratado ou a janela expirou.",
       "ru": "Действие не принято: запись, возможно, уже обработана или срок ожидания истёк."
+    },
+    "approvalAgeDays.one": {
+      "zh": "1 天前",
+      "en": "1 d ago",
+      "ja": "1 日前",
+      "es": "hace 1 día",
+      "fr": "il y a 1 j",
+      "de": "vor 1 Tag",
+      "pt": "1 dia atrás",
+      "ru": "1 день назад"
+    },
+    "approvalAgeMonths.one": {
+      "zh": "1 个月前",
+      "en": "1 mo ago",
+      "ja": "1 か月前",
+      "es": "hace 1 mes",
+      "fr": "il y a 1 mois",
+      "de": "vor 1 Monat",
+      "pt": "1 mês atrás",
+      "ru": "1 месяц назад"
+    },
+    "approvalCount.one": {
+      "zh": "1 项待我确认",
+      "en": "1 waiting",
+      "ja": "1 件",
+      "es": "1 pendiente",
+      "fr": "1 en attente",
+      "de": "1 ausstehend",
+      "pt": "1 pendente",
+      "ru": "Ждёт одобрения: 1"
+    },
+    "paramUnitWrap": {
+      "zh": "（{unit}）",
+      "en": " ({unit})",
+      "ja": "（{unit}）",
+      "es": " ({unit})",
+      "fr": " ({unit})",
+      "de": " ({unit})",
+      "pt": " ({unit})",
+      "ru": " ({unit})"
+    },
+    "approvalRunningCount.one": {
+      "zh": "1 项执行中",
+      "en": "1 running",
+      "ja": "1 件を実行中",
+      "es": "1 en curso",
+      "fr": "1 en cours d’exécution",
+      "de": "1 läuft",
+      "pt": "1 em execução",
+      "ru": "Выполняется: 1"
     }
   }
 }

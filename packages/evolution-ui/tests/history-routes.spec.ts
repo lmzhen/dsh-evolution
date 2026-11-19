@@ -74,7 +74,8 @@ describe('skill-history routes: the stats snapshot', () => {
         dims: { bodyChars: 0, bodyTokens: 0, supportFiles: 0, stampDensityPerKb: 0, churnPatches: 0, churnReads: 0, hardCapHits: 0 },
         findings: [],
       }, {
-        name: 'missing-health',
+        name: 'quiet-skill',
+        verdict: 'unreadable',
         dims: { bodyChars: 7, bodyTokens: 7 },
       }],
       getUsage: async () => new Map([['panel-skill', { use_count: 0, view_count: 2, view_days: { [new Date().toISOString().slice(0, 10)]: 2 }, patch_count: 1, last_used_at: '2026-01-01T00:00:00.000Z', last_viewed_at: null, last_patched_at: null, state: 'active', pinned: false }]]),
@@ -130,7 +131,9 @@ describe('skill-history routes: the stats snapshot', () => {
     expect(quiet.feedback30d).toBe(0)
     expect(quiet.negativeFeedback30d).toBe(0)
     expect(quiet.feedbackRate30d).toBeNull()
-    expect(stats.body.data.global.totals).toMatchObject({ skills: 2, needsAttention: 1, bodyChars: 0, bodyTokens: 0, supportFiles: 0 })
+    expect(quiet.health).toMatchObject({ verdict: 'unreadable', bodyChars: 7, bodyTokens: 7 })
+    expect(quiet.needsAttention).toBe(true)
+    expect(stats.body.data.global.totals).toMatchObject({ skills: 2, needsAttention: 2, bodyChars: 7, bodyTokens: 7, supportFiles: 0 })
     expect(stats.body.data.global.counts).toEqual({ offload: 0, condense: 0, extract: 1 })
     expect(stats.body.data.global.governance).toEqual([{ runId: 'run-1', state: 'succeeded', startedAt: 1, target: 'panel-skill', mode: 'offload', resultRef: 'report-1' }])
     // The probe stays tiny even when every aggregate service is present: `stats` is the one read.

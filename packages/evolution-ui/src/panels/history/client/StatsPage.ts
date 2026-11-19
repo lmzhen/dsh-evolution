@@ -146,11 +146,14 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       face.t('stats.activity') + face.t('stats.colon'),
       successOperations.map(operation => face.t(operation.labelKey) + ' ' + String(successCounts[operation.id])).join(' · '))
   const columns = layout === 'wide' ? allColumns : allColumns.filter(column => !hiddenInMedium.has(column.key))
+  const filteredEmpty = snapshot !== null && snapshot.rows.length > 0 && visible.length === 0
+  const emptyTitleKey = filteredEmpty ? 'stats.emptyFilter' : 'stats.empty'
+  const emptyHintKey = filteredEmpty ? 'stats.filterHint' : 'stats.emptyHint'
 
   const cards = visible.length === 0
     ? createElement('div', { className: 'evo-stats-empty evo-stats-cards-empty' },
-      createElement('strong', null, face.t('stats.empty')),
-      createElement('span', null, face.t('stats.emptyHint')))
+      createElement('strong', null, face.t(emptyTitleKey)),
+      createElement('span', null, face.t(emptyHintKey)))
     : createElement('div', { className: 'evo-stats-cards' },
     visible.map(row => createElement('article', { key: row.name, className: 'evo-stats-card' },
       createElement('div', { className: 'evo-stats-card-head' },
@@ -240,8 +243,8 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
               onSort,
               caption: face.t('stats.tableTitle'),
               empty: createElement('div', { className: 'evo-stats-empty' },
-                createElement('strong', null, face.t('stats.empty')),
-                createElement('span', null, face.t('stats.emptyHint'))),
+                createElement('strong', null, face.t(emptyTitleKey)),
+                createElement('span', null, face.t(emptyHintKey))),
             })))
 }
 

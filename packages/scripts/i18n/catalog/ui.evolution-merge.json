@@ -122,26 +122,6 @@
       "pt": "Indisponível",
       "ru": "Недоступно"
     },
-    "approval.off": {
-      "zh": "审批关：合并自动执行。",
-      "en": "Approval off: merges run automatically.",
-      "ja": "承認オフ：マージは自動で実行されます。",
-      "es": "Aprobación desactivada: el merge se ejecuta solo.",
-      "fr": "Approbation désactivée : les fusions s’exécutent automatiquement.",
-      "de": "Freigabe aus: Merges laufen automatisch.",
-      "pt": "Aprovação desativada: o merge é executado automaticamente.",
-      "ru": "Одобрение выключено: объединения выполняются сами."
-    },
-    "approval.on": {
-      "zh": "审批开：合并前需人工批准。",
-      "en": "Approval on: merges need human approval first.",
-      "ja": "承認オン：マージ前に人の承認が必要です。",
-      "es": "Aprobación activada: el merge necesita aprobación manual.",
-      "fr": "Approbation activée : les fusions attendent une approbation humaine.",
-      "de": "Freigabe an: Merges warten auf eine Person.",
-      "pt": "Aprovação ativada: o merge aguarda uma pessoa.",
-      "ru": "Одобрение включено: перед объединением нужно одобрение человека."
-    },
     "blocked.detail": {
       "zh": "查看原始信息",
       "en": "View raw details",
@@ -162,20 +142,10 @@
       "pt": "Copiar comando de diagnóstico",
       "ru": "Скопировать команду диагностики"
     },
-    "blocked.hint": {
-      "zh": "修好合并数据后再刷新；面板不会自动退回旧数据。",
-      "en": "Fix the merge data, then refresh; the panel won't fall back to older data on its own.",
-      "ja": "マージデータを修復してから更新してください。パネルが自動で古いデータに戻ることはありません。",
-      "es": "Arregla los datos del merge y luego actualiza; el panel no vuelve por su cuenta a datos antiguos.",
-      "fr": "Réparez les données de fusion puis actualisez ; le panneau ne revient pas tout seul aux anciennes données.",
-      "de": "Merge-Daten reparieren und dann aktualisieren; das Panel fällt nicht von selbst auf ältere Daten zurück.",
-      "pt": "Corrija os dados de merge e atualize; o painel não volta sozinho para dados antigos.",
-      "ru": "Исправьте данные объединения и обновите; сама панель к старым данным не вернётся."
-    },
     "blocked.reason.forward-only": {
       "zh": "合并状态版本过新，当前面板暂不支持。",
       "en": "The merge state was written by a newer version; this panel doesn't support it yet.",
-      "ja": "マージ状態のバージョンが新しすぎるため、このパネルでは読み取れません。",
+      "ja": "統合状態のバージョンが新しすぎるため、このパネルでは読み取れません。",
       "es": "El estado del merge es más nuevo de lo que admite este panel.",
       "fr": "L’état de fusion a été écrit par une version plus récente ; ce panneau ne peut pas le lire.",
       "de": "Der Merge-Status stammt aus einer neueren Version; dieses Panel kann ihn nicht lesen.",
@@ -185,7 +155,7 @@
     "blocked.reason.migration-blocked": {
       "zh": "合并数据还是旧格式，自动升级没有完成；面板已暂停读取。",
       "en": "The merge data is still in the old format and the automatic upgrade did not finish, so the panel has paused reading it.",
-      "ja": "マージデータが旧形式のままで、自動アップグレードが完了していません。パネルは読み取りを停止しています。",
+      "ja": "統合データが旧形式のままで、自動アップグレードが完了していません。パネルは読み取りを停止しています。",
       "es": "Los datos de fusión siguen en el formato antiguo y la actualización automática no terminó; el panel ha pausado la lectura.",
       "fr": "Les données de fusion sont encore dans l’ancien format et la mise à niveau automatique ne s’est pas terminée ; le panneau a suspendu la lecture.",
       "de": "Die Zusammenführungsdaten liegen noch im alten Format vor, und die automatische Aktualisierung wurde nicht abgeschlossen; die Oberfläche liest sie nicht mehr.",
@@ -195,7 +165,7 @@
     "blocked.reason.needs-repair": {
       "zh": "合并状态需要修复，面板已暂停读取。",
       "en": "The merge state needs repair, so the panel has stopped reading it.",
-      "ja": "マージ状態の修復が必要なため、パネルの読み取りを一時停止しています。",
+      "ja": "統合状態の修復が必要なため、パネルの読み取りを一時停止しています。",
       "es": "El estado del merge necesita reparación; el panel ha dejado de leerlo.",
       "fr": "L’état de fusion doit être réparé ; le panneau est en pause.",
       "de": "Der Merge-Status muss repariert werden; das Lesen ist pausiert.",
@@ -205,7 +175,7 @@
     "blocked.reason.unknown": {
       "zh": "合并状态未就绪，面板已暂停读取。",
       "en": "The merge state isn't ready, so the panel has stopped reading it.",
-      "ja": "マージ状態が未準備のため、パネルの読み取りを一時停止しています。",
+      "ja": "統合状態が未準備のため、パネルの読み取りを一時停止しています。",
       "es": "El estado del merge no está listo; el panel ha dejado de leerlo.",
       "fr": "L’état de fusion n’est pas prêt ; le panneau est en pause.",
       "de": "Der Merge-Status ist nicht bereit; das Lesen ist pausiert.",
@@ -273,14 +243,14 @@
       "ru": "Всего байт"
     },
     "body.truncated": {
-      "zh": "正文过长，已截断。",
-      "en": "The body is too long and was truncated.",
-      "ja": "本文が長いため省略されています。",
-      "es": "El cuerpo es largo y se ha truncado.",
-      "fr": "Texte trop long, tronqué.",
-      "de": "Der Text ist zu lang und wurde gekürzt.",
-      "pt": "O corpo é longo e foi truncado.",
-      "ru": "Текст слишком длинный, обрезан."
+      "zh": "正文太长，只显示前 {shown} 字节（共 {total} 字节）。",
+      "en": "The body is too long; showing the first {shown} of {total} bytes.",
+      "ja": "本文が長いため、全 {total} バイトのうち先頭の {shown} バイトだけを表示しています。",
+      "es": "El cuerpo es demasiado largo: se muestran los primeros {shown} de {total} bytes.",
+      "fr": "Texte trop long : affichage des {shown} premiers octets sur {total}.",
+      "de": "Der Text ist zu lang: Angezeigt werden die ersten {shown} von {total} Bytes.",
+      "pt": "O corpo é longo demais: são exibidos os primeiros {shown} de {total} bytes.",
+      "ru": "Текст слишком длинный: показаны первые {shown} из {total} байт."
     },
     "close": {
       "zh": "关闭",
@@ -435,7 +405,7 @@
     "empty.fuse": {
       "zh": "没有待合并的对。",
       "en": "No pairs to merge.",
-      "ja": "マージ待ちのペアはありません。",
+      "ja": "統合待ちのペアはありません。",
       "es": "No hay pares listos para merge.",
       "fr": "Aucune paire prête à fusionner.",
       "de": "Keine Paare bereit zum Merge.",
@@ -445,7 +415,7 @@
     "empty.pending": {
       "zh": "没有待批准的合并。",
       "en": "No merges awaiting approval.",
-      "ja": "承認待ちのマージはありません。",
+      "ja": "承認待ちの統合はありません。",
       "es": "No hay merges pendientes de aprobación.",
       "fr": "Aucune fusion en attente d’approbation.",
       "de": "Keine Merges warten auf Freigabe.",
@@ -465,7 +435,7 @@
     "empty.skipped": {
       "zh": "没有标记为无需合并的对。",
       "en": "No pairs are marked as not needing a merge.",
-      "ja": "マージ不要と判定されたペアはありません。",
+      "ja": "統合不要と判定されたペアはありません。",
       "es": "No hay pares marcados como innecesarios de merge.",
       "fr": "Aucune paire marquée comme sans fusion nécessaire.",
       "de": "Keine Paare als nicht mergebedürftig markiert.",
@@ -475,7 +445,7 @@
     "empty.verify": {
       "zh": "没有待判断的对。",
       "en": "No pairs waiting for a verdict.",
-      "ja": "判定待ちのペアはありません。",
+      "ja": "要確認のペアはありません。",
       "es": "No hay pares pendientes de juicio.",
       "fr": "Aucune paire à juger.",
       "de": "Keine Paare zu beurteilen.",
@@ -491,36 +461,6 @@
       "de": "Merge-Vorschläge",
       "pt": "Sugestões de mesclagem",
       "ru": "Предложения по объединению"
-    },
-    "error.raw": {
-      "zh": "原始信息",
-      "en": "Raw details",
-      "ja": "元のメッセージ",
-      "es": "Mensaje original",
-      "fr": "Message brut",
-      "de": "Roh-Meldung",
-      "pt": "Mensagem original",
-      "ru": "Исходное сообщение"
-    },
-    "error.retry": {
-      "zh": "重试",
-      "en": "Retry",
-      "ja": "再試行",
-      "es": "Reintentar",
-      "fr": "Réessayer",
-      "de": "Erneut versuchen",
-      "pt": "Tentar novamente",
-      "ru": "Повторить"
-    },
-    "error.title": {
-      "zh": "读取失败",
-      "en": "Couldn't load",
-      "ja": "読み取りに失敗しました",
-      "es": "No se pudo leer",
-      "fr": "Échec de lecture",
-      "de": "Lesen fehlgeschlagen",
-      "pt": "Falha na leitura",
-      "ru": "Не удалось прочитать"
     },
     "expired.skipped-ttl": {
       "zh": "跳过已到期",
@@ -631,16 +571,6 @@
       "de": "Details anzeigen",
       "pt": "Ver detalhes",
       "ru": "Показать подробности"
-    },
-    "failureFallback": {
-      "zh": "可复制命令见下方",
-      "en": "Copyable commands are below",
-      "ja": "下のコマンドをコピーして実行できます",
-      "es": "Abajo tienes comandos que puedes copiar",
-      "fr": "Commandes à copier ci-dessous",
-      "de": "Befehl unten kopieren",
-      "pt": "Copie um comando abaixo",
-      "ru": "Команду можно скопировать ниже"
     },
     "failureForbidden": {
       "zh": "无权访问",
@@ -785,7 +715,7 @@
     "history.kind.merged": {
       "zh": "已合并",
       "en": "Merged",
-      "ja": "マージ済み",
+      "ja": "統合済み",
       "es": "Mergeado",
       "fr": "Fusionné",
       "de": "Gemergt",
@@ -812,16 +742,6 @@
       "pt": "Separado",
       "ru": "Разделено"
     },
-    "history.lastVersion": {
-      "zh": "最后版本",
-      "en": "Last version",
-      "ja": "最終バージョン",
-      "es": "Última versión",
-      "fr": "Dernière version",
-      "de": "Letzte Version",
-      "pt": "Última versão",
-      "ru": "Последняя версия"
-    },
     "history.reason.archived": {
       "zh": "已归档",
       "en": "Archived",
@@ -835,7 +755,7 @@
     "history.reason.kept": {
       "zh": "无需合并",
       "en": "No merge needed",
-      "ja": "マージ不要",
+      "ja": "統合不要",
       "es": "No hacía falta merge",
       "fr": "sans fusion nécessaire",
       "de": "kein Merge nötig",
@@ -855,7 +775,7 @@
     "history.reason.merged": {
       "zh": "已合并",
       "en": "Merged",
-      "ja": "マージ済み",
+      "ja": "統合済み",
       "es": "Se hizo el merge",
       "fr": "fusionné",
       "de": "gemergt",
@@ -865,7 +785,7 @@
     "history.reason.rejected": {
       "zh": "人工拒绝合并",
       "en": "Rejected by a person",
-      "ja": "手動でマージを却下",
+      "ja": "手動で統合を却下",
       "es": "Merge rechazado a mano",
       "fr": "fusion rejetée par l’utilisateur",
       "de": "vom Nutzer abgelehnt",
@@ -1042,16 +962,6 @@
       "pt": "Atualizando; as linhas abaixo são o resultado anterior…",
       "ru": "Обновляем; ниже пока прошлый результат…"
     },
-    "row.actions": {
-      "zh": "操作",
-      "en": "Actions",
-      "ja": "操作",
-      "es": "Acciones",
-      "fr": "Actions",
-      "de": "Aktionen",
-      "pt": "Ações",
-      "ru": "Действия"
-    },
     "row.actualTarget": {
       "zh": "实际目标",
       "en": "Actual target",
@@ -1072,16 +982,6 @@
       "pt": "Tentativas",
       "ru": "Попытки"
     },
-    "row.bodies": {
-      "zh": "正文",
-      "en": "Bodies",
-      "ja": "本文",
-      "es": "Cuerpos",
-      "fr": "Textes",
-      "de": "Texte",
-      "pt": "Corpos",
-      "ru": "Тексты"
-    },
     "row.confidence": {
       "zh": "置信度",
       "en": "Confidence",
@@ -1091,16 +991,6 @@
       "de": "Konfidenz",
       "pt": "Confiança",
       "ru": "Уверенность"
-    },
-    "row.copy": {
-      "zh": "复制命令",
-      "en": "Copy command",
-      "ja": "コマンドをコピー",
-      "es": "Copiar comando",
-      "fr": "Copier la commande",
-      "de": "Befehl kopieren",
-      "pt": "Copiar comando",
-      "ru": "Скопировать команду"
     },
     "row.details": {
       "zh": "详情",
@@ -1142,16 +1032,6 @@
       "pt": "Falha",
       "ru": "Сбой"
     },
-    "row.fullId": {
-      "zh": "完整编号",
-      "en": "Full ID",
-      "ja": "完全な番号",
-      "es": "ID completo",
-      "fr": "ID complet",
-      "de": "Vollständige ID",
-      "pt": "ID completo",
-      "ru": "Полный ID"
-    },
     "row.id": {
       "zh": "编号",
       "en": "ID",
@@ -1192,16 +1072,6 @@
       "pt": "Sem resumo",
       "ru": "Без сводки"
     },
-    "row.notProvided": {
-      "zh": "未提供",
-      "en": "Not provided",
-      "ja": "未指定",
-      "es": "sin indicar",
-      "fr": "non fourni",
-      "de": "nicht angegeben",
-      "pt": "não informado",
-      "ru": "не указано"
-    },
     "row.origin": {
       "zh": "来源",
       "en": "Origin",
@@ -1231,46 +1101,6 @@
       "de": "Grund",
       "pt": "Motivo",
       "ru": "Причина"
-    },
-    "row.requestedTarget": {
-      "zh": "请求目标",
-      "en": "Requested target",
-      "ja": "指定されたターゲット",
-      "es": "Destino solicitado",
-      "fr": "Cible demandée",
-      "de": "Angefragtes Ziel",
-      "pt": "Destino solicitado",
-      "ru": "Запрошенная цель"
-    },
-    "row.skipKind": {
-      "zh": "跳过类型",
-      "en": "Skip type",
-      "ja": "スキップ種別",
-      "es": "Tipo de omisión",
-      "fr": "Motif de saut",
-      "de": "Skip-Art",
-      "pt": "Tipo de descarte",
-      "ru": "Тип пропуска"
-    },
-    "row.stage": {
-      "zh": "合并暂存",
-      "en": "Merge staging",
-      "ja": "マージのステージング",
-      "es": "Staging del merge",
-      "fr": "Staging de fusion",
-      "de": "Merge-Staging",
-      "pt": "Staging do merge",
-      "ru": "Черновик объединения"
-    },
-    "row.staging": {
-      "zh": "暂存",
-      "en": "Staging",
-      "ja": "ステージング",
-      "es": "Staging",
-      "fr": "Staging",
-      "de": "Staging",
-      "pt": "Staging",
-      "ru": "Черновик"
     },
     "row.summaryA": {
       "zh": "摘要 A",
@@ -1311,16 +1141,6 @@
       "de": "Ziel",
       "pt": "Destino",
       "ru": "Цель"
-    },
-    "row.targetCreated": {
-      "zh": "新建",
-      "en": "Created",
-      "ja": "新規作成",
-      "es": "creado",
-      "fr": "créée",
-      "de": "neu erstellt",
-      "pt": "criado",
-      "ru": "создана"
     },
     "row.verify": {
       "zh": "判定状态",
@@ -1652,30 +1472,10 @@
       "pt": "O host não oferece este recurso",
       "ru": "Хост не предоставляет эту возможность"
     },
-    "settings.hint": {
-      "zh": "写入审批 = 使用中生成/修改；技能自动合并 = 两轮合并工作流。两段独立，不从另一项推导。",
-      "en": "Write approval covers content generated or changed while a skill is in use; skill auto-merge is the two-round merge workflow. The two are independent; one never follows from the other.",
-      "ja": "書き込み承認＝使用中の生成・変更、スキル自動マージ＝2段階のマージワークフロー。この2つは独立しており、一方からもう一方は決まりません。",
-      "es": "Aprobación de escrituras = crear o modificar durante el uso; merge automático de skills = flujo de merge en dos rondas. Son independientes: una no se deduce de la otra.",
-      "fr": "Approbation des écritures = création/modification en cours d’usage ; fusion automatique = workflow de fusion en deux tours. Les deux sont indépendants.",
-      "de": "Schreibfreigabe = Erzeugen und Ändern während der Nutzung; automatisches Skill-Merge = der Zwei-Runden-Ablauf. Beides ist unabhängig, eines folgt nicht aus dem anderen.",
-      "pt": "Aprovação de escrita = criar ou alterar durante o uso; merge automático de skills = o fluxo de merge em duas rodadas. Os dois são independentes.",
-      "ru": "Одобрение записей = создание и изменение во время работы; автообъединение = двухраундовый процесс. Настройки независимы друг от друга."
-    },
-    "settings.live": {
-      "zh": "可直接在此保存；platformWrite 能力来自宿主。",
-      "en": "Saved directly here; the platformWrite capability comes from the host.",
-      "ja": "ここで直接保存できます。platformWrite の機能はホストから提供されます。",
-      "es": "Se guarda aquí mismo; la capacidad platformWrite la aporta el host.",
-      "fr": "Enregistrez directement ici ; la capacité platformWrite vient de l’hôte.",
-      "de": "Hier direkt speicherbar; die platformWrite-Fähigkeit kommt vom Host.",
-      "pt": "Salve diretamente aqui; a capacidade platformWrite vem do host.",
-      "ru": "Можно сохранить прямо здесь; возможность platformWrite даёт хост."
-    },
     "settings.mergeApproval": {
       "zh": "技能自动合并（合并审批）",
       "en": "Skill auto-merge (merge approval)",
-      "ja": "スキル自動マージ（マージ承認）",
+      "ja": "スキル自動統合（統合承認）",
       "es": "Merge automático de skills (aprobación del merge)",
       "fr": "Fusion automatique (approbation des fusions)",
       "de": "Automatisches Skill-Merge (Freigabe)",
@@ -1702,16 +1502,6 @@
       "pt": "Ativado",
       "ru": "Вкл"
     },
-    "settings.openPlatform": {
-      "zh": "打开平台设置",
-      "en": "Open platform settings",
-      "ja": "プラットフォーム設定を開く",
-      "es": "Abrir ajustes de la plataforma",
-      "fr": "Ouvrir les paramètres de la plateforme",
-      "de": "Plattform-Einstellungen öffnen",
-      "pt": "Abrir configurações da plataforma",
-      "ru": "Открыть настройки платформы"
-    },
     "settings.openPlatformPath": {
       "zh": "设置 → 能力进化 → 合并建议",
       "en": "Settings → Capability evolution → Merge suggestions",
@@ -1732,46 +1522,6 @@
       "pt": "Aprovação de escrita (escrita da plataforma)",
       "ru": "Одобрение записей (настройка платформы)"
     },
-    "settings.platformWriteLinkHint": {
-      "zh": "此开关属于平台设置，这里只读；请到平台设置修改。",
-      "en": "This switch belongs to platform settings and is read-only here; change it there.",
-      "ja": "このスイッチはプラットフォーム設定に属するため、ここでは読み取り専用です。プラットフォーム設定で変更してください。",
-      "es": "Este interruptor pertenece a los ajustes de la plataforma; aquí solo se muestra. Cámbialo en los ajustes de la plataforma.",
-      "fr": "Ce commutateur relève des paramètres de la plateforme : lecture seule ici. Modifiez-le dans les paramètres de la plateforme.",
-      "de": "Dieser Schalter gehört zu den Plattform-Einstellungen und ist hier nur lesbar; ändere ihn dort.",
-      "pt": "Este interruptor pertence às configurações da plataforma e aqui é somente leitura; altere nas configurações da plataforma.",
-      "ru": "Этот переключатель относится к настройкам платформы; здесь только чтение. Меняйте его в настройках платформы."
-    },
-    "settings.readonly": {
-      "zh": "只读显示；修改请到平台设置页。",
-      "en": "Read-only here; change it on the platform settings page.",
-      "ja": "ここでは読み取り専用です。変更はプラットフォームの設定画面で行ってください。",
-      "es": "Solo lectura aquí; cámbialo en la página de ajustes de la plataforma.",
-      "fr": "Lecture seule ici ; modifiez dans les paramètres de la plateforme.",
-      "de": "Hier nur lesbar; Änderungen in den Plattform-Einstellungen.",
-      "pt": "Somente leitura aqui; altere na página de configurações da plataforma.",
-      "ru": "Только чтение; менять — на странице настроек платформы."
-    },
-    "settings.saveFailed": {
-      "zh": "保存失败",
-      "en": "Save failed",
-      "ja": "保存に失敗しました",
-      "es": "No se pudo guardar",
-      "fr": "Échec de l’enregistrement",
-      "de": "Speichern fehlgeschlagen",
-      "pt": "Falha ao salvar",
-      "ru": "Не удалось сохранить"
-    },
-    "settings.saved": {
-      "zh": "已保存",
-      "en": "Saved",
-      "ja": "保存しました",
-      "es": "Guardado",
-      "fr": "Enregistré",
-      "de": "Gespeichert",
-      "pt": "Salvo",
-      "ru": "Сохранено"
-    },
     "settings.title": {
       "zh": "审批设置",
       "en": "Approval settings",
@@ -1781,46 +1531,6 @@
       "de": "Freigabeeinstellungen",
       "pt": "Aprovações",
       "ru": "Настройки одобрения"
-    },
-    "skipKind.agent-keep": {
-      "zh": "自动保留",
-      "en": "Kept automatically",
-      "ja": "自動保持",
-      "es": "conservación automática",
-      "fr": "conservation auto",
-      "de": "automatisch behalten",
-      "pt": "mantido automaticamente",
-      "ru": "оставлено агентом"
-    },
-    "skipKind.forced": {
-      "zh": "强制",
-      "en": "Forced",
-      "ja": "強制",
-      "es": "forzado",
-      "fr": "forcé",
-      "de": "erzwungen",
-      "pt": "forçado",
-      "ru": "принудительно"
-    },
-    "skipKind.human-reject": {
-      "zh": "人工拒绝",
-      "en": "Rejected by a person",
-      "ja": "手動却下",
-      "es": "rechazo humano",
-      "fr": "rejet humain",
-      "de": "manuell abgelehnt",
-      "pt": "rejeição humana",
-      "ru": "отклонено человеком"
-    },
-    "skipKind.over-limit": {
-      "zh": "超限",
-      "en": "Over the limit",
-      "ja": "上限超過",
-      "es": "por encima del límite",
-      "fr": "hors limite",
-      "de": "über dem Limit",
-      "pt": "acima do limite",
-      "ru": "сверх лимита"
     },
     "sort.cancel": {
       "zh": "取消",
@@ -1872,30 +1582,10 @@
       "pt": "Fixar no topo",
       "ru": "Закрепить сверху"
     },
-    "sort.score": {
-      "zh": "按分数",
-      "en": "By score",
-      "ja": "スコア順",
-      "es": "Puntuación",
-      "fr": "Score",
-      "de": "Score",
-      "pt": "Pontuação",
-      "ru": "По оценке"
-    },
-    "sort.updatedAt": {
-      "zh": "按更新时间",
-      "en": "By last updated",
-      "ja": "更新日時順",
-      "es": "Última actualización",
-      "fr": "Dernière mise à jour",
-      "de": "Zuletzt aktualisiert",
-      "pt": "Última atualização",
-      "ru": "По времени изменения"
-    },
     "stage.author": {
       "zh": "合并",
       "en": "Merge",
-      "ja": "マージ",
+      "ja": "統合",
       "es": "Redacción",
       "fr": "Rédaction",
       "de": "Mergen",
@@ -2002,46 +1692,6 @@
       "pt": "Validar",
       "ru": "Проверка"
     },
-    "staging.cleared-source-gone": {
-      "zh": "已清理（源已缺失）",
-      "en": "Cleared (source is gone)",
-      "ja": "消去済み（元スキル欠落）",
-      "es": "Limpiado (origen ausente)",
-      "fr": "nettoyé (source absente)",
-      "de": "entfernt (Quelle fehlt)",
-      "pt": "limpo (origem ausente)",
-      "ru": "очищен (исходный навык пропал)"
-    },
-    "staging.cleared-source-ok": {
-      "zh": "已清理（源完好）",
-      "en": "Cleared (source intact)",
-      "ja": "消去済み（元スキル正常）",
-      "es": "Limpiado (origen correcto)",
-      "fr": "nettoyé (source intacte)",
-      "de": "entfernt (Quelle intakt)",
-      "pt": "limpo (origem intacta)",
-      "ru": "очищен (исходный навык на месте)"
-    },
-    "staging.kept": {
-      "zh": "保留",
-      "en": "Kept",
-      "ja": "保持",
-      "es": "Conservado",
-      "fr": "conservé",
-      "de": "behalten",
-      "pt": "mantido",
-      "ru": "оставлен"
-    },
-    "staging.none": {
-      "zh": "无",
-      "en": "None",
-      "ja": "なし",
-      "es": "Ninguno",
-      "fr": "aucun",
-      "de": "keins",
-      "pt": "nenhum",
-      "ru": "нет"
-    },
     "start.pair": {
       "zh": "复制配对命令",
       "en": "Copy pairing command",
@@ -2062,56 +1712,6 @@
       "pt": "Copiar o comando de busca de skills duplicadas",
       "ru": "Скопировать команду поиска дублей навыков"
     },
-    "state.approved": {
-      "zh": "已批准",
-      "en": "Approved",
-      "ja": "承認済み",
-      "es": "Aprobado",
-      "fr": "Approuvé",
-      "de": "Freigegeben",
-      "pt": "Aprovado",
-      "ru": "Одобрено"
-    },
-    "state.fuse": {
-      "zh": "待合并",
-      "en": "To merge",
-      "ja": "マージ待ち",
-      "es": "Listo para merge",
-      "fr": "Prêt à fusionner",
-      "de": "Bereit zum Merge",
-      "pt": "Pronto para merge",
-      "ru": "Готово к объединению"
-    },
-    "state.pending": {
-      "zh": "待批准",
-      "en": "Pending approval",
-      "ja": "承認待ち",
-      "es": "Pendiente de aprobación",
-      "fr": "En attente d’approbation",
-      "de": "Wartet auf Freigabe",
-      "pt": "Aguardando aprovação",
-      "ru": "Ожидает одобрения"
-    },
-    "state.skipped": {
-      "zh": "已跳过",
-      "en": "Skipped",
-      "ja": "スキップ済み",
-      "es": "Omitido",
-      "fr": "Ignoré",
-      "de": "Übersprungen",
-      "pt": "Ignorado",
-      "ru": "Пропущено"
-    },
-    "state.verify": {
-      "zh": "待我看",
-      "en": "Awaiting verdict",
-      "ja": "判定待ち",
-      "es": "Sin verificar",
-      "fr": "Non vérifié",
-      "de": "Ungeprüft",
-      "pt": "Não verificado",
-      "ru": "Ждёт решения"
-    },
     "tab.expired": {
       "zh": "已过期",
       "en": "Expired",
@@ -2125,7 +1725,7 @@
     "tab.fuse": {
       "zh": "待合并",
       "en": "To merge",
-      "ja": "マージ待ち",
+      "ja": "統合待ち",
       "es": "Listos para merge",
       "fr": "Prêts à fusionner",
       "de": "Bereit zum Merge",
@@ -2245,7 +1845,7 @@
     "blocked.hint.forward-only": {
       "zh": "合并数据来自更新版本的面板；先升级插件，再刷新页面。",
       "en": "The merge data comes from a newer panel version. Upgrade the plugin, then refresh.",
-      "ja": "マージデータは新しいバージョンのパネルで作成されています。プラグインを更新してから再読み込みしてください。",
+      "ja": "統合データは新しいバージョンのパネルで作成されています。プラグインを更新してから再読み込みしてください。",
       "es": "Los datos de fusión vienen de una versión más reciente del panel. Actualiza el plugin y vuelve a cargar.",
       "fr": "Les données de fusion proviennent d’une version plus récente du panneau. Mettez le plugin à jour, puis rechargez.",
       "de": "Die Zusammenführungsdaten stammen aus einer neueren Version der Oberfläche. Aktualisieren Sie das Plugin und laden Sie dann neu.",
@@ -2255,7 +1855,7 @@
     "blocked.hint.needs-repair": {
       "zh": "合并数据不完整；运行迁移工具，它会先备份再修复。完成后刷新页面。",
       "en": "The merge data is incomplete. Run the migration tool; it backs up before repairing. Refresh when done.",
-      "ja": "マージデータが不完全です。移行ツールを実行してください。修復前にバックアップします。完了後に再読み込みしてください。",
+      "ja": "統合データが不完全です。移行ツールを実行してください。修復前にバックアップします。完了後に再読み込みしてください。",
       "es": "Los datos de fusión están incompletos. Ejecuta la herramienta de migración; hace copia antes de reparar. Actualiza al terminar.",
       "fr": "Les données de fusion sont incomplètes. Lancez l’outil de migration ; il sauvegarde avant de réparer. Rechargez ensuite.",
       "de": "Die Zusammenführungsdaten sind unvollständig. Starten Sie das Migrationswerkzeug; es sichert vor der Reparatur. Danach neu laden.",
@@ -2265,7 +1865,7 @@
     "blocked.hint.unknown": {
       "zh": "先运行诊断命令确认合并状态，再刷新页面。",
       "en": "Run diagnostics to check the merge state, then refresh.",
-      "ja": "診断を実行してマージ状態を確認してから、再読み込みしてください。",
+      "ja": "診断を実行して統合状態を確認してから、再読み込みしてください。",
       "es": "Ejecuta el diagnóstico para comprobar el estado de fusión y luego actualiza la página.",
       "fr": "Lancez le diagnostic pour vérifier l’état de fusion, puis rechargez.",
       "de": "Starten Sie die Diagnose, um den Zusammenführungsstatus zu prüfen, und laden Sie dann neu.",
@@ -2291,6 +1891,76 @@
       "de": "Merge abgelehnt.",
       "pt": "Mesclagem rejeitada.",
       "ru": "Объединение отклонено."
+    },
+    "decide.reason.not-found": {
+      "zh": "这个合并建议不存在了，可能已经被处理。",
+      "en": "That merge suggestion no longer exists; it may already be handled.",
+      "ja": "この統合候補は存在しません。処理済みの可能性があります。",
+      "es": "Esa sugerencia de fusión ya no existe; puede que ya se haya gestionado.",
+      "fr": "Cette suggestion de fusion n’existe plus ; elle a peut-être déjà été traitée.",
+      "de": "Dieser Merge-Vorschlag existiert nicht mehr; er ist eventuell bereits erledigt.",
+      "pt": "Essa sugestão de mesclagem não existe mais; talvez já tenha sido tratada.",
+      "ru": "Этого предложения по объединению больше нет; возможно, его уже обработали."
+    },
+    "decide.reason.not-pending": {
+      "zh": "这一项已不在「待我确认」里，可能已被处理或已过期。",
+      "en": "This item is no longer awaiting approval; it may already be handled or expired.",
+      "ja": "この項目はもう承認待ちではありません。処理済みか期限切れの可能性があります。",
+      "es": "Este elemento ya no espera aprobación; puede que ya se haya gestionado o haya caducado.",
+      "fr": "Cet élément n’attend plus d’approbation ; il a peut-être déjà été traité ou a expiré.",
+      "de": "Dieser Vorschlag ist nicht mehr ausstehend; er ist eventuell bereits erledigt oder abgelaufen.",
+      "pt": "Este item não aguarda mais aprovação; talvez já tenha sido tratado ou expirado.",
+      "ru": "Этот элемент больше не ждёт одобрения: возможно, его уже обработали или срок ожидания истёк."
+    },
+    "decide.reason.changed": {
+      "zh": "这次没有生效：技能内容或这条记录刚被改过；刷新后再试。",
+      "en": "That didn’t take effect: the skill content or this record changed; refresh and try again.",
+      "ja": "今回は反映されませんでした。スキル内容またはこの記録が変更されています。更新してから再試行してください。",
+      "es": "No se aplicó: el contenido del skill o este registro cambió; actualiza y vuelve a intentarlo.",
+      "fr": "Aucun effet : le contenu du skill ou cet enregistrement a changé ; actualisez puis réessayez.",
+      "de": "Das wurde nicht wirksam: Skill-Inhalt oder Eintrag wurden geändert; aktualisiere und versuche es erneut.",
+      "pt": "Isso não foi aplicado: o conteúdo da skill ou este registro mudou; atualize e tente novamente.",
+      "ru": "Изменение не применилось: содержимое навыка или эта запись были изменены; обновите страницу и повторите."
+    },
+    "decide.reason.session-required": {
+      "zh": "这次操作没有关联会话，无法批准；请在打开的会话中重试。",
+      "en": "This action has no session, so it can’t approve; retry from an open session.",
+      "ja": "この操作にはセッションがないため承認できません。開いているセッションから再試行してください。",
+      "es": "Esta acción no tiene sesión y no puede aprobar; reintenta desde una sesión abierta.",
+      "fr": "Cette action n’a pas de session et ne peut pas approuver ; réessayez depuis une session ouverte.",
+      "de": "Ohne Sitzung lässt sich diese Aktion nicht freigeben; versuche es in einer geöffneten Sitzung erneut.",
+      "pt": "Esta ação não tem sessão e não pode aprovar; tente novamente em uma sessão aberta.",
+      "ru": "У этого действия нет сессии, поэтому одобрить нельзя; повторите в открытой сессии."
+    },
+    "decide.reason.over-limit": {
+      "zh": "合并后的正文超出上限，未写入；请先精简内容。",
+      "en": "The merged body is over the limit, so nothing was written. Shorten it first.",
+      "ja": "統合後の本文が上限を超えているため、書き込んでいません。先に内容を短くしてください。",
+      "es": "El cuerpo fusionado supera el límite y no se escribió; acórtalo primero.",
+      "fr": "Le texte fusionné dépasse la limite et n’a pas été écrit ; raccourcissez-le d’abord.",
+      "de": "Der zusammengeführte Text überschreitet das Zeichenlimit und wurde nicht geschrieben; kürze ihn zuerst.",
+      "pt": "O corpo mesclado passou do limite e não foi gravado; encurte-o primeiro.",
+      "ru": "Объединённый текст превышает лимит и не записан; сначала сократите его."
+    },
+    "decide.reason.target": {
+      "zh": "目标技能现在不可写，或已被其他合并占用；刷新后重试。",
+      "en": "The target skill is no longer writable or is taken by another merge; refresh and try again.",
+      "ja": "対象スキルが書き込み不可か、別の統合で使用中です。更新して再試行してください。",
+      "es": "El skill destino ya no se puede escribir o lo ocupa otra fusión; actualiza y vuelve a intentarlo.",
+      "fr": "Le skill cible n’est plus modifiable ou est utilisé par une autre fusion ; actualisez puis réessayez.",
+      "de": "Der Ziel-Skill ist nicht mehr beschreibbar oder wird von einem anderen Merge belegt; aktualisiere und versuche es erneut.",
+      "pt": "A skill de destino não pode mais ser gravada ou está em uso por outra mesclagem; atualize e tente novamente.",
+      "ru": "Целевой навык больше недоступен для записи или занят другим объединением; обновите страницу и повторите."
+    },
+    "decide.reason.busy": {
+      "zh": "另一个合并操作正在处理这个目标，请稍后重试。",
+      "en": "Another merge is working on this target; try again shortly.",
+      "ja": "別の統合がこの対象を処理中です。しばらくしてから再試行してください。",
+      "es": "Otra fusión está trabajando en este destino; inténtalo de nuevo en un momento.",
+      "fr": "Une autre fusion travaille sur cette cible ; réessayez dans un instant.",
+      "de": "Ein anderer Merge bearbeitet dieses Ziel; versuche es gleich erneut.",
+      "pt": "Outra mesclagem está trabalhando neste destino; tente novamente em instantes.",
+      "ru": "Другое объединение сейчас обрабатывает эту цель; повторите немного позже."
     }
   }
 }

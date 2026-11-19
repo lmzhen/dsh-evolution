@@ -224,9 +224,11 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
     // message and is not shown in the eight-locale UI. The rows are READ AGAIN
     // because the restore itself recorded a new version.
     void face.undo(name, unitId === undefined ? v : undefined, unitId).then(() => {
-      showVersions(name, (error) => {
-        setNoteError(true)
-        setNoteText(face.t('undo.failed') + '\n' + face.t('error') + ': ' + (error instanceof Error ? error.message : String(error)))
+      showVersions(name, () => {
+        failureSource.current = 'read'
+        setFailure(undefined)
+        setNoteError(false)
+        setNoteText(face.t('undo.reloaded'))
       })
       succeeded(unitId === undefined ? face.format('undo.success', { n: v }) : face.t('undo.successUnit'))
     }).catch((error: unknown) => { failed(error, 'write') })
