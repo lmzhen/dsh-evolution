@@ -14,7 +14,9 @@ it('exposes review_done only while the PTC channel executes and reports completi
     locks: new ReviewWriteLocks(),
     tools: {
       register(definition) { registered.push(definition); return () => { registered.splice(registered.indexOf(definition), 1) } },
-      async execute() {
+      resolve: async () => ({ marker: 'review-toolset' }),
+      async execute(input: unknown) {
+        expect((input as { toolSet?: unknown }).toolSet).toEqual({ marker: 'review-toolset' })
         const done = registered.find(definition => definition.name === 'review_done')
         expect(done).toBeDefined()
         await done!.execute({ summary: 'done', memoryChanged: false, skillsChanged: ['probe'], unresolved: [] }, { signal: new AbortController().signal } as never)
