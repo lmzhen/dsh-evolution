@@ -76,8 +76,18 @@ function fakeIo(withTransact: boolean): EvolutionIoLike {
 
 function serialize(items: EvolutionActivityRecord[]): string {
   return JSON.stringify({ version: ACTIVITY_FILE_VERSION, items }, null, 2)
-}describe('evolution-activity store', () => {
-it('keeps v3 review task fields and partial reason on the sidecar', () => {
+}
+
+describe('evolution-activity store', () => {
+  it('still reads a v2 review record without the new fields', () => {
+    const raw = JSON.stringify({ version: 2, items: [], reviews: [{ reviewId: 'old', sessionId: 's1', kind: 'memory', status: 'completed', finalText: 'old', actions: [], at: 1, startedAt: 1, finishedAt: 2 }] })
+    const review = parseActivityReviews(raw)[0]
+    expect(review).toMatchObject({ reviewId: 'old', kind: 'memory', status: 'completed' })
+    expect(review?.taskId).toBeUndefined()
+    expect(review?.partialReason).toBeUndefined()
+  })
+
+  it('keeps v3 review task fields and partial reason on the sidecar', () => {
   const events = applyReviewActivityEvent([], {
     version: 1,
     reviewId: 'r1',
