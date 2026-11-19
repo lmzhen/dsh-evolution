@@ -274,7 +274,7 @@ PTC 会话父 header 只有 `run_code`，且 `run_code` 的 nested dispatch 会 
 - 模型调用 `review_wait({ resource, timeoutMs })`；wait 在工具侧阻塞到释放或超时，不做模型轮询。
 - wait 返回后模型必须重新读取目标文件，再生成新 patch；旧的 stage-time anchor 不允许直接重放。
 - CAS drift → 工具返回 `content-changed`；模型可重读重试；等待/重试耗尽 → `partial`。
-- `review_wait` 计入 `toolCalls`；不计入模型轮数（模型只在工具结果后发下一轮），但有 wait 上限，避免占用 120s 总预算。
+- `review_wait` 计入 `toolCalls`；模型拿到 wait 结果后仍需要一次请求，因此会占用一轮模型调用；用 `maxRounds`/deadline 兜底，wait 自身另有上限，不能无限占用 120s 总预算。
 - 不实现自动 rebase；不做跨进程资源协调器；desktop/web 共用 home 不作为当前目标。
 
 ### 8.3 多会话
