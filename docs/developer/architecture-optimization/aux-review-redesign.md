@@ -523,3 +523,10 @@ interface EvolutionReviewActivityRecordV3 {
 - 进一步 fail-closed：`tools.resolve` 缺失时 PTC review 直接报错，不再回落到父 scope 全量工具；`filterToolSet` 对非 Map view 返回空 Map；保留底层 `dispose`；测试改为断言 allowed 的 `skill_manage/review_done` 保留、`bash` 被删。
 - PTC setup（child/host/channel 构造）失败时释放 auxRunning/定时器/lease，避免 sticky；timeout 原因固定写 `review-timeout`。
 - 仍为 P2：PTC 嵌套写门禁/actions、queue-timeout/可配置并发、wait abort 语义、inject latest-kind、seq 空转、真机 PTC/ALS/child 策略；真实宿主 cohort 验收仍未执行。
+
+
+### Round 22（2026-11-20）
+
+- 真实宿主 UI smoke：用平台 rc.5 checkout 起独立 profile（auxlab2，端口 3124），手动装入 0.58.0-dev.3 家族 tar 包，API 401 用启动输出的 token 进入 web UI；侧栏“技能整理 → 数据总览”实际渲染出新的“自动复查 / 最近一次复查结果”区块（空态“暂无复查记录”），证明 UI/activity 读数已接到真实宿主。
+- 该测试 profile 没有模型 API Key，因此只验证 UI 装载与区块渲染，没有触发真实 AUX review；真实 memory/skill/PTC cohort 验收仍未完成。
+- 测试 profile 与 Chrome 临时目录已清理。
