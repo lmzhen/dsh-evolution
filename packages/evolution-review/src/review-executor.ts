@@ -11,6 +11,7 @@ import { BlockAssembler, createToolResultMessage, createUserMessage } from '@dee
 import { recordReviewRead } from '@deepseek-ai/dsh-evolution-core'
 import type { ContentBlock, ContextFormed, GenerateOptions, Message, RequestMessage, StreamChunk, ToolCallBlock, ToolCallId, ToolHistory, ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { ReviewToolChannel } from './review-tool-channel.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -139,6 +140,8 @@ export interface RunReviewInput {
   readonly parent: ReviewParent
   readonly llm: ReviewLlmPort
   readonly tools: ReviewToolPort
+  /** Optional native/PTC transport; when present it owns visible tools and execution. */
+  readonly channel?: ReviewToolChannel
   readonly instruction: string
   readonly toolAllow: ReadonlySet<string>
   readonly signal: AbortSignal
@@ -211,7 +214,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         ...(header.config.temperature === undefined ? {} : { temperature: header.config.temperature }),
         ...(header.config.maxTokens === undefined ? {} : { maxTokens: header.config.maxTokens }),
         messages,
-        tools: [...(header.tools ?? []), REVIEW_DONE_TOOL] as ToolSchema[],
+        tools: [...(input.channel?.visibleTools ?? header.tools ?? []), REVIEW_DONE_TOOL] as ToolSchema[],
         ...(toolHistory === undefined ? {} : { toolHistory }),
         signal,
       }, signal)
@@ -252,7 +255,11 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
       }
       messages.push(assistant)
       const allowedCalls = calls.filter(call => toolAllow.has(call.name))
-      const batch = allowedCalls.length === 0 ? { results: [] as ReviewToolOutcome[] } : await tools.execute({ calls: allowedCalls, signal, agent: parent })
+      const batch = allowedCalls.length === 0
+        ? { results: [] as ReviewToolOutcome[] }
+        : input.channel === undefined
+          ? await tools.execute({ calls: allowedCalls, signal, agent: parent })
+          : await input.channel.execute(allowedCalls, signal)
       const byCall = new Map(batch.results.map(item => [item.callId, item]))
       const allowedNames = [...toolAllow].sort().join(', ')
       for (const call of calls) {

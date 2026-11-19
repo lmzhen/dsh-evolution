@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-platform-contract'
 import { AUX_COMPLETION_INSTRUCTION, ReviewPartialFailure, runReview } from './review-executor.ts'
+import { nativeReviewToolChannel } from './review-tool-channel.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).
@@ -1077,6 +1078,7 @@ function snapshotReviewParent(agent: Agent): Agent {
     }
     const AUX_TOOL_ALLOW = new Set(['skill_manage', 'memory', 'skill', 'skill_search', 'read', 'glob', 'grep'])
     const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
+    const nativeChannel = nativeReviewToolChannel(reviewParent, toolAllow, { execute: tools })
     emitReviewScheduled(ctx, { sessionId: session.id, kind, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars, channel: 'aux' })
     void (async () => {
       let finalText = ''
@@ -1092,6 +1094,7 @@ function snapshotReviewParent(agent: Agent): Agent {
           parent: reviewParent,
           llm: { stream: options => llm(options) },
           tools: { execute: input => tools({ calls: input.calls, signal: input.signal, agent }) },
+          channel: nativeChannel,
           instruction: prompt,
           toolAllow,
           maxRounds: config.reviewMaxRounds,

@@ -5,6 +5,7 @@ import type { ContentBlock, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import { runReview } from '../src/review-executor.ts'
+import { nativeReviewToolChannel } from '../src/review-tool-channel.ts'
 import type { ReviewLlmPort, ReviewParent, ReviewToolPort } from '../src/review-executor.ts'
 import { withReviewContext } from '@deepseek-ai/dsh-evolution-core'
 
@@ -195,6 +196,26 @@ describe('runReview', () => {
     expect(result.done).toBe(false)
     expect(result.hitRoundLimit).toBe(true)
     expect(result.partialReason).toBe('max review rounds reached before review_done')
+  })
+
+  it('executes a native review channel without bypassing the runner', async () => {
+    const seen: { agent?: ReviewParent } = {}
+    const channel = nativeReviewToolChannel(parent(), allowed(), tools(seen))
+    expect(channel.mode).toBe('native')
+    expect(channel.visibleTools.map(tool => tool.name)).toEqual(['skill_manage'])
+    const result = await runReview({
+      parent: parent(),
+      llm: llm([toolCallChunks, doneChunks]),
+      tools: tools({}),
+      channel,
+      instruction: 'review',
+      toolAllow: allowed(),
+      signal: new AbortController().signal,
+      markReview: () => {},
+      clearReview: () => {},
+    })
+    expect(result.done).toBe(true)
+    expect(result.actions[0]).toMatchObject({ action: 'skill_manage', status: 'ok' })
   })
 
   it('rejects review_done mixed with other calls', async () => {
