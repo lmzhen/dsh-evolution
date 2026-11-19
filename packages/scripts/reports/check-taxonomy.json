@@ -76,6 +76,7 @@
         "gate-82"
       ],
       "specs": [
+        "evolution-adapter::tests/review-child.spec.ts",
         "evolution-client-kit::tests/data-table.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/presentation.spec.ts",
@@ -163,7 +164,10 @@
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
+        "evolution-review::tests/review-limiter.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
+        "evolution-review::tests/review-ptc-channel.spec.ts",
+        "evolution-review::tests/review-write-locks.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
         "evolution-skill-discovery::tests/projection-journal.spec.ts",
         "evolution-skill-health::tests/api.client.spec.ts",
@@ -326,6 +330,7 @@
         "evolution-activity::tests/activity-version-gate.spec.ts",
         "evolution-activity::tests/learning-graph/graph-write-gate.spec.ts",
         "evolution-activity::tests/replay/replay.spec.ts",
+        "evolution-adapter::tests/review-child.spec.ts",
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
@@ -689,8 +694,11 @@
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
+        "evolution-review::tests/review-limiter.spec.ts",
         "evolution-review::tests/review-mode-default.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
+        "evolution-review::tests/review-ptc-channel.spec.ts",
+        "evolution-review::tests/review-write-locks.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
         "evolution-skill-discovery::tests/projection-journal.spec.ts",
         "evolution-skill-discovery::tests/usage/io-evidence.spec.ts",
@@ -971,6 +979,7 @@
         "evolution-activity::tests/activity-version-gate.spec.ts",
         "evolution-activity::tests/learning-graph/graph-write-gate.spec.ts",
         "evolution-activity::tests/replay/replay.spec.ts",
+        "evolution-adapter::tests/review-child.spec.ts",
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
@@ -1334,8 +1343,11 @@
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
+        "evolution-review::tests/review-limiter.spec.ts",
         "evolution-review::tests/review-mode-default.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
+        "evolution-review::tests/review-ptc-channel.spec.ts",
+        "evolution-review::tests/review-write-locks.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
         "evolution-skill-discovery::tests/projection-journal.spec.ts",
         "evolution-skill-discovery::tests/usage/io-evidence.spec.ts",
@@ -1539,6 +1551,7 @@
         "evolution-activity::tests/learning-graph/graph.spec.ts",
         "evolution-activity::tests/replay/replay.spec.ts",
         "evolution-activity::tests/threat/threat-guard.spec.ts",
+        "evolution-adapter::tests/review-child.spec.ts",
         "evolution-agent::tests/agent-composition.spec.ts",
         "evolution-agent::tests/row-contract.spec.ts",
         "evolution-all::tests/all.spec.ts",
@@ -1924,8 +1937,11 @@
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
+        "evolution-review::tests/review-limiter.spec.ts",
         "evolution-review::tests/review-mode-default.spec.ts",
         "evolution-review::tests/review-notice.spec.ts",
+        "evolution-review::tests/review-ptc-channel.spec.ts",
+        "evolution-review::tests/review-write-locks.spec.ts",
         "evolution-review::tests/review.spec.ts",
         "evolution-review::tests/session-state-ownership.spec.ts",
         "evolution-skill-discovery::tests/awareness.spec.ts",
@@ -2090,11 +2106,11 @@
   "counts": {
     "fast": {
       "gates": 62,
-      "specs": 110
+      "specs": 114
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 417
+      "specs": 421
     },
     "ci-only": {
       "gates": 10,
@@ -2102,16 +2118,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 417
+      "specs": 421
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 489
+      "specs": 493
     }
   },
   "specs": {
-    "total": 489,
-    "marked": 489,
+    "total": 493,
+    "marked": 493,
     "unmarked": 0
   }
 }
