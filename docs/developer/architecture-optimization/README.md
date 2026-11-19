@@ -7,6 +7,8 @@
 > **DCR-2（2026-11-16）**：0.50.0 只适配 DSH `0.2.2-rc.3`，rc.1 兼容层删除，直接发 npm `latest`。本文中 rc.1 的测试/编译读数只作 0.49 历史基线。
 >
 > **多版本重构（2026-11-19）**：以 [multi-version-support.md](multi-version-support.md) 为唯一设计源，goal `goal-0eb89255-0cd9-46dd-8940-4d5524c2c6ed`；全部优化完成并通过全量验收/独立复核后才发布，过程中不发布中间版本。
+>
+> **当前进度（2026-11-19）**：P0/P0b/P0c 完成；P1 envelope/cohort、rc.3/rc.5 双线矩阵、cohort smoke、release evidence cohort 读数完成；P2 的 bundle 平台 row 覆盖清理、doctor cohort 显示完成。发布包 22、源码包 23；cohort 为 `0.2.2-rc.3 || 0.2.2-rc.5`（rc.4 未验证）；剩余发布门禁全量执行、独立复核与唯一一次正式发布。
 
 ## 1. 这个目录是什么
 
@@ -54,7 +56,7 @@
 | [26](D:/dsh/_research/plugin-code-audit-2026-11-09/audit-2026-11-12/reports/26-architecture-optimization-plan.md) | 目标架构（外部报告目录） |
 | [27](D:/dsh/_research/plugin-code-audit-2026-11-09/audit-2026-11-12/reports/27-architecture-goal-and-document-index.md) | goal、DCR、backlog、发布门 |
 
-> `docs/developer/architecture.md` 的 “36 个包” 是历史包组/逻辑行口径；当前物理源码包是 21 个。Phase 7 完成后统一该页。
+> `docs/developer/architecture.md` 的 “36 个包” 是历史包组/逻辑行口径；当前物理源码包是 23 个、发布包 22 个。
 
 ## 5. 规则
 
