@@ -274,7 +274,7 @@ export interface EvolutionPlatform {
 - adapter 只补真实差异，不加 feature 层版本分支；
 - 移除 `tool-skill` 平台覆盖。
 
-**P1 状态（2026-11-19）**：envelope schema/生成器/门禁已落地，22 个 staged manifest 的 54 条平台范围与 engines 全部等于 `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`；rc.1/rc.2/rc.4/rc.5 各自作为目标声明树、rc.3 作对照编译，**均 0 error**；五个版本都启动了 web host，`verify-cohort-smoke.mjs` 读平台 `pluginInventory/list` 均为家族 row **29/29 active**，唯一 disabled row 是设计上默认关闭的 `evolution-skill-health`。cohort 因此从 rc.3/rc.5 扩为 rc.1–rc.5；0.2.2 正式版未发布，不写入。
+**P1 状态（2026-11-19）**：envelope schema/生成器/门禁已落地，22 个 staged manifest 的 54 条平台范围与 engines 全部等于 `0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`；rc.1/rc.2/rc.4/rc.5 各自作为目标声明树、rc.3 作对照编译，**均 0 error**；五个版本都启动了 web host，`verify-cohort-smoke.mjs` 读平台 `pluginInventory/list` 均为家族 row **29/29 active**，唯一 disabled row 是设计上默认关闭的 `evolution-skill-health`。cohort 因此从 rc.3/rc.5 扩为 rc.1–rc.5；0.2.2 正式版未发布，不写入。新增 `verify-cohort-host.mjs` 把“干净 home 安装 → 启动 → smoke → reading”自动化，五个成员均产出 `activeRows=expectedActiveRows=29`、`doctor=ok`、`smoke=pass`。
 
 **验收**：矩阵每个 cohort 0 error；干净 profile 启动；所有家族 row active；doctor 报 cohort/能力；无平台 row 覆盖。
 
