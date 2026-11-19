@@ -243,39 +243,43 @@ PTC 不能复用父 agent 执行工具，因为平台 `run_code` 的嵌套 dispa
 
 ## 8. 多会话同时触发 skill 总结的可靠性补强
 
-§7 的调度骨架是有效方向，但“多个会话同时触发 skill review”还需要资源级并发协议，不能只靠每个 task 一个 lease。
+§7 的调度骨架加上“模型自己等待锁、重读、重写”的协议，在多会话同进程场景下已经够用；不需要为单轮工具失败做自动 rebase 引擎，也不把 desktop/web 共用 home 当作当前目标。
 
 ### 8.1 现有风险
 
-- 不同会话的 review 可以并行分析，但可能选中同一个 skill。只把 task 调度并行、写入队列化，仍会遇到“读旧内容 → 另一个 task 写入 → 本 task 用旧锚写”的冲突。
-- 现有 SkillLibrary 有 CAS/锚点，冲突通常会被拒绝而不是静默覆盖；这保证不写坏，但不保证两个会话的总结都能落地。
-- 现有 per-runId lease 只能表示“这个 review 正在跑”，不能表示“这个 skill 正被写”；同一 skill 的资源互斥需要独立资源锁。
-- desktop 与 web 可能共用同一个 DSH_HOME；进程内的 ReviewWriteGate 不够，必须复用跨进程的 HomeFence / skill-store 锁 / CAS。
-- 多会话同时触发会产生突发队列；没有全局并发上限、每会话上限、队列上限、合并策略和公平调度时，容易出现延迟膨胀、排队超时和单会话饥饿。
+- 不同会话的 review 可以并行分析，但可能选中同一个 skill；一个 task 写入后，另一个 task 的旧读基线会失效。
+- 现有 SkillLibrary 有 per-directory 锁、stage-time anchor 和 CAS；冲突会被拒绝而不是静默覆盖。这是最终正确性防线，不需要重写。
+- 现有 per-runId lease 只表示“这个 review 正在跑”，不表示“这个 skill 正在被写”；资源互斥应交给已有的 skill-store 锁 + CAS，而不是再加一层重量级协调器。
+- desktop 与 web 共用 DSH_HOME 属于当前明确不处理的极端场景；同进程多 session 是当前目标。
+- 单轮工具失败本身不是问题；问题是失败信息必须让模型知道“资源被锁、可以等待、解锁后要重读”，而不是一个不可恢复的普通错误。
 
-### 8.2 必须增加的协议
+### 8.2 最小协议
 
-1. **资源提交协调器**：
-   - 写前按资源域获取 durable 锁：`memory`、`skills`、`skill:<name>`；锁的 key 不是 task/run，而是资源。
-   - 在锁内重新读取当前内容，再把 patch 的 stage-time anchor 交给 SkillLibrary 的 CAS；drift 时返回结构化冲突，不盲写。
-   - 冲突后允许一次“重读 → 重试/重放”的 rebase；超过重试或轮数预算则 `partial`，并记录 `conflict` 原因。
-   - 只读工具不占写锁；分析阶段可以并行。
-2. **多会话调度边界**：
-   - 全局并发上限（按 provider/CPU 预算）；
-   - 每会话最多 memory+skill 两个 running，每 kind 一个 pending；
-   - 有界队列 + 同 kind 合并；公开 `queued` 状态和排队超时；
-   - 公平调度（至少避免单个 session 连续占满全局槽位）；
-   - provider 限流/退避由 adapter 层处理，review 状态如实记录。
-3. **跨进程一致性**：
-   - 资源锁和 CAS 必须落在 DSH_HOME 的共享锁协议上，不能只存在内存；
-   - 进程内队列只负责调度，不承担最终互斥；
-   - activity 写入继续走 HomeFence/transact，避免并发丢记录。
-4. **活动与观测**：
-   - 每个 task 记录 `queued/running/completed/partial/failed/timeout`、资源冲突、重试次数、目标 skill；
-   - 同一 skill 的多次并发 review 能在 UI 看到“已合并 / 被拒绝 / 重试后完成”，而不是只看到成功数。
+1. **写工具暴露可恢复的锁状态**：
+   - 写工具返回结构化 `resource-busy`（带 resource 和 retryAfterMs），或使用现有 HomeFence/skill-store 的阻塞获取；
+   - 不把锁冲突压成一个普通 `error`；
+   - 最终写入仍走 SkillLibrary 的 anchor+CAS，冲突时返回“内容已变化，请重读后重试”。
+2. **`review_wait` 工具**：
+   - 模型在收到 `resource-busy` 后调用一次 `review_wait({ resource, timeoutMs })`；
+   - wait 在工具侧阻塞到锁释放或自身 deadline，不做模型侧轮询；
+   - 返回后模型重新读取目标文件，再生成新的 patch；
+   - wait 有上限，不能无限占用 review 的 120 秒总预算。
+3. **预算与状态**：
+   - wait 是一次工具调用，计入 `toolCalls`；不额外消耗模型轮次（模型在等 tool result，不是在连续请求）；
+   - review 仍有轮数/时间上限；等待后仍无法完成则 `partial`，记录 `partialReason='lock-wait-exhausted'`；
+   - `review_done` 语义不变：没有显式完成就不算完成。
+4. **提示词纪律**：
+   - 写前读；收到 resource-busy 后 wait；wait 返回后必须重读，不能拿旧内容再写；
+   - 冲突重试只由模型按工具结果决定，不在插件里做隐式自动 rebase；
+   - 模型可以选择放弃该写入并调用 `review_done`，在 `unresolved` 中记录。
+5. **观测**：
+   - activity 记录 wait 次数、等待时长、resource、冲突/重试结果；
+   - UI 区分 `completed/partial`，并显示“因锁等待未完成”的原因。
 
 ### 8.3 结论
 
-- 只要补上资源级锁 + CAS 重试 + 有界公平队列 + 跨进程一致性，§7 的拆分会话/拆分 kind 方案在多会话同时触发的场景下是**有效且可靠**的。
-- 只按当前 §7 的“per-task lease + 单一 write gate”实现，结论是：**能防止静默写坏，但不足以保证每个会话的 skill 总结都完整落地**；会遇到可解释的冲突失败和队列饥饿。
-- 验收要增加：同一 skill 被两个会话同时总结、不同 skill 并发、N 会话突发、desktop/web 共享 home、冲突重试耗尽后的 `partial` 记录。
+- **够用**：同进程多会话共享 skill 时，只要写工具给出可恢复的 busy 状态、提供有界 `review_wait`、模型等待后重读再写，加上现有 SkillLibrary 的锁 + CAS，就能做到不静默写坏、也不会因为单轮失败直接丢掉总结。
+- **不需要**：自动 rebase 引擎、跨进程资源协调器、复杂公平队列，或者为 desktop/web 共用 home 增加大量补丁。调度层一个全局并发上限 + 每会话按 kind 的队列即可。
+- **仍需保留**：`partial/truncated`、`review_done`、PTC transport、activity 可观测。这些不是并发补丁，而是完成语义和工具通道的基础。
+- 验收增加：两个会话同时改同一 skill（一个成功、一个 wait 后重读重试）、wait 超时→`partial`、多会话不同 skill 并行、锁释放后没有静默覆盖。
+
