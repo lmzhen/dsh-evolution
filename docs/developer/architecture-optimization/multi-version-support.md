@@ -149,6 +149,7 @@ evolution-core/       # 只留域逻辑；import contract，不 import 平台包
 
 - **P0a**：新建 contract/adapter；adapter 提供 `evolutionPlatform` 与 helper；`evolution-core/platform` 变成 re-export 兼容桶；core runtime 暂时仍 mount adapter 以保持行为；rc.5 全绿。
 - **P0b**：把 adapter 中的端口接口/类型迁到 contract；feature 包逐批从 core/platform 切到 contract（类型/端口）与 adapter `./values`（宿主运行时 helper）；每次切换一个包组，测试绿后继续；最后删除兼容桶。
+  **P0b 第一切片（2026-11-19）**：`agents`、`commands`、`connection`、`settings`、`skills`、`storageDomain`、`userQuestions`、`workingDirectory` 的接口已迁到 contract；adapter 实现文件只保留实现并从 contract re-export 类型。剩余较复杂端口（`llm`、`projections`、`presets`、`tools`、`platformView`、`service`）下一批处理；当前 66 项定向测试、包映射/依赖闭包绿。
 - **P0c**：把 adapter 作为独立 row 加入 host/all/preset/standalone，顺序在 core 之前；core runtime 不再 mount adapter；真实启动验证 row 顺序。
 
 ### 3.3 契约与适配

@@ -1,15 +1,11 @@
 /**
- * The working-directory half of the family's host platform boundary.
- *
- * The platform resolves the session's cwd; the family only asks, keeping the
- * scope/cwd policy in one host seam.
+ * The working-directory implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { WorkingDirectoryPort } from '@deepseek-ai/dsh-evolution-contract'
 
-export interface WorkingDirectoryPort {
-  ensure(agent: Agent, signal?: AbortSignal): Promise<string>
-}
+export type { WorkingDirectoryPort } from '@deepseek-ai/dsh-evolution-contract'
 
 interface WorkingDirectoryServiceLike {
   ensure(agent: Agent, signal?: AbortSignal): Promise<string>

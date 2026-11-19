@@ -1,15 +1,11 @@
 /**
- * The commands half of the family's host platform boundary.
- *
- * Feature packages register command definitions through this port; the platform
- * command runtime remains the owner of dispatch, client behavior and disposal.
+ * The commands implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
+import type { CommandsPort } from '@deepseek-ai/dsh-evolution-contract'
 
-export interface CommandsPort {
-  register(definition: CommandDefinition): () => void
-}
+export type { CommandsPort } from '@deepseek-ai/dsh-evolution-contract'
 
 interface CommandsServiceLike {
   register(definition: CommandDefinition): () => void

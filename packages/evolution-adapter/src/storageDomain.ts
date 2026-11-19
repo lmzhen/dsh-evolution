@@ -1,14 +1,10 @@
 /**
- * The storage-domain half of the family's host platform boundary.
- *
- * The domain schema stays in evolution-state; this port only forwards its open
- * call so the platform package imports no state types.
+ * The storage-domain implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
+import type { StorageDomainPort } from '@deepseek-ai/dsh-evolution-contract'
 
-export interface StorageDomainPort {
-  open<T = unknown>(spec: unknown): Promise<T>
-}
+export type { StorageDomainPort } from '@deepseek-ai/dsh-evolution-contract'
 
 interface StorageDomainServiceLike {
   open(spec: unknown): Promise<unknown>

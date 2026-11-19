@@ -1,29 +1,11 @@
 /**
- * The connection half of the family's host platform boundary.
- *
- * The platform owns admission on the fetch carrier; the family only registers
- * exact routes and reports whether remote authorities are configured. A service
- * without `fetch.register` still exists as a port so `hostSurface` can report
- * the deployment fact, while registration fails loud at the call site.
+ * The connection implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { err, ok, type FamilyError, type Result } from '@deepseek-ai/dsh-evolution-contract/result'
+import { err, ok } from '@deepseek-ai/dsh-evolution-contract/result'
+import type { ConnectionPort, ConnectionRoute } from '@deepseek-ai/dsh-evolution-contract'
 
-export interface ConnectionRoute {
-  readonly path: string
-  readonly methods: readonly string[]
-  readonly requestBody: 'buffered' | 'streaming'
-  fetch(request: Request): Promise<Response>
-}
-
-export type ConnectionRegisterResult = Result<() => Promise<void>, FamilyError>
-
-export interface ConnectionPort {
-  readonly allowsRemoteAuthorities: boolean
-  register(route: ConnectionRoute): () => Promise<void>
-  /** Typed registration for callers that do not want to catch; optional during migration. */
-  tryRegister?(route: ConnectionRoute): ConnectionRegisterResult
-}
+export type { ConnectionPort, ConnectionRegisterResult, ConnectionRoute } from '@deepseek-ai/dsh-evolution-contract'
 
 interface ConnectionFetchLike {
   register(route: ConnectionRoute): () => Promise<void>

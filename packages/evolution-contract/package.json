@@ -28,5 +28,11 @@
     "lib/**/*.js",
     "lib/types/**/*.d.ts"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-agent": "workspace:^",
+    "@deepseek-ai/dsh-commands": "workspace:^",
+    "@deepseek-ai/dsh-skill": "workspace:^"
+  }
 }

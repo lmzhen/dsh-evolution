@@ -13,6 +13,14 @@
  */
 
 export * from './result.ts'
+export * from './agents.ts'
+export * from './commands.ts'
+export * from './connection.ts'
+export * from './settings.ts'
+export * from './skills.ts'
+export * from './storageDomain.ts'
+export * from './userQuestions.ts'
+export * from './workingDirectory.ts'
 
 /** Family-facing platform contract generation. */
 export const CONTRACT = 1 as const

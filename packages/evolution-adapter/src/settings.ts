@@ -1,15 +1,10 @@
 /**
- * The settings half of the family's host platform boundary.
- *
- * The family only silences the platform's settings-file auto-reload for the
- * lifetime of its fiber; reads stay in each feature's own config seam.
+ * The settings implementation half of the family's platform boundary.
  */
 import type { Context, Fiber } from '@deepseek-ai/cordis'
+import type { SettingsPort } from '@deepseek-ai/dsh-evolution-contract'
 
-export interface SettingsPort {
-  configure?(options: { auto: boolean }, owner: unknown): () => void
-  describe?(options?: { redactSecrets?: boolean }): Array<{ ns: string; value?: unknown; user?: Record<string, unknown> }>
-}
+export type { SettingsPort } from '@deepseek-ai/dsh-evolution-contract'
 
 interface SettingsServiceLike {
   configure(options: { auto: boolean }, owner: Fiber): () => void
@@ -27,4 +22,3 @@ export function settingsPort(ctx: Context): SettingsPort | undefined {
     ...(typeof service.describe === 'function' ? { describe: (options?: { redactSecrets?: boolean }) => service.describe!(options) } : {}),
   }
 }
-

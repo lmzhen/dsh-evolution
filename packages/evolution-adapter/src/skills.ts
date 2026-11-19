@@ -1,15 +1,11 @@
 /**
- * The skills-catalog half of the family's host platform boundary.
- *
- * Reads stay scope-aware: the caller passes the calling scope (or undefined for
- * the explicit global layer), exactly as the platform's skill registry expects.
+ * The skills implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
+import type { SkillsPort } from '@deepseek-ai/dsh-evolution-contract'
 
-export interface SkillsPort {
-  list(options?: { scope?: unknown }): Promise<readonly SkillSummary[]>
-}
+export type { SkillsPort } from '@deepseek-ai/dsh-evolution-contract'
 
 interface SkillsServiceLike {
   list(options?: { scope?: unknown }): Promise<readonly SkillSummary[]>
