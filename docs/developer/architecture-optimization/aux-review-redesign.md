@@ -370,7 +370,7 @@ interface EvolutionReviewActivityRecordV3 {
 - A/B：`ReviewExecutionResult` 增加 `done`/`hitRoundLimit`/`report`/`partialReason`；`runReview` 注入 `review_done` 合成 schema，未调用、夹带其他调用、轮数耗尽都返回 partial/原因；`tryAuxReview` 不再只看 `toolAllow.size` 标 completed，并把 `requests`/`toolCalls`/`partialReason` 写入 `evolution/review-completed` 与 activity record。
 - C：`advanceReview` 返回 `ReviewDebt`（memory/skill 布尔）；前台用 `injectKind` 保持 combined 行为；AUX 用 `scheduleAuxDebt` 生成独立 memory/skill task；`reviewPrompt(kind,'aux')` 不再返回 combined；`auxRunning` 改为嵌套 map，lease runId 带 kind，两个 kind 可并行；`pendingCadenceReviews` 存 debt。
 - 测试：`review-executor.spec.ts` 新增 4 例（review_done 完成、缺 done partial、轮数上限 partial、done 夹带调用 partial）；`signals.spec.ts` 覆盖双 debt；`prompts.spec.ts` 更新 aux 映射。当前 `evolution-review` 47 项、core signals/prompts 相关测试本地通过。
-- 未完成：PTC `ReviewToolChannel`、detached review child、`review_wait`/resource-busy、activity v3 schema/UI、真实宿主并行与 PTC 验收；`review_done` 在 PTC 中的 SDK 暴露仍需平台能力。
+- 未完成：PTC `ReviewToolChannel`、detached review child、`review_wait`/resource-busy、activity 字段的 UI 展示、真实宿主并行与 PTC 验收；`review_done` 在 PTC 中的 SDK 暴露仍需平台能力。
 
 ### 下一轮
 
@@ -378,3 +378,9 @@ interface EvolutionReviewActivityRecordV3 {
 2. 设计并实现 `review_wait`/resource-busy（先 native；复用 SkillLibrary/HomeFence）。
 3. activity v3 + UI 状态分离；旧 v2 只读。
 4. PTC detached review child（平台能力确认后）。
+
+
+### Round 2（2026-11-20）
+
+- activity 升到 v3：review record 增加 `taskId`、`requests`、`toolCalls`、`waitCount`、`partialReason`；`evolution-review` 的 aux event 写 `taskId`。旧 v2 bytes 仍按既有 foreign/legacy 规则可读，写入统一 v3。
+- 未完成仍是 PTC 工具通道、detached review child、`review_wait`/resource-busy、UI 展示与真实 PTC/多会话验收。
