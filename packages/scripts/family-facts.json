@@ -331,7 +331,7 @@
     },
     {
       "id": "platform-line",
-      "title": "the validated platform line and the floor the published ranges declare",
+      "title": "the validated platform cohort and the exact range the published packages declare",
       "home": "README.md",
       "machine": {
         "kind": "platform-version",
@@ -342,7 +342,7 @@
           "text": "**Validated platform line: DSH `0.2.2-rc.5`.**"
         },
         {
-          "text": "`^0.2.2-rc.5`"
+          "text": "`0.2.2-rc.3 || 0.2.2-rc.5`"
         }
       ],
       "forbid": [

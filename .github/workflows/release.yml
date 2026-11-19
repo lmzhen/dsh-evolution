@@ -52,6 +52,7 @@ jobs:
     outputs:
       version: ${{ steps.line.outputs.version }}
       floor: ${{ steps.line.outputs.floor }}
+      peers_range: ${{ steps.line.outputs.peers_range }}
       upstream_ref: ${{ steps.line.outputs.upstream_ref }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -60,7 +61,7 @@ jobs:
       - id: line
         shell: bash
         run: |
-          node -e "const fs=require('node:fs'); const line=require('./platform-line.json'); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'version='+line.version+'\nfloor='+line.floor+'\nupstream_ref=dsh-v'+line.version+'\n')"
+          node -e "const fs=require('node:fs'); const line=require('./platform-line.json'); const peers=line.cohort.join(' || '); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'version='+line.version+'\nfloor='+line.cohort[0]+'\npeers_range='+peers+'\nupstream_ref=dsh-v'+line.version+'\n')"
   # G7 §2.2 (single-line release): the dev-baseline job is GONE. It validated the family against
   # the pinned 0.1.5-era tree (`UPSTREAM_SHA`), which has no `.volatile()` in its vendored
   # schemastery — the run after 0.17.0 failed there with 39 `Property 'volatile' does not exist`
@@ -244,7 +245,7 @@ jobs:
           # publishes, not a fresh local pack): the same payload audit the build chain runs,
           # now against the exact tarballs npm is about to receive.
           node packages/evolution/scripts/audit-release-tarballs.mjs \
-            packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "^${{ needs.platform-line.outputs.floor }}"
+            packages/evolution/dist --version "${RELEASE_VERSION#v}" --platform-range "${{ needs.platform-line.outputs.peers_range }}"
 
       - name: Publish validated tarballs
         shell: bash

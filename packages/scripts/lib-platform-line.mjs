@@ -19,7 +19,7 @@ export const OUTPUT_KEYS = Object.freeze({
   enginesRange: 'engines_range',
 })
 
-const PLATFORM_FIELDS = new Set(['$comment', 'version', 'floor'])
+const PLATFORM_FIELDS = new Set(['$comment', 'version', 'floor', 'cohort', 'contract'])
 
 function die(message) { throw new Error('platform-line: ' + message) }
 
@@ -65,23 +65,39 @@ export function parsePlatformLine(raw, sourcePath = '<inline>') {
   try { parsed = JSON.parse(raw) } catch (error) { die(sourcePath + ' is not JSON: ' + error.message) }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) die(sourcePath + ' must be a JSON object')
   for (const key of Object.keys(parsed)) {
-    if (!PLATFORM_FIELDS.has(key)) die(sourcePath + ' carries unknown field ' + JSON.stringify(key) + ' (one home only: version/floor)')
+    if (!PLATFORM_FIELDS.has(key)) die(sourcePath + ' carries unknown field ' + JSON.stringify(key) + ' (one home only: version/floor/cohort/contract)')
   }
   for (const field of ['version', 'floor']) {
     if (typeof parsed[field] !== 'string' || parsed[field].trim() === '') die(sourcePath + ' is missing the ' + field + ' string')
   }
+  if (!Array.isArray(parsed.cohort) || parsed.cohort.length === 0) die(sourcePath + ' is missing a nonempty cohort list')
+  if (!parsed.cohort.every((version) => typeof version === 'string' && version.trim() !== '')) die(sourcePath + ' cohort entries must be nonempty strings')
+  if (!Number.isInteger(parsed.contract) || parsed.contract < 1) die(sourcePath + ' is missing a positive integer contract field')
   const { semver } = semverFrom(dirname(sourcePath === '<inline>' ? process.cwd() + '/package.json' : resolve(sourcePath)))
   if (semver.valid(parsed.version) === null) die('version is not a valid semver: ' + parsed.version)
   if (semver.valid(parsed.floor) === null) die('floor is not a valid semver: ' + parsed.floor)
-  if (!sameTuple(semver, parsed.version, parsed.floor)) die('version and floor must share one major.minor.patch tuple (single-line anchor); got ' + parsed.version + ' / ' + parsed.floor)
-  // DCR-2: a single-version line (floor === version) is valid; it pins the\n  // package to exactly that platform release and its later patch line.\n  if (semver.compare(parsed.floor, parsed.version) > 0) die('floor must sort below or equal version; got floor=' + parsed.floor + ' version=' + parsed.version)
-  const nextPatch = parsed.version.replace(/-.*$/, '').replace(/^(\d+)\.(\d+)\.(\d+)$/, (m, a, b, c) => a + '.' + b + '.' + (Number(c) + 1)) + '-0'
+  const cohort = [...new Set(parsed.cohort)]
+  if (cohort.length !== parsed.cohort.length) die(sourcePath + ' cohort carries duplicate versions')
+  for (const version of cohort) {
+    if (semver.valid(version) === null) die('cohort entry is not a valid semver: ' + version)
+    if (!sameTuple(semver, parsed.version, version)) die('cohort entry ' + version + ' must share the current major.minor.patch tuple ' + parsed.version)
+  }
+  for (let index = 1; index < cohort.length; index += 1) {
+    if (semver.compare(cohort[index - 1], cohort[index]) >= 0) die('cohort must be strictly ascending; got ' + cohort.join(', '))
+  }
+  if (!cohort.includes(parsed.version)) die('version ' + parsed.version + ' must be one of the cohort entries')
+  if (cohort[cohort.length - 1] !== parsed.version) die('version must be the newest cohort entry; got version=' + parsed.version + ' newest=' + cohort[cohort.length - 1])
+  if (parsed.floor !== cohort[0]) die('floor must equal the oldest cohort entry; got floor=' + parsed.floor + ' oldest=' + cohort[0])
+  if (semver.compare(parsed.floor, parsed.version) > 0) die('floor must sort below or equal version; got floor=' + parsed.floor + ' version=' + parsed.version)
+  const peersRange = cohort.join(' || ')
   return Object.freeze({
     version: parsed.version,
     floor: parsed.floor,
+    cohort: Object.freeze([...cohort]),
+    contract: parsed.contract,
     previousAnchor: previousAnchorOf(semver, parsed.version, parsed.floor),
-    peersRange: '^' + parsed.floor,
-    enginesRange: '>=' + parsed.floor + ' <' + nextPatch,
+    peersRange,
+    enginesRange: peersRange,
     upstreamRef: 'dsh-v' + parsed.version,
   })
 }
@@ -125,9 +141,7 @@ export function windowRows(platformLine) {
     '0.3.0-rc.1',
   ]
   return versions.map((version) => {
-    const peersAdmits = semver.satisfies(version, platformLine.peersRange)
-    const enginesAdmits = semver.satisfies(version, platformLine.enginesRange, { includePrerelease: true })
-    const expected = peersAdmits && enginesAdmits
-    return { version, peersAdmits, enginesAdmits, expected, note: expected ? 'admit' : (peersAdmits !== enginesAdmits ? 'predicate-split: policy denies' : 'deny') }
+    const admitted = platformLine.cohort.includes(version)
+    return { version, peersAdmits: admitted, enginesAdmits: admitted, expected: admitted, note: admitted ? 'admit' : 'deny' }
   })
 }

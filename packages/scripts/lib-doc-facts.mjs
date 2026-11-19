@@ -376,8 +376,14 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
     // mention an older line while comparing lines or recording history (README.md:275 does).
     let version
     let floor
+    let cohort
     if (machine.file.endsWith('.json')) {
-      try { const line = JSON.parse(text); version = line.version; floor = line.floor } catch { /* reported as unarmed */ }
+      try {
+        const line = JSON.parse(text)
+        version = line.version
+        floor = line.floor
+        cohort = Array.isArray(line.cohort) ? line.cohort.filter((entry) => typeof entry === 'string') : undefined
+      } catch { /* reported as unarmed */ }
     } else {
       version = /^\s*PLATFORM_VERSION:\s*(\S+)\s*$/m.exec(text)?.[1]
       floor = /^\s*PLATFORM_FLOOR:\s*(\S+)\s*$/m.exec(text)?.[1]
@@ -393,7 +399,12 @@ function machineViolations(fact, root, docs, home, repoScope, asset) {
       return out
     }
     if (!home.includes(version)) out.push(`${fact.home}: ${machine.file} pins PLATFORM_VERSION ${version}, but the home does not state that line`)
-    if (floor !== undefined && !home.includes('^' + floor)) out.push(`${fact.home}: ${machine.file} pins PLATFORM_FLOOR ${floor}, but the home does not state the ^${floor} range the published packages declare`)
+    if (cohort !== undefined && cohort.length > 0) {
+      const range = cohort.join(' || ')
+      if (!home.includes(range)) out.push(`${fact.home}: ${machine.file} declares the exact cohort range ${range}, but the home does not state it`)
+    } else if (floor !== undefined && !home.includes('^' + floor)) {
+      out.push(`${fact.home}: ${machine.file} pins PLATFORM_FLOOR ${floor}, but the home does not state the ^${floor} range the published packages declare`)
+    }
     const CLAIMS = [
       /Validated platform line: DSH `([^`]+)`/g,
       /已验证[^\n]*?平台线[^\n]*?`([^`]+)`/g,
