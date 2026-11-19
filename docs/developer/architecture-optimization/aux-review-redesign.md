@@ -385,3 +385,10 @@ interface EvolutionReviewActivityRecordV3 {
 - activity 升到 v3：review record 增加 `taskId`、`requests`、`toolCalls`、`waitCount`、`partialReason`；`evolution-review` 的 aux event 写 `taskId`。旧 v2 bytes 仍按既有 foreign/legacy 规则可读，写入统一 v3。
 - 同一边界多次触发时 `pendingCadenceReviews` 用 `mergeDebt` 合并 memory/skill，不覆盖另一域。
 - 未完成仍是 PTC 工具通道、detached review child、`review_wait`/resource-busy、UI 展示与真实 PTC/多会话验收。
+
+
+### Round 3（2026-11-20）
+
+- 新增 `packages/evolution-review/src/review-tool-channel.ts`：`ReviewToolChannel` 边界与 native 实现；`runReview` 优先使用 channel 的 visibleTools/execute，未提供 channel 时保留旧 header/tools 路径；`review_done` 仍由 runner 注入。native channel 测试通过（8 项 executor 测试）。
+- PTC 阻塞事实：平台 `SubagentActivation` 的 local child 会进入 parent catalog；`ctx.agents.create` 存在但需要 setup/seed 且没有现成的“review child 不向父 Session/catalog 发布”的公开语义。当前不伪造 session，PTC channel 暂不实现；先把平台 detached review child 作为前置能力登记。
+- `review_wait`/resource-busy 仍需在 native 工具结果上落地；当前 SkillLibrary 锁/CAS 作为最终防线保留。
