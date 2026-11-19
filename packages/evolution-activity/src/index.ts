@@ -50,12 +50,16 @@ export interface EvolutionActivityRecord {
 /** One durable review outcome folded into the activity sidecar. */
 export interface EvolutionReviewActivityRecord {
   reviewId: string
+  taskId?: string | undefined
   sessionId: string
   branchSessionId?: string | undefined
   kind: EvolutionReviewCompletedEvent['kind']
   status: EvolutionReviewCompletedEvent['status']
   trigger: EvolutionReviewCompletedEvent['trigger']
   finalText: string
+  requests?: number | undefined
+  toolCalls?: number | undefined
+  waitCount?: number | undefined
   partialReason?: string | undefined
   /** Full final-text length before the review preview was bounded. */
   finalTextChars?: number | undefined
@@ -70,7 +74,7 @@ export interface EvolutionReviewActivityRecord {
 }
 
 /** Version of the `activity.json` shape; writers always emit the current one. */
-export const ACTIVITY_FILE_VERSION = 2
+export const ACTIVITY_FILE_VERSION = 3
 
 /** Default bound on the retained sidecar (S6.4: also the fallback for a
  * non-finite `maxItems`). */
@@ -134,6 +138,7 @@ export function applyReviewActivityEvent(
 ): EvolutionReviewActivityRecord[] {
   const record: EvolutionReviewActivityRecord = {
     reviewId: event.reviewId,
+    ...event.taskId === undefined ? {} : { taskId: event.taskId },
     sessionId: event.sessionId,
     ...event.branchSessionId === undefined ? {} : { branchSessionId: event.branchSessionId },
     kind: event.kind,
@@ -141,6 +146,9 @@ export function applyReviewActivityEvent(
     trigger: event.trigger,
     finalText: graphemeCount(event.finalText) <= REVIEW_TEXT_PREVIEW_CHARS ? event.finalText : truncateGraphemes(event.finalText, REVIEW_TEXT_PREVIEW_CHARS, ''),
     finalTextChars: event.finalText.length,
+    ...event.requests === undefined ? {} : { requests: event.requests },
+    ...event.toolCalls === undefined ? {} : { toolCalls: event.toolCalls },
+    ...event.waitCount === undefined ? {} : { waitCount: event.waitCount },
     ...event.partialReason === undefined ? {} : { partialReason: event.partialReason },
     actions: event.actions,
     ...event.usage === undefined ? {} : { usage: event.usage },
