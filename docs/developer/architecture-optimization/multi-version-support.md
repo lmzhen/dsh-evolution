@@ -358,8 +358,9 @@ export interface EvolutionPlatform {
 
 ## 10. Open Questions（未冻结）
 
-1. `evolution-platform-contract` 是否独立 npm 包，还是 `evolution-core` 的纯子路径？倾向独立包（编译隔离更干净），但需评估 21→22 包的发布/依赖成本。
+1. `evolution-platform-contract` 是否独立 npm 包，还是 `evolution-core` 的纯子路径？当前已按独立包落地（22 个发布包），后续只在有明确收益时再评估合并。
 2. 60 字符 catalog cap 的最终归属：家族 catalog 配置、可选 profile override，还是接受平台默认？需要产品/体验确认。
 3. cohort 首版是否包含 rc.3，还是只做 rc.4–rc.5？由 P1 矩阵/真机结果决定。
 4. 是否把 Cordis/Schemastery 也纳入 contract 包装？当前倾向保留直接 import（框架 seam，不随 DSH 版本面变化）。
 5. 旧线采用 dist-tag 还是并行 major？按 npm 发布成本与用户升级路径定。
+6. **P1 前置发现（2026-11-19）**：现有 `verify-platform-matrix.mjs` 以自定义 `paths` 混排 mirror/base alias 与目标平台 `.d.ts`，对干净的 rc.3 树仍报 4 个 `TS2717` 类型身份冲突（`evolutionApproval` / `skillUsage` / `evolutionState` / `evolutionStateStorage`）。这更像 detector 的模块身份问题，不是已证明的 API 不兼容。P1 必须先重写为“单一声明树”：平台依赖走临时 node_modules，family 源码只走 source paths，禁止两个来源同时映射同一包；矩阵绿之前不得把 rc.3 写入 cohort。
