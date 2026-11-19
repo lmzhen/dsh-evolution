@@ -1,25 +1,25 @@
 {
-  "note": "0.57.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host; cohort smoke measured on the exact rc.5 clean install (29/29 active rows, doctor ok); S4 spec. Final CI face must be re-read before publish.",
-  "familyVersion": "0.57.0",
+  "note": "0.58.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host; S4 HMR specs; cohort smoke measured on the exact rc.5 clean install (29/29 active rows, doctor ok).",
+  "familyVersion": "0.58.0",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.57.0",
-      "startedAt": "2026-11-19T06:16:30.000Z",
-      "artifactSha256": "d0ce901cd9902462792c660c550f69ddf5f0beaade7213befdbc60ab36f8166e",
-      "inputsSha256": "6ebadadb81c7ab5a69e390a56c6586ad72ce8a2606c53064d2e8a12378620fb6",
-      "commit": "704b5fce",
+      "familyVersion": "0.58.0",
+      "startedAt": "2026-11-19T16:20:00.000Z",
+      "artifactSha256": "68ec2417ce5cb67c44cc4cb45f2d1b872a3e3de2c37d9754018c3d95e005d166",
+      "inputsSha256": "ab0975ce1b5ac264798c454912203f70cbf859ba1771e754c36dd80239a02b46",
+      "commit": "6d570a2d",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
-        "skillHistoryRows": 45,
-        "skillHistoryBytes": 32468,
+        "skillHistoryRows": 26,
+        "skillHistoryBytes": 21069,
         "threeReadsStable": true,
         "readMs": [
-          708,
-          1162,
-          1008
+          567,
+          210,
+          329
         ],
         "ownerStatus": 200
       }
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.57.0",
-      "startedAt": "2026-11-19T06:16:30.000Z",
-      "artifactSha256": "d0ce901cd9902462792c660c550f69ddf5f0beaade7213befdbc60ab36f8166e",
-      "inputsSha256": "6ebadadb81c7ab5a69e390a56c6586ad72ce8a2606c53064d2e8a12378620fb6",
-      "commit": "704b5fce",
+      "familyVersion": "0.58.0",
+      "startedAt": "2026-11-19T16:20:00.000Z",
+      "artifactSha256": "68ec2417ce5cb67c44cc4cb45f2d1b872a3e3de2c37d9754018c3d95e005d166",
+      "inputsSha256": "ab0975ce1b5ac264798c454912203f70cbf859ba1771e754c36dd80239a02b46",
+      "commit": "6d570a2d",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -39,7 +39,7 @@
         "anonymous": 401,
         "anonymousBody": "unauthorized",
         "diagnosticsReadMs": [
-          13
+          82
         ],
         "carrier": "connection.fetch"
       }
@@ -47,28 +47,28 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.57.0",
-      "startedAt": "2026-11-19T06:16:30.000Z",
-      "artifactSha256": "d0ce901cd9902462792c660c550f69ddf5f0beaade7213befdbc60ab36f8166e",
-      "inputsSha256": "6ebadadb81c7ab5a69e390a56c6586ad72ce8a2606c53064d2e8a12378620fb6",
-      "commit": "704b5fce",
+      "familyVersion": "0.58.0",
+      "startedAt": "2026-11-19T16:20:00.000Z",
+      "artifactSha256": "68ec2417ce5cb67c44cc4cb45f2d1b872a3e3de2c37d9754018c3d95e005d166",
+      "inputsSha256": "ab0975ce1b5ac264798c454912203f70cbf859ba1771e754c36dd80239a02b46",
+      "commit": "6d570a2d",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
-        "familyVersion": "0.57.0"
+        "familyVersion": "0.58.0"
       }
     },
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.57.0",
-      "startedAt": "2026-11-19T06:16:30.000Z",
-      "artifactSha256": "d0ce901cd9902462792c660c550f69ddf5f0beaade7213befdbc60ab36f8166e",
-      "inputsSha256": "6ebadadb81c7ab5a69e390a56c6586ad72ce8a2606c53064d2e8a12378620fb6",
-      "commit": "704b5fce",
+      "familyVersion": "0.58.0",
+      "startedAt": "2026-11-19T16:20:00.000Z",
+      "artifactSha256": "68ec2417ce5cb67c44cc4cb45f2d1b872a3e3de2c37d9754018c3d95e005d166",
+      "inputsSha256": "ab0975ce1b5ac264798c454912203f70cbf859ba1771e754c36dd80239a02b46",
+      "commit": "6d570a2d",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -87,9 +87,9 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on 704b5fce (OK 52/52)"
+    "source": "verify-traceability --strict on 6d570a2d (pending tag)"
   },
-  "generatedAt": "2026-11-19T06:45:00.000Z",
+  "generatedAt": "2026-11-19T16:20:00.000Z",
   "cohort": {
     "versions": [
       "0.2.2-rc.5"
