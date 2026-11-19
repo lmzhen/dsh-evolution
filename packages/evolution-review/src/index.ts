@@ -14,6 +14,7 @@ import { nativeReviewToolChannel } from './review-tool-channel.ts'
 import { createPtcReviewToolChannel } from './review-ptc-channel.ts'
 import { createReviewChildAgent } from '@deepseek-ai/dsh-evolution-adapter/review-child'
 import { ReviewWriteLocks } from './review-write-locks.ts'
+import { ReviewLimiter } from './review-limiter.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).
@@ -999,6 +1000,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
    */
   let inFlightControllers = new Set<AbortController>()
   const reviewWriteLocks = new ReviewWriteLocks()
+  const auxLimiter = new ReviewLimiter(4)
 
 /**
  * Freeze the parent prefix for an aux review.
@@ -1103,7 +1105,10 @@ function snapshotReviewParent(agent: Agent): Agent {
       let hitRoundLimit = false
       let report: { summary: string; memoryChanged: boolean; skillsChanged: readonly string[]; unresolved: readonly string[] } | undefined
       let error: string | undefined
+      let limiterRelease: (() => void) | undefined
       try {
+        limiterRelease = await auxLimiter.acquire(controller.signal)
+        if (limiterRelease === undefined) throw new Error('aux review queue aborted')
         const prompt = reviewPrompt(kind, 'aux') + '\n\n' + AUX_COMPLETION_INSTRUCTION + (channel.instruction === undefined ? '' : '\n\n' + channel.instruction)
         const result = await withReviewContext({ reviewId, runId: reviewId, reads: new Set<string>() }, () => runReview({
           parent: reviewParent,
@@ -1143,6 +1148,7 @@ function snapshotReviewParent(agent: Agent): Agent {
         status = timedOut ? 'timeout' : controller.signal.aborted ? 'aborted' : 'failed'
         ctx.logger.warn('dsh-evolution-review: aux review failed: ' + error)
       } finally {
+        limiterRelease?.()
         clearTimeout(timer)
         if (leaseRenewTimer !== undefined) clearInterval(leaseRenewTimer)
         const finishedAt = Date.now()
@@ -1211,6 +1217,7 @@ function snapshotReviewParent(agent: Agent): Agent {
     for (const controller of inFlightControllers) controller.abort()
     inFlightControllers = new Set<AbortController>()
     reviewWriteLocks.dispose()
+    auxLimiter.dispose()
     sessionState.dispose()
   }, 'dsh-evolution-review.cleanup')
 }

@@ -469,3 +469,9 @@ interface EvolutionReviewActivityRecordV3 {
 
 - review event/activity 补齐 `hitRoundLimit` 与结构化 `report`（summary/memoryChanged/skillsChanged/unresolved）；A/F 的“记录完整完成读数”不再依赖 summary 文本。
 - activity v3 测试覆盖 hitRoundLimit/report；review 11 项 + activity 23 项通过，构建 0 error。
+
+
+### Round 15（2026-11-20）
+
+- AUX 全局并发有界：新增 `ReviewLimiter(4)`，每个插件实例一个 FIFO 信号量；review 在首个模型请求前取槽，超时/卸载可中止排队；cleanup 时 `dispose()` 唤醒等待者。无 per-session/weight 公平调度，符合 C 的范围。
+- 新增 limiter 单测（槽位移交、排队中止）；接入 `tryAuxReview`。
