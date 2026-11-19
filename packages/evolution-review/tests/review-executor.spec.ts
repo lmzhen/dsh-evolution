@@ -6,6 +6,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import { runReview } from '../src/review-executor.ts'
 import { nativeReviewToolChannel } from '../src/review-tool-channel.ts'
+import { ReviewWriteLocks } from '../src/review-write-locks.ts'
 import type { ReviewLlmPort, ReviewParent, ReviewToolPort } from '../src/review-executor.ts'
 import { withReviewContext } from '@deepseek-ai/dsh-evolution-core'
 
@@ -239,6 +240,39 @@ describe('runReview', () => {
     expect(result.done).toBe(true)
     expect(result.waitCount).toBe(1)
     expect(result.actions[0]).toMatchObject({ action: 'review_wait', target: 'skill:probe', status: 'ok' })
+  })
+
+  it('returns resource-busy to a second review instead of racing the writer', async () => {
+    const locks = new ReviewWriteLocks()
+    let startedResolve: (() => void) | undefined
+    let releaseResolve: (() => void) | undefined
+    const started = new Promise<void>(resolve => { startedResolve = resolve })
+    const gate = new Promise<void>(resolve => { releaseResolve = resolve })
+    let calls = 0
+    const writer: ReviewToolPort = {
+      async execute() {
+        calls += 1
+        startedResolve?.()
+        await gate
+        return { results: [{ callId: call.id, result: { content: [{ type: 'text' as const, text: 'ok' }], isError: false } }] }
+      },
+    }
+    const first = runReview({
+      parent: parent(), llm: llm([toolCallChunks, doneChunks]), tools: writer, instruction: 'review',
+      toolAllow: allowed(), writeLocks: locks, owner: 'first', signal: new AbortController().signal,
+      markReview: () => {}, clearReview: () => {},
+    })
+    await started
+    const second = await runReview({
+      parent: parent(), llm: llm([toolCallChunks, doneChunks]), tools: writer, instruction: 'review',
+      toolAllow: allowed(), writeLocks: locks, owner: 'second', signal: new AbortController().signal,
+      markReview: () => {}, clearReview: () => {},
+    })
+    expect(second.actions[0]).toMatchObject({ action: 'skill_manage', status: 'error' })
+    releaseResolve?.()
+    const firstResult = await first
+    expect(firstResult.done).toBe(true)
+    expect(calls).toBe(1)
   })
 
   it('rejects review_done mixed with other calls', async () => {
