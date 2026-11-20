@@ -1,3 +1,11 @@
+## 0.59.0 (2026-11-20) — Aux Review 架构重构与极简模式隔离
+
+> **范围**：① Aux Review 完成语义收口：轮数/时间/工具调用预算耗尽统一 `partial/timeout` 并记录 `hitRoundLimit`、`partialReason`，`review_done` 成为唯一完成信号，memory/skill 拆成独立 task 并行执行；② PTC 走 detached review child，父 Session 不追加 `tool/ptc-dispatch*`，child 提供 review 工具集并从结构化结果读取 report；native 改为完整父工具目录 + 执行层 allowlist，避免模型侧工具过滤破坏前缀缓存；③ activity v3 记录 taskId/kind/status/requests/toolCalls/waitCount/partialReason/report，兼容 v2 只读；④ UI 自动复查汇总增加完成/部分/超时/失败、平均轮数与工具调用，每条显示轮数/工具调用/等待，缓存命中率仍只在后台；⑤ 新增 `reviewMaxToolCalls` 配置，补充 `reviewMaxRounds`/`reviewTimeoutMs`；⑥ 极简 preset 的 family 模型面由 runtime guard 隐藏并跳过 AUX——极简请求头只剩平台工具；平台没有 `commands.restrict`，命令面按用户决定不再开发，保持现状。
+>
+> **不迁移**：磁盘 activity 继续兼容 v2；前台 inject 的提示词、投递与 combined 语义不变；PTC 写路径/审批与真实双会话同 skill 冲突列为 DEFERRED，不阻塞本版。PTC 与 native 共用 `SkillLibrary`/`MemoryStore` 锁，不需要 PTC 专用防并发机制。
+>
+> **验证**：本地静态门禁 **57 pass / 0 fail**（gate-29 CI home 占位不可判定、gate-75 CI 路径跳过）；定向测试 82 passed；真实 native/PTC 各完成 memory/skill review，PTC 父 Session seq 不变；极简真机请求头从 8 个工具降为 3 个平台工具、无 review activity；独立复核 P0/P1=0。
+
 ## 0.58.0 (2026-11-20) — 多版本支持架构收口
 
 > **范围**：① 平台能力契约与单一适配包落地：新增 `@lmzhen/dsh-evolution-platform-contract` 与 `@lmzhen/dsh-evolution-adapter`，feature 只依赖契约，平台 runtime import 只出现在 adapter；② 发布包络收敛为用户指定的精确 `0.2.2-rc.5` 单成员 cohort，22 个发布 manifest 的 peers/engines 使用同一并集，不再声明未要求的额外版本；③ CI 每成员执行干净安装、启动、`pluginInventory/list` row 存活与 doctor，并产出 `source=ci` 的 cohort reading；④ release evidence 把 spike 绑定到被测家族树（`measuredCommit` + tag 树 diff），解决 tag 提交自指；⑤ bundle patch 只保留家族 row，不覆盖平台 row。

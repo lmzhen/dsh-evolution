@@ -304,6 +304,16 @@ DeepSeek 的上下文缓存是前缀缓存。结构上 system/message 来自父 
 - 同一 skill 的并发写由 `SkillLibrary` 锁 + CAS 兜底；单轮失败是模型可恢复信息。
 - 全局只加一个并发上限（默认 2）和一个简单 FIFO；不做复杂公平调度。
 
+### 8.4 PTC 与 native 共用锁（2026-11-20）
+
+PTC 不是另一套写实现：PTC child 的 `skill_manage`/`memory` 调用走同一 `toolsPort` 和同一 `SkillLibrary`/`MemoryStore` 锁。因此：
+
+- 不需要 PTC 专用写锁或 PTC 专用 CAS；
+- 锁的键按资源（skill 目录/ memory），不按 native/PTC 会话；
+- PTC program 内多个写仍由同一把锁裁决，冲突返回 `resource-busy`，模型 `review_wait` 后重读重试；
+- PTC 专属风险只有两个：`resource-busy` 必须原样穿过 `run_code` 嵌套 dispatch；approval/sandbox 不能持锁等待或把拒绝伪装成成功。这两项是 PTC 执行壳语义，不是并发机制缺口。
+- 因此“PTC 双会话同 skill 写冲突”是验收覆盖项，不是架构前置；当前作为 DEFERRED，不阻塞 0.59.0。
+
 ## 9. Activity 与 UI
 
 `activity.json` 升到 schema v3，新增 review task 字段：
@@ -794,3 +804,5 @@ interface EvolutionReviewActivityRecordV3 {
 - gate-07 因新增 `ctx.get('sessionProjections')` 无 platform-declaration anchor 先红；已在 `minimal-preset.ts` 补 anchor，单门复跑通过。
 - guard P2 加固后定向测试 82 passed；构建 0 error。
 - 最终静态门禁待本轮 runner 输出；已知只有 gate-29 的 CI home 占位与 gate-75 CI 路径不可本地判定。
+
+**用户确认（2026-11-20）**：极简命令面若平台当前接口不支持 `commands.restrict`，**不再开发此功能**；本版按 A1 发布（模型工具与 AUX 禁用，命令面保持平台现状）。PTC 写路径/审批与真实双会话同 skill 冲突**作为 DEFERRED**，不阻塞本版。最终版本 **0.59.0**，确认后立即走 pre-tag/CI 并发布。
