@@ -931,6 +931,30 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Final review P0=0 / P1=0
+
+独立复核最终结论（06215ce0）：
+
+```text
+P0 = 0
+P1 = 0
+```
+
+复核探针：
+
+- keyed + nested + serialized + 外层 fence lease：2135ms ok；
+- keyed + nested 无外层 lease：2115ms ok；
+- keyed + nested unserialized：1845ms ok；
+- keyed + nested 3 sources：2636ms ok；
+- non-keyed + nested 对照：704ms ok。
+
+`skill-keyed-concurrency` 6/6 通过；此前 keyed 锁序（S→T）与 nested 重复取锁均闭环。
+
+未验证：
+
+- 真实宿主 keyed merge 全链路；
+- keyedSkillLocks=true 的 npm web 并发验收（发布后）。
+
 ### 2026-11-20：Phase P1.12 nested merge 不再重复取 source lease
 
 复核发现 b69765ba 在 keyed + nested 下外层已取 sources key，fenceHeld 分支又对同一 source 取一次，导致自死锁。
