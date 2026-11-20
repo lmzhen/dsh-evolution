@@ -61,6 +61,7 @@ import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { decideSkillWrite, type SkillWriteIntent, type SkillWriteRefusalReason } from './skill-write-intent.ts'
 import { SkillTargetLocks } from './skill-target-locks.ts'
+import { SkillRootGate } from './skill-root-gate.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
 import { type ChangeSummary, type UnitHead, clipChangeSummary, contentRetentionFeedback, DEFAULT_SKILL_WRITE_SUMMARY_CHARS, HISTORY_DIR, loadVersionContent, loadVersions, normalizeChangeSummary, recordVersions, type HistoryFence, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { getRecord, loadUsage, mutateUsage, suppressedFile, usageFile } from './usage.ts'
@@ -818,6 +819,8 @@ export class SkillLibrary {
   private readonly serial: <T>(task: () => Promise<T>) => Promise<T>
   /** Transitional target locks (same key as SkillWriteService). */
   private readonly targetLocks = new SkillTargetLocks()
+  /** Root structural gate; simple writes still use the serial until D.5d. */
+  private readonly rootGate = new SkillRootGate()
   /** V10-03 (P2-18): see the constructor's threatExemptLabels. Empty by
    * default — the strict ANY-hit-blocks policy is unchanged. */
   private readonly threatExemptLabels: readonly string[]
@@ -2422,8 +2425,9 @@ export class SkillLibrary {
     } catch { /* lifecycle telemetry is best-effort; the archive already landed */ }
   }
 
-  async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary): Promise<SkillActionResult> {
-    return await this.archiveCore(rawName, options, origin, false, change)
+  async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary, rootHeld = false): Promise<SkillActionResult> {
+    if (rootHeld) return await this.archiveCore(rawName, options, origin, false, change)
+    return await this.rootGate.write(() => this.archiveCore(rawName, options, origin, false, change))
   }
 
   private async archiveCore(rawName: string, options: ArchiveOptions, origin: WriteOrigin, fenceHeld: boolean, change?: ChangeSummary): Promise<SkillActionResult> {
@@ -2562,13 +2566,14 @@ export class SkillLibrary {
     const protectedSource = sources.find(name => PROTECTED_BUILTIN_SKILLS.has(name))
     if (protectedSource !== undefined) return { ok: false, message: `来源技能「${protectedSource}」是受保护的内置技能。` }
     const limits = plan.limits ?? this.limits
+    const rootHeld = options?.serialized === true
     const run = async (): Promise<CommitMergeResult> => {
       // A nested merge already holds the home fence; its archive/restore bookkeeping
       // must run inline instead of queueing behind that same lease.
       const fenceHeld = plan.nested === true
       const archive = (name: string, archiveOptions: ArchiveOptions) => fenceHeld
         ? this.archiveCore(name, archiveOptions, plan.origin, true)
-        : this.archive(name, archiveOptions, plan.origin)
+        : this.archive(name, archiveOptions, plan.origin, undefined, rootHeld)
       const dir = this.dirOf(target)
       const targetPath = join(dir, 'SKILL.md')
       if (!plan.targetExists && await this.io.exists(dir)) {
@@ -2674,7 +2679,7 @@ export class SkillLibrary {
         const stuck: string[] = []
         for (const source of [...archived].reverse()) {
           try {
-            const restored = fenceHeld ? await this.restoreFromArchiveCore(source, plan.origin, true) : await this.restoreFromArchive(source, plan.origin)
+            const restored = fenceHeld ? await this.restoreFromArchiveCore(source, plan.origin, true) : await this.restoreFromArchive(source, plan.origin, rootHeld)
             if (!restored.ok) stuck.push(source)
           } catch {
             stuck.push(source)
@@ -2865,7 +2870,8 @@ export class SkillLibrary {
       await plan.onPhase?.('unit-written')
       return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
     }
-    return options?.serialized === true ? await run() : await this.serial(run)
+    if (rootHeld) return await run()
+    return await this.rootGate.write(() => this.serial(run))
   }
 
   /**
@@ -3569,8 +3575,9 @@ export class SkillLibrary {
    * recoverability: archival never deletes, and this is the control-plane
    * path back. The `.archive-reason` marker is dropped on restore.
    */
-  async restoreFromArchive(rawName: string, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
-    return await this.restoreFromArchiveCore(rawName, origin, false)
+  async restoreFromArchive(rawName: string, origin: WriteOrigin = this.authority.origin, rootHeld = false): Promise<SkillActionResult> {
+    if (rootHeld) return await this.restoreFromArchiveCore(rawName, origin, false)
+    return await this.rootGate.write(() => this.restoreFromArchiveCore(rawName, origin, false))
   }
 
   private async restoreFromArchiveCore(rawName: string, origin: WriteOrigin, fenceHeld: boolean): Promise<SkillActionResult> {

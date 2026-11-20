@@ -905,6 +905,33 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase D.5c archive/restore/commitMerge 持 root exclusive
+
+已完成：
+
+- `archive` / `restoreFromArchive` 增加 `rootHeld` 参数：
+  - 默认取 `rootGate.write`；
+  - 已持门调用方传 `rootHeld=true` 走内部路径，避免 non-reentrant deadlock。
+- `commitMerge`：
+  - `serialized:true` → 视为已持门，直接执行；
+  - 否则 `rootGate.write` + serial；
+  - 内部 archive/restore 传 `rootHeld`，不再重新取门。
+- 既有 `skill-store-serial` / `skill-consolidate` 测试全部通过，consolidate 未自死锁。
+
+验证：
+
+```text
+skill-store-serial + skill-consolidate: 17 passed
+overlay build:                          0
+```
+
+边界：
+
+- simple mutator 仍只走 root serial，尚未持 root shared；
+- 因此 root gate 尚未与 simple 写互斥；
+- restructure/extract 尚未持 root exclusive；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase D.5b.1 support 写/删持 target lock
 
 已完成：
