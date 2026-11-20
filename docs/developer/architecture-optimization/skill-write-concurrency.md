@@ -884,6 +884,27 @@ delete → service.remove()
 
 - 若某平台 backend 的 `targetKey` 不是 host path，或版本格式不同，监听器不记录；该 read 不授权写，写路径返回 `SKILL_NOT_OBSERVED`。
 
+### 2026-11-20：Phase C.9 owner 独立与审批语义核对
+
+已完成：
+
+- 新增 service 测试：parent session 读 SKILL.md 后，review child 仍 `SKILL_NOT_OBSERVED`；child 自己 read 后才可写。
+- 验证 observation owner 不会跨 parent/child 泄漏，满足 AUX child owner 的基本不变量。
+
+审批 F 的现状核对：
+
+- 现有 approval staging 已把 `staged_from_sha256` 写入 operation；
+- approval replay 走 `executeCore(operation, ..., owner=undefined)`，`stagedAnchor` 交给 library；
+- 既有 `v30 REV-03`、`P1-13` 测试覆盖“staging 后目标变化 → replay 拒绝”；
+- 因此单 target 审批的 expected/CAS 语义已经具备；
+- 多 target unit 审批仍未实现，留待 unit phase。
+
+验证：
+
+```text
+skill-write-service: 6 passed
+```
+
 ### 2026-11-20：Phase D.2 service 持有 target lock
 
 已完成：

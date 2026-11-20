@@ -75,4 +75,19 @@ describe('SkillWriteService observations', () => {
       expect.objectContaining({ ok: true }),
     )
   }, 30_000)
+  it('keeps a review child owner independent from its parent session', async () => {
+    const { service } = await setup()
+    const parent = { kind: 'parent-session' }
+    const child = { kind: 'review-child-session' }
+    await service.readBody(parent, 'write-service')
+
+    expect(await service.updateBody(child, 'write-service', body('child'))).toEqual(
+      expect.objectContaining({ ok: false, code: 'SKILL_NOT_OBSERVED' }),
+    )
+    await service.readBody(child, 'write-service')
+    expect(await service.updateBody(child, 'write-service', body('child'))).toEqual(
+      expect.objectContaining({ ok: true }),
+    )
+  }, 30_000)
+
 })
