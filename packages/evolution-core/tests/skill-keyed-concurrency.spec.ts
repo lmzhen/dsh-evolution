@@ -84,6 +84,18 @@ describe('keyed SkillLibrary concurrency', () => {
     expect(result.ok).toBe(true)
   }, 30_000)
 
+  it('settles archive and a concurrent keyed simple write', async () => {
+    const { lib } = await setup()
+    const outcome = await Promise.race([
+      Promise.all([lib.archive('a'), lib.update('b', skill('b', 'b archived'), 'foreground')]),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 10_000)),
+    ])
+    expect(outcome).not.toBeNull()
+    if (outcome === null) return
+    expect(outcome[0].ok).toBe(true)
+    expect(outcome[1].ok).toBe(true)
+  }, 30_000)
+
   it('does not deadlock consolidate under the keyed hybrid lock', async () => {
     const { lib } = await setup()
     const outcome = await Promise.race([

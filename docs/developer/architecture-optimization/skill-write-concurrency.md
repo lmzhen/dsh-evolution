@@ -931,6 +931,21 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P0.2 keyed archive/simple 并发回归
+
+- 新增 keyed hybrid 测试：
+  - `archive(a)` 与 `update(b)` 同时启动；
+  - 10s 内都 settle；
+  - archive 成功、update 成功；
+- 覆盖 P0-1 在 keyed 路径下的 ABBA 风险。
+
+验证：
+
+```text
+skill-keyed-concurrency: 5 passed
+overlay build: 0
+```
+
 ### 2026-11-20：Phase P0.1 独立复核死锁修复
 
 独立复核发现 3 个 P0，已修复：
