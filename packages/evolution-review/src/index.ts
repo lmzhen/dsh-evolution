@@ -1201,9 +1201,19 @@ function snapshotReviewParent(agent: Agent): Agent {
             kind,
             status,
             toolMode: channel.mode,
-            ...(typeof (session as { header?: { agentPreset?: unknown } }).header?.agentPreset === 'string'
-              ? { preset: (session as { header: { agentPreset: string } }).header.agentPreset }
-              : {}),
+            ...(() => {
+              // The creation header is only the starting preset; a blank-session
+              // mode switch is recorded as `agent-preset/selected` and projected.
+              const projected = (ctx.get('sessionProjections') as {
+                snapshot?(target: unknown, keys?: readonly string[]): { values?: Record<string, unknown> }
+              } | undefined)?.snapshot?.(session, ['agentPreset'])?.values?.agentPreset
+              const preset = typeof projected === 'string'
+                ? projected
+                : typeof (session as { header?: { agentPreset?: unknown } }).header?.agentPreset === 'string'
+                  ? (session as { header: { agentPreset: string } }).header.agentPreset
+                  : undefined
+              return preset === undefined ? {} : { preset }
+            })(),
             trigger: { reason, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars },
             finalText,
             actions,

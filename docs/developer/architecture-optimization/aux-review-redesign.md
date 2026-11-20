@@ -257,14 +257,23 @@ PTC 会话父 header 只有 `run_code`，且 `run_code` 的 nested dispatch 会 
 
 ### 7.4 前缀缓存复用
 
-DeepSeek 的上下文缓存按 **system → tools → messages 的字节前缀**命中：工具目录一变，其后的 message 前缀全部失效。当前两种通道的缓存特征：
+DeepSeek 的上下文缓存是前缀缓存。结构上 system/message 来自父 `deriveMessages()`，review instruction 追加在末尾；两种通道的 tools 目录不同：
 
-- **PTC**：`runReview` 的 messages 来自父 `deriveMessages()` + review instruction；顶层 tools 只含父 header 的 `run_code`，不插入合成完成工具；并按 PTC 路由回放父 `toolHistory()`。system/tools/父 messages 与父请求逐字节一致，只有 review instruction 是追加后缀，父前缀可复用。
-- **native**：`nativeReviewToolChannel` 为限制审查工具，把父 tools 裁剪成 allowlist，并在末尾追加 `review_done`/`review_wait`。工具目录从第一处差异起就与父请求不同，父 message 前缀无法完整命中；review 之间共享裁剪后的工具目录，因此 review-to-review 仍可命中自己的前缀。
-- 标准/创造/极简都走 native，但各自父工具目录不同；极简还缺少 read/glob/grep，因此三种模式的缓存统计必须分开。
-- 旧 `0.58.0` 的 aux 是 native 且使用父完整 tools + `toolHistory`；desktop activity v2 中 cordis 会话 134 条 review 的平均缓存命中约 **99.65%**。这组历史读数只能作为旧实现基线，不能代表新 native 过滤通道。
-- 新实现已给 activity v3 review 记录增加可选 `toolMode`（native/ptc）和 `preset`（来自 session header `agentPreset`）；目前只落记录，尚无按模式聚合的 UI/接口，开发者可直接按 `toolMode/preset` 聚合 `cacheReadTokens/(inputTokens+cacheReadTokens+cacheWriteTokens)`。旧 v2 记录没有这两个字段，不能按模式回溯。
-- 若 native 缓存损失不可接受，正确修法是保留父完整工具目录，把 `review_done` 作为 in-history tool addition（DeepSeek 路由支持 `addition-only`）追加在父前缀之后；不要简单恢复未过滤工具而失去审查工具约束。
+- **PTC**：顶层 tools 只含父 header 的 `run_code`，不插入合成完成工具；并按 PTC 路由回放父 `toolHistory()`。system/父 messages 与父请求一致，只有 review instruction 是追加后缀。
+- **native**：`nativeReviewToolChannel` 把父 tools 裁剪成 allowlist，并在末尾追加 `review_done`/`review_wait`。工具目录与父请求不同，按“字节前缀”理论会损失父 message 后缀；但真实 provider 的缓存单元还受 system/preset 与跨会话暖缓存影响，不能只凭结构断言。
+- 2026-11-20 实测（隔离 home，同一 prompt/三文件，`cacheRead/(input+cacheRead+cacheWrite)`，每模式 2 条 review）：
+
+  | 实际模式 | toolMode | 首条 | 第二条 |
+  |---|---|---:|---:|
+  | 标准 | native | 0.98 | 0.92 |
+  | PTC | ptc | 0.98 | 0.98 |
+  | 创造 | native | 0.13 | 0.97 |
+  | 极简 | native | 0.00 | 0.98 |
+
+  这说明 PTC 两条都复用良好；native 首条可能是冷缓存（创造/极简），第二条因 review-to-review 前缀而高；标准首条高，不能简单归因为“工具目录一定全部失效”。样本只有每模式 2 条，不能当作稳定结论。
+- 旧 `0.58.0` 的 aux 是 native 且使用父完整 tools + `toolHistory`；desktop activity v2 中 cordis 会话 134 条 review 的平均缓存命中约 **99.65%**，是旧实现基线。
+- activity v3 review 已记录可选 `toolMode`（native/ptc）和 `preset`（当前生效的 `agentPreset` 投影，不是创建 header）；尚无按模式聚合的 UI/接口，开发者可按这两个字段聚合缓存。
+- 若后续更多样本证明 native 首条持续显著低，正确修法是保留父完整工具目录，把 `review_done` 作为 in-history tool addition 追加在父前缀之后；不要简单恢复未过滤工具而失去审查工具约束。
 
 ## 8. 锁与等待
 
@@ -677,3 +686,18 @@ interface EvolutionReviewActivityRecordV3 {
   - PTC 顶层 tools 仍为父 `run_code`，messages = 父 `deriveMessages` + review instruction，且已回放父 `toolHistory`，父前缀可复用；
   - native 把 tools 裁剪为 allowlist 并追加 `review_done/review_wait`，工具目录与父不同，父前缀不能完整命中；标准/创造/极简均 native，各自工具目录不同。
 - activity v3 新增可选 `toolMode`/`preset`（session header `agentPreset`），只落记录；按模式聚合缓存留作开发者诊断，不进 C 端主界面。native 缓存若需修复，应采用 in-history tool addition 保持父工具目录，而不是恢复未过滤工具。
+
+### Round 37（2026-11-20，四模式缓存实测）
+
+- 实测环境：隔离 home + rc.5 host + dev10；同一 prompt/三文件；每模式跑一次 memory+skill AUX；UI 实际预设由 session 日志 `agent-preset/selected` 确认，而不是 header。
+- 命中率（`cacheRead/(input+cacheRead+cacheWrite)`）：
+
+  | 模式 | toolMode | memory/first | skill/second |
+  |---|---|---:|---:|
+  | 标准 | native | 0.98 | 0.92 |
+  | PTC | ptc | 0.98 | 0.98 |
+  | 创造 | native | 0.13 | 0.97 |
+  | 极简 | native | 0.00 | 0.98 |
+
+- 结论修正：PTC 首条即高命中，符合“父前缀复用”；native 并不必然首条全 miss——标准首条 0.98，创造/极简首条冷、第二条高。样本仅每模式 2 条，不能据此断言稳定命中率；需要更多轮/更长会话才能定论。
+- 修正 `preset` 采集：`session.header.agentPreset` 只是创建值，UI 切换模式写 `agent-preset/selected` 投影；review 现在读 `sessionProjections` 的 `agentPreset`，避免把 PTC/创造/极简都记成 standard。
