@@ -2251,12 +2251,12 @@ it('P2-17 (v38): a FAILED archive does not read as "already archived" for its me
   // refuses, the retry inside consolidate() finds the lock gone.
   const realArchive = skills.archive.bind(skills)
   let attempts = 0
-  const archiveSpy = vi.spyOn(skills, 'archive').mockImplementation(async (rawName: string, options?: Parameters<typeof skills.archive>[1]) => {
+  const archiveSpy = vi.spyOn(skills, 'archive').mockImplementation(async (rawName: string, options?: Parameters<typeof skills.archive>[1], origin?: Parameters<typeof skills.archive>[2], change?: Parameters<typeof skills.archive>[3], rootHeld?: boolean, namespaceHeld?: boolean) => {
     attempts += 1
     if (rawName === 'narrow-src' && attempts === 1) {
       return { ok: false, message: 'Skill "narrow-src" is being written (write lock present); retry archiving once the write completes.' }
     }
-    return await realArchive(rawName, options)
+    return await realArchive(rawName, options, origin, change, rootHeld, namespaceHeld)
   })
   const result = await ctx.evolutionCurator.run({ ignoreGates: true })
   archiveSpy.mockRestore()
