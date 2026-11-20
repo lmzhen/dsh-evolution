@@ -1,25 +1,25 @@
 {
-  "note": "0.58.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host; S4 HMR specs; cohort smoke measured on the exact rc.5 clean install (29/29 active rows, doctor ok).",
-  "familyVersion": "0.58.0",
+  "note": "0.59.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host from the 0.59.0 candidate; S4 HMR 2/2; traceability 52/52. inputsSha256 hashes the 22 packed tarballs plus platform-line.json and the CHANGELOG head.",
+  "familyVersion": "0.59.0",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.58.0",
-      "startedAt": "2026-11-19T16:20:00.000Z",
-      "artifactSha256": "68ec2417ce5cb67c44cc4cb45f2d1b872a3e3de2c37d9754018c3d95e005d166",
-      "inputsSha256": "ab0975ce1b5ac264798c454912203f70cbf859ba1771e754c36dd80239a02b46",
-      "commit": "6d570a2d",
+      "familyVersion": "0.59.0",
+      "startedAt": "2026-11-20T04:08:15.337Z",
+      "artifactSha256": "d5a7ab837cb67ada8927313b53b82bc86a2cf73bb41895400f4bfcd590d9fa0a",
+      "inputsSha256": "9a8a3fbb9db35e373f92e190ac50913f638e370d63ba7bc68023e8123f5266af",
+      "commit": "81ef9ff1d760da8a805b97caf4e864115323a19d",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
-        "skillHistoryRows": 26,
-        "skillHistoryBytes": 21069,
+        "skillHistoryRows": 29,
+        "skillHistoryBytes": 22699,
         "threeReadsStable": true,
         "readMs": [
-          567,
-          210,
-          329
+          135,
+          234,
+          213
         ],
         "ownerStatus": 200
       }
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.58.0",
-      "startedAt": "2026-11-19T16:20:00.000Z",
-      "artifactSha256": "68ec2417ce5cb67c44cc4cb45f2d1b872a3e3de2c37d9754018c3d95e005d166",
-      "inputsSha256": "ab0975ce1b5ac264798c454912203f70cbf859ba1771e754c36dd80239a02b46",
-      "commit": "6d570a2d",
+      "familyVersion": "0.59.0",
+      "startedAt": "2026-11-20T04:08:15.337Z",
+      "artifactSha256": "d5a7ab837cb67ada8927313b53b82bc86a2cf73bb41895400f4bfcd590d9fa0a",
+      "inputsSha256": "9a8a3fbb9db35e373f92e190ac50913f638e370d63ba7bc68023e8123f5266af",
+      "commit": "81ef9ff1d760da8a805b97caf4e864115323a19d",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -39,7 +39,9 @@
         "anonymous": 401,
         "anonymousBody": "unauthorized",
         "diagnosticsReadMs": [
-          82
+          24,
+          3,
+          3
         ],
         "carrier": "connection.fetch"
       }
@@ -47,28 +49,28 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.58.0",
-      "startedAt": "2026-11-19T16:20:00.000Z",
-      "artifactSha256": "68ec2417ce5cb67c44cc4cb45f2d1b872a3e3de2c37d9754018c3d95e005d166",
-      "inputsSha256": "ab0975ce1b5ac264798c454912203f70cbf859ba1771e754c36dd80239a02b46",
-      "commit": "6d570a2d",
+      "familyVersion": "0.59.0",
+      "startedAt": "2026-11-20T04:08:15.337Z",
+      "artifactSha256": "d5a7ab837cb67ada8927313b53b82bc86a2cf73bb41895400f4bfcd590d9fa0a",
+      "inputsSha256": "9a8a3fbb9db35e373f92e190ac50913f638e370d63ba7bc68023e8123f5266af",
+      "commit": "81ef9ff1d760da8a805b97caf4e864115323a19d",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
-        "familyVersion": "0.58.0"
+        "familyVersion": "0.59.0"
       }
     },
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.58.0",
-      "startedAt": "2026-11-19T16:20:00.000Z",
-      "artifactSha256": "68ec2417ce5cb67c44cc4cb45f2d1b872a3e3de2c37d9754018c3d95e005d166",
-      "inputsSha256": "ab0975ce1b5ac264798c454912203f70cbf859ba1771e754c36dd80239a02b46",
-      "commit": "6d570a2d",
+      "familyVersion": "0.59.0",
+      "startedAt": "2026-11-20T04:08:15.337Z",
+      "artifactSha256": "d5a7ab837cb67ada8927313b53b82bc86a2cf73bb41895400f4bfcd590d9fa0a",
+      "inputsSha256": "9a8a3fbb9db35e373f92e190ac50913f638e370d63ba7bc68023e8123f5266af",
+      "commit": "81ef9ff1d760da8a805b97caf4e864115323a19d",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -87,9 +89,9 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on 6d570a2d (pending tag)"
+    "source": "verify-traceability --strict on 81ef9ff1 (pending tag)"
   },
-  "generatedAt": "2026-11-19T16:20:00.000Z",
+  "generatedAt": "2026-11-20T04:08:15.337Z",
   "cohort": {
     "versions": [
       "0.2.2-rc.5"
