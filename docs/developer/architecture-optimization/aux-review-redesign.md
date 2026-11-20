@@ -402,6 +402,64 @@ interface EvolutionReviewActivityRecordV3 {
 - 不改变前台 inject 提示词和投递方式。
 
 
+## 模式能力策略（跨插件，2026-11-20）
+
+这层解决“极简无 skill”与“family 模型面泄漏”的共同根因；它不是 Aux Review 专属逻辑，但 Aux Review 是其中一个消费者。
+
+### 设计原则
+
+1. **preset 是 session 模式**：UI 已经随 session 切换，不需要卸载 UI 面板。
+2. **模型工具、命令、后台自动化是三个独立表面**，不能用同一个“插件是否加载”开关粗暴处理。
+3. **单一策略源**：由 core runtime 根据当前 `agentPreset` 投影计算 `PresetCapabilities`；工具、命令、后台任务只消费结果，不各自复制 preset 判断。
+4. **未知 preset 默认保持 legacy 全量**，只对明确声明的模式收窄；不猜版本、不猜名称。
+
+### 策略表
+
+| preset | 模型工具 | 后台自动任务 | 命令 | UI |
+|---|---|---|---|---|
+| `minimal` | family tools 全部 deny；仅保留平台工具 | AUX review/curator 自动触发关闭 | family 命令应不可见 | 正常渲染 session UI；family 空态/动作由策略隐藏，不卸载面板 |
+| standard / cordis(创造) | native 全量父目录 + 执行 allowlist | 正常 | 正常 | 正常 |
+| ptc | PTC child + `run_code` | 正常 | 正常 | 正常 |
+| 未知/自定义 | legacy 全量，不主动收窄 | 正常 | 正常 | 正常 |
+
+### 已实现（A1）
+
+- core runtime 监听 `agent/created` / `agent-preset/selected`，读取 `agentPreset` 投影；minimal 时 `tools.restrict({deny})` 隐藏 family tools，切出时 dispose。
+- review 在 minimal 直接跳过，且先释放 kind 状态，不产生 activity。
+- 极简真机请求头已从 8 个工具降为 `pwsh/read_image/working_directory`。
+
+### 命令面缺口与正确方案
+
+平台命令注册是 `ScopedLayers`：profile-root 命令对所有 agent 可见；当前 `CommandRuntime.list(agent)` 只有视图，没有类似 `tools.restrict()` 的 allow/deny API。  
+因此 family 命令（`/evolution` 等）在 minimal 目前仍会被列出。正确方案不是每个 handler 里判断 preset（仍可见、仍可执行一半），而是：
+
+1. **平台增加 `commands.restrict({allow?, deny?})`**，作用域与 `tools.restrict` 同构：
+   - 存在 scoped command layer；
+   - `list(agent)` 与 dispatch 用同一个过滤视图；
+   - 返回 exact disposer；
+   - 未知名称 fail-closed。
+2. family runtime 的 minimal policy 调用 `commands.restrict({deny: FAMILY_COMMANDS})`，与 tools 的 guard 共用同一 preset 状态。
+3. 若平台短期不加，退化为“命令 handler 返回 policy 错误”仍不满足“不可见”，只能作为过渡，不应作为最终架构。
+
+### 后台任务面
+
+- AUX review 已消费 policy；curator/其他 turn-end 自动任务也必须走同一 `PresetCapabilities`，不能各自判断。
+- policy 只在 `agentPreset` 投影变化时变更；任务启动时再检查一次，避免 preset 切换后旧任务继续写入。
+- 任务取消/排队中策略变化：新任务拒绝入队；已运行任务按其启动时 policy + abort 处理，不静默继续。
+
+### 生命周期与鲁棒性
+
+- guard 必须覆盖：创建时即 minimal、空白 session 切换、切回 full、agent disposed、插件热载时已有 agent 扫描。
+- `tools.restrict`/`commands.restrict` 失败不得否决 agent 创建；记录 warn 并重试下一次 sync。
+- policy 结果应可观测（doctor/日志），但缓存命中率等成本指标不进用户 UI。
+
+### 验收
+
+- minimal：请求头无 family tools；family 命令不可见/不可调用；无 AUX activity；平台工具保留。
+- standard/创造/PTC：工具、命令、AUX 与当前实现一致；不因 minimal guard 误伤。
+- 切换：minimal↔standard 双向切换后工具/命令恢复正确，无 restriction 泄漏。
+- 未知 preset：legacy 行为不变。
+
 ## 15. 实施状态
 
 ### Round 1（2026-11-20）
@@ -729,3 +787,10 @@ interface EvolutionReviewActivityRecordV3 {
 - `evolution-review` 在最小 preset 下直接跳过 AUX（不产生 review activity）。
 - 真实极简会话验证：request header tools 从 8 个降为 3 个（`pwsh`、`read_image`、`working_directory`），无 family 工具；activity 无 review。
 - 边界：这是 A1，不是 A2；family UI 面板、命令、settings 仍全局存在。真正“全插件不出现”需要组合层 preset-scoped 挂载，当前平台没有公开 extends/追加 row 能力；未做运行时 UI 卸载。
+- 独立复核：P0=0/P1=0；P2 修了 guard 抛错不得否决 agent 创建、review skip 增加 header preset 回退、native instruction 点名允许工具清单。仍存 P2：native runner 的 allowedNames 退化为全目录（执行仍由 channel 单一拦截）、热载不给既有 minimal agent 补装、restrict 与 get 之间失配的理论窗口。
+
+### Round 41（2026-11-20，final static gates after guard）
+
+- gate-07 因新增 `ctx.get('sessionProjections')` 无 platform-declaration anchor 先红；已在 `minimal-preset.ts` 补 anchor，单门复跑通过。
+- guard P2 加固后定向测试 82 passed；构建 0 error。
+- 最终静态门禁待本轮 runner 输出；已知只有 gate-29 的 CI home 占位与 gate-75 CI 路径不可本地判定。
