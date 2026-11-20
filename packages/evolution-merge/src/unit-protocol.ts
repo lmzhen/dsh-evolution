@@ -418,12 +418,7 @@ export class MergeUnitTransactions implements UnitTransaction {
 
   private async withRecoveryFence<T>(task: () => Promise<T>): Promise<T> {
     if (this.options.fence === undefined) return await task()
-    const lease = await this.options.fence.acquire()
-    try {
-      return await task()
-    } finally {
-      await lease.release()
-    }
+    return await this.options.fence.run(async () => await task())
   }
 
   /** Acquire the one tree fence (or a HomeAuthority fallback) and prove it is held. */
@@ -585,66 +580,74 @@ export class MergeUnitTransactions implements UnitTransaction {
     const snapshot = await readUnitSnapshot(this.options.io, this.options.home, ref.unitId);
     if (snapshot === null) return { ok: false as const, code: "unit-rollback-blocked" as const, message: "snapshot missing" };
     const journal = await readUnitJournal(this.options.io, this.options.home, ref.unitId);
-    let fenceLease: HomeFenceLease | undefined
-    let lock: TreeLock | undefined
-    let claim: UnitClaim | undefined;
+    if (this.options.fence !== undefined) {
+      return await this.options.fence.run(async (lock) => await this.rollbackLocked(ref, snapshot, journal, lock))
+    }
+    const acquired = await this.acquireTreeFence()
     try {
-      const acquired = await this.acquireTreeFence();
-      fenceLease = acquired.fenceLease;
-      lock = acquired.lock;
-      this.options.onLock?.("tree");
-      claim = await this.options.claim.acquire(snapshot.target, snapshot.runId);
-      this.options.onLock?.("claim");
-      const currentTarget = await this.options.backend.readSkill(snapshot.target);
-      if (currentTarget !== snapshot.targetBefore && !sameTarget(currentTarget, snapshot.targetAfter))
-        return {
-          ok: false as const,
-          code: "unit-rollback-blocked" as const,
-          message: "target drifted since snapshot; manual recovery required",
-        };
-      for (const source of snapshot.sourceBefore) {
-        const current = await this.options.backend.readSkill(source.name);
-        if (current !== null && current !== source.body)
-          return { ok: false as const, code: "unit-rollback-blocked" as const, message: "source drifted since snapshot: " + source.name };
-      }
-      if (!(await lock.assertHeld()))
-        return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost before target restore" };
-      await this.options.backend.restoreTarget(snapshot.target, snapshot.targetBefore);
-      for (const file of snapshot.supportBefore) {
-        if (!(await lock.assertHeld()))
-          return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost before support restore" };
-        await this.options.backend.restoreSupportFile?.(snapshot.target, file.path, file.content);
-      }
-      for (const source of snapshot.sourceBefore) {
-        if (!(await lock.assertHeld()))
-          return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost before source restore" };
-        await this.options.backend.restoreSource(source.name, source.body);
-      }
-      if (journal !== null)
-        await writeUnitJournal(this.options.io, this.options.home, { ...journal, phase: "rolled-back", updatedAt: this.now() });
-      const evidenceRecord: UnitEvidenceRecord = {
-        schemaVersion: 1,
-        unitId: ref.unitId,
-        runId: snapshot.runId,
-        planDigest: snapshot.planDigest,
-        state: "target-only",
-        target: { before: snapshot.targetBefore, after: snapshot.targetBefore ?? "", supportDigest: "", created: false },
-        sources: snapshot.sourceBefore.map((source) => ({
-          name: source.name,
-          before: source.body,
-          after: null,
-          archived: false,
-          absorbedInto: snapshot.target,
-        })),
-        mutations: 0,
-        at: this.now(),
-      };
-      return { ok: true as const, evidence: evidenceRecord };
+      return await this.rollbackLocked(ref, snapshot, journal, acquired.lock)
     } finally {
-      try { await claim?.release() } finally {
-        if (fenceLease !== undefined) await fenceLease.release();
-        else await lock?.release();
-      }
+      await acquired.fenceLease.release()
+    }
+  }
+
+  private async rollbackLocked(
+    ref: { unitId: string; reason: string },
+    snapshot: NonNullable<Awaited<ReturnType<typeof readUnitSnapshot>>>,
+    journal: Awaited<ReturnType<typeof readUnitJournal>>,
+    lock: TreeLock,
+  ) {
+    let claim: UnitClaim | undefined
+    try {
+    claim = await this.options.claim.acquire(snapshot.target, snapshot.runId);
+    this.options.onLock?.("claim");
+    const currentTarget = await this.options.backend.readSkill(snapshot.target);
+    if (currentTarget !== snapshot.targetBefore && !sameTarget(currentTarget, snapshot.targetAfter))
+      return {
+        ok: false as const,
+        code: "unit-rollback-blocked" as const,
+        message: "target drifted since snapshot; manual recovery required",
+      };
+    for (const source of snapshot.sourceBefore) {
+      const current = await this.options.backend.readSkill(source.name);
+      if (current !== null && current !== source.body)
+        return { ok: false as const, code: "unit-rollback-blocked" as const, message: "source drifted since snapshot: " + source.name };
+    }
+    if (!(await lock.assertHeld()))
+      return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost before target restore" };
+    await this.options.backend.restoreTarget(snapshot.target, snapshot.targetBefore);
+    for (const file of snapshot.supportBefore) {
+      if (!(await lock.assertHeld()))
+        return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost before support restore" };
+      await this.options.backend.restoreSupportFile?.(snapshot.target, file.path, file.content);
+    }
+    for (const source of snapshot.sourceBefore) {
+      if (!(await lock.assertHeld()))
+        return { ok: false as const, code: "unit-fence-failed" as const, message: "tree fence lost before source restore" };
+      await this.options.backend.restoreSource(source.name, source.body);
+    }
+    if (journal !== null)
+      await writeUnitJournal(this.options.io, this.options.home, { ...journal, phase: "rolled-back", updatedAt: this.now() });
+    const evidenceRecord: UnitEvidenceRecord = {
+      schemaVersion: 1,
+      unitId: ref.unitId,
+      runId: snapshot.runId,
+      planDigest: snapshot.planDigest,
+      state: "target-only",
+      target: { before: snapshot.targetBefore, after: snapshot.targetBefore ?? "", supportDigest: "", created: false },
+      sources: snapshot.sourceBefore.map((source) => ({
+        name: source.name,
+        before: source.body,
+        after: null,
+        archived: false,
+        absorbedInto: snapshot.target,
+      })),
+      mutations: 0,
+      at: this.now(),
+    };
+    return { ok: true as const, evidence: evidenceRecord };
+    } finally {
+      await claim?.release()
     }
   }
 

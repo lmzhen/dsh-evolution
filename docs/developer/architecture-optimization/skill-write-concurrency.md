@@ -931,6 +931,28 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P0.6 merge 恢复改用 fence.run
+
+修复独立复核指出的既有 P0：
+
+- `unit-protocol` 的 `withRecoveryFence` 从 `fence.acquire()` lease 改为 `fence.run()` ALS；
+- `rollback` 拆为 `rollbackLocked`：
+  - 有 fence → `fence.run(lock => rollbackLocked)`；
+  - 无 fence → 继续使用 `acquireTreeFence` fallback；
+- 这样 backend 的 update/writeSupport/restore 在 ALS 持树下走 `holdsTree()` no-op，不再二次请求 HomeFence lease。
+
+验证：
+
+```text
+library-adapter + recovery-settle + unit-claim + undo-fence: 14 passed
+overlay build: 0
+```
+
+边界：
+
+- 尚未用真实 `skillLibraryUnitBackend` 构造崩溃快照并跑 rollback/finalize end-to-end；
+- 需独立复核复验 P0=0。
+
 ### 2026-11-20：Phase P1 fail-closed keyed probe
 
 - `keyedTargetLocks()` 不再用 `try/catch` 吞 `lockPort()` 的装配错误：
