@@ -2430,7 +2430,13 @@ export class SkillLibrary {
 
   async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary, rootHeld = false): Promise<SkillActionResult> {
     if (rootHeld) return await this.archiveCore(rawName, options, origin, false, change)
-    return await this.rootGate.write(() => this.archiveCore(rawName, options, origin, false, change))
+    const namespace = skillNamespaceKey(rawName)
+    const lease = await this.lockPort().acquire([namespace])
+    try {
+      return await this.rootGate.write(() => this.archiveCore(rawName, options, origin, false, change))
+    } finally {
+      await lease.release()
+    }
   }
 
   private async archiveCore(rawName: string, options: ArchiveOptions, origin: WriteOrigin, fenceHeld: boolean, change?: ChangeSummary): Promise<SkillActionResult> {
@@ -3584,7 +3590,13 @@ export class SkillLibrary {
    */
   async restoreFromArchive(rawName: string, origin: WriteOrigin = this.authority.origin, rootHeld = false): Promise<SkillActionResult> {
     if (rootHeld) return await this.restoreFromArchiveCore(rawName, origin, false)
-    return await this.rootGate.write(() => this.restoreFromArchiveCore(rawName, origin, false))
+    const namespace = skillNamespaceKey(rawName)
+    const lease = await this.lockPort().acquire([namespace])
+    try {
+      return await this.rootGate.write(() => this.restoreFromArchiveCore(rawName, origin, false))
+    } finally {
+      await lease.release()
+    }
   }
 
   private async restoreFromArchiveCore(rawName: string, origin: WriteOrigin, fenceHeld: boolean): Promise<SkillActionResult> {

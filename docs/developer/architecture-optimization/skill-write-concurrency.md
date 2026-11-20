@@ -905,6 +905,31 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.9b archive/restore 持 namespace key
+
+已完成：
+
+- `archive` / `restoreFromArchive` 在外层通过 `lockPort().acquire([skillNamespaceKey(name)])` 持 keyed namespace 锁；
+- rootHeld 内部路径不重复取锁；
+- keyed 装配测试：
+  - 手动持有 skill namespace lease；
+  - 同 skill update 被阻塞；
+  - release 后 update 成功。
+
+验证：
+
+```text
+skill-keyed-concurrency: 3 passed
+overlay build:           0
+```
+
+边界：
+
+- consolidate/commitMerge/restructure/extract 的 UnitTransaction 还没有 namespace keys；
+- 这些结构操作内部 archive 走 rootHeld，不重新取 namespace；需要外层结构操作补 keys；
+- 生产仍 fallback root lock；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.9a namespace key 进入 simple 写
 
 已完成：

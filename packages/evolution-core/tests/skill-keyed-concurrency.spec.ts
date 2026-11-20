@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TargetLockSet, TargetMutationLock } from '@deepseek-ai/dsh-evolution-core'
 import { authorityFrom, nodeEvolutionIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillLibrary, skillNamespaceKey } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 const skill = (name: string, body: string) => `---\nname: ${name}\ndescription: A sufficiently long description for the keyed concurrency test.\n---\n\n${body}\n`
@@ -32,17 +32,18 @@ class SlowIo implements EvolutionIoLike {
   }
 }
 
-async function setup(): Promise<{ lib: SkillLibrary; io: SlowIo; root: string }> {
+async function setup(): Promise<{ lib: SkillLibrary; io: SlowIo; root: string; locks: TargetLockSet }> {
   const home = await tempRoot('dsh-keyed-locks-')
   const root = `${home}/skills`
   const io = new SlowIo()
-  const keyed = new TargetMutationLock(new TargetLockSet(home))
+  const locks = new TargetLockSet(home)
+  const keyed = new TargetMutationLock(locks)
   const lib = new SkillLibrary(root, io, undefined, undefined, undefined, undefined, authorityFrom({ origin: 'foreground' }), keyed)
   await lib.create('a', skill('a', 'a body'), 'foreground')
   await lib.create('b', skill('b', 'b body'), 'foreground')
   io.active = 0
   io.max = 0
-  return { lib, io, root }
+  return { lib, io, root, locks }
 }
 
 describe('keyed SkillLibrary concurrency', () => {
@@ -67,4 +68,19 @@ describe('keyed SkillLibrary concurrency', () => {
     expect(b.ok).toBe(true)
     expect(io.max).toBe(1)
   }, 30_000)
+  it('blocks a keyed simple write while the skill namespace is held', async () => {
+    const { lib, locks } = await setup()
+    const lease = await locks.acquireLease([skillNamespaceKey('a')])
+    let finished = false
+    const pending = lib.update('a', skill('a', 'blocked'), 'foreground').then((result) => {
+      finished = true
+      return result
+    })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(finished).toBe(false)
+    await lease.release()
+    const result = await pending
+    expect(result.ok).toBe(true)
+  }, 30_000)
+
 })
