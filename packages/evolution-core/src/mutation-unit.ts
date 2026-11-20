@@ -166,6 +166,8 @@ export interface MutationLockPort {
    * implements the root lock may ignore them.
    */
   acquire(targetKeys?: readonly string[]): Promise<MutationLockLease>
+  /** True when this port locks per target key rather than the whole home. */
+  readonly keyed?: boolean
 }
 
 export interface MutationSnapshotOp {

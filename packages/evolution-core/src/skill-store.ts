@@ -958,6 +958,11 @@ export class SkillLibrary {
     return { ok: true, body, onDisk: body.trimEnd() + '\n', norm }
   }
 
+  /** True when the injected lock port is per-target rather than the home fence. */
+  private keyedTargetLocks(): boolean {
+    try { return (this.lockPort() as { keyed?: boolean }).keyed === true } catch { return false }
+  }
+
   private lockPort(): MutationLockPort {
     if (this.mutationLock !== undefined) return this.mutationLock
     // Fail loud outside tests: production skill writes must use the family authority fence.
@@ -2437,6 +2442,7 @@ export class SkillLibrary {
 
   async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary, rootHeld = false): Promise<SkillActionResult> {
     if (rootHeld) {
+      if (!this.keyedTargetLocks()) return await this.archiveCore(rawName, options, origin, true, change)
       const lease = await this.lockPort().acquire([skillNamespaceKey(rawName)])
       try {
         return await this.archiveCore(rawName, options, origin, true, change)
@@ -2446,6 +2452,7 @@ export class SkillLibrary {
     }
     const namespace = skillNamespaceKey(rawName)
     return await this.rootGate.write(async () => {
+      if (!this.keyedTargetLocks()) return await this.archiveCore(rawName, options, origin, true, change)
       const lease = await this.lockPort().acquire([namespace])
       try {
         return await this.archiveCore(rawName, options, origin, true, change)
@@ -2596,8 +2603,10 @@ export class SkillLibrary {
       // A nested merge already holds the home fence; its archive/restore bookkeeping
       // must run inline instead of queueing behind that same lease.
       const fenceHeld = plan.nested === true
+      const keyed = this.keyedTargetLocks()
       const archive = async (name: string, archiveOptions: ArchiveOptions): Promise<SkillActionResult> => {
         if (!fenceHeld) return await this.archive(name, archiveOptions, plan.origin, undefined, true)
+        if (!keyed) return await this.archiveCore(name, archiveOptions, plan.origin, true)
         const lease = await this.lockPort().acquire([skillNamespaceKey(name)])
         try {
           return await this.archiveCore(name, archiveOptions, plan.origin, true)
@@ -2607,6 +2616,7 @@ export class SkillLibrary {
       }
       const restore = async (source: string): Promise<SkillActionResult> => {
         if (!fenceHeld) return await this.restoreFromArchive(source, plan.origin, true)
+        if (!keyed) return await this.restoreFromArchiveCore(source, plan.origin, true)
         const lease = await this.lockPort().acquire([skillNamespaceKey(source)])
         try {
           return await this.restoreFromArchiveCore(source, plan.origin, true)
@@ -3623,6 +3633,7 @@ export class SkillLibrary {
    */
   async restoreFromArchive(rawName: string, origin: WriteOrigin = this.authority.origin, rootHeld = false): Promise<SkillActionResult> {
     if (rootHeld) {
+      if (!this.keyedTargetLocks()) return await this.restoreFromArchiveCore(rawName, origin, true)
       const lease = await this.lockPort().acquire([skillNamespaceKey(rawName)])
       try {
         return await this.restoreFromArchiveCore(rawName, origin, true)
@@ -3632,6 +3643,7 @@ export class SkillLibrary {
     }
     const namespace = skillNamespaceKey(rawName)
     return await this.rootGate.write(async () => {
+      if (!this.keyedTargetLocks()) return await this.restoreFromArchiveCore(rawName, origin, true)
       const lease = await this.lockPort().acquire([namespace])
       try {
         return await this.restoreFromArchiveCore(rawName, origin, true)

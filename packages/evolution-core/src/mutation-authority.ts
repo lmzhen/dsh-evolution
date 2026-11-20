@@ -65,6 +65,8 @@ export class MutationAuthority {
 /** Read the authority's fence adapter from a context; undefined means no authority is mounted. */
 /** A keyed MutationLockPort over TargetLockSet; empty key sets are refused, not silently unlocked. */
 export class TargetMutationLock implements MutationLockPort {
+  readonly keyed = true
+
   constructor(private readonly locks: TargetLockSet) {}
 
   async acquire(targetKeys: readonly string[] = []): Promise<MutationLockLease> {
@@ -75,15 +77,17 @@ export class TargetMutationLock implements MutationLockPort {
 
 /** Routes keyed writes to the target lock set and keyless writes to the root fence. */
 export class HybridMutationLock implements MutationLockPort {
+  readonly keyed = true
+
   constructor(
-    private readonly keyed: TargetMutationLock,
+    private readonly keyedLock: TargetMutationLock,
     private readonly fallback: MutationLockPort,
   ) {}
 
   async acquire(targetKeys: readonly string[] = []): Promise<MutationLockLease> {
     return targetKeys.length === 0
       ? await this.fallback.acquire()
-      : await this.keyed.acquire(targetKeys)
+      : await this.keyedLock.acquire(targetKeys)
   }
 }
 

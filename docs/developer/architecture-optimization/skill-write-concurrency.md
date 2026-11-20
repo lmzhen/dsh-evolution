@@ -931,6 +931,26 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P0.4 nested merge 不再重取 fence
+
+复验发现：nested merge 的 namespace lease 在默认 fence 装配下会再次请求同一 HomeFence（merge 单外层用 fence lease，lease 不建 ALS，holdsTree 判不到），生产 merge 必挂。
+
+修复：
+
+- `MutationLockPort` 增加 `keyed?: boolean`；
+- `TargetMutationLock` / `HybridMutationLock` 标记 `keyed=true`；
+- `SkillLibrary.keyedTargetLocks()` 判断注入端口；
+- archive/restore 只在 keyed 端口下取 namespace lease，fence 端口直接走 root gate/core；
+- nested commitMerge 同样只在 keyed 下取 namespace lease；
+- 新增回归：外层持 HomeFence lease 时 nested commitMerge 20s 内成功。
+
+验证：
+
+```text
+commit-merge-fence-lease + commit-merge: 9 passed
+overlay build: 0
+```
+
 ### 2026-11-20：Phase P0.3 lease 内 audit 自死锁修复
 
 独立复核复验 P0 后，又发现并修复一个 P0：
