@@ -905,6 +905,44 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.10 hybrid keyed 装配验收
+
+已完成：
+
+- SkillLibrary 测试装配：
+  ```ts
+  new HybridMutationLock(
+    new TargetMutationLock(new TargetLockSet(home)),
+    { acquire() { throw new Error('unexpected keyless mutation lock') } },
+  )
+  ```
+  fallback 故意抛错，确保没有遗漏 targetKeys。
+- 4 个测试全部通过：
+  - 不同 skill update 真实并行；
+  - 同 skill update 串行；
+  - 手动持有 namespace lease 时同 skill update 等待；
+  - consolidate 在 keyed hybrid 下不自死锁。
+
+验证：
+
+```text
+skill-keyed-concurrency: 4 passed
+overlay build:           0
+```
+
+关键结论：
+
+- simple/结构操作都填了可用的 target keys；
+- 没有触发 keyless fallback；
+- consolidate 内部 archive/restore 走 rootHeld，未重复取 namespace；
+- keyed 模式已经具备生产候选条件。
+
+生产切换仍暂缓：
+
+- 需要把 Hybrid lock 装配到 MutationAuthority；
+- 需要全量 tool/structural 回归；
+- 需要真实 npm web 并发验收。
+
 ### 2026-11-20：Phase E.9c 剩余结构操作填 namespace keys
 
 已完成：

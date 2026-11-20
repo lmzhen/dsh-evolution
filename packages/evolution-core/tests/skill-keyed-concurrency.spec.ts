@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TargetLockSet, TargetMutationLock } from '@deepseek-ai/dsh-evolution-core'
+import { HybridMutationLock, TargetLockSet, TargetMutationLock } from '@deepseek-ai/dsh-evolution-core'
 import { authorityFrom, nodeEvolutionIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { SkillLibrary, skillNamespaceKey } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
@@ -38,7 +38,8 @@ async function setup(): Promise<{ lib: SkillLibrary; io: SlowIo; root: string; l
   const io = new SlowIo()
   const locks = new TargetLockSet(home)
   const keyed = new TargetMutationLock(locks)
-  const lib = new SkillLibrary(root, io, undefined, undefined, undefined, undefined, authorityFrom({ origin: 'foreground' }), keyed)
+  const hybrid = new HybridMutationLock(keyed, { async acquire() { throw new Error('unexpected keyless mutation lock') } })
+  const lib = new SkillLibrary(root, io, undefined, undefined, undefined, undefined, authorityFrom({ origin: 'foreground' }), hybrid)
   await lib.create('a', skill('a', 'a body'), 'foreground')
   await lib.create('b', skill('b', 'b body'), 'foreground')
   io.active = 0
@@ -81,6 +82,15 @@ describe('keyed SkillLibrary concurrency', () => {
     await lease.release()
     const result = await pending
     expect(result.ok).toBe(true)
+  }, 30_000)
+
+  it('does not deadlock consolidate under the keyed hybrid lock', async () => {
+    const { lib } = await setup()
+    const outcome = await Promise.race([
+      lib.consolidate('a', ['b'], 'foreground'),
+      new Promise<{ ok: false; message: string }>(resolve => setTimeout(() => resolve({ ok: false, message: 'timeout' }), 15_000)),
+    ])
+    expect(outcome.ok).toBe(true)
   }, 30_000)
 
 })
