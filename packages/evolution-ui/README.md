@@ -9,4 +9,4 @@ Pending decisions, merge commands, and health findings are read-only in the brow
 
 ### Recent automatic reviews
 
-The skill library overview reads the activity sidecar through the stats route and renders the latest eight reviews separately from the skill table. Each row shows kind (memory/skill), status (completed/partial/failed/timeout/aborted), finish time, and the partial reason when present. Reviews are read-only facts; the panel never edits them.
+The skill library overview reads the activity sidecar through the stats route and renders the latest eight reviews separately from the skill table. A compact summary covers all retained reviews (completed/partial/timeout/failed counts, average rounds and tool calls, round-limit count). Each row shows kind (memory/skill), status (completed/partial/failed/timeout/aborted), finish time, rounds, tool calls, waits, the round-limit marker when present, and the partial reason. Reviews are read-only facts; the panel never edits them.

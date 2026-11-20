@@ -331,6 +331,8 @@ interface EvolutionReviewActivityRecordV3 {
 - 写入继续走 `evolution-activity` 的 HomeFence/transact；旧记录只读兼容。
 - UI 的“技能自动进化”页按 kind 分开展示 memory/skill；`partial` 显示原因和未解决项。
 - 不把 `review_done` 的摘要当成功证据；`status` 与 `report` 分列。
+- 自动复查区块增加轻量汇总：完成/部分/超时/失败计数、平均轮数、平均工具调用、轮数截断数；最近 8 条每行补 `requests/toolCalls/waitCount/hitRoundLimit`。汇总覆盖 activity 保留的全部 review，不只看最近 8 条。
+- 轮数/时间/工具调用上限：`reviewMaxRounds`、`reviewTimeoutMs`、`reviewMaxToolCalls`（默认 12 / 120000 / 50）是部署配置；不新增独立 `truncated` 状态，UI 用 `partial + hitRoundLimit` 标示轮数截断。
 
 ## 10. 平台侧改动清单
 
@@ -701,3 +703,13 @@ interface EvolutionReviewActivityRecordV3 {
 
 - 结论修正：PTC 首条即高命中，符合“父前缀复用”；native 并不必然首条全 miss——标准首条 0.98，创造/极简首条冷、第二条高。样本仅每模式 2 条，不能据此断言稳定命中率；需要更多轮/更长会话才能定论。
 - 修正 `preset` 采集：`session.header.agentPreset` 只是创建值，UI 切换模式写 `agent-preset/selected` 投影；review 现在读 `sessionProjections` 的 `agentPreset`，避免把 PTC/创造/极简都记成 standard。
+
+### Round 38（2026-11-20，统一统计与可配置上限）
+
+- `reviewMaxToolCalls` 加入 review config（默认 50、上限 500），与既有 `reviewMaxRounds`/`reviewTimeoutMs` 一起作为部署配置；runner 达到工具调用上限仍记录 partial + reason。
+- `SkillStatsSnapshot.global.reviewSummary` 汇总 activity 保留的全部 review：total/completed/partial/timeout/failed/aborted/hitRoundLimit、平均 requests/toolCalls。
+- 自动复查 UI：
+  - 顶部一行汇总：完成/部分/超时/失败、平均轮数、平均工具调用、轮数截断；
+  - 最近 8 条每行补轮数、工具调用、等待次数、轮数截断标记；
+  - 新增 8 语言 key，生成物同步。
+- 当前统计仍是开发者可见的轻量摘要，不做独立图表/大屏；缓存命中率仍不进主 UI。

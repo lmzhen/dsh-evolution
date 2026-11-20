@@ -194,6 +194,7 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
     : null
 
   const reviews = snapshot?.global.reviews ?? []
+  const reviewSummary = snapshot?.global.reviewSummary
   const reviewStatusKey = (status: string): string => status === 'completed'
     ? 'stats.review.status.completed'
     : status === 'partial'
@@ -203,12 +204,32 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
         : status === 'aborted'
           ? 'stats.review.status.aborted'
           : 'stats.review.status.failed'
+  const summaryItem = (label: string, value: string): ReturnType<typeof createElement> =>
+    createElement('span', { className: 'evo-stats-review-metric' },
+      createElement('b', null, value),
+      createElement('span', null, face.t(label)))
+  const reviewSummaryLine = reviewSummary === undefined
+    ? null
+    : createElement('div', { className: 'evo-stats-reviews-summary' },
+      summaryItem('stats.reviews.summary.completed', numberText(reviewSummary.completed)),
+      summaryItem('stats.reviews.summary.partial', numberText(reviewSummary.partial)),
+      summaryItem('stats.reviews.summary.timeout', numberText(reviewSummary.timeout)),
+      summaryItem('stats.reviews.summary.failed', numberText(reviewSummary.failed)),
+      reviewSummary.avgRequests === null ? null : summaryItem('stats.reviews.summary.rounds', reviewSummary.avgRequests.toFixed(1)),
+      reviewSummary.avgToolCalls === null ? null : summaryItem('stats.reviews.summary.toolCalls', reviewSummary.avgToolCalls.toFixed(1)),
+      reviewSummary.hitRoundLimit > 0 ? summaryItem('stats.reviews.summary.truncated', numberText(reviewSummary.hitRoundLimit)) : null)
+  const reviewMetric = (label: string, value: number | undefined): ReturnType<typeof createElement> | null => value === undefined
+    ? null
+    : createElement('span', { className: 'evo-stats-review-metric' },
+      createElement('b', null, numberText(value)),
+      createElement('span', null, face.t(label)))
   const reviewSection = snapshot === null
     ? null
     : createElement('section', { className: 'evo-stats-reviews', 'aria-label': face.t('stats.reviews.title') },
       createElement('div', { className: 'evo-stats-reviews-head' },
         createElement('h3', null, face.t('stats.reviews.title')),
         createElement('span', null, face.t('stats.reviews.hint'))),
+      reviewSummaryLine,
       reviews.length === 0
         ? createElement('p', { className: 'evo-stats-reviews-empty' }, face.t('stats.reviews.empty'))
         : createElement('ul', { className: 'evo-stats-review-list' },
@@ -216,6 +237,10 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
             createElement('span', { className: 'evo-stats-pill ' + (review.status === 'completed' ? 'is-ok' : review.status === 'partial' ? 'is-warn' : 'is-muted') }, face.t(reviewStatusKey(review.status))),
             createElement('span', { className: 'evo-stats-review-kind' }, face.t(review.kind === 'memory' ? 'stats.review.kind.memory' : 'stats.review.kind.skill')),
             createElement('span', { className: 'evo-stats-review-time' }, lastAtText(new Date(review.finishedAt).toISOString())),
+            reviewMetric('stats.review.requests', review.requests),
+            reviewMetric('stats.review.toolCalls', review.toolCalls),
+            reviewMetric('stats.review.wait', review.waitCount),
+            review.hitRoundLimit === true ? createElement('span', { className: 'evo-stats-review-reason' }, face.t('stats.review.truncated')) : null,
             review.partialReason === undefined ? null : createElement('span', { className: 'evo-stats-review-reason' }, review.partialReason),
             review.report !== undefined && review.report.unresolved.length > 0 ? createElement('span', { className: 'evo-stats-review-reason' }, review.report.unresolved.join(' · ')) : null))))
 
@@ -302,6 +327,9 @@ export const STATS_CSS = [
   '.evo-stats-review-kind{font-weight:600;color:var(--dsw-alias-label-primary,#20261f)}',
   '.evo-stats-review-time{color:var(--dsw-alias-label-tertiary,#9aa096);font-variant-numeric:tabular-nums}',
   '.evo-stats-review-reason{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--evo-warn,#b26a3c)}',
+  '.evo-stats-reviews-summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;font-variant-numeric:tabular-nums}',
+  '.evo-stats-review-metric{display:inline-flex;align-items:baseline;gap:3px;color:var(--dsw-alias-label-tertiary,#9aa096);font-variant-numeric:tabular-nums}',
+  '.evo-stats-review-metric b{font-weight:600;color:var(--dsw-alias-label-secondary,#6f766d)}',
   '.evo-stats-activity{margin:-6px 0 0;color:var(--dsw-alias-label-tertiary,#9aa096);font-size:10.5px;line-height:1.5}',
   '.evo-stats-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
   '.evo-stats-search{display:flex;align-items:center;gap:7px;flex:1 1 240px;height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:9px;background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-tertiary,#9aa096)}',

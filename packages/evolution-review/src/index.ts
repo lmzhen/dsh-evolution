@@ -40,6 +40,9 @@ import { isReviewNotice, noticeAfter, type NoticeEventKind, type NoticeMessage, 
 
 /** Model requests per auxiliary review run. One skill of incremental edits may need many rounds. */
 const DEFAULT_REVIEW_MAX_ROUNDS = 12
+/** Tool calls per auxiliary review run; completion is still required before this bound. */
+const DEFAULT_REVIEW_MAX_TOOL_CALLS = 50
+const MAX_REVIEW_MAX_TOOL_CALLS = 500
 /** Keep a mistyped deployment value from turning one review into an unbounded loop. */
 const MAX_REVIEW_MAX_ROUNDS = 200
 
@@ -117,6 +120,8 @@ export interface Config {
   reviewTimeoutMs?: number
   /** Model requests per aux review run (E2 internal). Default 12; set dozens for incremental condense. */
   reviewMaxRounds?: number
+  /** Tool calls per aux review run. Default 50; a smaller budget fails to partial, never completed. */
+  reviewMaxToolCalls?: number
   /** E3/P1-8 (v11) — TRUE semantics: this flag gates ONLY the completion
    * channel. The cadence latch stays active regardless of the value (a
    * completion-gated deployment still fires at the policy cadence), so
@@ -171,6 +176,7 @@ export const Config = z.object({
   reviewSkillInterval: z.number().min(1).volatile(),
   reviewTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_REVIEW_TIMEOUT_MS),
   reviewMaxRounds: z.number().min(1).max(MAX_REVIEW_MAX_ROUNDS).default(DEFAULT_REVIEW_MAX_ROUNDS),
+  reviewMaxToolCalls: z.number().min(1).max(MAX_REVIEW_MAX_TOOL_CALLS).default(DEFAULT_REVIEW_MAX_TOOL_CALLS),
   // V7-15 (0.3.44): the trigger is closed to the three known values — a typo
   // cannot silently select a fourth behavior. Note: schemastery is tolerant
   // (it STRIPS an unmatching value and keeps the default), so the runtime
@@ -264,6 +270,7 @@ function mergeDebt(a: ReviewDebt | null | undefined, b: ReviewDebt | null | unde
 type ClampedReviewConfig = Config & {
   reviewTimeoutMs: number
   reviewMaxRounds: number
+  reviewMaxToolCalls: number
 }
 
 /**
@@ -286,6 +293,7 @@ export function clampReviewConfig(rawConfig: Config, ctx: Context): ClampedRevie
     // also catches NaN/±Infinity, which z.number() lets through).
     reviewTimeoutMs: field('reviewTimeoutMs', rawConfig.reviewTimeoutMs, DEFAULT_REVIEW_TIMEOUT_MS, 1, MAX_TIMER_DELAY_MS),
     reviewMaxRounds: field('reviewMaxRounds', rawConfig.reviewMaxRounds, DEFAULT_REVIEW_MAX_ROUNDS, 1, MAX_REVIEW_MAX_ROUNDS),
+    reviewMaxToolCalls: field('reviewMaxToolCalls', rawConfig.reviewMaxToolCalls, DEFAULT_REVIEW_MAX_TOOL_CALLS, 1, MAX_REVIEW_MAX_TOOL_CALLS),
   })
 }
 
@@ -1160,6 +1168,7 @@ function snapshotReviewParent(agent: Agent): Agent {
           instruction: prompt,
           toolAllow,
           maxRounds: config.reviewMaxRounds,
+          maxToolCalls: config.reviewMaxToolCalls,
           signal: controller.signal,
           markReview: () => {},
           clearReview: () => {},

@@ -136,7 +136,25 @@ export interface SkillStatsReview {
   readonly finishedAt: number
   readonly partialReason?: string
   readonly hitRoundLimit?: boolean
+  readonly requests?: number
+  readonly toolCalls?: number
+  readonly waitCount?: number
+  readonly toolMode?: 'native' | 'ptc'
+  readonly preset?: string
   readonly report?: { readonly summary: string; readonly memoryChanged: boolean; readonly skillsChanged: readonly string[]; readonly unresolved: readonly string[] }
+}
+
+/** Library-wide automatic-review health summary; absent when no reviews are retained. */
+export interface SkillStatsReviewSummary {
+  readonly total: number
+  readonly completed: number
+  readonly partial: number
+  readonly timeout: number
+  readonly failed: number
+  readonly aborted: number
+  readonly hitRoundLimit: number
+  readonly avgRequests: number | null
+  readonly avgToolCalls: number | null
 }
 
 /** Library-wide facts. These never belong in a single-skill detail view. */
@@ -146,6 +164,8 @@ export interface SkillStatsGlobal {
   readonly governance: readonly SkillStatsGovernance[]
   /** Recent automatic reviews; absent means this deployment did not report them. */
   readonly reviews?: readonly SkillStatsReview[]
+  /** Health summary over all retained reviews; absent when none are retained. */
+  readonly reviewSummary?: SkillStatsReviewSummary
   /** Label keys for the three success counters; the browser never imports core runtime. */
   readonly operations?: readonly { readonly id: SkillOperationId; readonly labelKey: string }[]
 }

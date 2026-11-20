@@ -16,6 +16,7 @@ import type {
   SkillStatsGovernance,
   SkillStatsRow,
   SkillStatsReview,
+  SkillStatsReviewSummary,
   SkillStatsSnapshot,
   SkillStatsTotals,
   SkillUsageFacts,
@@ -163,10 +164,38 @@ function reviewsOf(value: unknown): SkillStatsReview[] | undefined {
       reviewId, kind, status, startedAt, finishedAt,
       ...(typeof source.partialReason === 'string' && source.partialReason !== '' ? { partialReason: source.partialReason } : {}),
       ...(source.hitRoundLimit === true ? { hitRoundLimit: true } : {}),
+      ...(numberOrNull(source.requests) === null ? {} : { requests: numberOrNull(source.requests)! }),
+      ...(numberOrNull(source.toolCalls) === null ? {} : { toolCalls: numberOrNull(source.toolCalls)! }),
+      ...(numberOrNull(source.waitCount) === null ? {} : { waitCount: numberOrNull(source.waitCount)! }),
+      ...(source.toolMode === 'native' || source.toolMode === 'ptc' ? { toolMode: source.toolMode } : {}),
+      ...(typeof source.preset === 'string' && source.preset !== '' ? { preset: source.preset } : {}),
       ...(report !== null && typeof report.summary === 'string' ? { report: { summary: report.summary, memoryChanged: report.memoryChanged === true, skillsChanged: strings(report.skillsChanged), unresolved: strings(report.unresolved) } } : {}),
     })
   }
   return rows
+}
+
+function reviewSummaryOf(value: unknown): SkillStatsReviewSummary | undefined {
+  const source = recordOf(value)
+  if (source === null) return undefined
+  const count = (key: string): number | null => numberOrNull(source[key])
+  const total = count('total')
+  const completed = count('completed')
+  const partial = count('partial')
+  const timeout = count('timeout')
+  const failed = count('failed')
+  if (total === null || completed === null || partial === null || timeout === null || failed === null) return undefined
+  return {
+    total,
+    completed,
+    partial,
+    timeout,
+    failed,
+    aborted: count('aborted') ?? 0,
+    hitRoundLimit: count('hitRoundLimit') ?? 0,
+    avgRequests: count('avgRequests'),
+    avgToolCalls: count('avgToolCalls'),
+  }
 }
 
 function governanceOf(value: unknown): SkillStatsGovernance[] {
@@ -207,12 +236,14 @@ export function parseSkillStats(value: unknown): SkillStatsSnapshot {
   const globalGovernance = governanceOf(globalSource?.governance)
   const operations = operationsOf(globalSource?.operations)
   const reviews = reviewsOf(globalSource?.reviews)
+  const reviewSummary = reviewSummaryOf(globalSource?.reviewSummary)
   const global = {
     totals: globalSource?.totals === undefined ? totals : totalsOf(globalSource.totals, rows),
     counts: countsOf(globalSource?.counts) ?? counts,
     governance: globalGovernance.length > 0 ? globalGovernance : governance,
     ...(operations === undefined ? {} : { operations }),
     ...(reviews === undefined ? {} : { reviews }),
+    ...(reviewSummary === undefined ? {} : { reviewSummary }),
   }
   return {
     rows,

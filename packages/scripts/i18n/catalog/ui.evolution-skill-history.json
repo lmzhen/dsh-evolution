@@ -1711,6 +1711,116 @@
       "de": "Abgebrochen",
       "pt": "Cancelada",
       "ru": "Прервано"
+    },
+    "stats.reviews.summary.completed": {
+      "zh": "已完成",
+      "en": "Completed",
+      "ja": "完了",
+      "es": "Completadas",
+      "fr": "Terminées",
+      "de": "Abgeschlossen",
+      "pt": "Concluídas",
+      "ru": "Завершено"
+    },
+    "stats.reviews.summary.partial": {
+      "zh": "部分",
+      "en": "Partial",
+      "ja": "一部",
+      "es": "Parciales",
+      "fr": "Partielles",
+      "de": "Teilweise",
+      "pt": "Parciais",
+      "ru": "Частично"
+    },
+    "stats.reviews.summary.timeout": {
+      "zh": "超时",
+      "en": "Timed out",
+      "ja": "タイムアウト",
+      "es": "Agotadas",
+      "fr": "Expirées",
+      "de": "Zeitüberschreitung",
+      "pt": "Expiradas",
+      "ru": "Таймаут"
+    },
+    "stats.reviews.summary.failed": {
+      "zh": "失败",
+      "en": "Failed",
+      "ja": "失敗",
+      "es": "Fallidas",
+      "fr": "Échouées",
+      "de": "Fehlgeschlagen",
+      "pt": "Falhas",
+      "ru": "Ошибки"
+    },
+    "stats.reviews.summary.rounds": {
+      "zh": "平均轮数",
+      "en": "Avg rounds",
+      "ja": "平均ラウンド",
+      "es": "Rondas medias",
+      "fr": "Tours moyens",
+      "de": "Ø Runden",
+      "pt": "Rodadas médias",
+      "ru": "Средние раунды"
+    },
+    "stats.reviews.summary.toolCalls": {
+      "zh": "平均工具调用",
+      "en": "Avg tool calls",
+      "ja": "平均ツール呼び出し",
+      "es": "Llamadas medias",
+      "fr": "Appels moyens",
+      "de": "Ø Tool-Aufrufe",
+      "pt": "Chamadas médias",
+      "ru": "Средние вызовы"
+    },
+    "stats.reviews.summary.truncated": {
+      "zh": "轮数截断",
+      "en": "Round limit",
+      "ja": "ラウンド上限",
+      "es": "Límite de rondas",
+      "fr": "Limite de tours",
+      "de": "Rundenlimit",
+      "pt": "Limite de rodadas",
+      "ru": "Лимит раундов"
+    },
+    "stats.review.requests": {
+      "zh": "轮",
+      "en": "rounds",
+      "ja": "ラウンド",
+      "es": "rondas",
+      "fr": "tours",
+      "de": "Runden",
+      "pt": "rodadas",
+      "ru": "раундов"
+    },
+    "stats.review.toolCalls": {
+      "zh": "工具调用",
+      "en": "tool calls",
+      "ja": "ツール呼び出し",
+      "es": "llamadas",
+      "fr": "appels",
+      "de": "Tool-Aufrufe",
+      "pt": "chamadas",
+      "ru": "вызовов"
+    },
+    "stats.review.wait": {
+      "zh": "等待",
+      "en": "waits",
+      "ja": "待機",
+      "es": "esperas",
+      "fr": "attentes",
+      "de": "Wartezeiten",
+      "pt": "esperas",
+      "ru": "ожиданий"
+    },
+    "stats.review.truncated": {
+      "zh": "轮数截断",
+      "en": "round limit",
+      "ja": "ラウンド上限",
+      "es": "límite de rondas",
+      "fr": "limite de tours",
+      "de": "Rundenlimit",
+      "pt": "limite de rodadas",
+      "ru": "лимит раундов"
     }
   }
 }

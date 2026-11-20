@@ -13,6 +13,7 @@ import { latestVersionAt } from '@deepseek-ai/dsh-evolution-core/skills'
 import type {
   SkillErrorNote,
   SkillStatsReview,
+  SkillStatsReviewSummary,
   SkillHealthFacts,
   SkillStatsCounts,
   SkillStatsGovernance,
@@ -167,6 +168,12 @@ function reviewsOf(value: unknown): SkillStatsReview[] {
     const startedAt = numberOrNull(source.startedAt)
     const finishedAt = numberOrNull(source.finishedAt)
     if (reviewId === '' || kind === undefined || status === undefined || startedAt === null || finishedAt === null) continue
+    const finiteCount = (input: unknown): number | undefined => typeof input === 'number' && Number.isFinite(input) && input >= 0 ? input : undefined
+    const requests = finiteCount(source.requests)
+    const toolCalls = finiteCount(source.toolCalls)
+    const waitCount = finiteCount(source.waitCount)
+    const toolMode = source.toolMode === 'native' || source.toolMode === 'ptc' ? source.toolMode : undefined
+    const preset = typeof source.preset === 'string' && source.preset !== '' ? source.preset : undefined
     rows.push({
       reviewId,
       kind,
@@ -175,10 +182,36 @@ function reviewsOf(value: unknown): SkillStatsReview[] {
       finishedAt,
       ...(typeof source.partialReason === 'string' && source.partialReason !== '' ? { partialReason: source.partialReason } : {}),
       ...(source.hitRoundLimit === true ? { hitRoundLimit: true } : {}),
+      ...(requests === undefined ? {} : { requests }),
+      ...(toolCalls === undefined ? {} : { toolCalls }),
+      ...(waitCount === undefined ? {} : { waitCount }),
+      ...(toolMode === undefined ? {} : { toolMode }),
+      ...(preset === undefined ? {} : { preset }),
       ...(report === undefined ? {} : { report }),
     })
   }
-  return rows.slice(-8).reverse()
+  return rows
+}
+
+/** Aggregate all retained reviews; the snapshot still carries only the newest preview rows. */
+function reviewSummaryOf(rows: readonly SkillStatsReview[]): SkillStatsReviewSummary | undefined {
+  if (rows.length === 0) return undefined
+  const count = (status: SkillStatsReview['status']): number => rows.filter(row => row.status === status).length
+  const averages = (pick: (row: SkillStatsReview) => number | undefined): number | null => {
+    const values = rows.flatMap(row => { const value = pick(row); return value === undefined ? [] : [value] })
+    return values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length
+  }
+  return {
+    total: rows.length,
+    completed: count('completed'),
+    partial: count('partial'),
+    timeout: count('timeout'),
+    failed: count('failed'),
+    aborted: count('aborted'),
+    hitRoundLimit: rows.filter(row => row.hitRoundLimit === true).length,
+    avgRequests: averages(row => row.requests),
+    avgToolCalls: averages(row => row.toolCalls),
+  }
 }
 
 function governanceOf(value: unknown): SkillStatsGovernance[] {
@@ -231,7 +264,9 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
   const feedbackWindow = feedbackWindowOf(feedbackWindowRead)
   const counts = countsOf(await services.getCounts?.().catch(() => null) ?? null)
   const governance = governanceOf(await services.getGovernance?.().catch(() => null) ?? null)
-  const reviews = reviewsOf(await services.getReviews?.().catch(() => null) ?? null)
+  const allReviews = reviewsOf(await services.getReviews?.().catch(() => null) ?? null)
+  const reviewSummary = reviewSummaryOf(allReviews)
+  const reviews = allReviews.slice(-8).reverse()
 
   const rows: SkillStatsRow[] = index.map(row => {
     const usage = usageOf(usageByName?.get(row.name))
@@ -271,6 +306,7 @@ export async function buildSkillStatsSnapshot(services: RouteServices, curator: 
       counts,
       governance,
       reviews,
+      ...(reviewSummary === undefined ? {} : { reviewSummary }),
       operations: SKILL_OPERATIONS.map(operation => ({ id: operation.id, labelKey: operation.labelKey })),
     },
     generatedAt: new Date().toISOString(),

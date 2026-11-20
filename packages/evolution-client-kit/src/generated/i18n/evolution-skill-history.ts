@@ -175,7 +175,18 @@ export const dictionaries = {
     "stats.review.status.partial": "部分完成",
     "stats.review.status.failed": "失败",
     "stats.review.status.timeout": "超时",
-    "stats.review.status.aborted": "已中止"
+    "stats.review.status.aborted": "已中止",
+    "stats.reviews.summary.completed": "已完成",
+    "stats.reviews.summary.partial": "部分",
+    "stats.reviews.summary.timeout": "超时",
+    "stats.reviews.summary.failed": "失败",
+    "stats.reviews.summary.rounds": "平均轮数",
+    "stats.reviews.summary.toolCalls": "平均工具调用",
+    "stats.reviews.summary.truncated": "轮数截断",
+    "stats.review.requests": "轮",
+    "stats.review.toolCalls": "工具调用",
+    "stats.review.wait": "等待",
+    "stats.review.truncated": "轮数截断"
   },
   en: {
     "action.archive": "Archived",
@@ -348,7 +359,18 @@ export const dictionaries = {
     "stats.review.status.partial": "Partial",
     "stats.review.status.failed": "Failed",
     "stats.review.status.timeout": "Timed out",
-    "stats.review.status.aborted": "Aborted"
+    "stats.review.status.aborted": "Aborted",
+    "stats.reviews.summary.completed": "Completed",
+    "stats.reviews.summary.partial": "Partial",
+    "stats.reviews.summary.timeout": "Timed out",
+    "stats.reviews.summary.failed": "Failed",
+    "stats.reviews.summary.rounds": "Avg rounds",
+    "stats.reviews.summary.toolCalls": "Avg tool calls",
+    "stats.reviews.summary.truncated": "Round limit",
+    "stats.review.requests": "rounds",
+    "stats.review.toolCalls": "tool calls",
+    "stats.review.wait": "waits",
+    "stats.review.truncated": "round limit"
   },
   ja: {
     "action.archive": "アーカイブ",
@@ -521,7 +543,18 @@ export const dictionaries = {
     "stats.review.status.partial": "一部完了",
     "stats.review.status.failed": "失敗",
     "stats.review.status.timeout": "タイムアウト",
-    "stats.review.status.aborted": "中止"
+    "stats.review.status.aborted": "中止",
+    "stats.reviews.summary.completed": "完了",
+    "stats.reviews.summary.partial": "一部",
+    "stats.reviews.summary.timeout": "タイムアウト",
+    "stats.reviews.summary.failed": "失敗",
+    "stats.reviews.summary.rounds": "平均ラウンド",
+    "stats.reviews.summary.toolCalls": "平均ツール呼び出し",
+    "stats.reviews.summary.truncated": "ラウンド上限",
+    "stats.review.requests": "ラウンド",
+    "stats.review.toolCalls": "ツール呼び出し",
+    "stats.review.wait": "待機",
+    "stats.review.truncated": "ラウンド上限"
   },
   es: {
     "action.archive": "archivado",
@@ -694,7 +727,18 @@ export const dictionaries = {
     "stats.review.status.partial": "Parcial",
     "stats.review.status.failed": "Fallida",
     "stats.review.status.timeout": "Tiempo agotado",
-    "stats.review.status.aborted": "Cancelada"
+    "stats.review.status.aborted": "Cancelada",
+    "stats.reviews.summary.completed": "Completadas",
+    "stats.reviews.summary.partial": "Parciales",
+    "stats.reviews.summary.timeout": "Agotadas",
+    "stats.reviews.summary.failed": "Fallidas",
+    "stats.reviews.summary.rounds": "Rondas medias",
+    "stats.reviews.summary.toolCalls": "Llamadas medias",
+    "stats.reviews.summary.truncated": "Límite de rondas",
+    "stats.review.requests": "rondas",
+    "stats.review.toolCalls": "llamadas",
+    "stats.review.wait": "esperas",
+    "stats.review.truncated": "límite de rondas"
   },
   fr: {
     "action.archive": "archivé",
@@ -867,7 +911,18 @@ export const dictionaries = {
     "stats.review.status.partial": "Partielle",
     "stats.review.status.failed": "Échouée",
     "stats.review.status.timeout": "Expirée",
-    "stats.review.status.aborted": "Interrompue"
+    "stats.review.status.aborted": "Interrompue",
+    "stats.reviews.summary.completed": "Terminées",
+    "stats.reviews.summary.partial": "Partielles",
+    "stats.reviews.summary.timeout": "Expirées",
+    "stats.reviews.summary.failed": "Échouées",
+    "stats.reviews.summary.rounds": "Tours moyens",
+    "stats.reviews.summary.toolCalls": "Appels moyens",
+    "stats.reviews.summary.truncated": "Limite de tours",
+    "stats.review.requests": "tours",
+    "stats.review.toolCalls": "appels",
+    "stats.review.wait": "attentes",
+    "stats.review.truncated": "limite de tours"
   },
   de: {
     "action.archive": "archiviert",
@@ -1040,7 +1095,18 @@ export const dictionaries = {
     "stats.review.status.partial": "Teilweise",
     "stats.review.status.failed": "Fehlgeschlagen",
     "stats.review.status.timeout": "Zeitüberschreitung",
-    "stats.review.status.aborted": "Abgebrochen"
+    "stats.review.status.aborted": "Abgebrochen",
+    "stats.reviews.summary.completed": "Abgeschlossen",
+    "stats.reviews.summary.partial": "Teilweise",
+    "stats.reviews.summary.timeout": "Zeitüberschreitung",
+    "stats.reviews.summary.failed": "Fehlgeschlagen",
+    "stats.reviews.summary.rounds": "Ø Runden",
+    "stats.reviews.summary.toolCalls": "Ø Tool-Aufrufe",
+    "stats.reviews.summary.truncated": "Rundenlimit",
+    "stats.review.requests": "Runden",
+    "stats.review.toolCalls": "Tool-Aufrufe",
+    "stats.review.wait": "Wartezeiten",
+    "stats.review.truncated": "Rundenlimit"
   },
   ru: {
     "action.archive": "заархивировано",
@@ -1213,7 +1279,18 @@ export const dictionaries = {
     "stats.review.status.partial": "Частично",
     "stats.review.status.failed": "Ошибка",
     "stats.review.status.timeout": "Тайм-аут",
-    "stats.review.status.aborted": "Прервано"
+    "stats.review.status.aborted": "Прервано",
+    "stats.reviews.summary.completed": "Завершено",
+    "stats.reviews.summary.partial": "Частично",
+    "stats.reviews.summary.timeout": "Таймаут",
+    "stats.reviews.summary.failed": "Ошибки",
+    "stats.reviews.summary.rounds": "Средние раунды",
+    "stats.reviews.summary.toolCalls": "Средние вызовы",
+    "stats.reviews.summary.truncated": "Лимит раундов",
+    "stats.review.requests": "раундов",
+    "stats.review.toolCalls": "вызовов",
+    "stats.review.wait": "ожиданий",
+    "stats.review.truncated": "лимит раундов"
   },
   pt: {
     "action.archive": "arquivamento",
@@ -1386,7 +1463,18 @@ export const dictionaries = {
     "stats.review.status.partial": "Parcial",
     "stats.review.status.failed": "Falhou",
     "stats.review.status.timeout": "Tempo esgotado",
-    "stats.review.status.aborted": "Cancelada"
+    "stats.review.status.aborted": "Cancelada",
+    "stats.reviews.summary.completed": "Concluídas",
+    "stats.reviews.summary.partial": "Parciais",
+    "stats.reviews.summary.timeout": "Expiradas",
+    "stats.reviews.summary.failed": "Falhas",
+    "stats.reviews.summary.rounds": "Rodadas médias",
+    "stats.reviews.summary.toolCalls": "Chamadas médias",
+    "stats.reviews.summary.truncated": "Limite de rodadas",
+    "stats.review.requests": "rodadas",
+    "stats.review.toolCalls": "chamadas",
+    "stats.review.wait": "esperas",
+    "stats.review.truncated": "limite de rodadas"
   },
 } as const
 
