@@ -905,6 +905,23 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase D.3 root shared/exclusive 门
+
+已完成：
+
+- 新增 `packages/evolution-core/src/skill-root-gate.ts`：
+  - 单文件写持 shared lease；
+  - archive/restore/consolidate 持 exclusive lease；
+  - 排队公平：已有 waiter 时新 reader 不插队；
+  - non-reentrant 约定。
+- 4 个单测：shared 并行、writer/reader 互斥、writer 活跃时 reader 不进入、租约不泄漏。
+
+边界：
+
+- 门已作为原语存在，尚未替换 SkillLibrary 的 per-root serial；
+- 还没有把 simple mutator 改成 shared + per-target lock；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase D.2 service 持有 target lock
 
 已完成：
