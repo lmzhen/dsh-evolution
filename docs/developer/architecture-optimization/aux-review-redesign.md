@@ -806,3 +806,10 @@ interface EvolutionReviewActivityRecordV3 {
 - 最终静态门禁待本轮 runner 输出；已知只有 gate-29 的 CI home 占位与 gate-75 CI 路径不可本地判定。
 
 **用户确认（2026-11-20）**：极简命令面若平台当前接口不支持 `commands.restrict`，**不再开发此功能**；本版按 A1 发布（模型工具与 AUX 禁用，命令面保持平台现状）。PTC 写路径/审批与真实双会话同 skill 冲突**作为 DEFERRED**，不阻塞本版。最终版本 **0.59.0**，确认后立即走 pre-tag/CI 并发布。
+
+### Round 42（2026-11-20，0.59.0 发布后 npm web 真机验收 → PTC 修复）
+
+- 0.59.0 真实 npm web 验收：安装/启动/诊断通过（22/22 包 0.59.0，familyVersion=0.59.0）；PTC 会话 AUX review 记录为 `completed` 但 actions 全是 `run_code: error`，模型报告 `tools.read`/`tools.review_done` 不可用。
+- 根因：review runner 直接调 LLM，未经过 agent loop，PTC executor 的 `tools:sdk`/`tools:ptc-only` system prompt section 从未组装；`review_done`/`review_wait` 的 `when` 又只在 execute 期间激活；SDK toolset 被提前 dispose，PTC 保留环境在首个程序后失去 binding。
+- 0.59.1 修复：PTC channel 在创建时从 child `systemPrompt.assemble` 提取 SDK 并追加到 instruction；先激活 task 再组 SDK；SDK toolset 生命周期覆盖 review；child 执行、parent 提供 catalog。
+- 发布策略：用户指定先发 0.59.1，再通过 npm web 验证 PTC 真机；0.59.0 的 PTC 验收不视为通过。

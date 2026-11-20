@@ -19,7 +19,7 @@ it('exposes review_done only while the PTC channel executes and reports completi
       return { results: [] }
     },
   }, new ReviewWriteLocks())
-  const channel = host.channel('review-1', [{ name: 'run_code' }], {}, undefined, new Set(['run_code', 'skill_manage', 'review_done', 'review_wait']))
+  const channel = await host.channel('review-1', [{ name: 'run_code' }], {}, undefined, new Set(['run_code', 'skill_manage', 'review_done', 'review_wait']))
   expect(channel.mode).toBe('ptc')
   expect(channel.visibleTools.map(tool => tool.name)).toEqual(['run_code'])
   expect(registered.map(definition => definition.name)).toEqual(['review_done', 'review_wait'])
@@ -44,8 +44,31 @@ it('resolves review_done from the child session when the ALS context is gone', a
       return { results: [] }
     },
   }, new ReviewWriteLocks())
-  const channel = host.channel('aux-review-2', [{ name: 'run_code' }], childAgent, undefined, new Set(['run_code', 'review_done', 'review_wait']))
+  const channel = await host.channel('aux-review-2', [{ name: 'run_code' }], childAgent, undefined, new Set(['run_code', 'review_done', 'review_wait']))
   await channel.execute([], new AbortController().signal)
   expect(channel.completion()).toMatchObject({ done: true, report: { summary: 'done' } })
+  channel.dispose(); host.dispose()
+})
+
+it('resolves the nested PTC SDK from the parent toolset while executing as the child', async () => {
+  let resolvedAgent: unknown
+  let executedAgent: unknown
+  const host = new PtcReviewToolHost({
+    register() { return () => {} },
+    resolve: async context => {
+      resolvedAgent = (context as { agent?: unknown }).agent
+      return { view: () => new Map([['skill_manage', {}], ['read', {}], ['bash', {}]]) }
+    },
+    async execute(input: unknown) {
+      executedAgent = (input as { agent?: unknown }).agent
+      return { results: [] }
+    },
+  }, new ReviewWriteLocks())
+  const child = { session: { id: 'review-child:aux-review-3:0' } }
+  const parent = { session: { id: 'parent-review-3' } }
+  const channel = await host.channel('aux-review-3', [{ name: 'run_code' }], child, undefined, new Set(['skill_manage', 'read']), parent)
+  await channel.execute([], new AbortController().signal)
+  expect(resolvedAgent).toBe(parent)
+  expect(executedAgent).toBe(child)
   channel.dispose(); host.dispose()
 })

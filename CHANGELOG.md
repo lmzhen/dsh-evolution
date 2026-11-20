@@ -1,3 +1,13 @@
+## 0.59.1 (2026-11-20) — 修复 PTC Aux Review 工具桥
+
+> **缺陷**：0.59.0 的 PTC AUX review 只有 `run_code` 可见，review 模型没有拿到 PTC executor 的 `tools:sdk` 系统提示，`tools.read`/`skill_manage`/`review_done` 均不可用；真实 npm web PTC 会话的 review 只能空跑后 `partial`。
+>
+> **根因**：① review runner 直接调 LLM，绕过 agent loop，未组装 PTC executor 的 `tools:sdk`/`tools:ptc-only` section；② `review_done`/`review_wait` 的 `when` 只在实际执行期间激活，SDK 组装时不可见；③ SDK 组装使用的 toolset 被提前 dispose，PTC 保留环境在首个程序后失去绑定。
+>
+> **修复**：PTC review channel 在创建时从 detached child 的 `systemPrompt.assemble` 提取 PTC SDK 并追加到 instruction；先激活 task 再组装 SDK；SDK toolset 在 review 生命周期内保持可用；child 负责执行、parent 提供 toolset catalog。
+>
+> **验证**：overlay build 0；review PTC/executor 定向测试 19 passed；npm web 真机验证在本版本发布后执行（用户指定发布后验证）。
+
 ## 0.59.0 (2026-11-20) — Aux Review 架构重构与极简模式隔离
 
 > **范围**：① Aux Review 完成语义收口：轮数/时间/工具调用预算耗尽统一 `partial/timeout` 并记录 `hitRoundLimit`、`partialReason`，`review_done` 成为唯一完成信号，memory/skill 拆成独立 task 并行执行；② PTC 走 detached review child，父 Session 不追加 `tool/ptc-dispatch*`，child 提供 review 工具集并从结构化结果读取 report；native 改为完整父工具目录 + 执行层 allowlist，避免模型侧工具过滤破坏前缀缓存；③ activity v3 记录 taskId/kind/status/requests/toolCalls/waitCount/partialReason/report，兼容 v2 只读；④ UI 自动复查汇总增加完成/部分/超时/失败、平均轮数与工具调用，每条显示轮数/工具调用/等待，缓存命中率仍只在后台；⑤ 新增 `reviewMaxToolCalls` 配置，补充 `reviewMaxRounds`/`reviewTimeoutMs`；⑥ 极简 preset 的 family 模型面由 runtime guard 隐藏并跳过 AUX——极简请求头只剩平台工具；平台没有 `commands.restrict`，命令面按用户决定不再开发，保持现状。

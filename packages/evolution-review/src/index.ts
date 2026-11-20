@@ -1141,7 +1141,7 @@ function snapshotReviewParent(agent: Agent): Agent {
         ptcToolHost.register()
       }
       if (reviewChild !== undefined && ptcToolHost !== undefined) {
-        channel = ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent, { provider: header.config.provider, model: header.config.model }, new Set([...AUX_TOOL_ALLOW, 'run_code', 'review_done', 'review_wait']))
+        channel = await ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent, { provider: header.config.provider, model: header.config.model }, new Set([...AUX_TOOL_ALLOW, 'run_code', 'review_done', 'review_wait']), agent)
       }
     } catch (error) {
       await reviewChild?.dispose()
