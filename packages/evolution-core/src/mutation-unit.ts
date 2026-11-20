@@ -224,6 +224,8 @@ export interface MutationUnitOptions {
   lock?: MutationLockPort
   /** Canonical skill target keys whose keyed lock backend should be acquired. */
   targetKeys?: readonly string[]
+  /** Recovery-only: derive keys from the snapshot being recovered. */
+  targetKeysForSnapshot?: (snapshot: { readonly ops: readonly { readonly target: string }[] }) => readonly string[]
   /** Explicit escape for a caller that already holds the home fence (nested merge/skill write). */
   nested?: boolean
   journal?: MutationJournalPort
@@ -271,6 +273,7 @@ export class MutationUnit {
   private readonly serial: <T>(task: () => Promise<T>) => Promise<T>
   private readonly lock: MutationLockPort
   private readonly targetKeys: readonly string[] | undefined
+  private readonly targetKeysForSnapshot: MutationUnitOptions['targetKeysForSnapshot'] | undefined
   private readonly journal: MutationJournalPort | undefined
   private readonly snapshots: MutationSnapshotPort | undefined
   private readonly claim: UnitClaimPort | undefined
@@ -292,6 +295,7 @@ export class MutationUnit {
     }
     this.lock = options.lock ?? noLock
   this.targetKeys = options.targetKeys
+  this.targetKeysForSnapshot = options.targetKeysForSnapshot
     this.journal = options.journal
     this.snapshots = options.snapshots
     this.claim = options.claim
@@ -457,7 +461,7 @@ export class MutationUnit {
     return await this.serial(async () => {
       let lease: MutationLockLease
       try {
-        lease = await this.lock.acquire(this.targetKeys)
+        lease = await this.lock.acquire(this.targetKeysForSnapshot?.(snapshot) ?? this.targetKeys)
       } catch (error) {
         const code = error instanceof TransactionNotInvokedError ? 'transact-not-invoked' : 'unit-fence-failed'
         return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }

@@ -77,6 +77,34 @@ describe('MutationUnit executor', () => {
     expect(io.files.get('source/B.md')).toBe('changedB')
   })
 
+  it('derives recovery lock keys from the snapshot', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'new')
+    const seen: Array<readonly string[] | undefined> = []
+    const lock = {
+      async acquire(keys?: readonly string[]): Promise<{ release(): Promise<void> }> {
+        seen.push(keys)
+        return { async release() {} }
+      },
+    }
+    const snapshot = {
+      unitId: 'recover-1',
+      state: 'prepared' as const,
+      ops: [{ kind: 'write' as const, target: 'source/SKILL.md', before: 'old', after: 'new', skill: 'source' }],
+    }
+    const unit = new MutationUnit({
+      io,
+      limits: LIMITS,
+      lock,
+      targetKeysForSnapshot: () => ['skill::source'],
+      snapshots: {
+        async read() { return snapshot },
+        async listPrepared() { return [snapshot] },
+      },
+    })
+    await unit.recover('recover-1')
+    expect(seen[0]).toEqual(['skill::source'])
+  })
+
   it('passes canonical target keys to a keyed lock port', async () => {
     const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
     const seen: Array<readonly string[] | undefined> = []

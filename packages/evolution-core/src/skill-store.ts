@@ -998,6 +998,20 @@ export class SkillLibrary {
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
       lock: this.lockPort(),
+      targetKeysForSnapshot: snapshot => {
+        const keys = new Set<string>()
+        for (const op of snapshot.ops) {
+          const rel = relative(this.root, op.target)
+          if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) continue
+          const parts = rel.split(/[\\/]+/)
+          const skill = parts[0]
+          if (skill === undefined || skill === '') continue
+          keys.add('skill::' + skill)
+          keys.add(skillNamespaceKey(skill))
+          if (parts.length > 1) keys.add('skill::' + skill + '::' + parts.slice(1).join('/'))
+        }
+        return [...keys]
+      },
     })
     const results = await this.rootGate.write(() => unit.recoverPrepared())
     await pruneTreeChangeUnits(this.io, home).catch(() => {})

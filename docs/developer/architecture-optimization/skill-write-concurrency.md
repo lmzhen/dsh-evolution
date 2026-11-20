@@ -931,6 +931,23 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.9 recovery 按 snapshot 派生 target keys
+
+- `MutationUnitOptions.targetKeysForSnapshot`：recover 从 snapshot ops 派生 key；
+- SkillLibrary recover 映射：
+  - absolute target → 相对 skill root；
+  - 生成 `skill::name`、`skill::name::*`、support 精确 key；
+- recover 不再以空 keys 回退 fence；
+- 新增测试：fake lock 捕获 recover acquire 的 keys，期望 `skill::source`。
+
+验证：
+
+```text
+mutation-unit: 26 passed
+mutation-recovery + keyed concurrency: 35 passed
+overlay build: 0
+```
+
 ### 2026-11-20：Phase P1.8 TargetLockSet repair + recovery gate
 
 - `MutationLockPort` 增加可选 `repair()`；
