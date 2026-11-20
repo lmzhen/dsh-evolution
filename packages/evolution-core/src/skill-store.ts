@@ -1858,7 +1858,7 @@ export class SkillLibrary {
     } else {
       await this.io.remove(marker)
     }
-    await this.audit(normalized, pinned ? 'pin' : 'unpin', null, null, pinned ? 'pinned' : 'unpinned')
+    await this.audit(normalized, pinned ? 'pin' : 'unpin', null, null, pinned ? 'pinned' : 'unpinned', undefined, undefined, undefined, undefined, true)
     return {
       ok: true,
       message: `${pinned
@@ -2439,7 +2439,7 @@ export class SkillLibrary {
     if (rootHeld) {
       const lease = await this.lockPort().acquire([skillNamespaceKey(rawName)])
       try {
-        return await this.archiveCore(rawName, options, origin, false, change)
+        return await this.archiveCore(rawName, options, origin, true, change)
       } finally {
         await lease.release()
       }
@@ -2448,7 +2448,7 @@ export class SkillLibrary {
     return await this.rootGate.write(async () => {
       const lease = await this.lockPort().acquire([namespace])
       try {
-        return await this.archiveCore(rawName, options, origin, false, change)
+        return await this.archiveCore(rawName, options, origin, true, change)
       } finally {
         await lease.release()
       }
@@ -2596,9 +2596,24 @@ export class SkillLibrary {
       // A nested merge already holds the home fence; its archive/restore bookkeeping
       // must run inline instead of queueing behind that same lease.
       const fenceHeld = plan.nested === true
-      const archive = (name: string, archiveOptions: ArchiveOptions) => fenceHeld
-        ? this.archiveCore(name, archiveOptions, plan.origin, true)
-        : this.archive(name, archiveOptions, plan.origin, undefined, true)
+      const archive = async (name: string, archiveOptions: ArchiveOptions): Promise<SkillActionResult> => {
+        if (!fenceHeld) return await this.archive(name, archiveOptions, plan.origin, undefined, true)
+        const lease = await this.lockPort().acquire([skillNamespaceKey(name)])
+        try {
+          return await this.archiveCore(name, archiveOptions, plan.origin, true)
+        } finally {
+          await lease.release()
+        }
+      }
+      const restore = async (source: string): Promise<SkillActionResult> => {
+        if (!fenceHeld) return await this.restoreFromArchive(source, plan.origin, true)
+        const lease = await this.lockPort().acquire([skillNamespaceKey(source)])
+        try {
+          return await this.restoreFromArchiveCore(source, plan.origin, true)
+        } finally {
+          await lease.release()
+        }
+      }
       const dir = this.dirOf(target)
       const targetPath = join(dir, 'SKILL.md')
       if (!plan.targetExists && await this.io.exists(dir)) {
@@ -2704,7 +2719,7 @@ export class SkillLibrary {
         const stuck: string[] = []
         for (const source of [...archived].reverse()) {
           try {
-            const restored = fenceHeld ? await this.restoreFromArchiveCore(source, plan.origin, true) : await this.restoreFromArchive(source, plan.origin, true)
+            const restored = await restore(source)
             if (!restored.ok) stuck.push(source)
           } catch {
             stuck.push(source)
@@ -3610,7 +3625,7 @@ export class SkillLibrary {
     if (rootHeld) {
       const lease = await this.lockPort().acquire([skillNamespaceKey(rawName)])
       try {
-        return await this.restoreFromArchiveCore(rawName, origin, false)
+        return await this.restoreFromArchiveCore(rawName, origin, true)
       } finally {
         await lease.release()
       }
@@ -3619,7 +3634,7 @@ export class SkillLibrary {
     return await this.rootGate.write(async () => {
       const lease = await this.lockPort().acquire([namespace])
       try {
-        return await this.restoreFromArchiveCore(rawName, origin, false)
+        return await this.restoreFromArchiveCore(rawName, origin, true)
       } finally {
         await lease.release()
       }

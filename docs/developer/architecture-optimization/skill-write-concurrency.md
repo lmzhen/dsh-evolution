@@ -931,6 +931,36 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P0.3 lease 内 audit 自死锁修复
+
+独立复核复验 P0 后，又发现并修复一个 P0：
+
+- `setPinned` 持 mutation-lock lease 后调用 `audit`，audit 仍以 `fenceHeld=false` 再取 fence；
+- 该 lease 的 ALS 不覆盖调用方，`HomeFence.run()` 判不到重入，排在自己未释放的 tail 后 → 永久死锁；
+- archive/restore 同类。
+
+修复：
+
+- pin/unpin audit 传 `fenceHeld=true`；
+- archive/restore 的 public 与 rootHeld 路径统一 `archiveCore(..., true, ...)` / `restoreFromArchiveCore(..., true)`；
+- nested commitMerge 的 archive/restore 在 `fenceHeld=true` 分支也取 namespace lease，关闭 merge sources 的 keyed 互斥缺口。
+
+验证：
+
+```text
+skill-store-authority-lock + commit-merge: 16 passed
+commit-merge: 8 passed
+overlay build: 0
+```
+
+仍留 P1：
+
+- consolidate sources 是逐 archive 持 namespace，不是全局持 key；
+- release 失败后锁文件可能残留，需重启恢复；
+- keyed 空 keys 仍回退 fence；
+- `SKILL_AMBIGUOUS_EDIT` 在 service 映射下不可达；
+- 真实 npm web 验收未做。
+
 ### 2026-11-20：Phase P0.2 keyed archive/simple 并发回归
 
 - 新增 keyed hybrid 测试：
