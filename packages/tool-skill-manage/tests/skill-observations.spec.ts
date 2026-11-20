@@ -98,4 +98,18 @@ describe('skill fs observation listener', () => {
 
     expect(store.requirePresent(owner.agent.session, skillBodyTarget('my-skill'))).toEqual({ kind: 'unobserved' })
   })
+  it('clears every observation when the plugin context disposes (HMR)', async () => {
+    const ctx = new Context()
+    const root = await makeRoot()
+    const store = installSkillObservationListener(ctx, root)
+    const path = await writeSkillFile(root, 'my-skill/SKILL.md', 'body')
+    const owner = { agent: { session: {} } }
+    emitRead(ctx, path, owner)
+    expect(store.requirePresent(owner.agent.session, skillBodyTarget('my-skill'))).toBeDefined()
+
+    await ctx.fiber.dispose()
+
+    expect(store.requirePresent(owner.agent.session, skillBodyTarget('my-skill'))).toEqual({ kind: 'unobserved' })
+  })
+
 })

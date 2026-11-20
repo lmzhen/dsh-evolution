@@ -905,6 +905,26 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.14 HMR 观察清空证据
+
+已完成：
+
+- 新增测试：plugin context dispose 后，所有 owner 的 skill observation 清空；
+- 依赖 `installSkillObservationListener` 的 `ctx.effect(() => () => store.clear())`；
+- 清空后同 session 的写会重新得到 `SKILL_NOT_OBSERVED`，不会沿用旧观察。
+
+验证：
+
+```text
+skill-observations: 5 passed
+overlay build:      0
+```
+
+边界：
+
+- 这是观察生命周期测试，不涉及 keyed 生产开关；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.12 全量定向回归
 
 在 keyed opt-in 装配（默认关闭）完成后跑全量定向套件：
