@@ -587,3 +587,9 @@ interface EvolutionReviewActivityRecordV3 {
   - 父 Session seq 保持 0，child seq > 0。
 - 这同时验证了 review_done 在 PTC 嵌套工具中可达，不再只是 echo 探针。
 - 测试为临时 harness，未入库（依赖平台 PTC 测试栈）；代码路径已在 adapter/review 构建与单测中通过。剩余是真实 AUX PTC 宿主复验。
+
+### Round 30（2026-11-20，PTC 可选平台能力边界）
+
+- 结论：`@deepseek-ai/dsh-tool-executor-ptc` 不由 family manifest 声明。平台 base bundle 内含该包，但 base/minimal 的 executor row 默认 `disabled: true`，PTC preset 才启用；因此它是“默认发行、按 preset 启用”的可选能力，不是 family 依赖。
+- adapter 新增 `PtcExecutorUnavailableError` 与 `loadPtcExecutor()`：只在 PTC 模式动态 import，检查 `apply`/`inject` shape，缺失或不兼容抛 `PTC_UNAVAILABLE`，不读版本号、不猜测平台版本；adapter 单测覆盖无 scoped parent 的 fail-closed。
+- 该选择保持 cohort/envelope 声明不变，代价是 PTC 集成属于平台内部 seam，必须在每个 cohort 的 PTC 真机验收覆盖；平台若提供稳定 PTC capability 再替换。

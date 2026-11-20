@@ -26,3 +26,8 @@ it('uses the live session store when the parent exposes one', async () => {
   expect(created).toHaveLength(1)
   expect((created[0] as [unknown, { meta?: { cwd?: string } }])[1].meta?.cwd).toBe('D:/workspace')
 })
+
+it('fails closed when PTC is requested without a scoped parent', async () => {
+  const parent = { id: 'parent', session: Session.create(SessionId('parent-ptc')) }
+  await expect(createReviewChildAgent(parent, 'task-ptc', { ptc: true })).rejects.toMatchObject({ code: 'PTC_UNAVAILABLE' })
+})
