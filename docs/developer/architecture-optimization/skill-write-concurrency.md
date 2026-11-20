@@ -905,6 +905,34 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.9a namespace key 进入 simple 写
+
+已完成：
+
+- 新增 `skillNamespaceKey(name)`：
+  ```text
+  skill::<name>::*
+  ```
+- create/update/patch/writeSupport 的 keyed targetKeys 现在同时包含：
+  - 精确 target key；
+  - skill namespace key；
+- 这样结构操作只要拿 namespace key，就能与同 skill 的 simple 写互斥；
+- 不同 skill 的 namespace key 不同，仍可并行。
+
+验证：
+
+```text
+skill-keyed-concurrency + tool observed: 6 passed
+overlay build:                            0
+```
+
+边界：
+
+- 结构操作尚未把自己的 namespace key 填进 UnitTransaction；
+- 因此 keyed 模式下结构 vs simple 仍未互斥；
+- 生产仍用 fallback root lock；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.8 HybridMutationLock
 
 已完成：

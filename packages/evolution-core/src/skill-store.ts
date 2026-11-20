@@ -60,6 +60,7 @@ import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { decideSkillWrite, type SkillWriteIntent, type SkillWriteRefusalReason } from './skill-write-intent.ts'
+import { skillNamespaceKey } from './skill-observation.ts'
 import { SkillTargetLocks } from './skill-target-locks.ts'
 import { SkillRootGate } from './skill-root-gate.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
@@ -1872,7 +1873,7 @@ export class SkillLibrary {
     // serialize queue (F-208 discipline, like update/patch) — two concurrent
     // create calls for one name used to both pass exists() and double-write
     // (double audit, double mutation event).
-    return await this.rootGate.read(() => this.withTarget('skill::' + normalized, () => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true), ['skill::' + normalized])))
+    return await this.rootGate.read(() => this.withTarget('skill::' + normalized, () => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true), ['skill::' + normalized, skillNamespaceKey(normalized)])))
   }
 
   private async createCore(
@@ -2075,7 +2076,7 @@ export class SkillLibrary {
     const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       lock: this.lockPort(),
-      targetKeys: ['skill::' + name],
+      targetKeys: ['skill::' + name, skillNamespaceKey(name)],
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {
@@ -2300,7 +2301,7 @@ export class SkillLibrary {
     const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       lock: this.lockPort(),
-      targetKeys: [filePath === '' ? 'skill::' + name : 'skill::' + name + '::' + filePath.replace(/\\/g, '/')],
+      targetKeys: [filePath === '' ? 'skill::' + name : 'skill::' + name + '::' + filePath.replace(/\\/g, '/'), skillNamespaceKey(name)],
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {
@@ -3821,7 +3822,7 @@ export class SkillLibrary {
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       serial: this.serial,
       lock: this.lockPort(),
-      targetKeys: ['skill::' + name + '::' + filePath.replace(/\\/g, '/')],
+      targetKeys: ['skill::' + name + '::' + filePath.replace(/\\/g, '/'), skillNamespaceKey(name)],
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {

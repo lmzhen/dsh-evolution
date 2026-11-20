@@ -71,6 +71,13 @@ export function skillTarget(skill: string, relPath = ''): SkillTarget {
   return { skill: name, relPath: rel, targetKey }
 }
 
+/** The namespace lock key covering every file of one skill. */
+export function skillNamespaceKey(skill: string): string {
+  const name = skill.trim()
+  if (name === '') throw new Error('skillNamespaceKey requires a skill name')
+  return 'skill::' + name + '::*'
+}
+
 /** The SKILL.md target of one skill. */
 export function skillBodyTarget(skill: string): SkillTarget {
   return skillTarget(skill, '')
