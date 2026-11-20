@@ -1200,6 +1200,10 @@ function snapshotReviewParent(agent: Agent): Agent {
             sessionId: String(session.id),
             kind,
             status,
+            toolMode: channel.mode,
+            ...(typeof (session as { header?: { agentPreset?: unknown } }).header?.agentPreset === 'string'
+              ? { preset: (session as { header: { agentPreset: string } }).header.agentPreset }
+              : {}),
             trigger: { reason, toolCalls: signal.toolCalls, userChars: signal.userChars, assistantChars: signal.assistantChars },
             finalText,
             actions,

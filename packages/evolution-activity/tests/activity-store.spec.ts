@@ -95,6 +95,8 @@ describe('evolution-activity store', () => {
     sessionId: 's1',
     kind: 'skill',
     status: 'partial',
+    toolMode: 'ptc',
+    preset: 'cordis',
     trigger: { reason: 'cadence', toolCalls: 3, userChars: 10, assistantChars: 20 },
     finalText: 'half done',
     requests: 2,
@@ -109,8 +111,8 @@ describe('evolution-activity store', () => {
     at: 3,
   }, 10)
   const record = events[0]!
-  expect(record).toMatchObject({ taskId: 't1', kind: 'skill', status: 'partial', requests: 2, toolCalls: 4, waitCount: 1, hitRoundLimit: true, partialReason: 'max tool calls reached before review_done' })
-  expect(parseActivityReviews(serializeActivity([], events))[0]).toMatchObject({ taskId: 't1', status: 'partial', waitCount: 1 })
+  expect(record).toMatchObject({ taskId: 't1', kind: 'skill', status: 'partial', toolMode: 'ptc', preset: 'cordis', requests: 2, toolCalls: 4, waitCount: 1, hitRoundLimit: true, partialReason: 'max tool calls reached before review_done' })
+  expect(parseActivityReviews(serializeActivity([], events))[0]).toMatchObject({ taskId: 't1', status: 'partial', toolMode: 'ptc', preset: 'cordis', waitCount: 1 })
 })
 
   it('folds plan-applied payloads into a bounded record list (pure fold)', () => {

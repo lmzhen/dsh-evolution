@@ -263,7 +263,7 @@ DeepSeek 的上下文缓存按 **system → tools → messages 的字节前缀**
 - **native**：`nativeReviewToolChannel` 为限制审查工具，把父 tools 裁剪成 allowlist，并在末尾追加 `review_done`/`review_wait`。工具目录从第一处差异起就与父请求不同，父 message 前缀无法完整命中；review 之间共享裁剪后的工具目录，因此 review-to-review 仍可命中自己的前缀。
 - 标准/创造/极简都走 native，但各自父工具目录不同；极简还缺少 read/glob/grep，因此三种模式的缓存统计必须分开。
 - 旧 `0.58.0` 的 aux 是 native 且使用父完整 tools + `toolHistory`；desktop activity v2 中 cordis 会话 134 条 review 的平均缓存命中约 **99.65%**。这组历史读数只能作为旧实现基线，不能代表新 native 过滤通道。
-- 新实现尚无按模式拆分的缓存读数：activity v3 只有 `usage.cacheReadTokens`，没有 `toolMode`/`preset` 字段。要回答“PTC/标准/创造/极简分别是否复用”，应先记录 toolMode + session header `agentPreset`，再按模式聚合 `cacheReadTokens/(inputTokens+cacheReadTokens+cacheWriteTokens)`。
+- 新实现已给 activity v3 review 记录增加可选 `toolMode`（native/ptc）和 `preset`（来自 session header `agentPreset`）；目前只落记录，尚无按模式聚合的 UI/接口，开发者可直接按 `toolMode/preset` 聚合 `cacheReadTokens/(inputTokens+cacheReadTokens+cacheWriteTokens)`。旧 v2 记录没有这两个字段，不能按模式回溯。
 - 若 native 缓存损失不可接受，正确修法是保留父完整工具目录，把 `review_done` 作为 in-history tool addition（DeepSeek 路由支持 `addition-only`）追加在父前缀之后；不要简单恢复未过滤工具而失去审查工具约束。
 
 ## 8. 锁与等待
@@ -669,3 +669,11 @@ interface EvolutionReviewActivityRecordV3 {
   4. **排队超时/可配置并发**：当前固定 limiter=2，未实现 `queue-timeout` 状态或 `maxConcurrentReviews` 配置（P2）。
   5. **pre-tag/CI、release evidence、唯一最终发布**：需用户确认版本/时机后执行。
 - 上述 1/2 不阻塞 native/default，但发布说明必须写明 PTC 写/审批验收边界；3/4 为 P2。
+
+### Round 36（2026-11-20，缓存审计）
+
+- 历史基线：desktop `activity.json` v2 中 cordis 会话 134 条 aux review 平均缓存命中 **99.65%**（`cacheRead/(input+cacheRead+cacheWrite)`）；这批数据来自旧 native 全父工具目录实现，不能代表新 native 过滤实现。
+- 代码审计结论：
+  - PTC 顶层 tools 仍为父 `run_code`，messages = 父 `deriveMessages` + review instruction，且已回放父 `toolHistory`，父前缀可复用；
+  - native 把 tools 裁剪为 allowlist 并追加 `review_done/review_wait`，工具目录与父不同，父前缀不能完整命中；标准/创造/极简均 native，各自工具目录不同。
+- activity v3 新增可选 `toolMode`/`preset`（session header `agentPreset`），只落记录；按模式聚合缓存留作开发者诊断，不进 C 端主界面。native 缓存若需修复，应采用 in-history tool addition 保持父工具目录，而不是恢复未过滤工具。

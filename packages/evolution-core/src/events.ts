@@ -56,6 +56,10 @@ export interface EvolutionReviewCompletedEvent {
   readonly branchSessionId?: string | undefined
   readonly kind: ReviewKind
   readonly status: 'completed' | 'partial' | 'failed' | 'timeout' | 'aborted'
+  /** Tool transport used by an auxiliary review; absent for foreground inject. */
+  readonly toolMode?: 'native' | 'ptc' | undefined
+  /** Session preset id carried by the parent header, when one exists. */
+  readonly preset?: string | undefined
   readonly trigger: { readonly reason: string; readonly toolCalls: number; readonly userChars: number; readonly assistantChars: number }
   readonly finalText: string
   readonly actions: readonly EvolutionReviewAction[]

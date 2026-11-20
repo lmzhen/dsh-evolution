@@ -19,4 +19,4 @@ The concurrency guarantee comes from the selected IO backend. The shipped Node b
 
 ### Review schema v3
 
-Review records now carry `taskId`, `kind`, `status` (including `partial`), `requests`, `toolCalls`, `waitCount`, and `partialReason` in addition to the original action/usage fields. Readers still accept v2 bytes; writers always emit v3.
+Review records now carry `taskId`, `kind`, `status` (including `partial`), `requests`, `toolCalls`, `waitCount`, `partialReason`, optional `toolMode`/`preset`, and the structured report. Readers still accept v2 bytes; writers always emit v3.

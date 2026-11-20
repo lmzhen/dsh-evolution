@@ -55,6 +55,8 @@ export interface EvolutionReviewActivityRecord {
   branchSessionId?: string | undefined
   kind: EvolutionReviewCompletedEvent['kind']
   status: EvolutionReviewCompletedEvent['status']
+  toolMode?: EvolutionReviewCompletedEvent['toolMode']
+  preset?: EvolutionReviewCompletedEvent['preset']
   trigger: EvolutionReviewCompletedEvent['trigger']
   finalText: string
   requests?: number | undefined
@@ -160,6 +162,8 @@ export function applyReviewActivityEvent(
     ...event.branchSessionId === undefined ? {} : { branchSessionId: event.branchSessionId },
     kind: event.kind,
     status: event.status,
+    ...event.toolMode === undefined ? {} : { toolMode: event.toolMode },
+    ...event.preset === undefined ? {} : { preset: event.preset },
     trigger: event.trigger,
     finalText: graphemeCount(event.finalText) <= REVIEW_TEXT_PREVIEW_CHARS ? event.finalText : truncateGraphemes(event.finalText, REVIEW_TEXT_PREVIEW_CHARS, ''),
     finalTextChars: event.finalText.length,
