@@ -905,6 +905,42 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase D.5e simple mutator 移除 root serial
+
+已完成：
+
+- `setPinned` / `create` / `update` / `patch` / `writeSupportFile` / `removeSupportFile` 移除 `this.serial(...)`；
+- 现在 simple 写锁顺序：
+  ```text
+  rootGate.read
+    → target lock
+      → core / UnitTransaction
+  ```
+- `restructure` / `extract` 改持 root exclusive；extract 拆出 `extractCore` 供持门调用；
+- 结构操作 `archive` / `restore` / `commitMerge` / `consolidate` 继续 root exclusive；
+- root serial 仍保留给结构操作和尚未迁移路径。
+
+验证：
+
+```text
+tool-skill-manage + observed writes: 46 passed
+skill-store-serial + consolidate:   17 passed
+overlay build:                      0
+```
+
+重要事实：
+
+- 移除 serial 后仍**没有实际并行写**：
+  - UnitTransaction / create 仍使用 per-root mutationLock；
+  - 该锁是跨进程 root 互斥，简单目标锁无法绕过；
+- 因此这一步消除了 root serial 的重复排队，但真正并行还差“per-target mutation lock”。
+
+下一组：
+
+- D.5f：把 `lockPort()` 的 root 文件锁替换为 per-target mutation lock；
+- 保留 transactIo / HomeFence；
+- 不同 target 并行、同 target 串行、跨进程同 target 仍互斥。
+
 ### 2026-11-20：Phase D.5d simple mutator 持 root shared
 
 已完成：

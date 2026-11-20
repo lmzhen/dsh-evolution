@@ -1797,7 +1797,7 @@ export class SkillLibrary {
     // the other single-file mutators on the in-process serial chain — a
     // concurrent update could otherwise pass its protection check before the
     // marker lands and rewrite a skill the user just froze.
-    return await this.rootGate.read(() => this.serial(() => this.withTarget('pin::' + name, () => this.setPinnedCore(name, pinned, origin))))
+    return await this.rootGate.read(() => this.withTarget('pin::' + name, () => this.setPinnedCore(name, pinned, origin)))
   }
 
   private async setPinnedCore(name: string, pinned: boolean, origin: WriteOrigin): Promise<SkillActionResult> {
@@ -1872,7 +1872,7 @@ export class SkillLibrary {
     // serialize queue (F-208 discipline, like update/patch) — two concurrent
     // create calls for one name used to both pass exists() and double-write
     // (double audit, double mutation event).
-    return await this.rootGate.read(() => this.serial(() => this.withTarget('skill::' + normalized, () => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true)))))
+    return await this.rootGate.read(() => this.withTarget('skill::' + normalized, () => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true))))
   }
 
   private async createCore(
@@ -2030,7 +2030,7 @@ export class SkillLibrary {
     await this.ensureRecovered()
     // F-208: the whole read→validate→write runs under the in-process serialize
     // queue so two concurrent updates on one skill never interleave.
-    return await this.rootGate.read(() => this.serial(() => this.withTarget('skill::' + name, () => this.updateCore(name, content, origin, anchor))))
+    return await this.rootGate.read(() => this.withTarget('skill::' + name, () => this.updateCore(name, content, origin, anchor)))
   }
 
   private async updateCore(name: string, content: string, origin: WriteOrigin, anchor?: WriteAnchor): Promise<SkillActionResult> {
@@ -2113,7 +2113,7 @@ export class SkillLibrary {
     // F-208: the whole read→patch→write runs under the in-process serialize
     // queue so two concurrent patches on one skill never interleave.
     const key = 'skill::' + name + (filePath === '' ? '' : '::' + filePath.replace(/\\/g, '/'))
-    return await this.rootGate.read(() => this.serial(() => this.withTarget(key, () => this.patchCore(name, oldString, newString, filePath, replaceAll, origin, anchor))))
+    return await this.rootGate.read(() => this.withTarget(key, () => this.patchCore(name, oldString, newString, filePath, replaceAll, origin, anchor)))
   }
 
   /**
@@ -3194,7 +3194,7 @@ export class SkillLibrary {
     await this.ensureRecovered()
     // F-208: the whole read→plan→write runs under the in-process serialize
     // queue so two concurrent restructures on one skill never interleave.
-    return await this.restructureCore(name, moves, origin, change)
+    return await this.rootGate.write(() => this.restructureCore(name, moves, origin, change))
   }
 
   private async restructureCore(name: string, moves: SkillRestructureMove[], origin: WriteOrigin, change?: ChangeSummary): Promise<SkillActionResult> {
@@ -3355,6 +3355,10 @@ export class SkillLibrary {
    * @returns the kernel result; a refusal writes nothing.
    */
   async extract(plan: ExtractPlanDraft, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary): Promise<SkillActionResult> {
+    return await this.rootGate.write(() => this.extractCore(plan, origin, change))
+  }
+
+  private async extractCore(plan: ExtractPlanDraft, origin: WriteOrigin, change?: ChangeSummary): Promise<SkillActionResult> {
     await this.ensureRecovered()
     if (plan.outcome === 'owner-gap' || plan.owner.mode !== 'covered') return { ok: false, message: '提取被拒绝：owner-gap 不是写操作。' }
     if (plan.support.unresolved.length > 0 || plan.support.dangling.length > 0) return { ok: false, message: '提取被拒绝：support closure 存在 unresolved/dangling。' }
@@ -3849,7 +3853,7 @@ export class SkillLibrary {
     unitId?: string,
   ): Promise<SkillActionResult> {
     const key = 'skill::' + rawName.trim() + '::' + filePath.replace(/\\/g, '/')
-    return await this.rootGate.read(() => this.serial(() => this.withTarget(key, () => this.removeSupportFileCore(rawName.trim(), filePath, origin, anchor, unitId))))
+    return await this.rootGate.read(() => this.withTarget(key, () => this.removeSupportFileCore(rawName.trim(), filePath, origin, anchor, unitId)))
   }
 
   private async removeSupportFileCore(
