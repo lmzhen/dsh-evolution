@@ -285,6 +285,28 @@ describe('runReview', () => {
     expect(calls).toBe(1)
   })
 
+  it('passes SKILL_STALE_VERSION through without mapping it to review_wait', async () => {
+    const stale: ReviewToolPort = {
+      async execute() {
+        return {
+          results: [{
+            callId: call.id,
+            result: { content: [{ type: 'text' as const, text: 'SKILL_STALE_VERSION: 文件在读取后发生变化，请重新读取再试' }], isError: true },
+          }],
+        }
+      },
+    }
+    const result = await runReview({
+      parent: parent(), llm: llm([toolCallChunks, doneChunks]), tools: stale, instruction: 'review',
+      toolAllow: allowed(), signal: new AbortController().signal,
+      markReview: () => {}, clearReview: () => {},
+    })
+    expect(result.done).toBe(true)
+    expect(result.waitCount).toBe(0)
+    expect(result.actions[0]).toMatchObject({ action: 'skill_manage', status: 'error' })
+    expect(result.actions.some(action => action.action === 'review_wait')).toBe(false)
+  })
+
   it('marks tool-call budget exhaustion partial', async () => {
     const result = await runReview({
       parent: parent(), llm: llm([toolCallChunks]), tools: tools({}), instruction: 'review',

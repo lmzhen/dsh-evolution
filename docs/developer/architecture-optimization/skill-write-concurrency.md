@@ -905,6 +905,33 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase I.1 stale 不映射 wait 证据
+
+已完成：
+
+- `review-executor` 单测：
+  - 写入工具返回 `SKILL_STALE_VERSION`；
+  - runner 原样作为 tool error 交给模型；
+  - `waitCount === 0`；
+  - actions 中没有 `review_wait`；
+  - 模型下一步正常 `review_done`。
+- 对比既有测试：
+  - `resource-busy` 才生成 review_wait 引导；
+  - review_wait 成功路径 waitCount=1。
+
+验证：
+
+```text
+review-executor: 16 passed
+overlay build:   0
+```
+
+边界：
+
+- 这证明 runner 不把 stale 当 wait；
+- SkillWriteService 的显式错误码仍是最终权威；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.15 多 target 单元全量 CAS 证据
 
 已完成：
