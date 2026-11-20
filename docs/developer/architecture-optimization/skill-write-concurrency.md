@@ -905,6 +905,31 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.6 SkillLibrary 填 target keys
+
+已完成：
+
+- `withMutationLock(task, targetKeys?)`；
+- create 传 `skill::name`；
+- update UnitTransaction 传 `skill::name`；
+- patch UnitTransaction 传 body/support key；
+- writeSupport UnitTransaction 传 support key；
+- patch no-op / 既有行为不变；
+- 生产 HomeFence lock 忽略 targetKeys，因此行为仍与之前一致。
+
+验证：
+
+```text
+tool observed + skill-store-cas: 8 passed
+overlay build:                    0
+```
+
+边界：
+
+- 还没有用 `TargetMutationLock` 装配 SkillLibrary；
+- root gate/target lock 与 HomeFence 仍同时存在；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.5 UnitTransaction 传递 target keys
 
 已完成：

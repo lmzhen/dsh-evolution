@@ -901,11 +901,11 @@ export class SkillLibrary {
     return await this.targetLocks.withLock(targetKey, task)
   }
 
-  private async withMutationLock<T>(task: () => Promise<T>): Promise<T> {
+  private async withMutationLock<T>(task: () => Promise<T>, targetKeys?: readonly string[]): Promise<T> {
     // Fail closed: a missing authority/lock is an assembly error, not a reason to run
     // the write outside the fence. The old catch-and-fallback inverted this guard: the
     // "refusing an unfenced production write" error itself took the fallback path.
-    const lease = await this.lockPort().acquire()
+    const lease = await this.lockPort().acquire(targetKeys)
     try {
       return await task()
     } finally {
@@ -1872,7 +1872,7 @@ export class SkillLibrary {
     // serialize queue (F-208 discipline, like update/patch) — two concurrent
     // create calls for one name used to both pass exists() and double-write
     // (double audit, double mutation event).
-    return await this.rootGate.read(() => this.withTarget('skill::' + normalized, () => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true))))
+    return await this.rootGate.read(() => this.withTarget('skill::' + normalized, () => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true), ['skill::' + normalized])))
   }
 
   private async createCore(
@@ -2075,6 +2075,7 @@ export class SkillLibrary {
     const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       lock: this.lockPort(),
+      targetKeys: ['skill::' + name],
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {
@@ -2299,6 +2300,7 @@ export class SkillLibrary {
     const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       lock: this.lockPort(),
+      targetKeys: [filePath === '' ? 'skill::' + name : 'skill::' + name + '::' + filePath.replace(/\\/g, '/')],
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {
@@ -3819,6 +3821,7 @@ export class SkillLibrary {
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
       serial: this.serial,
       lock: this.lockPort(),
+      targetKeys: ['skill::' + name + '::' + filePath.replace(/\\/g, '/')],
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       hooks: {
         committed: async event => {
