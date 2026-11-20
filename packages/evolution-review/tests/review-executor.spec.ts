@@ -278,7 +278,7 @@ describe('runReview', () => {
       toolAllow: allowed(), writeLocks: locks, owner: 'second', signal: new AbortController().signal,
       markReview: () => {}, clearReview: () => {},
     })
-    expect(second.actions[0]).toMatchObject({ action: 'skill_manage', status: 'error' })
+    expect(second.actions[0]).toMatchObject({ action: 'skill_manage', status: 'error', errorKind: 'busy' })
     releaseResolve?.()
     const firstResult = await first
     expect(firstResult.done).toBe(true)
@@ -303,7 +303,7 @@ describe('runReview', () => {
     })
     expect(result.done).toBe(true)
     expect(result.waitCount).toBe(0)
-    expect(result.actions[0]).toMatchObject({ action: 'skill_manage', status: 'error' })
+    expect(result.actions[0]).toMatchObject({ action: 'skill_manage', status: 'error', errorKind: 'stale' })
     expect(result.actions.some(action => action.action === 'review_wait')).toBe(false)
   })
 

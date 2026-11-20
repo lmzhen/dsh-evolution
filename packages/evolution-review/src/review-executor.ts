@@ -66,6 +66,17 @@ export interface ReviewReport {
 export const REVIEW_DONE_TOOL_NAME = 'review_done'
 
 /** Tool that lets the model wait for a resource lock before re-reading. */
+
+/** Classify a skill-write tool error without importing the write service's enum. */
+function skillErrorKind(text: string): 'stale' | 'busy' | 'unobserved' | 'ambiguous' | 'not-found' | undefined {
+  if (/SKILL_STALE_VERSION/.test(text)) return 'stale'
+  if (/SKILL_RESOURCE_BUSY|resource-busy/.test(text)) return 'busy'
+  if (/SKILL_NOT_OBSERVED/.test(text)) return 'unobserved'
+  if (/SKILL_AMBIGUOUS_EDIT/.test(text)) return 'ambiguous'
+  if (/SKILL_NOT_FOUND/.test(text)) return 'not-found'
+  return undefined
+}
+
 export const REVIEW_WAIT_TOOL_NAME = 'review_wait'
 
 /** Extra instruction appended to aux prompts only; foreground prompts stay unchanged. */
@@ -166,6 +177,7 @@ export interface ReviewAction {
   readonly action: string
   readonly target: string
   readonly status: 'ok' | 'staged' | 'error'
+  readonly errorKind?: 'stale' | 'busy' | 'unobserved' | 'ambiguous' | 'not-found' | undefined
 }
 
 export interface ReviewUsage {
@@ -375,7 +387,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
         const item = byCall.get(call.id)
         const busyResource = busy.get(call.id)
         if (busyResource !== undefined) {
-          actions.push({ type: actionType(call.name), action: call.name, target: toolTarget(call.name, call.arguments), status: 'error' })
+          actions.push({ type: actionType(call.name), action: call.name, target: toolTarget(call.name, call.arguments), status: 'error', errorKind: 'busy' })
           messages.push(createToolResultMessage({
             callId: call.id,
             content: [{ type: 'text', text: 'resource-busy: ' + busyResource + '; call review_wait, then re-read the target and retry' }] as ContentBlock[],
@@ -398,11 +410,14 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
           }))
           continue
         }
+        const errorText = item.result.isError ? item.result.content.map(block => block.type === 'text' ? block.text : '').join('\n') : ''
+        const errorKind = item.result.isError ? skillErrorKind(errorText) : undefined
         actions.push({
           type: actionType(call.name),
           action: call.name,
           target: toolTarget(call.name, call.arguments),
           status: item.result.isError ? 'error' : item.result.content.some(block => block.type === 'text' && /staged id:|已暂存|pending_id/.test(block.text)) ? 'staged' : 'ok',
+          ...(errorKind === undefined ? {} : { errorKind }),
         })
         if (call.name === 'skill' && item.result.isError !== true) {
           try {

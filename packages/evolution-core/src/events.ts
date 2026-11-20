@@ -43,6 +43,8 @@ export interface EvolutionReviewAction {
   readonly action: string
   readonly target: string
   readonly status: 'ok' | 'staged' | 'error'
+  /** Machine-readable failure class for concurrent skill writes; absent on success. */
+  readonly errorKind?: 'stale' | 'busy' | 'unobserved' | 'ambiguous' | 'not-found' | undefined
   readonly revision?: string | undefined
   readonly summary?: string | undefined
 }

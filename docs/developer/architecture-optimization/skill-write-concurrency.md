@@ -905,6 +905,34 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase J.1 activity 区分 stale/busy
+
+已完成：
+
+- `EvolutionReviewAction` 增加可选 `errorKind`：
+  ```text
+  stale | busy | unobserved | ambiguous | not-found
+  ```
+- `review-executor` 对 tool error 归类：
+  - `SKILL_STALE_VERSION` → `stale`；
+  - `SKILL_RESOURCE_BUSY` / `resource-busy` → `busy`；
+  - `SKILL_NOT_OBSERVED` / `SKILL_AMBIGUOUS_EDIT` / `SKILL_NOT_FOUND` 分别归类；
+- review busy 分支直接写 `errorKind: busy`；
+- activity v3 原样序列化 actions，因此记录可区分 stale/busy；旧记录无该字段仍可读。
+
+验证：
+
+```text
+review-executor: 16 passed
+activity store/version gate: 29 passed
+overlay build: 0
+```
+
+边界：
+
+- UI 尚未展示 errorKind；本步只保证 activity/report 数据可区分；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase I.1 stale 不映射 wait 证据
 
 已完成：
