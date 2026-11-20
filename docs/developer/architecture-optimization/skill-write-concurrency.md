@@ -905,6 +905,41 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase D.4 锁替换前的重入地图
+
+替换 per-root serial 前，先固定现有调用图（避免把 deadlock 从 serial 搬到 gate）：
+
+| 入口 | 当前临界区 | 内部是否调用其它 mutator | 新锁归属 |
+|---|---|---|---|
+| `create` | serial + mutationLock | `createCore` 不调 mutator | root shared + body target |
+| `update` | serial | `updateCore` | root shared + body target |
+| `patch` | serial | `patchCore` | root shared + body/support target |
+| `writeSupportFile` | serial?（当前无 serial，内部 unit） | `writeSupportFileCore` | root shared + support target |
+| `removeSupportFile` | serial | `removeSupportFileCore` | root shared + support target |
+| `setPinned` | serial | `setPinnedCore` | root shared + marker target |
+| `archive` | 无 serial（调用方负责） | `archiveCore` | root exclusive |
+| `restoreFromArchive` | 无 serial | `restoreFromArchiveCore` | root exclusive |
+| `consolidate` | serial | 内部调用 `archive()` | root exclusive；archive 必须走“已持门”内部路径 |
+| `commitMerge` | serial（除非 serialized:true） | `archive()` / `restoreFromArchive()` | root exclusive；nested 走内部路径 |
+| `restructure` / `extract` | mutation unit / 调用方锁 | `archive` / `update` | root exclusive 或统一 unit 锁 |
+
+关键约束：
+
+1. `SkillRootGate` 与 `SkillTargetLocks` 都不可重入；
+2. consolidate/commitMerge 不能再调用会重新取根的 `archive()`；必须抽 `archiveUnderExclusive()` 或让 archive 接受 `rootHeld: true`；
+3. `commitMerge` 的 `serialized:true` 语义要改为 `rootHeld:true`；
+4. 结构操作必须先取 root exclusive，再取 target 锁；simple 操作只取 root shared + target；
+5. 跨进程 `transactIo`/HomeFence 保持在 gate 内层，不能反向获取 gate；
+6. 迁移期间 serial 与 gate 不能同时生效，否则同一写会双重排队且重入风险翻倍；
+7. 先按 mutator 分组切换，每组跑定向并发测试；全部切换后再删 ROOT_SERIAL。
+
+下一组实施顺序：
+
+- D.5a：create/update/patch/writeSupport/removeSupport/setPinned 切 root shared + target；
+- D.5b：archive/restore 切 root exclusive，consolidate/commitMerge 改内部路径；
+- D.5c：restructure/extract/unit 操作接入；
+- D.5d：删除 ROOT_SERIAL，保留 transact/HomeFence。
+
 ### 2026-11-20：Phase D.3 root shared/exclusive 门
 
 已完成：
