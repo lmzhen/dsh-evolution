@@ -13,6 +13,7 @@ import { contentHash } from './mutations.ts'
 import type { SkillLibrary, WriteAnchor, WriteOrigin } from './skill-store.ts'
 import type { SkillObservationStore } from './skill-observation.ts'
 import { skillBodyTarget, skillSupportTarget } from './skill-observation.ts'
+import { SkillTargetLocks } from './skill-target-locks.ts'
 
 /** Exact execution identity for observations. */
 export type SkillWriteOwner = object
@@ -39,6 +40,8 @@ export type SkillWriteServiceResult =
  * authoritatively absent and is recorded as such.
  */
 export class SkillWriteService {
+  private readonly locks = new SkillTargetLocks()
+
   constructor(
     private readonly library: SkillLibrary,
     private readonly observations: SkillObservationStore,
@@ -82,9 +85,11 @@ export class SkillWriteService {
     const target = skillBodyTarget(name)
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
-    const result = await this.library.update(name, content, origin, anchorOf(observed.version))
-    if (result.ok) await this.readBody(owner, name)
-    return actionResult(result)
+    return await this.locks.withLock(target.targetKey, async () => {
+      const result = await this.library.update(name, content, origin, anchorOf(observed.version))
+      if (result.ok) await this.readBody(owner, name)
+      return actionResult(result)
+    })
   }
 
   /**
@@ -107,9 +112,11 @@ export class SkillWriteService {
     const target = skillBodyTarget(name)
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
-    const result = await this.library.patch(name, oldString, newString, '', replaceAll, origin, anchorOf(observed.version))
-    if (result.ok) await this.readBody(owner, name)
-    return actionResult(result)
+    return await this.locks.withLock(target.targetKey, async () => {
+      const result = await this.library.patch(name, oldString, newString, '', replaceAll, origin, anchorOf(observed.version))
+      if (result.ok) await this.readBody(owner, name)
+      return actionResult(result)
+    })
   }
 
   /**
@@ -124,9 +131,11 @@ export class SkillWriteService {
     const target = skillSupportTarget(name, filePath)
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
-    const result = await this.library.writeSupportFile(name, filePath, content, origin, anchorOf(observed.version))
-    if (result.ok) await this.readSupport(owner, name, filePath)
-    return actionResult(result)
+    return await this.locks.withLock(target.targetKey, async () => {
+      const result = await this.library.writeSupportFile(name, filePath, content, origin, anchorOf(observed.version))
+      if (result.ok) await this.readSupport(owner, name, filePath)
+      return actionResult(result)
+    })
   }
 
   /** Remove a support file only after this owner read it at the observed version. */
@@ -134,9 +143,11 @@ export class SkillWriteService {
     const target = skillSupportTarget(name, filePath)
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
-    const result = await this.library.removeSupportFile(name, filePath, origin, anchorOf(observed.version))
-    if (result.ok) this.observations.record(owner, target, { kind: 'absent' })
-    return actionResult(result)
+    return await this.locks.withLock(target.targetKey, async () => {
+      const result = await this.library.removeSupportFile(name, filePath, origin, anchorOf(observed.version))
+      if (result.ok) this.observations.record(owner, target, { kind: 'absent' })
+      return actionResult(result)
+    })
   }
 
   /**

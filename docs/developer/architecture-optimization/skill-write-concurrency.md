@@ -884,6 +884,30 @@ delete → service.remove()
 
 - 若某平台 backend 的 `targetKey` 不是 host path，或版本格式不同，监听器不记录；该 read 不授权写，写路径返回 `SKILL_NOT_OBSERVED`。
 
+### 2026-11-20：Phase D.2 service 持有 target lock
+
+已完成：
+
+- `SkillWriteService` 注入 `SkillTargetLocks`；
+- `updateBody` / `patchBody` / `updateSupport` / `removeSupport` 在 library mutator 外层持有对应 targetKey 锁；
+- 当前 library 内部仍有 per-root serial，所以这一步是过渡层：
+  - service 的 target lock 保证同一 target 的 service 写串行；
+  - 不同 target 是否并行仍受 library serial 限制；
+  - 验证语义正确后再拆 library per-root serial。
+
+验证：
+
+```text
+skill-write-service + skill-target-locks: 9 passed
+overlay build:                            0
+```
+
+边界：
+
+- 尚未替换 library 内部 serial；
+- 多文件 unit 尚未接入 withLocks；
+- 审批 replay 仍走旧路径。
+
 ### 2026-11-20：Phase D.1 per-target 锁原语
 
 已完成：
