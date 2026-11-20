@@ -931,6 +931,54 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P0.1 独立复核死锁修复
+
+独立复核发现 3 个 P0，已修复：
+
+**P0-1 archive/restore 取锁顺序**
+
+- 旧：先 target namespace lease，后 rootGate.write；
+- simple 写先 rootGate.read，后 target/namespace；
+- 两者形成 ABBA 死锁，默认配置即可触发；
+- 修复：archive/restore 统一为 rootGate.write 外层，namespace lease 内层；
+- 新增回归：archive + 不同 skill update 并发必须在 10s 内 settle。
+
+**P0-2 commitMerge 内部 archive 重入门**
+
+- 旧：`rootHeld = options.serialized`，commitMerge 自己持门时内部 archive 仍 `rootHeld=false`；
+- 修复：commitMerge 外层始终持 rootGate（serialized 只决定是否再走 serial），内部 archive/restore 固定 `rootHeld=true`；
+- 既有 commit-merge 8 tests 全过。
+
+**P0-3 TargetLockSet release 失败泄漏**
+
+- 旧：release 抛错时跳过 releaseGate/tail 删除，同 key 后续永久挂起；
+- 修复：release 的 `done` 用 try/finally，失败记录 `lastReleaseError` 但不阻断 gate/tail；
+- 多 key 回滚逐 key try/catch；
+- 新增回归：release 抛错后同 key 可再次 acquire。
+
+**配套修复**
+
+- setPinned 恢复 namespace mutation lock，避免 pin 与 update 的 protection 竞态；
+- MutationAuthority 的 TargetLockSet 改为实例级复用，不再每次 getter 新建；
+- commitMerge/consolidate 不再在外层重复取 lockPort（会与内部 unit 的 root fallback 自锁）；
+- archive/restore 的 `rootHeld=true` 分支自己取 namespace key，保证 consolidate/commitMerge 的 sources 也有 keyed 互斥；
+- `SKILL_STALE_VERSION` 等 code 进入 tool message，review executor 的 errorKind 分类在生产路径可命中；
+- authority plugin 增加 schemastery Config schema，拼错开关会在 loader 报错。
+
+验证（P0 修复后）：
+
+```text
+skill-store + commit-merge + serial + consolidate
++ keyed + target locks + mutation unit: 9 files / 133 tests passed
+overlay build: 0
+```
+
+仍保留的已知边界：
+
+- P1-3：平台 `skill` 工具读不产生 `fs/observed`，因此“用 skill 工具加载→写”仍会 NOT_OBSERVED；这是平台观察事件缺口，不在本层伪造授权。
+- consolidate 的 sources 是逐个 archive 时持 namespace key，不是整个 consolidate 全程持全部 key；目标 body unit 一次性持 target keys。跨步骤窗口仍需真实宿主并发验收。
+- 生产 keyed 默认仍 false。
+
 ### 2026-11-20：Phase J.1 activity 区分 stale/busy
 
 已完成：

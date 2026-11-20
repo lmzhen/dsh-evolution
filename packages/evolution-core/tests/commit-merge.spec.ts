@@ -100,9 +100,9 @@ it('commitMerge rolls a created target back when a source archive fails', async 
   await lib.create('src-a', BODY('src-a'), 'foreground')
   const sourceBody = (await lib.read('src-a')) ?? ''
   const original = lib.archive.bind(lib)
-  vi.spyOn(lib, 'archive').mockImplementation(async (name, options, origin) => {
+  vi.spyOn(lib, 'archive').mockImplementation(async (name, options, origin, change, rootHeld) => {
     if (name === 'src-a') return { ok: false, message: 'archive-boom' }
-    return await original(name, options, origin)
+    return await original(name, options, origin, change, rootHeld)
   })
   const result = await lib.commitMerge({
     target: 'umbrella',

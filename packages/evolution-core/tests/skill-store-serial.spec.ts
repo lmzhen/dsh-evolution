@@ -46,6 +46,23 @@ it('consolidate archives its source from inside the serial section — no self-d
   expect((await lib.list()).some(skill => skill.name === 'src-a')).toBe(false)
 })
 
+  it('archive and a concurrent simple write settle instead of deadlocking', async () => {
+    const root = await tempRoot('dsh-evo-archive-gate-'
+    )
+    const lib = new SkillLibrary(root)
+    await lib.create('archive-a', skillOf('archive-a'), 'foreground')
+    await lib.create('update-b', skillOf('update-b'), 'foreground')
+    const both = Promise.all([
+      lib.archive('archive-a'),
+      lib.update('update-b', skillOf('update-b') + '\nupdated'),
+    ])
+    const outcome = await settledWithin(both, 10_000)
+    expect(outcome.ok, 'archive must take rootGate before namespace; simple writes take rootGate first').toBe(true)
+    if (!outcome.ok) return
+    expect(outcome.value[0].ok).toBe(true)
+    expect(outcome.value[1].ok).toBe(true)
+  })
+
 it('the serial chain orders concurrent patches on one file — every marker lands (S2-1)', async () => {
   const root = await tempRoot('dsh-evo-serial-queue-')
   const lib = new SkillLibrary(root)

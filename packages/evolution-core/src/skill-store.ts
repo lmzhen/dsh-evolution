@@ -1798,7 +1798,14 @@ export class SkillLibrary {
     // the other single-file mutators on the in-process serial chain — a
     // concurrent update could otherwise pass its protection check before the
     // marker lands and rewrite a skill the user just froze.
-    return await this.rootGate.read(() => this.withTarget('pin::' + name, () => this.setPinnedCore(name, pinned, origin)))
+    return await this.rootGate.read(async () => {
+      const lease = await this.lockPort().acquire([skillNamespaceKey(name)])
+      try {
+        return await this.withTarget('pin::' + name, () => this.setPinnedCore(name, pinned, origin))
+      } finally {
+        await lease.release()
+      }
+    })
   }
 
   private async setPinnedCore(name: string, pinned: boolean, origin: WriteOrigin): Promise<SkillActionResult> {
@@ -2429,14 +2436,23 @@ export class SkillLibrary {
   }
 
   async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary, rootHeld = false): Promise<SkillActionResult> {
-    if (rootHeld) return await this.archiveCore(rawName, options, origin, false, change)
-    const namespace = skillNamespaceKey(rawName)
-    const lease = await this.lockPort().acquire([namespace])
-    try {
-      return await this.rootGate.write(() => this.archiveCore(rawName, options, origin, false, change))
-    } finally {
-      await lease.release()
+    if (rootHeld) {
+      const lease = await this.lockPort().acquire([skillNamespaceKey(rawName)])
+      try {
+        return await this.archiveCore(rawName, options, origin, false, change)
+      } finally {
+        await lease.release()
+      }
     }
+    const namespace = skillNamespaceKey(rawName)
+    return await this.rootGate.write(async () => {
+      const lease = await this.lockPort().acquire([namespace])
+      try {
+        return await this.archiveCore(rawName, options, origin, false, change)
+      } finally {
+        await lease.release()
+      }
+    })
   }
 
   private async archiveCore(rawName: string, options: ArchiveOptions, origin: WriteOrigin, fenceHeld: boolean, change?: ChangeSummary): Promise<SkillActionResult> {
@@ -2575,14 +2591,14 @@ export class SkillLibrary {
     const protectedSource = sources.find(name => PROTECTED_BUILTIN_SKILLS.has(name))
     if (protectedSource !== undefined) return { ok: false, message: `来源技能「${protectedSource}」是受保护的内置技能。` }
     const limits = plan.limits ?? this.limits
-    const rootHeld = options?.serialized === true
+    const serialized = options?.serialized === true
     const run = async (): Promise<CommitMergeResult> => {
       // A nested merge already holds the home fence; its archive/restore bookkeeping
       // must run inline instead of queueing behind that same lease.
       const fenceHeld = plan.nested === true
       const archive = (name: string, archiveOptions: ArchiveOptions) => fenceHeld
         ? this.archiveCore(name, archiveOptions, plan.origin, true)
-        : this.archive(name, archiveOptions, plan.origin, undefined, rootHeld)
+        : this.archive(name, archiveOptions, plan.origin, undefined, true)
       const dir = this.dirOf(target)
       const targetPath = join(dir, 'SKILL.md')
       if (!plan.targetExists && await this.io.exists(dir)) {
@@ -2688,7 +2704,7 @@ export class SkillLibrary {
         const stuck: string[] = []
         for (const source of [...archived].reverse()) {
           try {
-            const restored = fenceHeld ? await this.restoreFromArchiveCore(source, plan.origin, true) : await this.restoreFromArchive(source, plan.origin, rootHeld)
+            const restored = fenceHeld ? await this.restoreFromArchiveCore(source, plan.origin, true) : await this.restoreFromArchive(source, plan.origin, true)
             if (!restored.ok) stuck.push(source)
           } catch {
             stuck.push(source)
@@ -2879,8 +2895,7 @@ export class SkillLibrary {
       await plan.onPhase?.('unit-written')
       return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
     }
-    if (rootHeld) return await run()
-    return await this.rootGate.write(() => this.serial(run))
+    return await this.rootGate.write(() => serialized ? run() : this.serial(run))
   }
 
   /**
@@ -3592,14 +3607,23 @@ export class SkillLibrary {
    * path back. The `.archive-reason` marker is dropped on restore.
    */
   async restoreFromArchive(rawName: string, origin: WriteOrigin = this.authority.origin, rootHeld = false): Promise<SkillActionResult> {
-    if (rootHeld) return await this.restoreFromArchiveCore(rawName, origin, false)
-    const namespace = skillNamespaceKey(rawName)
-    const lease = await this.lockPort().acquire([namespace])
-    try {
-      return await this.rootGate.write(() => this.restoreFromArchiveCore(rawName, origin, false))
-    } finally {
-      await lease.release()
+    if (rootHeld) {
+      const lease = await this.lockPort().acquire([skillNamespaceKey(rawName)])
+      try {
+        return await this.restoreFromArchiveCore(rawName, origin, false)
+      } finally {
+        await lease.release()
+      }
     }
+    const namespace = skillNamespaceKey(rawName)
+    return await this.rootGate.write(async () => {
+      const lease = await this.lockPort().acquire([namespace])
+      try {
+        return await this.restoreFromArchiveCore(rawName, origin, false)
+      } finally {
+        await lease.release()
+      }
+    })
   }
 
   private async restoreFromArchiveCore(rawName: string, origin: WriteOrigin, fenceHeld: boolean): Promise<SkillActionResult> {

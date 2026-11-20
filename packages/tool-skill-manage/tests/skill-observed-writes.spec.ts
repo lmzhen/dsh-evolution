@@ -94,6 +94,7 @@ describe('tool observed writes', () => {
       const second = await call(ctx, ownerB, { action: 'update', name: 'stale-skill', content: skill('stale-skill', 'B') }, 'stale-b')
       expect((first.value as { ok?: boolean }).ok).toBe(true)
       expect((second.value as { ok?: boolean }).ok).toBe(false)
+      expect((second.value as { message?: string }).message ?? '').toContain('SKILL_STALE_VERSION')
       expect((second.value as { message?: string }).message ?? '').toContain('读取之后被改动过')
     } finally {
       await ctx.fiber.dispose()

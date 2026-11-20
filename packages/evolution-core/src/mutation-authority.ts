@@ -26,8 +26,8 @@ export interface MutationAuthorityOptions {
 export class MutationAuthority {
   private readonly leases: LeaseStore
   private readonly fence: HomeFence
-  private readonly home: string
   private readonly keyed: boolean
+  private readonly targetLocks: TargetLockSet | undefined
 
   /** Lease primitives for run/claim owners (review, approval). */
   get lease(): LeaseStore { return this.leases }
@@ -38,7 +38,7 @@ export class MutationAuthority {
   /** Adapter for MutationUnit call sites; root fence or, when opted in, keyed targets. */
   get mutationLock(): MutationLockPort {
     if (!this.keyed) return this.rootMutationLock
-    return new HybridMutationLock(new TargetMutationLock(new TargetLockSet(this.home)), this.rootMutationLock)
+    return new HybridMutationLock(new TargetMutationLock(this.targetLocks as TargetLockSet), this.rootMutationLock)
   }
 
   private get rootMutationLock(): MutationLockPort {
@@ -55,8 +55,8 @@ export class MutationAuthority {
   }
 
   constructor(options: MutationAuthorityOptions) {
-    this.home = options.home
     this.keyed = options.keyed === true
+    this.targetLocks = this.keyed ? new TargetLockSet(options.home) : undefined
     this.leases = options.leases ?? new LeaseStore({ io: options.io, home: options.home, ...(options.now === undefined ? {} : { now: options.now }) })
     this.fence = options.fence ?? new HomeFence({ io: options.io, home: options.home, ...(options.waitMs === undefined ? {} : { waitMs: options.waitMs }), ...(options.now === undefined ? {} : { now: options.now }) })
   }

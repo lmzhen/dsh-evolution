@@ -132,6 +132,10 @@ function isBusy(error: unknown): boolean {
  */
 export class TargetLockSet {
   private readonly tails = new Map<string, Promise<unknown>>()
+  private releaseError: Error | undefined
+
+  /** Last release failure; diagnostics only, never a reason to wedge the key queue. */
+  get lastReleaseError(): Error | undefined { return this.releaseError }
 
   constructor(
     private readonly home: string,
@@ -165,7 +169,9 @@ export class TargetLockSet {
     try {
       for (const key of ordered) leases.push(await this.acquireKey(key))
     } catch (error) {
-      for (const release of leases.reverse()) await release()
+      for (const release of leases.reverse()) {
+        try { await release() } catch { /* keep releasing the remaining keys */ }
+      }
       throw error
     }
     let released = false
@@ -209,9 +215,14 @@ export class TargetLockSet {
       if (released) return
       released = true
       releaseLock()
-      await done
-      releaseGate()
-      if (this.tails.get(key) === tail) this.tails.delete(key)
+      try {
+        await done
+      } catch (error) {
+        this.releaseError = error instanceof Error ? error : new Error(String(error))
+      } finally {
+        releaseGate()
+        if (this.tails.get(key) === tail) this.tails.delete(key)
+      }
     }
   }
 

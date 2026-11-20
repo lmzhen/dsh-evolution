@@ -852,7 +852,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   function toActionResult(result: SkillWriteServiceResult): SkillActionResult {
     return result.ok
       ? { ok: true, message: result.message, ...(result.noop === true ? { noop: true } : {}) }
-      : { ok: false, message: result.message }
+      : { ok: false, message: result.code === undefined ? result.message : result.code + ': ' + result.message }
   }
 
   async function executeCore(
@@ -1110,9 +1110,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       const supportAction = action === 'write_file' || action === 'remove_file'
       return {
         ok: false,
-        message: supportAction
+        message: 'SKILL_STALE_VERSION: ' + (supportAction
           ? `技能「${name}」的支撑文件「${args.file_path ?? ''}」在这次写入暂存之后发生了变化（或其状态无法验证）。`
-          : `技能「${name}」在这次写入暂存之后发生了变化（内容${result.anchor === 'missing' ? '已不存在' : '哈希不匹配'}）。`,
+          : `技能「${name}」在这次写入暂存之后发生了变化（内容${result.anchor === 'missing' ? '已不存在' : '哈希不匹配'}）。`),
         skills: [],
       }
     }
