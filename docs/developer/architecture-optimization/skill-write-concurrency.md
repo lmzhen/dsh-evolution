@@ -905,6 +905,37 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase D.5d simple mutator 持 root shared
+
+已完成：
+
+- `setPinned` / `create` / `update` / `patch` / `writeSupportFile` / `removeSupportFile` 增加 root shared 外层；
+- 锁顺序固定为：
+  ```text
+  rootGate.read
+    → root serial
+      → target lock
+        → core
+  ```
+- `consolidate` 外层持 root exclusive；
+- consolidate 内部的 archive/restore 改为 `rootHeld=true` 内部路径，避免重新取门；
+- 结构操作仍同时持有 serial，simple 仍同时持有 serial，所以本轮**仍无并行收益**，但 root gate 已覆盖读写两侧。
+
+验证：
+
+```text
+skill-store-serial + skill-consolidate: 17 passed
+tool observed + skill-write-service:   10 passed
+overlay build:                          0
+```
+
+边界：
+
+- simple 还没有移除 serial；
+- restructure/extract 尚未持 root exclusive；
+- 删除 serial 前必须先给 restructure/extract 补门；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase D.5c archive/restore/commitMerge 持 root exclusive
 
 已完成：

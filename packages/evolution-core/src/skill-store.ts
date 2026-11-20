@@ -1797,7 +1797,7 @@ export class SkillLibrary {
     // the other single-file mutators on the in-process serial chain — a
     // concurrent update could otherwise pass its protection check before the
     // marker lands and rewrite a skill the user just froze.
-    return await this.serial(() => this.withTarget('pin::' + name, () => this.setPinnedCore(name, pinned, origin)))
+    return await this.rootGate.read(() => this.serial(() => this.withTarget('pin::' + name, () => this.setPinnedCore(name, pinned, origin))))
   }
 
   private async setPinnedCore(name: string, pinned: boolean, origin: WriteOrigin): Promise<SkillActionResult> {
@@ -1872,7 +1872,7 @@ export class SkillLibrary {
     // serialize queue (F-208 discipline, like update/patch) — two concurrent
     // create calls for one name used to both pass exists() and double-write
     // (double audit, double mutation event).
-    return await this.serial(() => this.withTarget('skill::' + normalized, () => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true))))
+    return await this.rootGate.read(() => this.serial(() => this.withTarget('skill::' + normalized, () => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true)))))
   }
 
   private async createCore(
@@ -2030,7 +2030,7 @@ export class SkillLibrary {
     await this.ensureRecovered()
     // F-208: the whole read→validate→write runs under the in-process serialize
     // queue so two concurrent updates on one skill never interleave.
-    return await this.serial(() => this.withTarget('skill::' + name, () => this.updateCore(name, content, origin, anchor)))
+    return await this.rootGate.read(() => this.serial(() => this.withTarget('skill::' + name, () => this.updateCore(name, content, origin, anchor))))
   }
 
   private async updateCore(name: string, content: string, origin: WriteOrigin, anchor?: WriteAnchor): Promise<SkillActionResult> {
@@ -2113,7 +2113,7 @@ export class SkillLibrary {
     // F-208: the whole read→patch→write runs under the in-process serialize
     // queue so two concurrent patches on one skill never interleave.
     const key = 'skill::' + name + (filePath === '' ? '' : '::' + filePath.replace(/\\/g, '/'))
-    return await this.serial(() => this.withTarget(key, () => this.patchCore(name, oldString, newString, filePath, replaceAll, origin, anchor)))
+    return await this.rootGate.read(() => this.serial(() => this.withTarget(key, () => this.patchCore(name, oldString, newString, filePath, replaceAll, origin, anchor))))
   }
 
   /**
@@ -2983,7 +2983,7 @@ export class SkillLibrary {
     // Every refusal below (protection, missing skill, package integrity)
     // still fires before ANY side effect, so the pre-side-effect refusal
     // semantics are unchanged.
-    return await this.serial(async (): Promise<SkillActionResult> => {
+    return await this.rootGate.write(() => this.serial(async (): Promise<SkillActionResult> => {
       const referenceWrites: TreeChangeWrite[] = []
       // V2 (design §16.7): support files copied into the target from an apply-mode
       // source, staged before any side effect and committed in the same tree change.
@@ -3081,7 +3081,7 @@ export class SkillLibrary {
               throw new Error(`Consolidation aborted: source "${source}" changed while the consolidation ran (its planned bytes are no longer current).`)
             }
           }
-          const result = await this.archive(source, { absorbedInto: targetName })
+          const result = await this.archive(source, { absorbedInto: targetName }, undefined, undefined, true)
           if (!result.ok) throw new Error(result.message)
           archived.push(source)
         }
@@ -3156,7 +3156,7 @@ export class SkillLibrary {
         const failedRestores: string[] = []
         for (const source of archived.reverse()) {
           try {
-            const restored = await this.restoreFromArchive(source)
+            const restored = await this.restoreFromArchive(source, undefined, true)
             if (!restored.ok) failedRestores.push(source)
           } catch {
             // restoreFromArchive never rejects by contract; if it ever does,
@@ -3169,7 +3169,7 @@ export class SkillLibrary {
         }
         return { ok: false, message: `合并失败，已回滚：${reason}` }
       }
-    })
+    }))
   }
 
   /**
@@ -3772,7 +3772,7 @@ export class SkillLibrary {
   ): Promise<SkillActionResult> {
     const name = rawName.trim()
     const key = 'skill::' + name + '::' + filePath.replace(/\\/g, '/')
-    return await this.withTarget(key, () => this.writeSupportFileCore(name, filePath, content, origin, anchor))
+    return await this.rootGate.read(() => this.withTarget(key, () => this.writeSupportFileCore(name, filePath, content, origin, anchor)))
   }
 
   private async writeSupportFileCore(
@@ -3849,7 +3849,7 @@ export class SkillLibrary {
     unitId?: string,
   ): Promise<SkillActionResult> {
     const key = 'skill::' + rawName.trim() + '::' + filePath.replace(/\\/g, '/')
-    return await this.serial(() => this.withTarget(key, () => this.removeSupportFileCore(rawName.trim(), filePath, origin, anchor, unitId)))
+    return await this.rootGate.read(() => this.serial(() => this.withTarget(key, () => this.removeSupportFileCore(rawName.trim(), filePath, origin, anchor, unitId))))
   }
 
   private async removeSupportFileCore(
