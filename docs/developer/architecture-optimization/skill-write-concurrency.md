@@ -905,6 +905,32 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.3 target lock lease
+
+已完成：
+
+- `TargetLockSet.acquireLease(keys)`：
+  - 返回可跨 await 持有的 lease；
+  - 多 key 排序获取，失败时释放已获取 key；
+  - release 幂等；
+  - 保留 in-process per-key FIFO 与跨进程 file lock。
+- 新增 2 个测试：
+  - 同 key 第二个 lease 等待第一个 release；
+  - 多 key lease 释放后可重新获取，队列清零。
+
+验证：
+
+```text
+authority-target-locks: 5 passed
+overlay build:          0
+```
+
+边界：
+
+- 仍是 kernel，没有接 MutationLockPort；
+- 生产 HomeFence global lock 未改；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.2 target lock kernel
 
 已完成：

@@ -155,6 +155,66 @@ export class TargetLockSet {
     return this.tails.size
   }
 
+  /**
+   * Acquire a lease over one or more target keys without running a body.
+   * Keys are normalized/sorted; a failed acquisition releases every already-held key.
+   */
+  async acquireLease(keys: readonly string[]): Promise<{ release(): Promise<void> }> {
+    const ordered = [...new Set(keys)].sort()
+    const leases: Array<() => Promise<void>> = []
+    try {
+      for (const key of ordered) leases.push(await this.acquireKey(key))
+    } catch (error) {
+      for (const release of leases.reverse()) await release()
+      throw error
+    }
+    let released = false
+    return {
+      release: async () => {
+        if (released) return
+        released = true
+        for (const release of leases.reverse()) await release()
+      },
+    }
+  }
+
+  private async acquireKey(key: string): Promise<() => Promise<void>> {
+    const prior = this.tails.get(key) ?? Promise.resolve()
+    let releaseGate!: () => void
+    const gate = new Promise<void>((resolve) => { releaseGate = resolve })
+    const tail = prior.then(() => gate)
+    this.tails.set(key, tail)
+    await prior
+
+    let releaseLock!: () => void
+    const held = new Promise<void>((resolve) => { releaseLock = resolve })
+    let acquiredResolve!: () => void
+    const acquired = new Promise<void>((resolve) => { acquiredResolve = resolve })
+    const done = this.withLockFile(key, async () => {
+      acquiredResolve()
+      await held
+    })
+    done.catch(() => {})
+
+    try {
+      await Promise.race([acquired, done])
+    } catch (error) {
+      releaseGate()
+      if (this.tails.get(key) === tail) this.tails.delete(key)
+      throw error
+    }
+
+    let released = false
+    return async () => {
+      if (released) return
+      released = true
+      releaseLock()
+      await done
+      releaseGate()
+      if (this.tails.get(key) === tail) this.tails.delete(key)
+    }
+  }
+
   private async acquire<T>(keys: readonly string[], index: number, body: () => Promise<T>): Promise<T> {
     const key = keys[index]
     if (key === undefined) return await body()

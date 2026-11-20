@@ -51,4 +51,30 @@ describe('TargetLockSet', () => {
     ])
     expect(order).toEqual(['start', 'end', 'start', 'end'])
   })
+  it('exposes an acquire/release lease for unit lock ports', async () => {
+    const home = await tempRoot('dsh-target-locks-')
+    const locks = new TargetLockSet(home)
+    const first = await locks.acquireLease(['skill::a'])
+    let secondAcquired = false
+    const second = locks.acquireLease(['skill::a']).then(async (lease) => {
+      secondAcquired = true
+      await lease.release()
+    })
+    await sleep(40)
+    expect(secondAcquired).toBe(false)
+    await first.release()
+    await second
+    expect(secondAcquired).toBe(true)
+  })
+
+  it('releases all keys on a multi-key lease', async () => {
+    const home = await tempRoot('dsh-target-locks-')
+    const locks = new TargetLockSet(home)
+    const lease = await locks.acquireLease(['skill::b', 'skill::a'])
+    await lease.release()
+    const next = await locks.acquireLease(['skill::a', 'skill::b'])
+    await next.release()
+    expect(locks.size).toBe(0)
+  })
+
 })
