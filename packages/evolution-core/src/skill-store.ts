@@ -2625,7 +2625,7 @@ export class SkillLibrary {
       const keyed = this.keyedTargetLocks()
       const archive = async (name: string, archiveOptions: ArchiveOptions): Promise<SkillActionResult> => {
         if (!fenceHeld) return await this.archive(name, archiveOptions, plan.origin, undefined, true, sourceHeld)
-        if (!keyed) return await this.archiveCore(name, archiveOptions, plan.origin, true)
+        if (!keyed || sourceHeld) return await this.archiveCore(name, archiveOptions, plan.origin, true)
         const lease = await this.lockPort().acquire([skillNamespaceKey(name)])
         try {
           return await this.archiveCore(name, archiveOptions, plan.origin, true)
@@ -2635,7 +2635,7 @@ export class SkillLibrary {
       }
       const restore = async (source: string): Promise<SkillActionResult> => {
         if (!fenceHeld) return await this.restoreFromArchive(source, plan.origin, true, sourceHeld)
-        if (!keyed) return await this.restoreFromArchiveCore(source, plan.origin, true)
+        if (!keyed || sourceHeld) return await this.restoreFromArchiveCore(source, plan.origin, true)
         const lease = await this.lockPort().acquire([skillNamespaceKey(source)])
         try {
           return await this.restoreFromArchiveCore(source, plan.origin, true)

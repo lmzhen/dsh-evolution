@@ -931,6 +931,22 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.12 nested merge 不再重复取 source lease
+
+复核发现 b69765ba 在 keyed + nested 下外层已取 sources key，fenceHeld 分支又对同一 source 取一次，导致自死锁。
+
+修复：
+
+- `fenceHeld` 分支判断 `if (!keyed || sourceHeld)` → 走 archiveCore/restoreCore；
+- 新增 keyed + nested commitMerge 回归（20s 内 settle）。
+
+验证：
+
+```text
+skill-keyed-concurrency: 6 passed
+overlay build: 0
+```
+
 ### 2026-11-20：Phase P1.11 merge 统一 S→T 锁序
 
 复核发现 keyed 下 consolidate 为 S→T（sources 先、target 后），merge 为 T→S（target 先、sources 后），同 target/有交集时可能互锁。

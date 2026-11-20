@@ -97,6 +97,29 @@ describe('keyed SkillLibrary concurrency', () => {
     expect(outcome[1].ok).toBe(true)
   }, 30_000)
 
+  it('does not deadlock keyed nested commitMerge on its own source keys', async () => {
+    const { lib } = await setup()
+    const sourceBody = (await lib.read('a')) ?? ''
+    const outcome = await Promise.race([
+      lib.commitMerge({
+        target: 'c',
+        targetExists: false,
+        sources: ['a'],
+        body: skill('c', 'c body'),
+        supportFiles: [],
+        expectedTargetBody: null,
+        expectedSourceBodies: [{ name: 'a', body: sourceBody }],
+        origin: 'foreground',
+        nested: true,
+        summary: 'keyed nested merge',
+      }),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 20_000)),
+    ])
+    expect(outcome).not.toBeNull()
+    if (outcome === null) return
+    expect(outcome.ok).toBe(true)
+  }, 30_000)
+
   it('does not deadlock consolidate under the keyed hybrid lock', async () => {
     const { lib } = await setup()
     const outcome = await Promise.race([
