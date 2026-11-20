@@ -617,3 +617,10 @@ interface EvolutionReviewActivityRecordV3 {
   - PTC control 匹配从子串改为 `review-child:<taskId>:` 前缀，降低误配。
 - 复核 P2 剩余：PTC `review_done` 的“program 内唯一动作”仍未强校验；control 无负向误配测试（已收紧前缀）；这些不阻塞 native/default，但 PTC 发布说明应保留边界。
 - 复验：adapter 4 + PTC channel 2 + executor 13 = 19 passed；临时真实 PTC 栈 1 项全流程（run_code → review_done → completion → dispose 后 child 消失、父 seq 0）通过。
+
+### Round 33（2026-11-20，独立复核最终结论）
+
+- 第二次独立复核在生命周期修复上发现一个新的 P1 回归：`index.ts` 仍把已带 `aux-` 前缀的 `reviewId` 再拼一次，child Session id 变成 `review-child:aux-aux-<uuid>:N`，与 `controlFor` 的 `review-child:<reviewId>:` 前缀不匹配；真实 PTC 在 ALS 丢失时 `review_done` 会再次 `ok:false`。
+- 修复：`createReviewChildAgent(agent, reviewId, …)` 直接传 `reviewId`；测试改用生产形状 `review-child:aux-review-2:0` + key `aux-review-2`；adapter 断言 sanitize 后的 child id 前缀。
+- 复核复验：**P0=0，P1=0**。原生命周期 P1 已关闭；新前缀回归已关闭。
+- 仍保留 P2（不阻塞）：PTC `review_done` 的 program 内唯一动作未强校验；跨包 id 不变量测试可再从 adapter 输出派生；无 sessions 有 plugin 的 mock ctx 泄漏（真实 Cordis 不可达）；`inject:['sessions']` 缺失时可能等待而非 fail-closed。
