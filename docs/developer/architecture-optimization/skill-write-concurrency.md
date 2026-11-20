@@ -905,6 +905,69 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.1 scoped authority 设计
+
+目标：让不同 skill target 的写入跨进程并行，同时保留同 target 互斥与结构操作互斥。
+
+### 锁模型
+
+```text
+HomeAuthority
+  tree global lock      <home>/.authority/home.lock
+  target lock(file)      <home>/.authority/targets/<sha256(targetKey)>.lock
+  state lock             <home>/.authority/state.lock
+```
+
+- targetKey 是 `skill::name` 或 `skill::name::path`；
+- 每个 target 一个 lock file；
+- 不同 target 的 lock file 独立，因此不同 skill 可以并行；
+- 结构操作需要锁住它影响的全部 target：
+  - archive/restore：目标 skill 的 body key（以及该 skill 所有 support key？见下）；
+  - consolidate/commitMerge：target + 所有 sources；
+  - restructure/extract：source + target；
+- 多 target 按字典序获取，逆序释放，避免死锁。
+
+### 结构操作与 support 的问题
+
+一个 skill 的 support 文件与 body 共享目录，archive 会移动整棵树。因此：
+
+- archive/restore 除了 body target，还需覆盖该 skill 的所有 **已知 support key**；
+- 未知/新增 support 在 archive 时可能漏锁；
+- 解决：结构操作额外持有一个 **skill namespace lock**（`skill::name::*`），simple support 写同时持 namespace lock 的 shared 语义；
+- 平台只有 exclusive file lock，没有 shared；因此先采用简化协议：
+  - simple 写：target lock；
+  - 结构操作：skill namespace lock（exclusive）+ 所有已知 target lock；
+  - simple support write 在 target lock 之外再取 namespace lock（exclusive）——会与同 skill body 写串行，但不同 skill 仍并行。
+
+### HomeAuthority API 变更
+
+```ts
+runExclusive(scope, body)
+runTargets(targetKeys: readonly string[], body)  // sorted exclusive target locks
+runNested(...)
+```
+
+- `runTargets` 内部：去重 → 排序 → 逐个获取 keyed file lock → 执行 → 逆序释放；
+- in-process FIFO 按 key；不同 key 不排队；
+- state 锁仍在 target 锁内层；
+- global tree 锁只用于 snapshot/retention/跨树操作，不再包住普通 skill 写。
+
+### MutationAuthority / UnitTransaction 接线
+
+- `MutationLockPort.acquire(targetKeys?: readonly string[])`；
+- SkillLibrary 为每次 simple 写传一个 key；
+- UnitTransaction 把 `targetKeys` 传给 lock port；
+- 结构操作传 skill namespace key + 已知 support keys；
+- recovery / snapshot 继续使用 global tree lock。
+
+### 失败与回退
+
+- 旧部署若没有 keyed lock API：回退到 global tree lock（当前行为）；
+- 任一 key 获取超时 → AuthorityBusyError；
+- 结构操作锁集不完整 → 拒绝并明确提示，不降级为无锁；
+- 迁移期间不混用 global + keyed；
+- 全量测试覆盖同 target/不同 target/跨进程/结构阻塞。
+
 ### 2026-11-20：Phase D.5f 剩余串行的真实位置
 
 新事实（读 `authority.ts` / `mutation-authority.ts`）：
