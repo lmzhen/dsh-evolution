@@ -1,6 +1,6 @@
 # Aux Review 目标重构设计
 
-> 状态：设计稿（2026-11-20），待评审后实施。
+> 状态：已实施（2026-11-20）；native/PTC 真机验收通过，独立复核 P0=0/P1=0；待用户确认版本与发布。
 > 范围：`evolution-review` 的 aux 后台 review；前台 inject 保持不变。
 > 依据：`docs/developer/architecture-optimization/aux-review-completion.md` 的决策与平台/插件代码现状。
 > 目标：一次解决完成语义、memory/skill 拆分并行、PTC 通道、锁等待、多会话并发；不为单轮工具失败做自动 rebase，不为 desktop/web 共用 home 增加跨进程补丁。
@@ -355,6 +355,23 @@ interface EvolutionReviewActivityRecordV3 {
 - 前台 inject：现有 combined 行为不变。
 - activity v2 记录可读，v3 记录可分 kind/status。
 
+### 13.1 验收状态（2026-11-20）
+
+| 项 | 状态 | 证据 |
+|---|---|---|
+| 轮数/时间/无 done/夹带 → partial | 已验收 | `review-executor` 单测 |
+| review_done 单独调用 → completed | 已验收 | 单测 + native/PTC 真机 |
+| 同 session memory+skill 并行 | 已验收 | PTC 真机启动相差 33 ms，两 task completed |
+| 不同 session 并发 | 代码/单测 | limiter + 独立 task；未单独真机计时 |
+| 同 skill 两 session 冲突 wait/重读/CAS | 单测 | `ReviewWriteLocks` + executor busy 分支；**未做真实双会话写冲突** |
+| 不同 skill 并发 | 单测 | limiter 独立槽；未单独真机计时 |
+| review_wait 超时 → partial | 已验收 | 单测 |
+| PTC memory/skill completed | 已验收 | 真机 activity v3 + UI 截图 |
+| PTC 父 seq 不变 / child dispatch | 已验收（PTC 帧不进父日志；child 已执行 run_code/review_done） | 持久日志无 `ptc-dispatch`；activity actions |
+| PTC child cwd/sandbox/approval | 部分 | 真机 read 路径成功说明 cwd 继承；写/审批未单独覆盖 |
+| 前台 inject combined | 已验收 | 单测 + 现有行为回归 |
+| activity v2 可读 / v3 分 kind/status | 已验收 | activity 24 项 + UI |
+
 ## 14. 非目标
 
 - 不做逐位置技能修改校验；信任模型 agent 能力。
@@ -630,3 +647,14 @@ interface EvolutionReviewActivityRecordV3 {
 - 本地 `run-gates.mjs local --lane ci-static --concurrency 4` 在最终 HEAD 上：pass=57、fail=0、cannotDecide=1（gate-29 只因 `<plane home>` 占位参数无法解析）、skipped=1（gate-75 的 CI workspace 相对路径）。
 - gate-29 单独用真实 home 复跑：`verify-write-inventory ... --home D:\dsh-homes\web` exit 0（34 sites / 6 symbols / 33 paths）。
 - 因此本地静态门禁实际无 fail；CI 形态应由 action 注入 `$RUNNER_TEMP/plane-home`。尚未执行 pre-tag/CI 与真实发布。
+
+### Round 35（2026-11-20，剩余项台账收口）
+
+- 设计文档状态从“设计稿”改为“已实施”，完成语义/PTC/并行/UI 的验收状态见 §13.1。
+- 明确仍保留、未在本轮关闭的项：
+  1. **真实双会话同 skill 写冲突**：已有 `ReviewWriteLocks`/busy/wait 单测，未在真实宿主制造两个并发写并观察 wait→重读→CAS。
+  2. **PTC child 的写路径 sandbox/approval**：真机 read 路径成功，cwd 继承已间接验证；写/审批未单独覆盖。
+  3. **PTC `review_done` program 内唯一动作**：提示词要求，但未在 PTC 侧强校验（P2）。
+  4. **排队超时/可配置并发**：当前固定 limiter=2，未实现 `queue-timeout` 状态或 `maxConcurrentReviews` 配置（P2）。
+  5. **pre-tag/CI、release evidence、唯一最终发布**：需用户确认版本/时机后执行。
+- 上述 1/2 不阻塞 native/default，但发布说明必须写明 PTC 写/审批验收边界；3/4 为 P2。
