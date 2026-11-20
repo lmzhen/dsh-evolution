@@ -931,6 +931,31 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1 默认 public archive fence 恢复
+
+独立复核 P0=0 后的 P1 修复：
+
+- public archive/restore 在非 keyed（默认 HomeFence）端口下恢复取 fence lease；
+  - root gate 外层 → fence lease 内层 → core；
+  - audit 已 `fenceHeld=true`，不会再自死锁；
+  - rootHeld/nested 非 keyed 仍跳过，由外层 fence 覆盖；
+- commitMerge `serialized=true` 不再新取 rootGate，避免 serial→fence→gate 与 gate→serial 的相反顺序。
+
+验证：
+
+```text
+serial + keyed + commit-merge + fence-lease: 17 passed
+overlay build: 0
+```
+
+剩余 P1：
+
+- consolidate sources 逐 archive 窗口；
+- release 失败后锁文件残留、无 repair 消费；
+- keyed 空 keys 回退 fence / recover keyless；
+- `SKILL_AMBIGUOUS_EDIT` 不可达；
+- 真实 npm web 并发验收未做。
+
 ### 2026-11-20：Phase P0.6 merge 恢复改用 fence.run
 
 修复独立复核指出的既有 P0：

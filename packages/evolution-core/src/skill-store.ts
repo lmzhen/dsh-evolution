@@ -2457,7 +2457,6 @@ export class SkillLibrary {
     }
     const namespace = skillNamespaceKey(rawName)
     return await this.rootGate.write(async () => {
-      if (!this.keyedTargetLocks()) return await this.archiveCore(rawName, options, origin, true, change)
       const lease = await this.lockPort().acquire([namespace])
       try {
         return await this.archiveCore(rawName, options, origin, true, change)
@@ -2925,7 +2924,8 @@ export class SkillLibrary {
       await plan.onPhase?.('unit-written')
       return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
     }
-    return await this.rootGate.write(() => serialized ? run() : this.serial(run))
+    if (serialized) return await run()
+    return await this.rootGate.write(() => this.serial(run))
   }
 
   /**
@@ -3648,7 +3648,6 @@ export class SkillLibrary {
     }
     const namespace = skillNamespaceKey(rawName)
     return await this.rootGate.write(async () => {
-      if (!this.keyedTargetLocks()) return await this.restoreFromArchiveCore(rawName, origin, true)
       const lease = await this.lockPort().acquire([namespace])
       try {
         return await this.restoreFromArchiveCore(rawName, origin, true)
