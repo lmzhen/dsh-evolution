@@ -905,6 +905,28 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.15 多 target 单元全量 CAS 证据
+
+已完成：
+
+- `MutationUnit` 测试：
+  - 两个 target 的 write；
+  - B 的 expected 与当前值不一致；
+  - 整个 unit 失败；
+  - A 保持原值，B 保持并发写入后的值；
+  - 无部分写入。
+- 验证：
+  ```text
+  mutation-unit: 25 passed
+  overlay build: 0
+  ```
+
+边界：
+
+- 这是 unit kernel 证据；真正多文件业务 unit（restructure/extract）已有同构事务；
+- 审批 side 仍是单 target staged record：当前 tool 一次只暂存一个 target，`staged_from_sha256` 单 anchor 足够；多 target 审批 unit 尚未暴露；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.14 HMR 观察清空证据
 
 已完成：

@@ -62,6 +62,21 @@ describe('MutationUnit executor', () => {
     expect(() => new MutationUnit({ io: new MemoryIo(), limits: LIMITS })).toThrow(/lock.*nested/i)
   })
 
+  it('aborts a multi-target unit without partial writes when one target is stale', async () => {
+    const io = new MemoryIo()
+    io.files.set('source/A.md', 'oldA')
+    io.files.set('source/B.md', 'changedB')
+    const result = await unit(io).apply(request({
+      ops: [
+        { kind: 'write', target: 'source/A.md', content: 'newA', expected: 'oldA', skill: 'source' },
+        { kind: 'write', target: 'source/B.md', content: 'newB', expected: 'oldB', skill: 'source' },
+      ],
+    }))
+    expect(result.ok).toBe(false)
+    expect(io.files.get('source/A.md')).toBe('oldA')
+    expect(io.files.get('source/B.md')).toBe('changedB')
+  })
+
   it('passes canonical target keys to a keyed lock port', async () => {
     const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
     const seen: Array<readonly string[] | undefined> = []
