@@ -882,6 +882,29 @@ delete → service.remove()
 - 若最终复核不接受双 token，则回退为“只允许能同步取得完整内容的读作为写许可”；通用 read 不授权写，需用户在 skill 管理路径显式读。
 - 该回退会降低后台 review 的可用性，但不会产生错误的写许可。
 
+### 2026-11-20：Phase B.1 纯写意图原语
+
+已完成：
+
+- 新增 `packages/evolution-core/src/skill-write-intent.ts`
+  - `SkillWriteCurrent`：present(version, content) / absent；
+  - `SkillWriteIntent`：createIfAbsent / replaceIfVersion / editIfVersion；
+  - `decideSkillWrite(intent, current)`：纯决策，无 IO、锁、session；
+  - `decideLiteralEdit()`：版本校验后唯一匹配 / 显式 replaceAll；
+  - `skillContentVersion()`：LF 归一 sha256。
+- 语义与平台 edit 对齐：
+  - **先版本，后 old_string**；不同区域但版本变化仍 stale；
+  - 默认唯一匹配；
+  - 未匹配 / 歧义 / 空 old_string / no-op 都是 typed refusal；
+  - version 在纯原语中保持 opaque，调用方决定平台 FsVersion 还是 content sha。
+- 7 个单测：create、replace、版本先于匹配、唯一/多匹配、replaceAll、非法输入、内容版本。
+
+边界：
+
+- 尚未接入 SkillLibrary/tool；
+- 尚未有锁；
+- 尚未改变任何现有写入行为。
+
 ### 2026-11-20：Phase A.4 平台观察订阅
 
 已完成：
