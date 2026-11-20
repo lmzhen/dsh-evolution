@@ -281,6 +281,8 @@ export interface SkillActionResult {
    * not satisfy: nothing was written. Carries {@link SkillActionResult.anchor}
    * so a caller with staged-replay wording can translate it (v35 C9). */
   stale?: true
+  /** old_string matched more than once and replace_all was not requested. */
+  ambiguous?: true
   /** The locked read's verdict for the caller's anchor. */
   anchor?: AnchorVerdict
 }
@@ -2239,7 +2241,13 @@ export class SkillLibrary {
       if (oldString === '' || trimPatternBoundaries(oldString) === '') {
         return { result: { ok: false, message: `old_string is empty (or whitespace-only) — a patch of "${name}/${patchLabel}" needs an anchor; use update for a full rewrite.` }, write: null }
       }
-      const patched = fuzzyPatch(md, oldString, newString, replaceAll)
+      if (!replaceAll && oldString !== '') {
+    const first = md.indexOf(oldString)
+    if (first >= 0 && md.indexOf(oldString, first + oldString.length) >= 0) {
+      return { result: { ok: false, message: `在「${name}/${patchLabel}」里 old_string 出现了多次；请缩小锚点或显式 replace_all=true。`, ambiguous: true }, write: null }
+    }
+  }
+  const patched = fuzzyPatch(md, oldString, newString, replaceAll)
       // `null` means "no match" or (V7-11) the replaceAll loop exceeded the
       // cumulative fuzzy budget; an empty string is a legitimate replacement.
       if (patched === null) return { result: { ok: false, message: `在「${name}/${patchLabel}」里找不到 old_string（或 replaceAll 的模糊匹配预算已用尽）。整篇重写请改用 update。` }, write: null }

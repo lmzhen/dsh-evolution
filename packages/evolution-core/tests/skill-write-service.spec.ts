@@ -75,6 +75,19 @@ describe('SkillWriteService observations', () => {
       expect.objectContaining({ ok: true }),
     )
   }, 30_000)
+  it('returns SKILL_AMBIGUOUS_EDIT unless replace_all is explicit', async () => {
+    const { service } = await setup()
+    const owner = {}
+    await service.readBody(owner, 'write-service')
+    expect((await service.updateBody(owner, 'write-service', body('dup\ndup\n'))).ok).toBe(true)
+    await service.readBody(owner, 'write-service')
+    expect(await service.patchBody(owner, 'write-service', 'dup', 'DUP')).toEqual(
+      expect.objectContaining({ ok: false, code: 'SKILL_AMBIGUOUS_EDIT' }),
+    )
+    await service.readBody(owner, 'write-service')
+    expect(await service.patchBody(owner, 'write-service', 'dup', 'DUP', true)).toEqual(expect.objectContaining({ ok: true }))
+  }, 30_000)
+
   it('keeps a review child owner independent from its parent session', async () => {
     const { service } = await setup()
     const parent = { kind: 'parent-session' }

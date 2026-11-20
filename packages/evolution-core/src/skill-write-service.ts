@@ -201,8 +201,9 @@ function refusal(kind: 'unobserved' | 'absent'): SkillWriteServiceResult {
 
 function anchorOf(version: string): WriteAnchor { return { sha256: version } }
 
-function actionResult(result: { ok: boolean; message: string; noop?: boolean; stale?: true; anchor?: 'match' | 'drift' | 'missing' }): SkillWriteServiceResult {
+function actionResult(result: { ok: boolean; message: string; noop?: boolean; stale?: true; ambiguous?: true; anchor?: 'match' | 'drift' | 'missing' }): SkillWriteServiceResult {
   if (result.ok) return { ok: true, message: result.message, ...(result.noop === true ? { noop: true } : {}) }
   if (result.stale === true) return { ok: false, code: 'SKILL_STALE_VERSION', message: result.message }
+  if (result.ambiguous === true) return { ok: false, code: 'SKILL_AMBIGUOUS_EDIT', message: result.message }
   return { ok: false, code: 'SKILL_INVALID', message: result.message }
 }

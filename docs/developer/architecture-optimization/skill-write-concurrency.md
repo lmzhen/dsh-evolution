@@ -931,6 +931,20 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.3 ambiguous edit 可达
+
+- `SkillLibrary.patch` 在 `replace_all=false` 且 exact old_string 出现多次时返回 `ambiguous: true`；
+- `SkillWriteService.actionResult` 映射为 `SKILL_AMBIGUOUS_EDIT`；
+- 新增测试：重复锚点拒绝；`replace_all=true` 成功；
+- 默认唯一匹配语义落地，显式 `replace_all` 才全替。
+
+验证：
+
+```text
+skill-write-service: 7 passed
+overlay build: 0
+```
+
 ### 2026-11-20：Phase P1.2 consolidate 全程持 source keys
 
 - consolidate 在 keyed 模式下，于 root gate 内先获取所有 source 的 namespace keys，再进入 serial/body；
