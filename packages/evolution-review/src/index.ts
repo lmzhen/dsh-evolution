@@ -1085,9 +1085,11 @@ function snapshotReviewParent(agent: Agent): Agent {
     }
     // The minimal preset deliberately has no skill loader/catalog; the runtime
     // guard hides the family tools, and no auxiliary review should be scheduled.
-    const activePreset = (ctx.get('sessionProjections') as {
+    const projectedPreset = (ctx.get('sessionProjections') as {
       snapshot?(target: unknown, keys?: readonly string[]): { values?: Record<string, unknown> } | undefined
     } | undefined)?.snapshot?.(session, ['agentPreset'])?.values?.agentPreset
+    const headerPreset = (session as { header?: { agentPreset?: unknown } }).header?.agentPreset
+    const activePreset = typeof projectedPreset === 'string' ? projectedPreset : typeof headerPreset === 'string' ? headerPreset : undefined
     if (activePreset === 'minimal') {
       releaseKind()
       ctx.logger.info('dsh-evolution-review: minimal preset has no family review surface')

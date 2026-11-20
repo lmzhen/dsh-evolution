@@ -45,7 +45,7 @@ export function nativeReviewToolChannel(
     // Cache-stability: the provider sees the same catalog as the parent. The
     // allowlist is enforced below, before any tool executes.
     visibleTools: (header?.tools ?? []) as readonly ToolSchema[],
-    instruction: 'Use only the review tools in this catalog. Any other tool call is rejected before execution.',
+    instruction: 'Use only the review tools in this catalog (skill_manage, memory, skill, skill_search, read, glob, grep). Any other tool call is rejected before execution.',
     async execute(calls, signal) {
       const runnable = calls.filter(call => toolAllow.has(call.name))
       if (runnable.length === 0) return { results: calls.map(blocked) }

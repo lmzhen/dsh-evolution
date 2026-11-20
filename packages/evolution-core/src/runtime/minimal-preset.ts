@@ -64,7 +64,12 @@ export function installMinimalPresetGuard(ctx: Context): void {
       try { return tools.get?.(name, agent) !== undefined } catch { return false }
     })
     if (known.length === 0) return
-    disposers.set(key, tools.restrict({ deny: known }))
+    try {
+      disposers.set(key, tools.restrict({ deny: known }))
+    } catch (error) {
+      // A guard failure must never veto agent creation; the next sync retries.
+      ctx.logger.warn('dsh-evolution-core: minimal preset tool restriction failed: ' + (error instanceof Error ? error.message : String(error)))
+    }
   }
 
   ctx.inject(['agents'], child => {
