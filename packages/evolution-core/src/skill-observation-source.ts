@@ -14,7 +14,7 @@
  * @module @deepseek-ai/dsh-evolution-core/skill-observation-source
  */
 import { relative, resolve, isAbsolute } from 'node:path'
-import type { SkillObservationStore, SkillTarget } from './skill-observation.ts'
+import type { SkillObservedVersion, SkillObservationStore, SkillTarget } from './skill-observation.ts'
 import { skillBodyTarget, skillSupportTarget } from './skill-observation.ts'
 
 /** One platform observation, already reduced to the values the store needs. */
@@ -22,7 +22,7 @@ export interface FsSkillObservation {
   /** Absolute host path of the read target. */
   readonly hostPath: string
   /** Platform `FsVersion` or another opaque freshness token. */
-  readonly version: string
+  readonly version: SkillObservedVersion
 }
 
 /**

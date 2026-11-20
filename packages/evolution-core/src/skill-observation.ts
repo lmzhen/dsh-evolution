@@ -15,6 +15,17 @@
 import { contentHash } from './mutations.ts'
 
 /** The skill content version used by all observations and write intents. */
+/**
+ * The freshness token an observation carries.
+ *
+ * The source decides its basis: the platform `fs` edge uses its opaque
+ * `FsVersion`, while a path that has the full canonical bytes may use a
+ * content version. The store never reinterprets the token, so the same
+ * observation cannot silently change meaning between read and write.
+ */
+export type SkillObservedVersion = string
+
+/** The content identity used by semantic anchors (staged snapshots, history). */
 export type SkillContentVersion = string
 
 /**
@@ -33,7 +44,7 @@ export interface SkillTarget {
 
 /** One authoritative read observation. */
 export type SkillObservation =
-  | { readonly kind: 'present'; readonly version: SkillContentVersion }
+  | { readonly kind: 'present'; readonly version: SkillObservedVersion }
   | { readonly kind: 'absent' }
 
 /** Any object with stable identity: a session, a review task, a run handle. */
@@ -124,7 +135,7 @@ export class SkillObservationStore {
    * Resolve the observation a writer may rely on.
    * @returns the present version, or the refusal that names why it is unusable.
    */
-  requirePresent(owner: SkillObservationOwner, target: SkillTarget): { readonly version: SkillContentVersion } | SkillObservationRefusal {
+  requirePresent(owner: SkillObservationOwner, target: SkillTarget): { readonly version: SkillObservedVersion } | SkillObservationRefusal {
     const observation = this.get(owner, target)
     if (observation === undefined) return { kind: 'unobserved' }
     if (observation.kind === 'absent') return { kind: 'absent' }

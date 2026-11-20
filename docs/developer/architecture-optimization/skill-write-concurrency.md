@@ -855,6 +855,33 @@ delete → service.remove()
 
 ## 14. 实施记录
 
+### 2026-11-20：DCR-1 双版本角色（待最终复核）
+
+新事实：
+
+- 通用 `read` 只给平台 `FsVersion`（`dev:ino:size:mtimeNs:ctimeNs`）+ 可能截断的窗口内容；
+- 读结果可能按行截断（`readMaxLineLength`）、按字节截断（`readMaxBytes`）、只读窗口；
+- 因此不能从通用 read 结果安全重建“整文件 canonical bytes 的 sha256”。
+
+决定：
+
+- **freshness token**（用于 observation / `replaceIfVersion` / stale 判定）由观察源决定：
+  - 平台 fs 读 → 平台 opaque `FsVersion`；
+  - 能同步拿到完整 canonical bytes 的路径（如 SkillLibrary 自身 read）→ content sha。
+- **content sha** 继续作为语义身份/anchor：staged snapshot、history、unit fingerprint、审批快照。
+- 两种 token 不混用：`SkillObservedVersion` 只表示 freshness，`SkillContentVersion` 只表示内容身份。
+
+影响：
+
+- `SkillWriteService` 的 CAS 比较必须使用与 observation 同源的 freshness token；
+- 若某路径只能给 content sha，它只能在该路径内做 CAS，不能拿去和平台 `FsVersion` 比较；
+- 审批暂存继续使用 content sha（因为审批需要“字节内容未变”的语义），执行时另做 freshness CAS。
+
+回退：
+
+- 若最终复核不接受双 token，则回退为“只允许能同步取得完整内容的读作为写许可”；通用 read 不授权写，需用户在 skill 管理路径显式读。
+- 该回退会降低后台 review 的可用性，但不会产生错误的写许可。
+
 ### 2026-11-20：Phase A.2 平台观察入口映射
 
 已完成：
