@@ -905,6 +905,35 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase D.5f 剩余串行的真实位置
+
+新事实（读 `authority.ts` / `mutation-authority.ts`）：
+
+- simple mutator 移除 serial 后仍无并行，根因不在 SkillLibrary：
+  ```text
+  MutationAuthority.mutationLock
+    → HomeFence.acquire()
+    → HomeAuthority.runExclusive('tree')
+    → 固定锁文件 <home>/.authority/home.lock
+  ```
+- 该锁是 home-wide、跨进程唯一；所有 `UnitTransaction` / create / update / patch / support 写都经过它。
+- 因此 per-target lock 只能做进程内同 target 串行，不能带来跨进程并行。
+
+设计选择：
+
+1. **保留 HomeFence root 锁**（当前）：正确性最好，跨进程简单，但没有并行收益；
+2. **Scoped authority**：为每个 skill target 建独立锁文件，同时保留一个全局 tree intent 锁；
+   - 结构操作取全局 exclusive；
+   - simple 取 target lock，并检查全局 intent；
+   - 需要跨进程读写锁语义，不能只用单文件 lock；
+   - 是新的 authority 层重构，不是 SkillLibrary 局部改动。
+
+当前决定：
+
+- 不把 HomeFence 偷偷降级成进程内锁；
+- 先把 scoped authority 作为独立设计项，不在本轮改；
+- 现有 target lock / root gate 保留，作为未来 scoped authority 的进程内部分。
+
 ### 2026-11-20：Phase D.5e simple mutator 移除 root serial
 
 已完成：
