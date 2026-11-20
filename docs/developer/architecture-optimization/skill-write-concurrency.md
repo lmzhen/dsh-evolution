@@ -931,6 +931,38 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.5 pre-tag 静态门禁
+
+本轮跑完整 pre-tag 静态门禁（69 条）：
+
+- pass 59；
+- fail 2（已修）；
+- cannot-decide 6（4 条已登记环境缺输入，2 条超时）；
+- skipped 2。
+
+已修：
+
+1. gate-06 dependency closure：
+   - `skill-observations.ts` 的 `dsh-fs` 类型导入恢复；
+   - `tool-skill-manage` peerDependencies 声明 `@deepseek-ai/dsh-fs`；
+2. gate-46 check-taxonomy：
+   - 14 个新增 spec 补 `// @tier fast`；
+   - 重新生成 `packages/scripts/reports/check-taxonomy.json`。
+
+验证：
+
+```text
+verify-dependency-closure: OK（0 undeclared）
+gen-check-taxonomy --check: OK（5 lanes）
+overlay build: 0
+```
+
+剩余 cannot-decide：
+
+- gate-01/05：本机没有 harness-0.2.1 平台 checkout；
+- gate-07/24：verify-arch-guards/verify-arming 180s 超时（单独跑 arch-guards 已 OK）；
+- gate-29/81：本机缺 prepare 专有输入/健康语料。
+
 ### 2026-11-20：Phase P1.4 观察版本探针不再吞读错
 
 `skillPlatformVersion` 原实现 `try/statSync catch -> undefined` 被 arch guard N14 判为“durable-read failure served as absent”。

@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { MutationAuthority, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'

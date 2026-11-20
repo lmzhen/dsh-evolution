@@ -1,3 +1,4 @@
+// @tier fast
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { MutationAuthority, authorityFrom, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'

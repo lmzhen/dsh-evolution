@@ -11,9 +11,9 @@
  */
 import { readFileSync, statSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-fs'
 import { contentHash } from '@deepseek-ai/dsh-evolution-core'
 import { SkillObservationStore, recordFsSkillObservation } from '@deepseek-ai/dsh-evolution-core/skills'
-import type {} from '@deepseek-ai/dsh-fs'
 
 /** Actor shape the platform carries on `fs/observed`. */
 type ObservationActor = { agent?: { session?: object } } | undefined

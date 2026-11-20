@@ -1,3 +1,4 @@
+// @tier fast
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { SkillObservationStore, skillVersionOf } from '../src/skill-observation.ts'

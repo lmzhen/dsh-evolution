@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { SkillTargetLocks } from '../src/skill-target-locks.ts'
 

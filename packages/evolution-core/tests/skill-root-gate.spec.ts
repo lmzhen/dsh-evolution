@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { SkillRootGate } from '../src/skill-root-gate.ts'
 

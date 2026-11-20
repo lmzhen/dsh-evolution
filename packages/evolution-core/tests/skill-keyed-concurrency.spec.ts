@@ -1,3 +1,4 @@
+// @tier fast
 import { describe, expect, it } from 'vitest'
 import { HybridMutationLock, TargetLockSet, TargetMutationLock } from '@deepseek-ai/dsh-evolution-core'
 import { authorityFrom, nodeEvolutionIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
