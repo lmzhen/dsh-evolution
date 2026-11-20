@@ -624,3 +624,9 @@ interface EvolutionReviewActivityRecordV3 {
 - 修复：`createReviewChildAgent(agent, reviewId, …)` 直接传 `reviewId`；测试改用生产形状 `review-child:aux-review-2:0` + key `aux-review-2`；adapter 断言 sanitize 后的 child id 前缀。
 - 复核复验：**P0=0，P1=0**。原生命周期 P1 已关闭；新前缀回归已关闭。
 - 仍保留 P2（不阻塞）：PTC `review_done` 的 program 内唯一动作未强校验；跨包 id 不变量测试可再从 adapter 输出派生；无 sessions 有 plugin 的 mock ctx 泄漏（真实 Cordis 不可达）；`inject:['sessions']` 缺失时可能等待而非 fail-closed。
+
+### Round 34（2026-11-20，本地门禁复核）
+
+- 本地 `run-gates.mjs local --lane ci-static --concurrency 4` 在最终 HEAD 上：pass=57、fail=0、cannotDecide=1（gate-29 只因 `<plane home>` 占位参数无法解析）、skipped=1（gate-75 的 CI workspace 相对路径）。
+- gate-29 单独用真实 home 复跑：`verify-write-inventory ... --home D:\dsh-homes\web` exit 0（34 sites / 6 symbols / 33 paths）。
+- 因此本地静态门禁实际无 fail；CI 形态应由 action 注入 `$RUNNER_TEMP/plane-home`。尚未执行 pre-tag/CI 与真实发布。
