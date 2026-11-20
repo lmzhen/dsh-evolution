@@ -3764,7 +3764,8 @@ export class SkillLibrary {
     anchor?: WriteAnchor,
   ): Promise<SkillActionResult> {
     const name = rawName.trim()
-    return await this.writeSupportFileCore(name, filePath, content, origin, anchor)
+    const key = 'skill::' + name + '::' + filePath.replace(/\\/g, '/')
+    return await this.withTarget(key, () => this.writeSupportFileCore(name, filePath, content, origin, anchor))
   }
 
   private async writeSupportFileCore(
@@ -3840,7 +3841,8 @@ export class SkillLibrary {
     anchor?: WriteAnchor,
     unitId?: string,
   ): Promise<SkillActionResult> {
-    return await this.serial(() => this.removeSupportFileCore(rawName.trim(), filePath, origin, anchor, unitId))
+    const key = 'skill::' + rawName.trim() + '::' + filePath.replace(/\\/g, '/')
+    return await this.serial(() => this.withTarget(key, () => this.removeSupportFileCore(rawName.trim(), filePath, origin, anchor, unitId)))
   }
 
   private async removeSupportFileCore(

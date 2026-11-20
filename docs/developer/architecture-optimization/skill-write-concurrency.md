@@ -905,6 +905,28 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase D.5b.1 support 写/删持 target lock
+
+已完成：
+
+- `writeSupportFile`：在现有 UnitTransaction 外持 `skill::name::path` target lock；
+- `removeSupportFile`：在 root serial 内持同一 target key；
+- 这样 service 与 library 对 support 文件的锁键完全一致。
+
+验证：
+
+```text
+tool observed writes: 4 passed
+overlay build:        0
+```
+
+边界：
+
+- 结构操作（archive/restore/consolidate/commitMerge）仍无 root exclusive gate；
+- root serial 仍保留；
+- 尚无并行收益；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase D.5a simple mutator 持 target lock
 
 已完成：
