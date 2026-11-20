@@ -57,9 +57,15 @@ function asObject(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' ? value as Record<string, unknown> : undefined
 }
 
-function controlFor(controls: ReadonlyMap<string, PtcReviewControl>): PtcReviewControl | undefined {
+function controlFor(controls: ReadonlyMap<string, PtcReviewControl>, exec?: unknown): PtcReviewControl | undefined {
   const reviewId = currentReviewContext()?.reviewId
-  return reviewId === undefined ? undefined : controls.get(reviewId)
+  if (reviewId !== undefined && controls.has(reviewId)) return controls.get(reviewId)
+  // PTC program dispatch may cross an async boundary where the ALS context is
+  // no longer visible. The child session id still carries the task identity.
+  const sessionId = (exec as { agent?: { session?: { id?: unknown } } } | undefined)?.agent?.session?.id
+  const text = typeof sessionId === 'string' ? sessionId : String(sessionId ?? '')
+  for (const [taskId, control] of controls) if (text.includes(taskId)) return control
+  return undefined
 }
 
 function reviewDefinitions(controls: ReadonlyMap<string, PtcReviewControl>, locks: ReviewWriteLocks): ToolDefinition[] {
@@ -68,19 +74,19 @@ function reviewDefinitions(controls: ReadonlyMap<string, PtcReviewControl>, lock
     description: 'Finish the review. Must be the only review action in its program.',
     parameters: {
       summary: { type: 'string', required: true },
-      memoryChanged: { type: 'boolean' },
-      skillsChanged: { type: 'array', items: { type: 'string' } },
-      unresolved: { type: 'array', items: { type: 'string' } },
+      memoryChanged: { type: 'boolean', required: true },
+      skillsChanged: { type: 'array', items: { type: 'string' }, required: true },
+      unresolved: { type: 'array', items: { type: 'string' }, required: true },
     },
     output: {
       schema: { type: 'object', additionalProperties: false, properties: { ok: { type: 'boolean', required: true } } },
       render: () => [{ type: 'text', text: 'review_done accepted' }],
     },
-    async execute(args) {
+    async execute(args, exec) {
       const raw = asObject(args)
       if (raw === undefined) return { ok: false }
       const parsed = parseReviewReport(JSON.stringify(raw))
-      const control = controlFor(controls)
+      const control = controlFor(controls, exec)
       if (parsed === undefined || control === undefined) return { ok: false }
       control.report = parsed
       control.done = true
@@ -102,7 +108,7 @@ function reviewDefinitions(controls: ReadonlyMap<string, PtcReviewControl>, lock
       const raw = asObject(args)
       const resource = typeof raw?.resource === 'string' ? raw.resource : ''
       const timeoutMs = typeof raw?.timeoutMs === 'number' && Number.isFinite(raw.timeoutMs) ? raw.timeoutMs : 1_000
-      const control = controlFor(controls)
+      const control = controlFor(controls, exec)
       if (control === undefined) return { ok: false }
       control.waitCount += 1
       if (resource === '') return { ok: true }
