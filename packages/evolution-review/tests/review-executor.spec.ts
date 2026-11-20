@@ -6,6 +6,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import { runReview } from '../src/review-executor.ts'
 import { nativeReviewToolChannel } from '../src/review-tool-channel.ts'
+import type { ReviewToolChannel } from '../src/review-tool-channel.ts'
 import { ReviewWriteLocks } from '../src/review-write-locks.ts'
 import type { ReviewLlmPort, ReviewParent, ReviewToolPort } from '../src/review-executor.ts'
 import { withReviewContext } from '@deepseek-ai/dsh-evolution-core'
@@ -350,3 +351,21 @@ describe('runReview', () => {
   })
 })
 
+
+it('replays parent tool history only for the PTC channel', async () => {
+  const history = { tools: [{ name: 'run_code', description: 'run', parameters: {} }], updates: [] }
+  const p = parent()
+  ;(p.session as { toolHistory?: () => typeof history }).toolHistory = () => history
+  const model = llm([textChunks])
+  const channel: ReviewToolChannel = {
+    mode: 'ptc',
+    visibleTools: [{ name: 'run_code', description: 'run', parameters: {} }],
+    completion: () => ({ done: true, report: { summary: 'done', memoryChanged: false, skillsChanged: [], unresolved: [] } }),
+    execute: async () => ({ results: [] }),
+  }
+  await runReview({
+    parent: p, llm: model, tools: tools({}), instruction: 'review', toolAllow: new Set(['run_code']), channel,
+    signal: new AbortController().signal, markReview: () => {}, clearReview: () => {},
+  })
+  expect((model.requests[0] as { toolHistory?: unknown }).toolHistory).toBe(history)
+})

@@ -9,7 +9,7 @@
  */
 import { BlockAssembler, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import { recordReviewRead } from '@deepseek-ai/dsh-evolution-core'
-import type { ContentBlock, ContextFormed, GenerateOptions, Message, RequestMessage, StreamChunk, ToolCallBlock, ToolCallId, ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { ContentBlock, ContextFormed, GenerateOptions, Message, RequestMessage, StreamChunk, ToolCallBlock, ToolCallId, ToolHistory, ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type { ReviewToolChannel } from './review-tool-channel.ts'
 import type { ReviewWriteLocks } from './review-write-locks.ts'
@@ -29,6 +29,7 @@ export interface ReviewParent {
     readonly seq: number
     requestHeader(): EpochHeader | undefined
     deriveMessages(): readonly Message[]
+    toolHistory?(): ToolHistory | undefined
   }
 }
 
@@ -239,6 +240,10 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
   const header = parent.session.requestHeader()
   if (header === undefined) throw new Error('review requires the parent request header')
   const beforeSeq = parent.session.seq
+  // PTC keeps the parent's full tool catalog; replaying its tool history keeps
+  // the request prefix byte-identical to the parent for provider prefix caching.
+  // Native adds synthetic completion tools, so its catalog intentionally differs.
+  const toolHistory = input.channel?.mode === 'ptc' ? parent.session.toolHistory?.() : undefined
   const messages: RequestMessage[] = [
     ...parent.session.deriveMessages(),
     createUserMessage({
@@ -274,6 +279,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewExecutionR
           ...(input.channel?.visibleTools ?? header.tools ?? []),
           ...(input.channel?.mode === 'ptc' ? [] : [REVIEW_WAIT_TOOL, REVIEW_DONE_TOOL]),
         ] as ToolSchema[],
+        ...(toolHistory === undefined ? {} : { toolHistory }),
         signal,
       }, signal)
       requests += 1

@@ -255,6 +255,17 @@ PTC 会话父 header 只有 `run_code`，且 `run_code` 的 nested dispatch 会 
 
 如果平台短期没有公开入口，PTC 适配应作为独立 platform capability 先补，不在插件里伪造 session。
 
+### 7.4 前缀缓存复用
+
+DeepSeek 的上下文缓存按 **system → tools → messages 的字节前缀**命中：工具目录一变，其后的 message 前缀全部失效。当前两种通道的缓存特征：
+
+- **PTC**：`runReview` 的 messages 来自父 `deriveMessages()` + review instruction；顶层 tools 只含父 header 的 `run_code`，不插入合成完成工具；并按 PTC 路由回放父 `toolHistory()`。system/tools/父 messages 与父请求逐字节一致，只有 review instruction 是追加后缀，父前缀可复用。
+- **native**：`nativeReviewToolChannel` 为限制审查工具，把父 tools 裁剪成 allowlist，并在末尾追加 `review_done`/`review_wait`。工具目录从第一处差异起就与父请求不同，父 message 前缀无法完整命中；review 之间共享裁剪后的工具目录，因此 review-to-review 仍可命中自己的前缀。
+- 标准/创造/极简都走 native，但各自父工具目录不同；极简还缺少 read/glob/grep，因此三种模式的缓存统计必须分开。
+- 旧 `0.58.0` 的 aux 是 native 且使用父完整 tools + `toolHistory`；desktop activity v2 中 cordis 会话 134 条 review 的平均缓存命中约 **99.65%**。这组历史读数只能作为旧实现基线，不能代表新 native 过滤通道。
+- 新实现尚无按模式拆分的缓存读数：activity v3 只有 `usage.cacheReadTokens`，没有 `toolMode`/`preset` 字段。要回答“PTC/标准/创造/极简分别是否复用”，应先记录 toolMode + session header `agentPreset`，再按模式聚合 `cacheReadTokens/(inputTokens+cacheReadTokens+cacheWriteTokens)`。
+- 若 native 缓存损失不可接受，正确修法是保留父完整工具目录，把 `review_done` 作为 in-history tool addition（DeepSeek 路由支持 `addition-only`）追加在父前缀之后；不要简单恢复未过滤工具而失去审查工具约束。
+
 ## 8. 锁与等待
 
 ### 8.1 现有基础
