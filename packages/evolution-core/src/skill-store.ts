@@ -2445,9 +2445,9 @@ export class SkillLibrary {
     } catch { /* lifecycle telemetry is best-effort; the archive already landed */ }
   }
 
-  async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary, rootHeld = false): Promise<SkillActionResult> {
+  async archive(rawName: string, options: ArchiveOptions = {}, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary, rootHeld = false, namespaceHeld = false): Promise<SkillActionResult> {
     if (rootHeld) {
-      if (!this.keyedTargetLocks()) return await this.archiveCore(rawName, options, origin, true, change)
+      if (!this.keyedTargetLocks() || namespaceHeld) return await this.archiveCore(rawName, options, origin, true, change)
       const lease = await this.lockPort().acquire([skillNamespaceKey(rawName)])
       try {
         return await this.archiveCore(rawName, options, origin, true, change)
@@ -3037,7 +3037,12 @@ export class SkillLibrary {
     // Every refusal below (protection, missing skill, package integrity)
     // still fires before ANY side effect, so the pre-side-effect refusal
     // semantics are unchanged.
-    return await this.rootGate.write(() => this.serial(async (): Promise<SkillActionResult> => {
+    return await this.rootGate.write(async () => {
+      const sourceLease = this.keyedTargetLocks()
+        ? await this.lockPort().acquire([...normalizedSources].map(skillNamespaceKey))
+        : undefined
+      try {
+        return await this.serial(async (): Promise<SkillActionResult> => {
       const referenceWrites: TreeChangeWrite[] = []
       // V2 (design §16.7): support files copied into the target from an apply-mode
       // source, staged before any side effect and committed in the same tree change.
@@ -3135,7 +3140,7 @@ export class SkillLibrary {
               throw new Error(`Consolidation aborted: source "${source}" changed while the consolidation ran (its planned bytes are no longer current).`)
             }
           }
-          const result = await this.archive(source, { absorbedInto: targetName }, undefined, undefined, true)
+          const result = await this.archive(source, { absorbedInto: targetName }, undefined, undefined, true, true)
           if (!result.ok) throw new Error(result.message)
           archived.push(source)
         }
@@ -3210,7 +3215,7 @@ export class SkillLibrary {
         const failedRestores: string[] = []
         for (const source of archived.reverse()) {
           try {
-            const restored = await this.restoreFromArchive(source, undefined, true)
+            const restored = await this.restoreFromArchive(source, undefined, true, true)
             if (!restored.ok) failedRestores.push(source)
           } catch {
             // restoreFromArchive never rejects by contract; if it ever does,
@@ -3223,7 +3228,11 @@ export class SkillLibrary {
         }
         return { ok: false, message: `合并失败，已回滚：${reason}` }
       }
-    }))
+        })
+      } finally {
+        if (sourceLease !== undefined) await sourceLease.release()
+      }
+    })
   }
 
   /**
@@ -3636,9 +3645,9 @@ export class SkillLibrary {
    * recoverability: archival never deletes, and this is the control-plane
    * path back. The `.archive-reason` marker is dropped on restore.
    */
-  async restoreFromArchive(rawName: string, origin: WriteOrigin = this.authority.origin, rootHeld = false): Promise<SkillActionResult> {
+  async restoreFromArchive(rawName: string, origin: WriteOrigin = this.authority.origin, rootHeld = false, namespaceHeld = false): Promise<SkillActionResult> {
     if (rootHeld) {
-      if (!this.keyedTargetLocks()) return await this.restoreFromArchiveCore(rawName, origin, true)
+      if (!this.keyedTargetLocks() || namespaceHeld) return await this.restoreFromArchiveCore(rawName, origin, true)
       const lease = await this.lockPort().acquire([skillNamespaceKey(rawName)])
       try {
         return await this.restoreFromArchiveCore(rawName, origin, true)

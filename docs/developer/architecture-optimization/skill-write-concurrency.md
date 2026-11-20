@@ -931,6 +931,22 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.2 consolidate 全程持 source keys
+
+- consolidate 在 keyed 模式下，于 root gate 内先获取所有 source 的 namespace keys，再进入 serial/body；
+- 内部 archive/restore 增加 `namespaceHeld` 参数，外层已持 keys 时不再重复获取；
+- 目标 body 仍由 tree unit 的 target keys 保护；
+- 非 keyed 模式不取外层 lease，避免 root fallback 自锁。
+
+验证：
+
+```text
+keyed concurrency: 5 passed
+overlay build: 0
+```
+
+注意：默认非 keyed 的 consolidate 在批量高负载下仍会接近 30s 测试超时；隔离单条 25s 通过，属于既有测试时间预算问题，不是新死锁。
+
 ### 2026-11-20：Phase P1 默认 public archive fence 恢复
 
 独立复核 P0=0 后的 P1 修复：
