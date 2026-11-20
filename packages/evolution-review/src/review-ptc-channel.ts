@@ -64,7 +64,7 @@ function controlFor(controls: ReadonlyMap<string, PtcReviewControl>, exec?: unkn
   // no longer visible. The child session id still carries the task identity.
   const sessionId = (exec as { agent?: { session?: { id?: unknown } } } | undefined)?.agent?.session?.id
   const text = typeof sessionId === 'string' ? sessionId : String(sessionId ?? '')
-  for (const [taskId, control] of controls) if (text.includes(taskId)) return control
+  for (const [taskId, control] of controls) if (text.startsWith('review-child:' + taskId + ':')) return control
   return undefined
 }
 

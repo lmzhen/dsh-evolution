@@ -35,7 +35,7 @@ export interface ReviewChildAgent {
   readonly agent: unknown
   /** The detached Session; exposed for tests and diagnostics. */
   readonly session: Session
-  /** Drop the review child scope/executor; the Session remains in the store as a child record. */
+  /** Drop the review child scope, its executor, and the scope-owned child Session. */
   dispose(): Promise<void>
 }
 
@@ -83,28 +83,47 @@ export async function createReviewChildAgent(parent: unknown, taskId: string, op
   const safe = taskId.replace(/[^A-Za-z0-9_.:-]/g, '_')
   const childId = SessionId(`review-child:${safe}:${nextChild++}`)
   const parentSession = (parent as { session?: { header?: { cwd?: unknown } } }).session
-  const sessions = (parent as { ctx?: { sessions?: { create(id?: SessionId, options?: { meta?: { cwd?: string } }): Session } } }).ctx?.sessions
+  const parentCtx = (parent as { ctx?: { plugin?: unknown; sessions?: { create(id?: SessionId, options?: { meta?: { cwd?: string } }): Session } } }).ctx
   const cwd = typeof parentSession?.header?.cwd === 'string' ? parentSession.header.cwd : undefined
-  const child = sessions?.create(childId, cwd === undefined ? undefined : { meta: { cwd } }) ?? Session.create(childId)
   // Object.create keeps the parent's Agent prototype and identity-independent
   // fields while making this object the exact scope key used by tools.execute.
   const agent = Object.create(parent as object) as Record<PropertyKey, unknown>
-  Object.defineProperty(agent, 'session', { value: child, enumerable: true, configurable: false })
-  Object.defineProperty(agent, 'id', { value: child.id, enumerable: true, configurable: false })
-  const parentCtx = (parent as { ctx?: { plugin?: unknown } }).ctx
   let scope: Scope | undefined
-  if (parentCtx !== undefined && typeof parentCtx.plugin === 'function') {
-    scope = createScope(parentCtx as never, agent, { parent: parent as object })
-    Object.defineProperty(agent, 'ctx', { value: scope.ctx, enumerable: true, configurable: false })
-  }
-  if (options.ptc === true) {
-    if (scope === undefined) throw new PtcExecutorUnavailableError('the parent has no scoped context')
-    const plugin = await loadPtcExecutor()
-    await scope.ctx.plugin(plugin as never, {} as never)
-  }
-  return {
-    agent,
-    session: child,
-    async dispose() { await scope?.dispose() },
+  let child: Session | undefined
+  try {
+    if (parentCtx !== undefined && typeof parentCtx.plugin === 'function') {
+      scope = createScope(parentCtx as never, agent, { parent: parent as object })
+      Object.defineProperty(agent, 'ctx', { value: scope.ctx, enumerable: true, configurable: false })
+    }
+    // A scope-owned Session is removed with the scope on success or failure.
+    // The capture plugin gets `sessions` through Cordis injection; the scope's
+    // own ctx is not guaranteed to hold that service without an inject list.
+    if (scope !== undefined) {
+      const capture = Object.assign((inner: unknown) => {
+        child = (inner as { sessions: { create(id?: SessionId, options?: { meta?: { cwd?: string } }): Session } }).sessions.create(
+          childId, cwd === undefined ? undefined : { meta: { cwd } },
+        )
+      }, { inject: ['sessions'] })
+      await scope.ctx.plugin(capture as never, {} as never)
+    } else {
+      child = parentCtx?.sessions?.create(childId, cwd === undefined ? undefined : { meta: { cwd } }) ?? Session.create(childId)
+    }
+    if (child === undefined) throw new PtcExecutorUnavailableError('the platform has no session store for the child scope')
+    Object.defineProperty(agent, 'session', { value: child, enumerable: true, configurable: false })
+    Object.defineProperty(agent, 'id', { value: child.id, enumerable: true, configurable: false })
+    if (options.ptc === true) {
+      if (scope === undefined) throw new PtcExecutorUnavailableError('the parent has no scoped context')
+      const plugin = await loadPtcExecutor()
+      await scope.ctx.plugin(plugin as never, {} as never)
+    }
+    return {
+      agent,
+      session: child,
+      async dispose() { await scope?.dispose() },
+    }
+  } catch (error) {
+    await scope?.dispose().catch(() => {})
+    throw error
   }
 }
+

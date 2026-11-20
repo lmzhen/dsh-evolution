@@ -605,3 +605,15 @@ interface EvolutionReviewActivityRecordV3 {
 - 真实 UI 截图（`D:/dsh/_e2e2-ptc-ui.png`）：自动复查显示 PTC memory/skill 均“已完成”，并与旧 `review-timeout` / `missing review_done` 记录并存，证明 v3 兼容和状态区分。
 - 并行证据：同一 session 的 memory/skill 分别在 `1795137247750` / `1795137247783` 开始（相差 33 ms），均成功结束，说明拆分后的两个 AUX task 可并行且不互相阻塞。
 - 仍未做：PTC 同 skill 冲突（真实宿主）、真实 UI 的 failed 新记录、最终 pre-tag/CI 与独立复核。
+
+### Round 32（2026-11-20，独立复核与 P1 生命周期修复）
+
+- 独立复核结论：**P0=0，P1=1**。P1 是 PTC setup 失败/成功路径的 child Session 与 scope 生命周期：旧实现先 `sessions.create` 建 live Session，再创建 scope/加载 PTC；若加载失败，函数未返回，调用方拿不到 child 去 dispose，会泄漏 live Session 与 Cordis fiber；成功路径的 `dispose()` 也只销毁 scope，不释放 child Session。
+- 修复：
+  - child Session 改由 child scope 内的 capture plugin 通过 `inject:['sessions']` 创建，Session effect 归 child scope 所有；成功 `dispose()` 或失败 `catch` 都通过 `scope.dispose()` 一并回收。
+  - `createReviewChildAgent` 的 catch 现在 `await scope?.dispose()` 后重抛；调用方无需拿到 child 才能清理。
+  - 新增 adapter 单测：child Session 在 `dispose()` 后从 `ctx.sessions` 消失，父 seq 保持 0。
+  - `index.ts` 的 `reviewChild.dispose()` 改为 best-effort，dispose 失败不再阻断 lease release/rerun。
+  - PTC control 匹配从子串改为 `review-child:<taskId>:` 前缀，降低误配。
+- 复核 P2 剩余：PTC `review_done` 的“program 内唯一动作”仍未强校验；control 无负向误配测试（已收紧前缀）；这些不阻塞 native/default，但 PTC 发布说明应保留边界。
+- 复验：adapter 4 + PTC channel 2 + executor 13 = 19 passed；临时真实 PTC 栈 1 项全流程（run_code → review_done → completion → dispose 后 child 消失、父 seq 0）通过。

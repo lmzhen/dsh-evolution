@@ -1236,7 +1236,11 @@ function snapshotReviewParent(agent: Agent): Agent {
         active?.delete(kind)
         if (active !== undefined && active.size === 0) auxRunning.delete(session.id)
         inFlightControllers.delete(controller)
-        await reviewChild?.dispose()
+        // A dispose failure must not strand the lease or the rerun; the scope
+        // teardown is best-effort after the review record has been emitted.
+        try { await reviewChild?.dispose() } catch (disposeError) {
+          ctx.logger.warn('dsh-evolution-review: PTC review child dispose failed: ' + (disposeError instanceof Error ? disposeError.message : String(disposeError)))
+        }
         if (leaseToken !== undefined && authority?.lease !== undefined) await authority.lease.release(leaseToken).catch(() => {})
         if (state.rerun !== undefined) void tryAuxReview(session, agent, state.rerun, signal, reason)
       }
