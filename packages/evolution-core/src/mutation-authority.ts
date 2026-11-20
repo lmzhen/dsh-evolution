@@ -11,6 +11,8 @@ export interface MutationAuthorityOptions {
   readonly fence?: HomeFence
   readonly waitMs?: number
   readonly now?: () => number
+  /** Opt in to per-target cross-process locks for writes carrying targetKeys. */
+  readonly keyed?: boolean
 }
 
 /**
@@ -24,6 +26,8 @@ export interface MutationAuthorityOptions {
 export class MutationAuthority {
   private readonly leases: LeaseStore
   private readonly fence: HomeFence
+  private readonly home: string
+  private readonly keyed: boolean
 
   /** Lease primitives for run/claim owners (review, approval). */
   get lease(): LeaseStore { return this.leases }
@@ -31,8 +35,13 @@ export class MutationAuthority {
   /** The one home fence domain unit engines must reuse instead of taking tree-lock themselves. */
   get homeFence(): HomeFence { return this.fence }
 
-  /** Adapter for MutationUnit call sites that accept a lock port. It is the fence, no more. */
+  /** Adapter for MutationUnit call sites; root fence or, when opted in, keyed targets. */
   get mutationLock(): MutationLockPort {
+    if (!this.keyed) return this.rootMutationLock
+    return new HybridMutationLock(new TargetMutationLock(new TargetLockSet(this.home)), this.rootMutationLock)
+  }
+
+  private get rootMutationLock(): MutationLockPort {
     return {
       acquire: async () => {
         // A nested writer running inside an already-held home fence must reuse that
@@ -46,6 +55,8 @@ export class MutationAuthority {
   }
 
   constructor(options: MutationAuthorityOptions) {
+    this.home = options.home
+    this.keyed = options.keyed === true
     this.leases = options.leases ?? new LeaseStore({ io: options.io, home: options.home, ...(options.now === undefined ? {} : { now: options.now }) })
     this.fence = options.fence ?? new HomeFence({ io: options.io, home: options.home, ...(options.waitMs === undefined ? {} : { waitMs: options.waitMs }), ...(options.now === undefined ? {} : { now: options.now }) })
   }

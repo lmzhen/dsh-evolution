@@ -905,6 +905,32 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.11 MutationAuthority keyed opt-in
+
+已完成：
+
+- `MutationAuthorityOptions.keyed?: boolean`（默认 false）；
+- `MutationAuthority.mutationLock`：
+  - keyed=false → 原 HomeFence root lock；
+  - keyed=true → `HybridMutationLock(TargetMutationLock(TargetLockSet(home)), root)`；
+- `mutationLockFrom` 不改，仍返回 authority.mutationLock，因此装配层只需设置 keyed。
+- 2 个测试：
+  - keyed=true：keyed acquire 不碰 fence；keyless acquire 走 fence；
+  - keyed=false：即使带 keys 也走 fence。
+
+验证：
+
+```text
+mutation-authority-keyed: 2 passed
+overlay build:            0
+```
+
+边界：
+
+- 默认 keyed=false，生产行为不变；
+- 打开后结构/恢复 keyless 走 fallback；
+- 需要全量回归与真实 web 验收后才默认开启。
+
 ### 2026-11-20：Phase E.10 hybrid keyed 装配验收
 
 已完成：
