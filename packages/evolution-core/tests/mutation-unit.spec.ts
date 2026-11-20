@@ -39,7 +39,7 @@ function request(overrides: Partial<MutationRequest> = {}): MutationRequest {
   }
 }
 
-function unit(io: MemoryIo, overrides: { lock?: MutationLockPort; journal?: { write(record: MutationJournalRecord): Promise<void> }; snapshots?: MutationSnapshotPort; hooks?: MutationUnitHooks; context?: { owner: 'foreground' | 'background_review'; runId: string; leaseId: string } } = {}) {
+function unit(io: MemoryIo, overrides: { lock?: MutationLockPort; targetKeys?: readonly string[]; journal?: { write(record: MutationJournalRecord): Promise<void> }; snapshots?: MutationSnapshotPort; hooks?: MutationUnitHooks; context?: { owner: 'foreground' | 'background_review'; runId: string; leaseId: string } } = {}) {
   return new MutationUnit({ io, limits: LIMITS, ...(overrides.lock === undefined ? { nested: true } : {}), ...overrides })
 }
 
@@ -60,6 +60,33 @@ class CommittedWarningIo extends MemoryIo {
 describe('MutationUnit executor', () => {
   it('refuses construction without a lock or an explicit nested mark', () => {
     expect(() => new MutationUnit({ io: new MemoryIo(), limits: LIMITS })).toThrow(/lock.*nested/i)
+  })
+
+  it('passes canonical target keys to a keyed lock port', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
+    const seen: Array<readonly string[] | undefined> = []
+    const lock = {
+      async acquire(keys?: readonly string[]): Promise<{ release(): Promise<void> }> {
+        seen.push(keys)
+        return { async release() {} }
+      },
+    }
+    const result = await unit(io, { lock, targetKeys: ['skill::source'] }).apply(request())
+    expect(result.ok).toBe(true)
+    expect(seen).toEqual([['skill::source']])
+  })
+
+  it('passes undefined when no target keys are configured', async () => {
+    const io = new MemoryIo(); io.files.set('source/SKILL.md', 'old')
+    const seen: Array<readonly string[] | undefined> = []
+    const lock = {
+      async acquire(keys?: readonly string[]): Promise<{ release(): Promise<void> }> {
+        seen.push(keys)
+        return { async release() {} }
+      },
+    }
+    await unit(io, { lock }).apply(request())
+    expect(seen).toEqual([undefined])
   })
 
   it('writes the plan and journals committed', async () => {

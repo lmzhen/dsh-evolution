@@ -218,6 +218,8 @@ export interface MutationUnitOptions {
   limits: MutationLimits
   serial?: <T>(task: () => Promise<T>) => Promise<T>
   lock?: MutationLockPort
+  /** Canonical skill target keys whose keyed lock backend should be acquired. */
+  targetKeys?: readonly string[]
   /** Explicit escape for a caller that already holds the home fence (nested merge/skill write). */
   nested?: boolean
   journal?: MutationJournalPort
@@ -264,6 +266,7 @@ export class MutationUnit {
   private readonly limits: MutationLimits
   private readonly serial: <T>(task: () => Promise<T>) => Promise<T>
   private readonly lock: MutationLockPort
+  private readonly targetKeys: readonly string[] | undefined
   private readonly journal: MutationJournalPort | undefined
   private readonly snapshots: MutationSnapshotPort | undefined
   private readonly claim: UnitClaimPort | undefined
@@ -284,6 +287,7 @@ export class MutationUnit {
       throw new Error('mutation-unit: a lock (or an explicit nested:true under an outer fence) is required')
     }
     this.lock = options.lock ?? noLock
+  this.targetKeys = options.targetKeys
     this.journal = options.journal
     this.snapshots = options.snapshots
     this.claim = options.claim
@@ -318,7 +322,7 @@ export class MutationUnit {
     return await this.serial(async () => {
       let lease: MutationLockLease
       try {
-        lease = await this.lock.acquire()
+        lease = await this.lock.acquire(this.targetKeys)
       } catch (error) {
         const code = error instanceof TransactionNotInvokedError ? 'transact-not-invoked' : 'unit-fence-failed'
         return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }
@@ -449,7 +453,7 @@ export class MutationUnit {
     return await this.serial(async () => {
       let lease: MutationLockLease
       try {
-        lease = await this.lock.acquire()
+        lease = await this.lock.acquire(this.targetKeys)
       } catch (error) {
         const code = error instanceof TransactionNotInvokedError ? 'transact-not-invoked' : 'unit-fence-failed'
         return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }
@@ -503,7 +507,7 @@ export class MutationUnit {
     return await this.serial(async () => {
       let lease: MutationLockLease
       try {
-        lease = await this.lock.acquire()
+        lease = await this.lock.acquire(this.targetKeys)
       } catch (error) {
         return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'lock-failed', message: error instanceof Error ? error.message : String(error) }] }
       }
