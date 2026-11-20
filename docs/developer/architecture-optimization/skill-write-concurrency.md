@@ -855,32 +855,54 @@ delete → service.remove()
 
 ## 14. 实施记录
 
-### 2026-11-20：DCR-1 双版本角色（待最终复核）
+### 2026-11-20：DCR-1 定格为“平台版本校验后取 content hash”
 
 新事实：
 
 - 通用 `read` 只给平台 `FsVersion`（`dev:ino:size:mtimeNs:ctimeNs`）+ 可能截断的窗口内容；
 - 读结果可能按行截断（`readMaxLineLength`）、按字节截断（`readMaxBytes`）、只读窗口；
-- 因此不能从通用 read 结果安全重建“整文件 canonical bytes 的 sha256”。
+- 因此不能从 read 结果文本安全重建“整文件 canonical bytes 的 sha256”。
 
-决定：
+决议（替代早期“双 token 并存”的待定状态）：
 
-- **freshness token**（用于 observation / `replaceIfVersion` / stale 判定）由观察源决定：
-  - 平台 fs 读 → 平台 opaque `FsVersion`；
-  - 能同步拿到完整 canonical bytes 的路径（如 SkillLibrary 自身 read）→ content sha。
-- **content sha** 继续作为语义身份/anchor：staged snapshot、history、unit fingerprint、审批快照。
-- 两种 token 不混用：`SkillObservedVersion` 只表示 freshness，`SkillContentVersion` 只表示内容身份。
+- observation 的最终版本仍是 **content sha256**；
+- 平台 `FsVersion` 只作为**捕获栅栏**：
+  1. 监听 `fs/observed` 拿到平台版本 V；
+  2. 同步读文件；读前后各算一次平台版本；
+  3. 只有两次都等于 V，才说明读到的是该 read 对应的字节；
+  4. 对该字节取 content hash，写入 observation；
+- 任一版本不一致 → 不记录 observation，下一次写必须重读。
 
 影响：
 
-- `SkillWriteService` 的 CAS 比较必须使用与 observation 同源的 freshness token；
-- 若某路径只能给 content sha，它只能在该路径内做 CAS，不能拿去和平台 `FsVersion` 比较；
-- 审批暂存继续使用 content sha（因为审批需要“字节内容未变”的语义），执行时另做 freshness CAS。
+- 通用 read 可以安全地产生 content-sha observation，不需要把平台 token 混入写 CAS；
+- `SkillWriteService` / `SkillLibrary` 继续只比较 content sha；
+- 平台 token 不进入 anchor、不进入审批暂存、不进入 history；
+- 并发窗口在“read → fs/observed 监听器”之间发生时，宁可少授权，不产生新内容授权。
 
 回退：
 
-- 若最终复核不接受双 token，则回退为“只允许能同步取得完整内容的读作为写许可”；通用 read 不授权写，需用户在 skill 管理路径显式读。
-- 该回退会降低后台 review 的可用性，但不会产生错误的写许可。
+- 若某平台 backend 的 `targetKey` 不是 host path，或版本格式不同，监听器不记录；该 read 不授权写，写路径返回 `SKILL_NOT_OBSERVED`。
+
+### 2026-11-20：Phase C.3 通用 read 的 content observation
+
+已完成：
+
+- `skill-observations.ts` 的 `fs/observed` listener 不再直接记录平台 token；
+- 新增 `skillPlatformVersion(hostPath)`：用 Node bigint stat 复现平台 `dev:ino:size:mtimeNs:ctimeNs`；
+- listener：
+  1. 映射 host path → skill target；
+  2. 平台版本匹配后才同步读文件；
+  3. 读后再校验版本；
+  4. 记录 `contentHash(bytes)`；
+- 任一版本不一致、读失败、非 skill 文件、无 actor 都不记录；
+- 测试更新为真实临时文件 + 真实平台版本：content hash 记录、owner 隔离、非 skill/absent/无 actor、版本漂移不记录。
+
+边界：
+
+- 这是 observation 层的安全读取，不是写路径；
+- 大文件 / 非本地 backend 未覆盖：不记录（宁缺勿错）；
+- tool 层仍未切换到 service。
 
 ### 2026-11-20：Phase C.2 服务改用现有 mutator 的锁内 anchor
 
@@ -905,7 +927,7 @@ delete → service.remove()
 - service 尚未被 tool 层调用；
 - `patchBody` 的 no-op 在 service 层先返回 `SKILL_INVALID`，不改 library 现有 noop 语义；
 - `create` / `remove` / 审批 / unit 尚未接入；
-- 平台 FsVersion 与 content sha 仍按 DCR-1 待复核。
+- 平台 FsVersion 与 content sha 已在 DCR-1 定格：平台版本仅作捕获栅栏，observation 使用 content sha。
 
 ### 2026-11-20：Phase C.1 SkillWriteService 读观察 + CAS
 
@@ -926,7 +948,7 @@ delete → service.remove()
 边界：
 
 - 服务是新增层，tool 层仍走原有路径；
-- `writeFileCas` 的版本仍按 contentHash 计算，平台 FsVersion 统一仍按 DCR-1 待复核；
+- `writeFileCas` 的版本仍按 contentHash 计算；平台 FsVersion 只在 observation 捕获栅栏中使用。
 - 没有改变任何现有 create/update/patch 行为。
 
 ### 2026-11-20：Phase B.2 存储层锁内 CAS 原语
@@ -950,7 +972,7 @@ delete → service.remove()
 - 这是 Phase B 的底层原语，尚未被 tool 层调用；
 - 现有 create/update/patch 行为未变；
 - `transact` 缺失时仍只有进程内锁，跨进程语义沿用现有 IO 配置；
-- 平台 FsVersion / content version 的统一仍遵循 DCR-1 待复核。
+- 平台 FsVersion 只在 observation 捕获栅栏中使用；写 CAS 统一用 content version。
 
 ### 2026-11-20：Phase B.1 纯写意图原语
 
@@ -992,7 +1014,7 @@ delete → service.remove()
 
 - listener 只记录，**不参与写入判定**；
 - store 目前是 tool plugin 内部对象，尚未暴露给 SkillWriteService；
-- 平台 `FsVersion` 仍是 opaque token，符合 DCR-1 的待复核状态。
+- 平台 `FsVersion` 只用于 observation 捕获栅栏；写 CAS 使用 content version。
 
 ### 2026-11-20：Phase A.2 平台观察入口映射
 

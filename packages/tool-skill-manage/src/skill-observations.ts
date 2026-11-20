@@ -9,7 +9,9 @@
  *
  * @module @deepseek-ai/dsh-tool-skill-manage/skill-observations
  */
+import { readFileSync, statSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
+import { contentHash } from '@deepseek-ai/dsh-evolution-core'
 import { SkillObservationStore, recordFsSkillObservation } from '@deepseek-ai/dsh-evolution-core/skills'
 import type {} from '@deepseek-ai/dsh-fs'
 
@@ -29,10 +31,41 @@ export function installSkillObservationListener(ctx: Context, root: string): Ski
     if (observation.kind !== 'present') return
     const owner = (actor as ObservationActor)?.agent?.session
     if (owner === undefined) return
+
+    // The platform event carries its FsVersion, not content. Read the bytes only
+    // when the platform version still matches before/after the read: if a writer
+    // changed the file between the tool's read and this listener, no observation
+    // is recorded (the next write must re-read), never a newer-content licence.
+    const hostPath = String(target.targetKey)
+    const version = String(observation.version)
+    if (skillPlatformVersion(hostPath) !== version) return
+    let content: string
+    try {
+      content = readFileSync(hostPath, 'utf8')
+    } catch {
+      return
+    }
+    if (skillPlatformVersion(hostPath) !== version) return
     recordFsSkillObservation(store, owner, root, {
-      hostPath: String(target.targetKey),
-      version: String(observation.version),
+      hostPath,
+      version: contentHash(content),
     })
   })
   return store
+}
+
+/**
+ * Platform `LocalFileSystem` version for one host path: the same
+ * `dev:ino:size:mtimeNs:ctimeNs` tuple it emits on `fs/observed`.
+ * @param hostPath - absolute host path.
+ * @returns the opaque version, or undefined for non-regular/missing paths.
+ */
+export function skillPlatformVersion(hostPath: string): string | undefined {
+  try {
+    const info = statSync(hostPath, { bigint: true })
+    if (!info.isFile()) return undefined
+    return `${info.dev}:${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`
+  } catch {
+    return undefined
+  }
 }
