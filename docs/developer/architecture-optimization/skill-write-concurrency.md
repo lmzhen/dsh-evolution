@@ -852,3 +852,42 @@ delete → service.remove()
 > **平台权威 = 按 session 观察 + per-target 锁 + 锁内版本 CAS + 显式 stale。**
 >
 > **我们的终局 = 把这套语义提升为 SkillWriteService，保留 transactIo/HomeFence/UnitTransaction，删除分散的 read gate、手工 anchor 和 per-root 锁；后台 patch 不再静默合并，不同区域冲突也显式 stale，由模型重读后重试。**
+
+## 14. 实施记录
+
+### 2026-11-20：Phase A.1 观察模型落地
+
+已完成：
+
+- 新增 `packages/evolution-core/src/skill-observation.ts`
+  - `SkillTarget` / `skillTarget()` / `skillBodyTarget()` / `skillSupportTarget()`
+  - `SkillContentVersion`：复用 `mutations.contentHash`，LF 归一后 sha256
+  - `SkillObservation`：`present(version)` / `absent`
+  - `SkillObservationStore`：按 owner WeakMap 隔离、`record` / `get` / `requirePresent` / `clear`
+- 从 `evolution-core/skills` 子路径导出；
+- 新增 9 个单测：body/support target 归一、路径逃逸拒绝、owner 隔离、absent、CRLF 同 hash、重读覆盖、clear。
+
+边界（刻意不做的）：
+
+- 本阶段**没有记录 read 观察**，也没有改变任何写入行为；
+- 没有引入锁、CAS、enforcement；
+- 现有 read gate / staged anchor / SkillLibrary 行为保持不变。
+
+下一步 Phase A.2 的开放问题：
+
+1. 通用 `read` 工具（平台 `read`）如何把“读到内容”变成 observation：
+   - 平台 `fs/observed` 事件是同步 recorder，只带 `FsVersion`，不带内容；
+   - 不能让异步读取成为写的授权来源（产生竞态）；
+   - 需要在 `fs/observed` 的 opaque version 与 skill content sha 之间选一个统一版本模型，或在平台读结果投影中取内容 hash。
+2. `skill_manage` 自己的 `list/review` 读路径是否算 observation：
+   - 只授权“读到的那一个 target”，不把目录扫描扩大成整树授权；
+   - support file 必须显式 read。
+3. HMR/dispose 清空 owner 的接入点：
+   - `SkillObservationStore` 已提供 `clear()`，生命周期挂载待 Phase A.2 设计。
+
+约束更新：
+
+- 路径归一必须拒绝 `..` 和绝对路径，不能把不同 target 折叠成同一个 key；
+- 版本比较必须先于 `old_string` 匹配，不能在 Phase A.2 提前改变写入顺序；
+- 任何 observation 的授权来源必须同步可得；fire-and-forget 的异步 hash 不能作为安全许可。
+
