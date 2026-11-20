@@ -884,7 +884,30 @@ delete → service.remove()
 
 - 若某平台 backend 的 `targetKey` 不是 host path，或版本格式不同，监听器不记录；该 read 不授权写，写路径返回 `SKILL_NOT_OBSERVED`。
 
+### 2026-11-20：Phase C.6 写后观察与 fallback 收紧评估
+
+已完成：
+
+- `SkillWriteService` 的 update / patch / updateSupport 成功后重新 `read` 并记录新观察；
+- tool 的 create / write_file fallback 成功后调用 `observeBodyWrite` / `observeSupportWrite`；
+- 同一 owner 连续写不再因为“写后未重新观察”而假 stale。
+
+验证：
+
+```text
+tool-skill-manage + observed writes: 44 passed
+overlay build:                      0
+```
+
+fallback 收紧评估：
+
+- 尝试直接把“无 observation”全部改为 `SKILL_NOT_OBSERVED`；
+- 现有测试里 `fakeAgent(undefined)` 每次调用都生成新的 session 对象，create 与后续 patch 不是同一 owner，因此测试表现为“未读”；
+- 这暴露的是测试 fixture 不模拟真实长生命周期 session，不是 service 逻辑错误；
+- 继续保留过渡 fallback，下一步先把测试 helper 改成稳定 agent/session，再收紧。
+
 ### 2026-11-20：Phase C.5 tool 级 observation/CAS 证据
+
 
 已完成：
 

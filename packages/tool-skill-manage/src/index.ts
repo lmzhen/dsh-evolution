@@ -984,7 +984,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const simpleActions: Record<string, () => Promise<SkillActionResult>> = {
       create: async () => {
         feedbackLines.push(...await duplicateHintLines(name, candidateDescription, crossSourceView))
-        return library.create(name, args.content ?? '', origin, { managed: origin !== 'foreground' })
+        const created = await library.create(name, args.content ?? '', origin, { managed: origin !== 'foreground' })
+        if (created.ok && owner !== undefined) await skillWriteService.observeBodyWrite(owner, name)
+        return created
       },
         update: async () => {
           if (owner !== undefined && stagedAnchor === undefined && hasObservation(owner, skillBodyTarget(name))) {

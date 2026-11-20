@@ -83,6 +83,7 @@ export class SkillWriteService {
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
     const result = await this.library.update(name, content, origin, anchorOf(observed.version))
+    if (result.ok) await this.readBody(owner, name)
     return actionResult(result)
   }
 
@@ -108,6 +109,7 @@ export class SkillWriteService {
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
     const result = await this.library.patch(name, oldString, newString, '', replaceAll, origin, anchorOf(observed.version))
+    if (result.ok) await this.readBody(owner, name)
     return actionResult(result)
   }
 
@@ -124,7 +126,18 @@ export class SkillWriteService {
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
     const result = await this.library.writeSupportFile(name, filePath, content, origin, anchorOf(observed.version))
+    if (result.ok) await this.readSupport(owner, name, filePath)
     return actionResult(result)
+  }
+
+  /** Record a just-committed SKILL.md write for this owner (create/fallback path). */
+  async observeBodyWrite(owner: SkillWriteOwner, name: string): Promise<void> {
+    await this.readBody(owner, name)
+  }
+
+  /** Record a just-committed support-file write for this owner (fallback path). */
+  async observeSupportWrite(owner: SkillWriteOwner, name: string, filePath: string): Promise<void> {
+    await this.readSupport(owner, name, filePath)
   }
 
   private record(owner: SkillWriteOwner, target: ReturnType<typeof skillBodyTarget>, content: string | null): void {
