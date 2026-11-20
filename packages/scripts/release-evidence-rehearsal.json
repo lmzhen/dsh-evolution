@@ -1,15 +1,15 @@
 {
-  "note": "0.59.0 local rehearsal: S1/S2/S3 measured on the rc.5 web host from the 0.59.0 candidate; S4 HMR 2/2; traceability 52/52. inputsSha256 hashes the 22 packed tarballs plus platform-line.json and the CHANGELOG head.",
-  "familyVersion": "0.59.0",
+  "note": "0.59.1 patch rehearsal: PTC review SDK fix only; S1-S3 routes/UI readings carried from the 0.59.0 candidate (no route/UI change), S4 HMR 2/2 re-run; npm web PTC acceptance is the post-publish gate requested by the user.",
+  "familyVersion": "0.59.1",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.0",
-      "startedAt": "2026-11-20T04:08:15.337Z",
-      "artifactSha256": "d5a7ab837cb67ada8927313b53b82bc86a2cf73bb41895400f4bfcd590d9fa0a",
-      "inputsSha256": "9a8a3fbb9db35e373f92e190ac50913f638e370d63ba7bc68023e8123f5266af",
-      "commit": "81ef9ff1d760da8a805b97caf4e864115323a19d",
+      "familyVersion": "0.59.1",
+      "startedAt": "2026-11-20T06:13:10.850Z",
+      "artifactSha256": "ae4c27bad8b46888ad9f14e94d92bfc37242a109f8e09603096d1ce2db2fec71",
+      "inputsSha256": "707466680eb7b089c4c919fd30d3fb31575d326d3b547a0099f9cc650306cfeb",
+      "commit": "fb55657e",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.0",
-      "startedAt": "2026-11-20T04:08:15.337Z",
-      "artifactSha256": "d5a7ab837cb67ada8927313b53b82bc86a2cf73bb41895400f4bfcd590d9fa0a",
-      "inputsSha256": "9a8a3fbb9db35e373f92e190ac50913f638e370d63ba7bc68023e8123f5266af",
-      "commit": "81ef9ff1d760da8a805b97caf4e864115323a19d",
+      "familyVersion": "0.59.1",
+      "startedAt": "2026-11-20T06:13:10.850Z",
+      "artifactSha256": "ae4c27bad8b46888ad9f14e94d92bfc37242a109f8e09603096d1ce2db2fec71",
+      "inputsSha256": "707466680eb7b089c4c919fd30d3fb31575d326d3b547a0099f9cc650306cfeb",
+      "commit": "fb55657e",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -49,11 +49,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.0",
-      "startedAt": "2026-11-20T04:08:15.337Z",
-      "artifactSha256": "d5a7ab837cb67ada8927313b53b82bc86a2cf73bb41895400f4bfcd590d9fa0a",
-      "inputsSha256": "9a8a3fbb9db35e373f92e190ac50913f638e370d63ba7bc68023e8123f5266af",
-      "commit": "81ef9ff1d760da8a805b97caf4e864115323a19d",
+      "familyVersion": "0.59.1",
+      "startedAt": "2026-11-20T06:13:10.850Z",
+      "artifactSha256": "ae4c27bad8b46888ad9f14e94d92bfc37242a109f8e09603096d1ce2db2fec71",
+      "inputsSha256": "707466680eb7b089c4c919fd30d3fb31575d326d3b547a0099f9cc650306cfeb",
+      "commit": "fb55657e",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
@@ -66,11 +66,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.0",
-      "startedAt": "2026-11-20T04:08:15.337Z",
-      "artifactSha256": "d5a7ab837cb67ada8927313b53b82bc86a2cf73bb41895400f4bfcd590d9fa0a",
-      "inputsSha256": "9a8a3fbb9db35e373f92e190ac50913f638e370d63ba7bc68023e8123f5266af",
-      "commit": "81ef9ff1d760da8a805b97caf4e864115323a19d",
+      "familyVersion": "0.59.1",
+      "startedAt": "2026-11-20T06:13:10.850Z",
+      "artifactSha256": "ae4c27bad8b46888ad9f14e94d92bfc37242a109f8e09603096d1ce2db2fec71",
+      "inputsSha256": "707466680eb7b089c4c919fd30d3fb31575d326d3b547a0099f9cc650306cfeb",
+      "commit": "fb55657e",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -89,9 +89,9 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on 81ef9ff1 (pending tag)"
+    "source": "verify-traceability --strict on fb55657e (pending tag)"
   },
-  "generatedAt": "2026-11-20T04:08:15.337Z",
+  "generatedAt": "2026-11-20T06:13:10.850Z",
   "cohort": {
     "versions": [
       "0.2.2-rc.5"
