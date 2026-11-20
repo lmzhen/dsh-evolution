@@ -129,6 +129,16 @@ export class SkillWriteService {
     return actionResult(result)
   }
 
+  /** Remove a support file only after this owner read it at the observed version. */
+  async removeSupport(owner: SkillWriteOwner, name: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillWriteServiceResult> {
+    const target = skillSupportTarget(name, filePath)
+    const observed = this.observations.requirePresent(owner, target)
+    if (!('version' in observed)) return refusal(observed.kind)
+    const result = await this.library.removeSupportFile(name, filePath, origin, anchorOf(observed.version))
+    if (result.ok) this.observations.record(owner, target, { kind: 'absent' })
+    return actionResult(result)
+  }
+
   /**
    * Create a support file when absent, or update it only after this owner read it.
    * A new support file is a createIfAbsent (no prior read is required); an

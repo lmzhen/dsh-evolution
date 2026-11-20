@@ -1017,7 +1017,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }
         return library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor)
       },
-      remove_file: () => library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor),
+      remove_file: async () => {
+        if (owner !== undefined && stagedAnchor === undefined) {
+          return toActionResult(await skillWriteService.removeSupport(owner, name, args.file_path ?? '', origin))
+        }
+        return library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor)
+      },
       pin: () => library.setPinned(name, true, origin),
       unpin: () => library.setPinned(name, false, origin),
       restructure: async () => {

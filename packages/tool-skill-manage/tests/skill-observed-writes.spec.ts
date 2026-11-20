@@ -115,4 +115,25 @@ describe('tool observed writes', () => {
     }
   }, 30_000)
 
+  it('removes a support file only for the owner that observed it', async () => {
+    const { ctx, root } = await setup()
+    const ownerA = agent()
+    const ownerB = agent()
+    try {
+      await call(ctx, ownerA, { action: 'create', name: 'remove-skill', content: skill('remove-skill', 'one') }, 'remove-create')
+      const written = await call(ctx, ownerA, { action: 'write_file', name: 'remove-skill', file_path: 'references/a.md', file_content: 'support' }, 'remove-write')
+      expect((written.value as { ok?: boolean }).ok).toBe(true)
+
+      const unread = await call(ctx, ownerB, { action: 'remove_file', name: 'remove-skill', file_path: 'references/a.md' }, 'remove-unread')
+      expect((unread.value as { ok?: boolean }).ok).toBe(false)
+      expect((unread.value as { message?: string }).message ?? '').toContain('read the skill target before writing it')
+
+      const removed = await call(ctx, ownerA, { action: 'remove_file', name: 'remove-skill', file_path: 'references/a.md' }, 'remove-observed')
+      expect((removed.value as { ok?: boolean }).ok).toBe(true)
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    }
+  }, 30_000)
+
 })

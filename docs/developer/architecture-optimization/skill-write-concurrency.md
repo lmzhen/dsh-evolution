@@ -884,6 +884,33 @@ delete → service.remove()
 
 - 若某平台 backend 的 `targetKey` 不是 host path，或版本格式不同，监听器不记录；该 read 不授权写，写路径返回 `SKILL_NOT_OBSERVED`。
 
+### 2026-11-20：Phase C.8 remove_file 接入 observation
+
+已完成：
+
+- `SkillWriteService.removeSupport`：
+  - `requirePresent(owner, support target)`；
+  - 未观察 → `SKILL_NOT_OBSERVED`；
+  - absent → `SKILL_NOT_FOUND`；
+  - 版本通过 anchor 交给 `removeSupportFile`；
+  - 成功后记录 `absent`。
+- `tool-skill-manage` 的 `remove_file` 在 owner + 非 replay 时走 service；
+- tool 测试新增：
+  - ownerA 写 support 后，ownerB 未读 remove → NOT_OBSERVED；
+  - ownerA 观察后 remove → 成功。
+
+验证：
+
+```text
+tool observed writes: 4 passed
+overlay build:        0
+```
+
+边界：
+
+- approval replay 仍走 staged anchor；
+- create / unit / AUX owner / per-target lock 仍待后续。
+
 ### 2026-11-20：Phase C.7 收紧 fallback（取代 C.6 的过渡结论）
 
 已完成：
