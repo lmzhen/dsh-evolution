@@ -1115,7 +1115,7 @@ function snapshotReviewParent(agent: Agent): Agent {
     let reviewChild: Awaited<ReturnType<typeof createReviewChildAgent>> | undefined
     let channel: ReviewToolChannel = nativeChannel
     try {
-      reviewChild = ptcOnly && toolsService !== undefined ? await createReviewChildAgent(agent, 'aux-' + reviewId, { ptc: true }) : undefined
+      reviewChild = ptcOnly && toolsService !== undefined ? await createReviewChildAgent(agent, reviewId, { ptc: true }) : undefined
       if (reviewChild !== undefined && toolsService !== undefined && ptcToolHost === undefined) {
         ptcToolHost = new PtcReviewToolHost(toolsService, reviewWriteLocks)
         ptcToolHost.register()

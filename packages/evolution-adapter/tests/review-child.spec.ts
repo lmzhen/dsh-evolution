@@ -10,6 +10,7 @@ it('replaces only the session and keeps parent methods bound', async () => {
   const review = await createReviewChildAgent(parent, 'task/with bad chars!')
   expect((review.agent as typeof parent).session).not.toBe(parentSession)
   expect((review.agent as typeof parent).session).toBe(review.session)
+  expect(review.session.id).toMatch(/^review-child:task_with_bad_chars_:/)
   expect((review.agent as typeof parent).read()).toBe('parent')
   expect(parentSession.seq).toBe(0)
   await review.dispose()
