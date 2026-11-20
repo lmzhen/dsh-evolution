@@ -931,6 +931,24 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.4 观察版本探针不再吞读错
+
+`skillPlatformVersion` 原实现 `try/statSync catch -> undefined` 被 arch guard N14 判为“durable-read failure served as absent”。
+
+修复：
+
+- 使用 `statSync(path, { bigint: true, throwIfNoEntry: false })`；
+- 缺失/非文件返回 undefined；
+- EACCES/EIO 等真实读错继续抛出，不再伪装 absent。
+
+验证：
+
+```text
+verify-arch-guards --strict: OK（42 rules clean）
+skill-observations: 5 passed
+overlay build: 0
+```
+
 ### 2026-11-20：Phase P1.3 superseded — first-occurrence 契约保留
 
 P1.3 曾让「old_string 多次出现」返回 `SKILL_AMBIGUOUS_EDIT`，但 tool 现有契约明确是：

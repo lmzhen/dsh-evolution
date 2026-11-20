@@ -60,11 +60,7 @@ export function installSkillObservationListener(ctx: Context, root: string, stor
  * @returns the opaque version, or undefined for non-regular/missing paths.
  */
 export function skillPlatformVersion(hostPath: string): string | undefined {
-  try {
-    const info = statSync(hostPath, { bigint: true })
-    if (!info.isFile()) return undefined
-    return `${info.dev}:${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`
-  } catch {
-    return undefined
-  }
+  const info = statSync(hostPath, { bigint: true, throwIfNoEntry: false })
+  if (info === undefined || !info.isFile()) return undefined
+  return `${info.dev}:${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`
 }
