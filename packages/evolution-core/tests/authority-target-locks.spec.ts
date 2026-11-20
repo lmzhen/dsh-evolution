@@ -80,7 +80,11 @@ describe('TargetLockSet', () => {
 
   it('does not wedge a key when lock release itself fails', async () => {
     const home = await tempRoot('dsh-target-locks-')
-    const failing = async (_path: string, body: () => Promise<unknown>): Promise<void> => {
+    let lockPath = ''
+    const failing = async (path: string, body: () => Promise<unknown>): Promise<void> => {
+      const { writeFile } = await import('node:fs/promises')
+      lockPath = path + '.lock'
+      await writeFile(lockPath, `${process.pid}\n`, 'utf8')
       await body()
       throw new Error('release-failed')
     }
@@ -90,6 +94,7 @@ describe('TargetLockSet', () => {
     expect(locks.lastReleaseError?.message).toContain('release-failed')
     const repaired = await locks.repair()
     expect(repaired.repaired).toContain('skill::a')
+    await expect(import('node:fs/promises').then(fs => fs.stat(lockPath))).rejects.toThrow()
     const second = await locks.acquireLease(['skill::a'])
     await second.release()
     expect(locks.size).toBe(0)

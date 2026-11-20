@@ -931,6 +931,28 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.10 复核 P1 修复
+
+复核指出两项 P1，已修：
+
+1. `TargetLockSet.repair()` 读/删路径少了平台锁的 `.lock` 后缀：
+   - 修复为 `lockPath(key) + ".lock"`；
+   - 删除后再次 `readFile`，只有 ENOENT 才计入 repaired；
+   - 测试 fake lock 现在真实创建 `.lock` 文件，并断言 repair 后文件消失。
+2. `extract()` 的 `ensureRecovered()` 在 `rootGate.write` 内，首次调用会自死锁：
+   - 移到 gate 之前；
+   - `extractCore` 不再调用 recovery。
+
+验证：
+
+```text
+authority-target-locks: 6 passed
+mutation-unit:          26 passed
+overlay build:          0
+```
+
+注意：本机当前在役 web/host 进程负载高，`skill-restructure.spec.ts` 即使隔离也会超过其文件级 30s timeout；这是测试预算问题，不是新死锁。
+
 ### 2026-11-20：Phase P1.9 recovery 按 snapshot 派生 target keys
 
 - `MutationUnitOptions.targetKeysForSnapshot`：recover 从 snapshot ops 派生 key；

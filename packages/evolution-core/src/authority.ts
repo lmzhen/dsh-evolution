@@ -253,7 +253,7 @@ export class TargetLockSet {
     const repaired: string[] = []
     const skipped: string[] = []
     for (const key of [...this.brokenKeys]) {
-      const path = this.lockPath(key)
+      const path = this.lockPath(key) + '.lock'
       let raw: string
       try {
         raw = await readFile(path, 'utf8')
@@ -273,8 +273,17 @@ export class TargetLockSet {
       }
       try {
         await rm(path, { force: true })
-        this.brokenKeys.delete(key)
-        repaired.push(key)
+        try {
+          await readFile(path, 'utf8')
+          skipped.push(key)
+        } catch (error) {
+          if ((error as { code?: unknown }).code === 'ENOENT') {
+            this.brokenKeys.delete(key)
+            repaired.push(key)
+          } else {
+            skipped.push(key)
+          }
+        }
       } catch {
         skipped.push(key)
       }

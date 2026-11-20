@@ -3434,11 +3434,11 @@ export class SkillLibrary {
    * @returns the kernel result; a refusal writes nothing.
    */
   async extract(plan: ExtractPlanDraft, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary): Promise<SkillActionResult> {
+    await this.ensureRecovered()
     return await this.rootGate.write(() => this.extractCore(plan, origin, change))
   }
 
   private async extractCore(plan: ExtractPlanDraft, origin: WriteOrigin, change?: ChangeSummary): Promise<SkillActionResult> {
-    await this.ensureRecovered()
     if (plan.outcome === 'owner-gap' || plan.owner.mode !== 'covered') return { ok: false, message: '提取被拒绝：owner-gap 不是写操作。' }
     if (plan.support.unresolved.length > 0 || plan.support.dangling.length > 0) return { ok: false, message: '提取被拒绝：support closure 存在 unresolved/dangling。' }
     if (plan.parts.length === 0) return { ok: false, message: '提取被拒绝：没有 part。' }
