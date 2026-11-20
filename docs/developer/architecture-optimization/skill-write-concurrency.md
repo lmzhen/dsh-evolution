@@ -884,6 +884,35 @@ delete → service.remove()
 
 - 若某平台 backend 的 `targetKey` 不是 host path，或版本格式不同，监听器不记录；该 read 不授权写，写路径返回 `SKILL_NOT_OBSERVED`。
 
+### 2026-11-20：Phase C.5 tool 级 observation/CAS 证据
+
+已完成：
+
+- 新增 `tool-skill-manage/tests/skill-observed-writes.spec.ts`：
+  - 创建 skill → 无 observation 的 update 走旧路径成功（过渡 fallback）；
+  - 同一 owner 收到 `fs/observed` 后 update 成功，磁盘内容为 observed 版本；
+  - 两个 owner 都观察同一版本 → 第一个 update 成功，第二个返回 stale（中文“读取之后被改动过”）。
+- 这证明 tool 层已经真实走通：
+  ```text
+  platform read → fs/observed → store(content hash)
+  → tool update → SkillWriteService → library.update(anchor)
+  → 第二个 owner stale
+  ```
+
+验证：
+
+```text
+skill-observed-writes: 2 passed
+tool-skill-manage:     42 passed
+overlay build:         0
+```
+
+边界：
+
+- 无 observation 仍是旧路径，fallback 尚未收紧；
+- `remove_file` / create / approval / unit / AUX owner 尚未切；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase C.4 tool 层开始消费 observation
 
 已完成：
