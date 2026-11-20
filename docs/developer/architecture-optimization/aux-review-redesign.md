@@ -603,4 +603,5 @@ interface EvolutionReviewActivityRecordV3 {
 - 父 Session 的持久日志中没有任何 `tool/ptc-dispatch*` / `review-child` 帧；PTC dispatch 只进 child Session，父 Session seq 未被 PTC 写入。
 - 修复：PTC 嵌套执行跨 async 边界后 `currentReviewContext()` 可能不可见，`review_done` 曾返回 `ok:false`。现在 `controlFor` 在 ALS 缺失时按 child Session id 中的 taskId 解析 control；同时 PTC `review_done` 参数 schema 把 `memoryChanged/skillsChanged/unresolved` 改为必填，避免模型省略字段导致 report 解析失败。
 - 真实 UI 截图（`D:/dsh/_e2e2-ptc-ui.png`）：自动复查显示 PTC memory/skill 均“已完成”，并与旧 `review-timeout` / `missing review_done` 记录并存，证明 v3 兼容和状态区分。
-- 仍未做：PTC 并行/同 skill 冲突、真实 UI 的 failed/timeout 新记录、最终 pre-tag/CI 与独立复核。
+- 并行证据：同一 session 的 memory/skill 分别在 `1795137247750` / `1795137247783` 开始（相差 33 ms），均成功结束，说明拆分后的两个 AUX task 可并行且不互相阻塞。
+- 仍未做：PTC 同 skill 冲突（真实宿主）、真实 UI 的 failed 新记录、最终 pre-tag/CI 与独立复核。
