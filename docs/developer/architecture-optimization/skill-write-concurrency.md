@@ -882,6 +882,29 @@ delete → service.remove()
 - 若最终复核不接受双 token，则回退为“只允许能同步取得完整内容的读作为写许可”；通用 read 不授权写，需用户在 skill 管理路径显式读。
 - 该回退会降低后台 review 的可用性，但不会产生错误的写许可。
 
+### 2026-11-20：Phase B.2 存储层锁内 CAS 原语
+
+已完成：
+
+- `SkillLibrary.writeFileCas(rawName, filePath, intent)`：
+  - 复用 `serial` + `withMutationLock`；
+  - 有 `transact` 时在事务回调内读、决策、写；
+  - 无 `transact` 时在同一锁内 read → decide → write；
+  - 目标版本在存储层按 `contentHash(current)` 计算，调用方传入 content version；
+  - 不写 audit/event，不替代现有 create/update/patch；
+- 4 个并发测试：
+  - 两个同 expected 的 replace，只有一个成功，另一个 stale；
+  - 两个 createIfAbsent，只有一个成功；
+  - 版本变化时不同区域 edit 仍 stale；
+  - 多匹配 edit 拒绝。
+
+边界：
+
+- 这是 Phase B 的底层原语，尚未被 tool 层调用；
+- 现有 create/update/patch 行为未变；
+- `transact` 缺失时仍只有进程内锁，跨进程语义沿用现有 IO 配置；
+- 平台 FsVersion / content version 的统一仍遵循 DCR-1 待复核。
+
 ### 2026-11-20：Phase B.1 纯写意图原语
 
 已完成：

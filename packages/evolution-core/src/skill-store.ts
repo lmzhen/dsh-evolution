@@ -59,6 +59,7 @@ import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutat
 import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
+import { decideSkillWrite, type SkillWriteIntent, type SkillWriteRefusalReason } from './skill-write-intent.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
 import { type ChangeSummary, type UnitHead, clipChangeSummary, contentRetentionFeedback, DEFAULT_SKILL_WRITE_SUMMARY_CHARS, HISTORY_DIR, loadVersionContent, loadVersions, normalizeChangeSummary, recordVersions, type HistoryFence, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { getRecord, loadUsage, mutateUsage, suppressedFile, usageFile } from './usage.ts'
@@ -745,6 +746,14 @@ function planRestructureSections(body: string, moves: SkillRestructureMove[]): R
     }
   }
   return { body: rebuilt.join('\n'), sections: spans.map(({ rel, heading, text }) => ({ rel, heading, text })) }
+}
+
+/** One low-level CAS result; no audit/event is emitted by this primitive. */
+export interface SkillFileCasResult {
+  readonly ok: boolean
+  readonly message: string
+  readonly reason?: SkillWriteRefusalReason | undefined
+  readonly path?: string | undefined
 }
 
 /**
@@ -3682,6 +3691,57 @@ export class SkillLibrary {
     await this.audit(name, 'restore', null, isPresent(restoredProbe) ? restoredProbe.value : null, `restored from ${source}`, undefined, undefined, undefined, origin, fenceHeld)
     this.notifyMutation({ action: 'restore', name, skillDir: dest })
     return { ok: true, message: `技能「${name}」已从 .archive 恢复。`, path: dest }
+  }
+
+  /** Result of the low-level CAS primitive. It intentionally has no audit/event. */
+  async writeFileCas(
+    rawName: string,
+    filePath: string,
+    intent: SkillWriteIntent,
+  ): Promise<SkillFileCasResult> {
+    await this.ensureRecovered()
+    const name = rawName.trim()
+    const badName = this.badName(name)
+    if (badName !== null) return { ok: false, message: badName, reason: 'invalid' }
+    let target: string
+    if (filePath === '') {
+      target = join(this.dirOf(name), 'SKILL.md')
+    } else {
+      const validation = validateSupportPath(filePath)
+      if (validation !== null) return { ok: false, message: validation, reason: 'invalid' }
+      target = join(this.dirOf(name), ...filePath.replace(/\\/g, '/').split('/').filter(Boolean))
+    }
+
+    return await this.serial(() => this.withMutationLock(async () => {
+      let refusal: { reason: SkillWriteRefusalReason; message: string } | undefined
+      const apply = (current: string | null): string | null => {
+        const decision = decideSkillWrite(intent, current === null
+          ? { kind: 'absent' }
+          : { kind: 'present', version: contentHash(current), content: current })
+        if (decision.kind === 'refuse') {
+          refusal = { reason: decision.reason, message: decision.message }
+          return current
+        }
+        return decision.next
+      }
+
+      let next: string | null
+      if (this.transact !== undefined) {
+        next = null
+        await this.transact(this.io, target, (current) => {
+          next = apply(current)
+          return next
+        })
+      } else {
+        const current = await probeText(this.io, target)
+        if (isUnknown(current)) return { ok: false, message: `cannot read ${target}: ${current.reason}`, reason: 'invalid' as const }
+        const value = isPresent(current) ? current.value : null
+        next = apply(value)
+        if (next !== null && next !== value) await this.io.writeText(target, next)
+      }
+      if (refusal !== undefined) return { ok: false, message: refusal.message, reason: refusal.reason }
+      return { ok: true, message: 'skill file written', path: target }
+    }))
   }
 
   async writeSupportFile(
