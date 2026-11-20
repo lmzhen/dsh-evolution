@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-19T08:58:15.301Z",
-  "tree": "3ef91c63",
+  "measuredAt": "2026-11-20T21:06:52.367Z",
+  "tree": "465e420a",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -42,6 +42,16 @@
       "reasonRef": "packages/evolution-activity/tests/threat/threat-guard.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
       "owner": "evolution-activity"
+    },
+    {
+      "spec": "packages/evolution-adapter/tests/review-child.spec.ts",
+      "id": "@deepseek-ai/dsh-session",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-adapter/tests/review-child.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-adapter"
     },
     {
       "spec": "packages/evolution-agent/tests/agent-composition.spec.ts",
@@ -1544,6 +1554,46 @@
       "owner": "tool-skill-manage"
     },
     {
+      "spec": "packages/tool-skill-manage/tests/skill-observations.spec.ts",
+      "id": "@deepseek-ai/dsh-fs",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/tool-skill-manage/tests/skill-observations.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "tool-skill-manage"
+    },
+    {
+      "spec": "packages/tool-skill-manage/tests/skill-observed-writes.spec.ts",
+      "id": "@deepseek-ai/dsh-llm",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/tool-skill-manage/tests/skill-observed-writes.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "tool-skill-manage"
+    },
+    {
+      "spec": "packages/tool-skill-manage/tests/skill-observed-writes.spec.ts",
+      "id": "@deepseek-ai/dsh-agent",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/tool-skill-manage/tests/skill-observed-writes.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "tool-skill-manage"
+    },
+    {
+      "spec": "packages/tool-skill-manage/tests/skill-observed-writes.spec.ts",
+      "id": "@deepseek-ai/dsh-agent-loop-testkit",
+      "kind": "testkit",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/tool-skill-manage/tests/skill-observed-writes.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "tool-skill-manage"
+    },
+    {
       "spec": "packages/tool-skill-manage/tests/skill-settings.spec.ts",
       "id": "@deepseek-ai/dsh-llm",
       "kind": "platform",
@@ -1702,16 +1752,6 @@
       "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
       "owner": "tool-skill-manage"
-    },
-    {
-      "spec": "packages/evolution-adapter/tests/review-child.spec.ts",
-      "id": "@deepseek-ai/dsh-session",
-      "kind": "platform",
-      "expectLine": "unknown",
-      "status": "pending",
-      "reasonRef": "packages/evolution-adapter/tests/review-child.spec.ts:1",
-      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
-      "owner": "evolution-adapter"
     }
   ]
 }
