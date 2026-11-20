@@ -884,6 +884,34 @@ delete → service.remove()
 
 - 若某平台 backend 的 `targetKey` 不是 host path，或版本格式不同，监听器不记录；该 read 不授权写，写路径返回 `SKILL_NOT_OBSERVED`。
 
+### 2026-11-20：Phase C.4 tool 层开始消费 observation
+
+已完成：
+
+- `tool-skill-manage` apply 内创建唯一：
+  - `SkillObservationStore`
+  - `installSkillObservationListener(ctx, library.root, store)`
+  - `SkillWriteService(library, store)`
+- `executeCore` 增加可选 `owner`（`exec.agent?.session`）；
+- `update` / body `patch` / `write_file` 在以下条件走 service：
+  - 有 owner；
+  - 没有 approval 的 `staged_from_sha256`（replay 仍走旧 anchor）；
+  - 该 owner 对目标已有 observation。
+- 其余情况保持现有 library 路径：这是**过渡期 fallback**，用于不读直写、审批 replay、无 session 的旧路径。
+- `skill-observations` listener 现在接收外部 store，避免 plugin 内部两个 store。
+
+验证：
+
+- `tool-skill-manage.spec.ts`：42 passed（含 no-op、replace_all、审批 replay、staged anchor 回归）；
+- build 0。
+
+边界：
+
+- 有 observation 时：走 service + content anchor + 锁内 stale；
+- 无 observation 时：仍走旧 read gate/旧路径，尚未实现 goal E 的“未读一律 NOT_OBSERVED”；
+- `remove_file` / create / approval / unit / AUX owner 仍未切；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase C.3 通用 read 的 content observation
 
 已完成：

@@ -31,6 +31,7 @@ import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, computeDedupGroups, nearDuplicateSummaries, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_SKILL_WRITE_SUMMARY_CHARS, newSkillLibrary, normalizeChangeSummary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type ChangeSummary, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import { installSkillObservationListener } from './skill-observations.ts'
+import { SkillObservationStore, SkillWriteService, skillBodyTarget, skillSupportTarget, type SkillWriteServiceResult } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fuzzyPatch } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
@@ -723,8 +724,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     versionKeep: limit('skillVersionKeep', rawConfig.skillVersionKeep, DEFAULT_SKILL_LIMITS.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP),
   }
   const library = newSkillLibrary({ authority: authorityFrom({ origin: 'foreground' }), config: rawConfig, io, limits: libraryLimits, ctx, threatExemptLabels: rawConfig.threatExemptLabels })
-  // Phase A.4: generic platform reads are the source of skill-file observations.
-  installSkillObservationListener(ctx, library.root)
+  // Phase C.4: one observation store and one write authority for this plugin.
+  const skillObservations = new SkillObservationStore()
+  installSkillObservationListener(ctx, library.root, skillObservations)
+  const skillWriteService = new SkillWriteService(library, skillObservations)
   void library.recoverOnBoot().catch(error => {
     ctx.logger.warn('skill_manage: boot unit recovery failed: ' + (error instanceof Error ? error.message : String(error)))
   })
@@ -845,12 +848,23 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
   }
 
+  /** Convert a SkillWriteService result to the tool's legacy action result. */
+  function hasObservation(owner: object | undefined, target: ReturnType<typeof skillBodyTarget>): boolean {
+    return owner !== undefined && skillObservations.get(owner, target) !== undefined
+  }
+
+  function toActionResult(result: SkillWriteServiceResult): SkillActionResult {
+    return result.ok ? { ok: true, message: '技能文件已写入。' } : { ok: false, message: result.message }
+  }
+
   async function executeCore(
     args: SkillWriteArgs,
     origin: WriteOrigin = 'foreground',
     /** T2-05/A20: the whole-tree observation the cross-source gate already made for THIS operation
      * (undefined when the gate did not run or its view was empty/unreadable). */
     crossSourceView?: readonly SkillSummary[],
+    /** Exact reading session for observation-based writes; undefined on approval replay. */
+    owner?: object,
   ): Promise<{ ok: boolean; message: string; skills: string[]; proposal?: string }> {
     // T2-09/A24: re-materialize the write caps HERE, not only at the tool entry. The approve path
     // (registerRunner) calls this function directly, so a deployment that TIGHTENED skillContentChars /
@@ -972,10 +986,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         feedbackLines.push(...await duplicateHintLines(name, candidateDescription, crossSourceView))
         return library.create(name, args.content ?? '', origin, { managed: origin !== 'foreground' })
       },
-        update: () => library.update(name, args.content ?? '', origin, stagedAnchor),
+        update: async () => {
+          if (owner !== undefined && stagedAnchor === undefined && hasObservation(owner, skillBodyTarget(name))) {
+            return toActionResult(await skillWriteService.updateBody(owner, name, args.content ?? '', origin))
+          }
+          return library.update(name, args.content ?? '', origin, stagedAnchor)
+        },
       patch: async () => {
         const section = args.section
-        if (section === undefined) return await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
+        if (section === undefined) {
+          if (owner !== undefined && (args.file_path ?? '') === '' && hasObservation(owner, skillBodyTarget(name))) {
+            return toActionResult(await skillWriteService.patchBody(owner, name, args.old_string ?? '', args.new_string ?? '', args.replace_all === true, origin))
+          }
+          return await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
+        }
         if (typeof section.heading !== 'string' || typeof section.content !== 'string') {
           return { ok: false, message: 'patch.section 需要 heading 与 content。' }
         }
@@ -987,7 +1011,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         }, origin)
       },
       delete: () => library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {}, undefined, change),
-      write_file: () => library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor),
+      write_file: async () => {
+        if (owner !== undefined && stagedAnchor === undefined && hasObservation(owner, skillSupportTarget(name, args.file_path ?? ''))) {
+          return toActionResult(await skillWriteService.updateSupport(owner, name, args.file_path ?? '', args.file_content ?? '', origin))
+        }
+        return library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor)
+      },
       remove_file: () => library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor),
       pin: () => library.setPinned(name, true, origin),
       unpin: () => library.setPinned(name, false, origin),
@@ -1541,7 +1570,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ? { ok: true, message: '提取提议（未写入；确认后按 extract items 提交）。', skills: [], proposal: proposed.proposal }
           : { ok: false, message: proposed.message, skills: [] }
       }
-      return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined)
+      return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined, exec.agent?.session)
     },
   }))
 

@@ -24,8 +24,7 @@ type ObservationActor = { agent?: { session?: object } } | undefined
  * @param root - absolute skills root captured at apply time.
  * @returns the store the future SkillWriteService reads; also cleared on dispose.
  */
-export function installSkillObservationListener(ctx: Context, root: string): SkillObservationStore {
-  const store = new SkillObservationStore()
+export function installSkillObservationListener(ctx: Context, root: string, store: SkillObservationStore = new SkillObservationStore()): SkillObservationStore {
   ctx.effect(() => () => store.clear(), 'tool-skill-manage.skill-observations')
   ctx.on('fs/observed', (target, observation, actor) => {
     if (observation.kind !== 'present') return
