@@ -31,3 +31,21 @@ it('exposes review_done only while the PTC channel executes and reports completi
   host.dispose()
   expect(registered).toHaveLength(0)
 })
+
+it('resolves review_done from the child session when the ALS context is gone', async () => {
+  const registered: ToolDefinition[] = []
+  const childAgent = { session: { id: 'review-child:review-2:0' } }
+  const host = new PtcReviewToolHost({
+    register(definition) { registered.push(definition); return () => {} },
+    resolve: async () => ({ view: () => new Map([['run_code', {}], ['review_done', {}]]) }),
+    async execute() {
+      const done = registered.find(definition => definition.name === 'review_done')!
+      await done.execute({ summary: 'done', memoryChanged: false, skillsChanged: [], unresolved: [] }, { signal: new AbortController().signal, agent: childAgent } as never)
+      return { results: [] }
+    },
+  }, new ReviewWriteLocks())
+  const channel = host.channel('review-2', [{ name: 'run_code' }], childAgent, undefined, new Set(['run_code', 'review_done', 'review_wait']))
+  await channel.execute([], new AbortController().signal)
+  expect(channel.completion()).toMatchObject({ done: true, report: { summary: 'done' } })
+  channel.dispose(); host.dispose()
+})
