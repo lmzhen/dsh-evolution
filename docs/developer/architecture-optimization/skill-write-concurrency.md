@@ -931,6 +931,52 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase E13 本地注入真机验收
+
+按用户选择做本地注入 web 验收（不是 npm 发布）。
+
+装配：
+
+- 新 profile `accept`：
+  ```text
+  @deepseek-ai/dsh-base
+  @deepseek-ai/dsh-headless
+  @deepseek-ai/dsh-credentials-local
+  @deepseek-ai/dsh-llm-deepseek
+  @lmzhen/dsh-evolution-all
+  ```
+- 从 `harness-rc3/packages/evolution` 注入本地构建：
+  - evolution-core；
+  - tool-skill-manage；
+  - evolution-review；
+  - evolution-merge；
+  - evolution-activity；
+- patch 覆盖：
+  - `evolution-authority.config.keyedSkillLocks: true`；
+  - `evolution-skill-catalog.config.root: D:/dsh/_keyed-acceptance-skills`；
+  - `agent-preset-registry.selectedDefault: evolution`。
+
+`--dump-config` 确认 keyedSkillLocks=true 已生效。
+
+真机结果：
+
+1. 单 headless host：
+   - `skill_manage create host-keyed` 成功；
+   - `skill_manage update host-keyed` 成功；
+   - 最终 SKILL.md body 为 `second body`。
+2. 两个 headless host 进程并发：
+   - 各自 create 不同 skill `host-keyed-a` / `host-keyed-b`；
+   - 两个进程 exit 0；
+   - 没有死锁/资源忙错误。
+
+边界：
+
+- 两个 headless host 未断言“并行耗时”，只证明 keyed 装配下真实 host 可并发完成；
+- 同 skill 双写 stale 仍由工具/服务测试覆盖；
+- 真机写落到 `D:/dsh-homes/web/skills`（SkillLibrary 根不是 catalog root），验收后已移出到 `D:/dsh/_keyed-acceptance-artifacts`；
+- web profile 注入前已备份，验收后已还原；
+- `accept` profile 已安全移除（先删 junction，再删目录）。
+
 ### 2026-11-20：Phase P1.6 定向测试稳定化
 
 13 个定向 spec 并行跑时出现 30s 超时（7 条），全部为高负载超时；改用 `--maxWorkers=1` 后：
