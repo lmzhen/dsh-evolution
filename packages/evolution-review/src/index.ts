@@ -1083,6 +1083,16 @@ function snapshotReviewParent(agent: Agent): Agent {
       runningByKind!.delete(kind)
       if (runningByKind!.size === 0) auxRunning.delete(session.id)
     }
+    // The minimal preset deliberately has no skill loader/catalog; the runtime
+    // guard hides the family tools, and no auxiliary review should be scheduled.
+    const activePreset = (ctx.get('sessionProjections') as {
+      snapshot?(target: unknown, keys?: readonly string[]): { values?: Record<string, unknown> } | undefined
+    } | undefined)?.snapshot?.(session, ['agentPreset'])?.values?.agentPreset
+    if (activePreset === 'minimal') {
+      releaseKind()
+      ctx.logger.info('dsh-evolution-review: minimal preset has no family review surface')
+      return true
+    }
     // Cutoff is the caller's boundary (turn/end), taken synchronously before
     // any lease wait so later goal-loop turns can never leak into the review.
     const reviewParent = snapshotReviewParent(agent)

@@ -7,6 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { warnIfFamilyMixed } from './coherence.ts'
 import { EvolutionLlm } from './llm.ts'
 import { EvolutionProjections } from './projections.ts'
+import { installMinimalPresetGuard } from './minimal-preset.ts'
 
 export const name = 'evolution-core-runtime'
 
@@ -15,5 +16,6 @@ export async function apply(ctx: Context): Promise<void> {
   // The adapter row owns `evolutionPlatform` and mounts before this row.
   await ctx.plugin(EvolutionProjections)
   await ctx.plugin(EvolutionLlm)
+  installMinimalPresetGuard(ctx)
   warnIfFamilyMixed(ctx)
 }

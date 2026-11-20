@@ -721,3 +721,11 @@ interface EvolutionReviewActivityRecordV3 {
 - 测试：`review-executor.spec.ts` 新增完整目录+阻断 bash 的用例；native 仍只执行 skill_manage，bash 结果为 error。
 - 仍未做：`review_done`/`review_wait` 仍是末尾合成工具，完整父前缀仍有一个后缀差异；如果缓存收益仍不够，后续改为 in-history tool addition。当前缓存读数需在 dev 版重测。
 - 缓存命中率指标不进入 UI；仅 activity/诊断读取。
+
+### Round 40（2026-11-20，极简模式隔离，A1）
+
+- 决策：极简 preset 的定位是无 skill，family 模型面不应出现。由于 `evolution-all` 的模型 row 在 profile-root、平台没有 per-session unload，本轮先用**运行时 guard** 实现 A1（模型面消失；UI/命令仍全局）。
+- `evolution-core/runtime` 新增 `installMinimalPresetGuard`：监听 `agent/created` / `agent-preset/selected`，当生效 preset 为 `minimal` 时用 `tools.restrict({deny})` 隐藏 `memory`、`skill_manage`、`skill_search`、`skill`、`maintenance_probe`、`merge_stage`；切回其他 preset 时 dispose。
+- `evolution-review` 在最小 preset 下直接跳过 AUX（不产生 review activity）。
+- 真实极简会话验证：request header tools 从 8 个降为 3 个（`pwsh`、`read_image`、`working_directory`），无 family 工具；activity 无 review。
+- 边界：这是 A1，不是 A2；family UI 面板、命令、settings 仍全局存在。真正“全插件不出现”需要组合层 preset-scoped 挂载，当前平台没有公开 extends/追加 row 能力；未做运行时 UI 卸载。
