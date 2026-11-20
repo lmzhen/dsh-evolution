@@ -3331,6 +3331,7 @@ export class SkillLibrary {
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
       lock: this.lockPort(),
+      targetKeys: [skillNamespaceKey(name)],
       hooks,
       validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
     })
@@ -3447,6 +3448,7 @@ export class SkillLibrary {
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
       lock: this.lockPort(),
+      targetKeys: [skillNamespaceKey(source), skillNamespaceKey(target)],
       hooks,
       validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
     })
@@ -3531,6 +3533,7 @@ export class SkillLibrary {
     const unit = this.commitUnit({
       limits: this.limits,
       ...(plan.nested === true ? { nested: true as const } : { lock: this.lockPort() }),
+      targetKeys: [...new Set(landing.map(entry => entry.skill))].map(skillNamespaceKey),
       ...(this.transact === undefined ? {} : { transact: this.transact }),
       now: () => Date.now(),
     })

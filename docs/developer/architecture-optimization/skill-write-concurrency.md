@@ -905,6 +905,29 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.9c 剩余结构操作填 namespace keys
+
+已完成：
+
+- restructure UnitTransaction：`[skillNamespaceKey(name)]`；
+- extract UnitTransaction：`[skillNamespaceKey(source), skillNamespaceKey(target)]`；
+- tree-change kernel（commitMerge/consolidate 共用）：按 landing 里的 skills 去重后填 namespace keys；
+- archive/restore 已有单独 namespace lock；
+- 生产 root lock 仍忽略 keys，因此行为不变。
+
+验证：
+
+```text
+skill-keyed-concurrency + tool observed: 7 passed
+overlay build:                            0
+```
+
+边界：
+
+- consolidate 是否走 tree-change kernel 的 key 需要再用 keyed 装配实测；
+- 生产仍 fallback root lock；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.9b archive/restore 持 namespace key
 
 已完成：
