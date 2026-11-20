@@ -931,6 +931,22 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.6 定向测试稳定化
+
+13 个定向 spec 并行跑时出现 30s 超时（7 条），全部为高负载超时；改用 `--maxWorkers=1` 后：
+
+```text
+Test Files  13 passed
+Tests       125 passed
+Duration    352.26s
+```
+
+结论：
+
+- 无死锁回归；
+- 本机并行负载会把 8–14s 的 create 推到 30s 预算外；
+- 发布/CI 应使用 `maxWorkers=1` 或更高 testTimeout 跑 pre-tag 定向套件。
+
 ### 2026-11-20：Phase P1.5 pre-tag 静态门禁
 
 本轮跑完整 pre-tag 静态门禁（69 条）：
