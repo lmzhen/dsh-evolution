@@ -1112,10 +1112,10 @@ function snapshotReviewParent(agent: Agent): Agent {
     const toolAllow = new Set((header.tools ?? []).map(tool => tool.name).filter(name => AUX_TOOL_ALLOW.has(name)))
     const nativeChannel = nativeReviewToolChannel(reviewParent, toolAllow, { execute: tools }, agent)
     const ptcOnly = toolAllow.size === 0 && (header.tools ?? []).some(tool => tool.name === 'run_code')
-    let reviewChild: ReturnType<typeof createReviewChildAgent> | undefined
+    let reviewChild: Awaited<ReturnType<typeof createReviewChildAgent>> | undefined
     let channel: ReviewToolChannel = nativeChannel
     try {
-      reviewChild = ptcOnly && toolsService !== undefined ? createReviewChildAgent(agent, 'aux-' + reviewId) : undefined
+      reviewChild = ptcOnly && toolsService !== undefined ? await createReviewChildAgent(agent, 'aux-' + reviewId, { ptc: true }) : undefined
       if (reviewChild !== undefined && toolsService !== undefined && ptcToolHost === undefined) {
         ptcToolHost = new PtcReviewToolHost(toolsService, reviewWriteLocks)
         ptcToolHost.register()
@@ -1124,7 +1124,7 @@ function snapshotReviewParent(agent: Agent): Agent {
         channel = ptcToolHost.channel(reviewId, header.tools ?? [], reviewChild.agent, { provider: header.config.provider, model: header.config.model }, new Set([...AUX_TOOL_ALLOW, 'run_code', 'review_done', 'review_wait']))
       }
     } catch (error) {
-      reviewChild?.dispose()
+      await reviewChild?.dispose()
       releaseKind()
       clearTimeout(timer)
       if (leaseRenewTimer !== undefined) clearInterval(leaseRenewTimer)
@@ -1236,7 +1236,7 @@ function snapshotReviewParent(agent: Agent): Agent {
         active?.delete(kind)
         if (active !== undefined && active.size === 0) auxRunning.delete(session.id)
         inFlightControllers.delete(controller)
-        reviewChild?.dispose()
+        await reviewChild?.dispose()
         if (leaseToken !== undefined && authority?.lease !== undefined) await authority.lease.release(leaseToken).catch(() => {})
         if (state.rerun !== undefined) void tryAuxReview(session, agent, state.rerun, signal, reason)
       }

@@ -559,3 +559,10 @@ interface EvolutionReviewActivityRecordV3 {
 - 结论：PTC review 需要平台级 **detached review Agent（真实 Agent/scope/executor，不是只换 session 的 Proxy）**，或平台提供“用父 scope executor + child session”执行入口；当前 rc.5 没有该公开入口。不能靠 family 侧补丁伪造 Agent，否则会绕过平台 scope/executor 与 approval/workingDirectory 语义。
 - native 真机已通过（见 Round 24）：memory/skill 两 task completed、memory 落盘、activity v3、UI 完成/部分并存；aux LLM 请求不传 toolHistory 后才看到合成 review_done。
 - 当前发布结论：native/default 可进入最终验收；PTC 仍为平台能力阻断，除非用户确认接受“PTC review 不可用”或先补平台 detached review Agent 能力。
+
+
+### Round 27（2026-11-20，平台侧替代做法）
+
+- 从平台源码找到替代原 Proxy-child 的做法：`@deepseek-ai/dsh-scope` 的 `createScope(ctx, key, { parent })` 可以为“与平台 Agent 同对象的 scope key”创建真实 scoped context。平台 PTC 测试正是用 `createScope(inner, agent)` + scoped `setExecutor` 选择 PTC。
+- adapter `createReviewChildAgent` 现改为：child Session 用 SessionStore live create；child Agent 用 `Object.create(parent)` 且以该对象自身为 scope key；`createScope(parentCtx, childAgent, {parent: parentAgent})` 后把 `ctx` 设为 scoped ctx；PTC 模式下在 scoped ctx 动态挂载 `@deepseek-ai/dsh-tool-executor-ptc`。这样 `selectExecutor(childAgent)` 能命中 child scope 的 PTC executor，而不再是 root native executor。
+- 该做法仍未在真实 PTC host 复验：本轮重建 e2e host 时模型凭据不可用，PTC 会话未成功发请求；已确认 adapter/review 构建通过、adapter 单测通过。下一步必须在可用模型凭据的宿主上验证 `run_code` 选择、child dispatch、父 seq 不变。
