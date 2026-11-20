@@ -960,7 +960,12 @@ export class SkillLibrary {
 
   /** True when the injected lock port is per-target rather than the home fence. */
   private keyedTargetLocks(): boolean {
-    try { return (this.lockPort() as { keyed?: boolean }).keyed === true } catch { return false }
+    if (this.mutationLock !== undefined) return this.mutationLock.keyed === true
+    // A test library may have no injected lock (fileMutationLock fallback). A
+    // production library without one must still fail closed, never silently
+    // bypass the fence because the keyed probe swallowed the assembly error.
+    if (process.env['VITEST'] !== 'true' && process.env['NODE_ENV'] !== 'test') this.lockPort()
+    return false
   }
 
   private lockPort(): MutationLockPort {

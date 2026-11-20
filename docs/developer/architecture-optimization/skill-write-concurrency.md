@@ -931,6 +931,26 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1 fail-closed keyed probe
+
+- `keyedTargetLocks()` 不再用 `try/catch` 吞 `lockPort()` 的装配错误：
+  - 有注入端口 → 读 `keyed`；
+  - 无注入端口且非测试 → 调 `lockPort()` 显式抛错；
+  - 测试 fallback → 非 keyed。
+- 防止“生产无 mutationLock”时 archive/restore 静默绕过 fence。
+
+验证：
+
+```text
+overlay build: 0
+```
+
+仍待：
+
+- merge 启动恢复 rollback/finalize 在 fence lease 下调单写会自死锁（既有 P0，非本轮引入）；
+- 默认模式 public archive/restore 目前不再取 fence lease，需在 rollback 改 `fence.run` 后恢复；
+- 其余 P1 见独立复核报告。
+
 ### 2026-11-20：Phase P0.4 nested merge 不再重取 fence
 
 复验发现：nested merge 的 namespace lease 在默认 fence 装配下会再次请求同一 HomeFence（merge 单外层用 fence lease，lease 不建 ALS，holdsTree 判不到），生产 merge 必挂。
