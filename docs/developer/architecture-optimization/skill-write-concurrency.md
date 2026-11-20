@@ -905,6 +905,31 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.12 authority plugin 配置开关
+
+已完成：
+
+- `evolution-authority` 增加配置：
+  ```ts
+  interface Config { keyedSkillLocks?: boolean }
+  ```
+- 默认 false，保持旧 HomeFence 行为；
+- true 时构造 `MutationAuthority({ keyed: true })`，其 `mutationLock` 变为 Hybrid keyed；
+- 装配层无需改 `mutationLockFrom`。
+
+验证：
+
+```text
+build 0（配置类型编译通过）
+```
+
+下一步：
+
+- 在测试 profile 打开 `keyedSkillLocks: true`；
+- 跑 tool/structural 全量；
+- 真实 web 并发验收；
+- 通过后才考虑默认开启。
+
 ### 2026-11-20：Phase E.11 MutationAuthority keyed opt-in
 
 已完成：
