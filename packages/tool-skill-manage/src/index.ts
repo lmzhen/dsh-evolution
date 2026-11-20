@@ -31,7 +31,7 @@ import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, computeDedupGroups, nearDuplicateSummaries, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_SKILL_WRITE_SUMMARY_CHARS, newSkillLibrary, normalizeChangeSummary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type ChangeSummary, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import { installSkillObservationListener } from './skill-observations.ts'
-import { SkillObservationStore, SkillWriteService, skillBodyTarget, skillSupportTarget, type SkillWriteServiceResult } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillObservationStore, SkillWriteService, type SkillWriteServiceResult } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fuzzyPatch } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
@@ -849,12 +849,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   }
 
   /** Convert a SkillWriteService result to the tool's legacy action result. */
-  function hasObservation(owner: object | undefined, target: ReturnType<typeof skillBodyTarget>): boolean {
-    return owner !== undefined && skillObservations.get(owner, target) !== undefined
-  }
-
   function toActionResult(result: SkillWriteServiceResult): SkillActionResult {
-    return result.ok ? { ok: true, message: '技能文件已写入。' } : { ok: false, message: result.message }
+    return result.ok
+      ? { ok: true, message: result.message, ...(result.noop === true ? { noop: true } : {}) }
+      : { ok: false, message: result.message }
   }
 
   async function executeCore(
@@ -989,7 +987,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return created
       },
         update: async () => {
-          if (owner !== undefined && stagedAnchor === undefined && hasObservation(owner, skillBodyTarget(name))) {
+          if (owner !== undefined && stagedAnchor === undefined) {
             return toActionResult(await skillWriteService.updateBody(owner, name, args.content ?? '', origin))
           }
           return library.update(name, args.content ?? '', origin, stagedAnchor)
@@ -997,7 +995,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       patch: async () => {
         const section = args.section
         if (section === undefined) {
-          if (owner !== undefined && (args.file_path ?? '') === '' && hasObservation(owner, skillBodyTarget(name))) {
+          if (owner !== undefined && (args.file_path ?? '') === '') {
             return toActionResult(await skillWriteService.patchBody(owner, name, args.old_string ?? '', args.new_string ?? '', args.replace_all === true, origin))
           }
           return await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
@@ -1014,8 +1012,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       },
       delete: () => library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {}, undefined, change),
       write_file: async () => {
-        if (owner !== undefined && stagedAnchor === undefined && hasObservation(owner, skillSupportTarget(name, args.file_path ?? ''))) {
-          return toActionResult(await skillWriteService.updateSupport(owner, name, args.file_path ?? '', args.file_content ?? '', origin))
+        if (owner !== undefined && stagedAnchor === undefined) {
+          return toActionResult(await skillWriteService.writeSupport(owner, name, args.file_path ?? '', args.file_content ?? '', origin))
         }
         return library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor)
       },

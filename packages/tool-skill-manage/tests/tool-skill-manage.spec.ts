@@ -17,8 +17,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { tempHome } from '../../test-support/temp-home.ts'
 
+const fakeSessions = new Map<string | undefined, { header: { origin?: string }; append: () => void }>()
+
 function fakeAgent(origin: string | undefined): Agent {
-  return { session: { header: { origin }, append: () => {} } } as unknown as Agent
+  let session = fakeSessions.get(origin)
+  if (session === undefined) {
+    session = { header: { origin }, append: () => {} }
+    fakeSessions.set(origin, session)
+  }
+  return { session } as unknown as Agent
 }
 
 /** Mount the tool against the testkit's real systemPrompt through the platform port. */

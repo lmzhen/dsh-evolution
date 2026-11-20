@@ -884,7 +884,37 @@ delete → service.remove()
 
 - 若某平台 backend 的 `targetKey` 不是 host path，或版本格式不同，监听器不记录；该 read 不授权写，写路径返回 `SKILL_NOT_OBSERVED`。
 
+### 2026-11-20：Phase C.7 收紧 fallback（取代 C.6 的过渡结论）
+
+已完成：
+
+- tool-skill-manage 的 update / body patch / write_file 在 owner 存在时不再检查“是否有 observation”，直接进入 service：
+  - 无 observation → `SKILL_NOT_OBSERVED`；
+  - 有 observation → content anchor + stale；
+- create 成功后立即 `observeBodyWrite`；
+- write_file 对“新 support 文件”由 service 做 createIfAbsent；已存在但未读的 support 文件仍拒绝；
+- patch no-op 不再在 service 层提前拒绝，保留 library 的 `noop:true` 语义；
+- `SkillActionResult` 的 `noop` 通过 service result 透传，usage patch_count 不再误增；
+- 测试 helper 的 `fakeAgent` 改为稳定 session，模拟真实长生命周期 owner。
+
+验证：
+
+```text
+tool-skill-manage:                 42 passed
+skill-write-service:               5 passed
+tool observed writes:              3 passed (含未读拒绝、第二写者 stale)
+overlay build:                     0
+verify-doc-facts:                  0 violations
+```
+
+边界：
+
+- 审批 replay（无 owner / staged anchor）仍走旧路径；
+- create / remove_file / unit / AUX owner 的收口仍在后续 Phase；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase C.6 写后观察与 fallback 收紧评估
+
 
 已完成：
 
@@ -904,7 +934,7 @@ fallback 收紧评估：
 - 尝试直接把“无 observation”全部改为 `SKILL_NOT_OBSERVED`；
 - 现有测试里 `fakeAgent(undefined)` 每次调用都生成新的 session 对象，create 与后续 patch 不是同一 owner，因此测试表现为“未读”；
 - 这暴露的是测试 fixture 不模拟真实长生命周期 session，不是 service 逻辑错误；
-- 继续保留过渡 fallback，下一步先把测试 helper 改成稳定 agent/session，再收紧。
+- 该过渡结论已被 Phase C.7 取代：测试 helper 已改为稳定 session，fallback 已收紧。
 
 ### 2026-11-20：Phase C.5 tool 级 observation/CAS 证据
 

@@ -57,16 +57,17 @@ function emitRead(ctx: Context, owner: Agent, path: string): void {
 }
 
 describe('tool observed writes', () => {
-  it('uses the service after the exact owner reads, and falls back before any observation', async () => {
+  it('records create as an observation and keeps the service path for the same owner', async () => {
     const { ctx, root } = await setup()
     const owner = agent()
     try {
       const created = await call(ctx, owner, { action: 'create', name: 'obs-skill', content: skill('obs-skill', 'one') }, 'obs-create')
       expect((created.value as { ok?: boolean }).ok).toBe(true)
 
-      // No observation: the transitional fallback keeps the old write behavior.
-      const fallback = await call(ctx, owner, { action: 'update', name: 'obs-skill', content: skill('obs-skill', 'fallback') }, 'obs-fallback')
-      expect((fallback.value as { ok?: boolean }).ok).toBe(true)
+      // Create records the new content, so the same owner can update without a
+      // separate read before the observation-derived service path.
+      const afterCreate = await call(ctx, owner, { action: 'update', name: 'obs-skill', content: skill('obs-skill', 'after-create') }, 'obs-after-create')
+      expect((afterCreate.value as { ok?: boolean }).ok).toBe(true)
 
       const path = join(root, 'skills', 'obs-skill', 'SKILL.md')
       emitRead(ctx, owner, path)
@@ -99,4 +100,19 @@ describe('tool observed writes', () => {
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
     }
   }, 30_000)
+  it('refuses an update from a session that never read the skill', async () => {
+    const { ctx, root } = await setup()
+    const ownerA = agent()
+    const ownerB = agent()
+    try {
+      await call(ctx, ownerA, { action: 'create', name: 'unread-skill', content: skill('unread-skill', 'one') }, 'unread-create')
+      const result = await call(ctx, ownerB, { action: 'update', name: 'unread-skill', content: skill('unread-skill', 'two') }, 'unread-update')
+      expect((result.value as { ok?: boolean }).ok).toBe(false)
+      expect((result.value as { message?: string }).message ?? '').toContain('read the skill target before writing it')
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    }
+  }, 30_000)
+
 })

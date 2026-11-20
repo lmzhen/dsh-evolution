@@ -29,7 +29,7 @@ export type SkillWriteErrorCode =
 
 /** Result of one service operation. */
 export type SkillWriteServiceResult =
-  | { readonly ok: true; readonly content?: string | null }
+  | { readonly ok: true; readonly message: string; readonly noop?: boolean; readonly content?: string | null }
   | { readonly ok: false; readonly code: SkillWriteErrorCode; readonly message: string }
 
 /**
@@ -104,7 +104,6 @@ export class SkillWriteService {
     replaceAll = false,
     origin: WriteOrigin = 'foreground',
   ): Promise<SkillWriteServiceResult> {
-    if (oldString === newString) return { ok: false, code: 'SKILL_INVALID', message: 'old_string and new_string must differ' }
     const target = skillBodyTarget(name)
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
@@ -128,6 +127,30 @@ export class SkillWriteService {
     const result = await this.library.writeSupportFile(name, filePath, content, origin, anchorOf(observed.version))
     if (result.ok) await this.readSupport(owner, name, filePath)
     return actionResult(result)
+  }
+
+  /**
+   * Create a support file when absent, or update it only after this owner read it.
+   * A new support file is a createIfAbsent (no prior read is required); an
+   * existing unread file is refused rather than overwritten.
+   */
+  async writeSupport(owner: SkillWriteOwner, name: string, filePath: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillWriteServiceResult> {
+    const target = skillSupportTarget(name, filePath)
+    const observed = this.observations.get(owner, target)
+    if (observed === undefined) {
+      const current = await this.library.readSupportFile(name, filePath)
+      if (current !== null) return { ok: false, code: 'SKILL_NOT_OBSERVED', message: 'read the skill target before writing it' }
+      this.observations.record(owner, target, { kind: 'absent' })
+      const created = await this.library.writeSupportFile(name, filePath, content, origin)
+      if (created.ok) await this.readSupport(owner, name, filePath)
+      return actionResult(created)
+    }
+    if (observed.kind === 'absent') {
+      const created = await this.library.writeSupportFile(name, filePath, content, origin)
+      if (created.ok) await this.readSupport(owner, name, filePath)
+      return actionResult(created)
+    }
+    return await this.updateSupport(owner, name, filePath, content, origin)
   }
 
   /** Record a just-committed SKILL.md write for this owner (create/fallback path). */
@@ -157,8 +180,8 @@ function refusal(kind: 'unobserved' | 'absent'): SkillWriteServiceResult {
 
 function anchorOf(version: string): WriteAnchor { return { sha256: version } }
 
-function actionResult(result: { ok: boolean; message: string; stale?: true; anchor?: 'match' | 'drift' | 'missing' }): SkillWriteServiceResult {
-  if (result.ok) return { ok: true }
+function actionResult(result: { ok: boolean; message: string; noop?: boolean; stale?: true; anchor?: 'match' | 'drift' | 'missing' }): SkillWriteServiceResult {
+  if (result.ok) return { ok: true, message: result.message, ...(result.noop === true ? { noop: true } : {}) }
   if (result.stale === true) return { ok: false, code: 'SKILL_STALE_VERSION', message: result.message }
   return { ok: false, code: 'SKILL_INVALID', message: result.message }
 }
