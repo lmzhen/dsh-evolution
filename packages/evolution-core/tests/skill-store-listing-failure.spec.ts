@@ -25,7 +25,7 @@ describe('create refuses when the case-variant probe cannot list (FLOW3-2)', () 
     expect(result.message).toContain('EACCES: injected listing failure')
     // No body lands: the refusal happens before any skill write. The root
     // coordination sidecar is not a skill body and is allowed to land first.
-    expect(writes.filter(path => !path.endsWith('.mutation-lock'))).toEqual([])
+    expect(writes.filter(path => !path.endsWith('.mutation-lock') && !path.endsWith('.lock'))).toEqual([])
   })
 
   it('an empty listing still creates (the control: refusal is about the failure, not about being empty)', async () => {
@@ -68,6 +68,6 @@ describe('restore refuses to guess when an archived candidate cannot be read', (
     expect(result.message).toContain('my-tool')
     expect(result.message).toContain('没有可读的 SKILL.md')
     // Nothing was moved or written: the refusal happens before any byte lands in the active tree.
-    expect(writes).toEqual([])
+    expect(writes.filter(path => !path.endsWith('.mutation-lock') && !path.endsWith('.lock'))).toEqual([])
   })
 })

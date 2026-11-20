@@ -801,6 +801,18 @@ function sameRevisionAnchor(expected: RevisionAnchor, live: RevisionAnchor): boo
   return expected.kind === 'absent' || expected.sha256 === (live as { readonly sha256: string }).sha256
 }
 
+/** One target-lock registry per skill ROOT, shared by every library instance in this process. */
+const TARGET_LOCKS_BY_ROOT = new Map<string, SkillTargetLocks>()
+
+function targetLocksFor(root: string): SkillTargetLocks {
+  let locks = TARGET_LOCKS_BY_ROOT.get(root)
+  if (locks === undefined) {
+    locks = new SkillTargetLocks()
+    TARGET_LOCKS_BY_ROOT.set(root, locks)
+  }
+  return locks
+}
+
 export class SkillLibrary {
   readonly root: string
   /** The ONE read face owner/health/panel consume; a thin adapter, not a store. */
@@ -819,7 +831,7 @@ export class SkillLibrary {
    * is the IO backend's transact lock; this chain is the second layer). */
   private readonly serial: <T>(task: () => Promise<T>) => Promise<T>
   /** Transitional target locks (same key as SkillWriteService). */
-  private readonly targetLocks = new SkillTargetLocks()
+  private readonly targetLocks: SkillTargetLocks
   /** Root structural gate; simple writes still use the serial until D.5d. */
   private readonly rootGate = new SkillRootGate()
   /** V10-03 (P2-18): see the constructor's threatExemptLabels. Empty by
@@ -847,6 +859,7 @@ export class SkillLibrary {
     fence?: HistoryFence,
   ) {
     this.root = root
+    this.targetLocks = targetLocksFor(root)
     this.io = io
     this.limits = limits
     this.onMutation = onMutation

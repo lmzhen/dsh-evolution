@@ -863,6 +863,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     crossSourceView?: readonly SkillSummary[],
     /** Exact reading session for observation-based writes; undefined on approval replay. */
     owner?: object,
+    /** Support-file read history the admission gate accepted. */
+    readSupportFiles?: ReadonlyMap<string, ReadonlySet<string>>,
   ): Promise<{ ok: boolean; message: string; skills: string[]; proposal?: string }> {
     // T2-09/A24: re-materialize the write caps HERE, not only at the tool entry. The approve path
     // (registerRunner) calls this function directly, so a deployment that TIGHTENED skillContentChars /
@@ -962,6 +964,19 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       typeof args.staged_from_sha256 === 'string' && args.staged_from_sha256 !== ''
         ? args.staged_from_sha256 === 'absent' ? { absent: true } : { sha256: args.staged_from_sha256 }
         : undefined
+    // Legacy `skill` tool reads are session history, not fs/observed events. If the
+    // admission gate accepted such a read, seed the body observation from the bytes
+    // under the service lock before the first write; newer read tools still produce
+    // the stronger fs/observed observation and take precedence.
+    if (owner !== undefined && stagedAnchor === undefined) {
+      if (action === 'update' || action === 'patch') {
+        await skillWriteService.readBody(owner, name).catch(() => null)
+      } else if ((action === 'write_file' || action === 'remove_file')
+        && typeof args.file_path === 'string' && args.file_path !== ''
+        && readSupportFiles?.get(name)?.has(args.file_path)) {
+        await skillWriteService.readSupport(owner, name, args.file_path).catch(() => null)
+      }
+    }
     // P0 authoring feedback: every create/update reports the description
     // against the 60-char authoring bar; the strict mode refuses a violation
     // up front (default off — advisory only, matching the platform limit).
@@ -1430,20 +1445,22 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       // attention for a refusal the tool already knew (PLAN-R2 P2-7 closed the missing-argument
       // half of that class; the shared table now carries the rest). The execution point re-runs
       // the gates a replay can still fail, with the SAME table, so the two cannot diverge.
+      const writeReadNames = (() => {
+        const run = currentReviewContext()?.reads
+        if (run === undefined) return sessionReadSkillNames(ctx, exec.agent?.session)
+        const merged = new Set<string>()
+        sessionReadSkillNames(ctx, exec.agent?.session)?.forEach(name => merged.add(name))
+        run.forEach(name => merged.add(name))
+        return merged
+      })()
+      const writeReadSupportFiles = sessionReadSupportFiles(ctx, exec.agent?.session, { root: library.root })
       const refusal = await runWriteGates({
         point: 'admission',
         args,
         origin: libraryOrigin,
         protectedNames: protectedSkillNamesOf(ctx.get('evolutionPolicy')),
-        readNames: (() => {
-          const run = currentReviewContext()?.reads
-          if (run === undefined) return sessionReadSkillNames(ctx, exec.agent?.session)
-          const merged = new Set<string>()
-          sessionReadSkillNames(ctx, exec.agent?.session)?.forEach(name => merged.add(name))
-          run.forEach(name => merged.add(name))
-          return merged
-        })(),
-        readSupportFiles: sessionReadSupportFiles(ctx, exec.agent?.session, { root: library.root }),
+        readNames: writeReadNames,
+        readSupportFiles: writeReadSupportFiles,
         confirm: async request => confirmSkillWrite(request, exec),
         // Read at the WRITE, not at apply: a settings edit lands on the next write with no restart.
         //
@@ -1575,7 +1592,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ? { ok: true, message: '提取提议（未写入；确认后按 extract items 提交）。', skills: [], proposal: proposed.proposal }
           : { ok: false, message: proposed.message, skills: [] }
       }
-      return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined, exec.agent?.session)
+      return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined, exec.agent?.session, writeReadSupportFiles)
     },
   }))
 
