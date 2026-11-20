@@ -931,6 +931,18 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.3 superseded — first-occurrence 契约保留
+
+P1.3 曾让「old_string 多次出现」返回 `SKILL_AMBIGUOUS_EDIT`，但 tool 现有契约明确是：
+
+- 默认替换第一次出现；
+- 结果消息报告 `FIRST of N occurrences` 并提示 `replace_all=true`；
+- 既有 tool 测试与 0.59.2 发布行为依赖该契约。
+
+决定：回退该行为，保留 first-occurrence + 计数提示；`SKILL_AMBIGUOUS_EDIT` 仍保留在 service 错误词汇中，但当前库层不产生。
+
+若要改成默认唯一匹配，需要单独 DCR 并同批更新 tool 描述、审批预览与测试，不能静默改变已发布行为。
+
 ### 2026-11-20：Phase P1.3 ambiguous edit 可达
 
 - `SkillLibrary.patch` 在 `replace_all=false` 且 exact old_string 出现多次时返回 `ambiguous: true`；
