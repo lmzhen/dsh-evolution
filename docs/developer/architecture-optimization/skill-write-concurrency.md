@@ -905,6 +905,30 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.5 UnitTransaction 传递 target keys
+
+已完成：
+
+- `MutationUnitOptions.targetKeys?: readonly string[]`；
+- MutationUnit 在 apply / revert / undo 三处 `lock.acquire()` 传入 targetKeys；
+- 测试：
+  - keyed lock 收到 `['skill::source']`；
+  - 未配置时收到 `undefined`，保持旧行为。
+
+验证：
+
+```text
+mutation-unit: 24 passed
+overlay build: 0
+```
+
+边界：
+
+- SkillLibrary 还未填 targetKeys；
+- 生产 HomeFence global lock 忽略 keys；
+- keyed 模式需显式装 `TargetMutationLock`；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.4 MutationLockPort 支持 target keys
 
 已完成：
