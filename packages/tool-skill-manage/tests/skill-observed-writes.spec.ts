@@ -115,6 +115,32 @@ describe('tool observed writes', () => {
     }
   }, 30_000)
 
+  it('keeps a parent read and a review-child read as separate owners', async () => {
+    const { ctx, root } = await setup()
+    const parent = agent()
+    const child = agent()
+    try {
+      await call(ctx, parent, { action: 'create', name: 'owner-skill', content: skill('owner-skill', 'one') }, 'owner-create')
+      const path = join(root, 'skills', 'owner-skill', 'SKILL.md')
+      emitRead(ctx, parent, path)
+
+      const childUnread = await call(ctx, child, { action: 'update', name: 'owner-skill', content: skill('owner-skill', 'child') }, 'owner-child-unread')
+      expect((childUnread.value as { ok?: boolean }).ok).toBe(false)
+      expect((childUnread.value as { message?: string }).message ?? '').toContain('read the skill target before writing it')
+
+      emitRead(ctx, child, path)
+      const childWrite = await call(ctx, child, { action: 'update', name: 'owner-skill', content: skill('owner-skill', 'child') }, 'owner-child-write')
+      expect((childWrite.value as { ok?: boolean }).ok).toBe(true)
+
+      const parentStale = await call(ctx, parent, { action: 'update', name: 'owner-skill', content: skill('owner-skill', 'parent') }, 'owner-parent-stale')
+      expect((parentStale.value as { ok?: boolean }).ok).toBe(false)
+      expect((parentStale.value as { message?: string }).message ?? '').toContain('读取之后被改动过')
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    }
+  }, 30_000)
+
   it('removes a support file only for the owner that observed it', async () => {
     const { ctx, root } = await setup()
     const ownerA = agent()

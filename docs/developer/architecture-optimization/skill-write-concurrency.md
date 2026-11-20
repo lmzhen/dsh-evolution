@@ -905,6 +905,32 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase I.2 tool 级 owner 隔离证据
+
+已完成：
+
+- tool 级测试（两个不同 agent session）：
+  1. parent create；
+  2. parent 读；
+  3. child 未读就 update → `SKILL_NOT_OBSERVED`；
+  4. child 读后 update → 成功；
+  5. parent 用旧观察 update → `SKILL_STALE_VERSION`。
+- 证明 owner 隔离发生在 tool 层，不只是 `SkillObservationStore` 单测；
+- review child 与 parent 同构，均以 `exec.agent.session` 为 owner。
+
+验证：
+
+```text
+skill-observed-writes: 5 passed
+overlay build:          0
+```
+
+边界：
+
+- 这是两个普通 session 的 tool 级证据，未接真实 AUX review task；
+- review child 的真实执行仍待宿主验收；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase J.1 activity 区分 stale/busy
 
 已完成：
