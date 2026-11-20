@@ -863,6 +863,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     crossSourceView?: readonly SkillSummary[],
     /** Exact reading session for observation-based writes; undefined on approval replay. */
     owner?: object,
+    /** Read history the admission gate accepted, used to seed legacy skill-tool reads. */
+    readNames?: ReadonlySet<string>,
     /** Support-file read history the admission gate accepted. */
     readSupportFiles?: ReadonlyMap<string, ReadonlySet<string>>,
   ): Promise<{ ok: boolean; message: string; skills: string[]; proposal?: string }> {
@@ -968,11 +970,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // admission gate accepted such a read, seed the body observation from the bytes
     // under the service lock before the first write; newer read tools still produce
     // the stronger fs/observed observation and take precedence.
-    if (owner !== undefined && stagedAnchor === undefined) {
+    if (owner !== undefined && stagedAnchor === undefined
+      && (action === 'update' || action === 'patch' || action === 'write_file' || action === 'remove_file')) {
+      const protection = await library.writeProtection(name, origin)
+      if (protection !== null) return { ok: false, message: `技能「${name}」受保护（${protection}）。`, skills: [] }
       if (action === 'update' || action === 'patch') {
-        await skillWriteService.readBody(owner, name).catch(() => null)
-      } else if ((action === 'write_file' || action === 'remove_file')
-        && typeof args.file_path === 'string' && args.file_path !== ''
+        const operator = origin === 'foreground' && typeof (owner as { id?: unknown }).id === 'string'
+        if (readNames?.has(name) === true || operator) await skillWriteService.readBody(owner, name).catch(() => null)
+      } else if (typeof args.file_path === 'string' && args.file_path !== ''
         && readSupportFiles?.get(name)?.has(args.file_path)) {
         await skillWriteService.readSupport(owner, name, args.file_path).catch(() => null)
       }
@@ -1592,7 +1597,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ? { ok: true, message: '提取提议（未写入；确认后按 extract items 提交）。', skills: [], proposal: proposed.proposal }
           : { ok: false, message: proposed.message, skills: [] }
       }
-      return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined, exec.agent?.session, writeReadSupportFiles)
+      return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined, exec.agent?.session, writeReadNames, writeReadSupportFiles)
     },
   }))
 

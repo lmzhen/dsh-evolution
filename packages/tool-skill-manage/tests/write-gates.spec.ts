@@ -137,19 +137,19 @@ describe('write gates: read-before-write (E-318)', () => {
     expect(valueOf(refused).message).toContain('E-318')
   })
 
-  it('exempts the foreground operator session', async () => {
+  it('accepts a foreground operator that read the skill', async () => {
     const { ctx, root } = await setup()
     await createTarget(ctx, 'gate-foreground')
     const accepted = await callTool(
       ctx,
       { action: 'patch', summary: 'test patch', name: 'gate-foreground', old_string: 'Body.', new_string: 'Operator edit.' },
-      sessionOf(undefined),
+      sessionOf(undefined, readFrames('gate-foreground')),
     )
     expect(valueOf(accepted).ok, valueOf(accepted).message).toBe(true)
     expect(await readFile(skillPath(root, 'gate-foreground'), 'utf8')).toContain('Operator edit.')
   })
 
-  it('proceeds with ONE warning when the session log is not readable', async () => {
+  it('refuses when the session log is not readable: read evidence is required', async () => {
     const { ctx } = await setup()
     await createTarget(ctx, 'gate-nolog')
     const warns: string[] = []
@@ -159,9 +159,8 @@ describe('write gates: read-before-write (E-318)', () => {
     // A session object without the events accessor: the check cannot run for this call.
     const bare = { id: 'gate-bare', header: { origin: 'subagent' } }
     const first = await callTool(ctx, { action: 'patch', summary: 'test patch', name: 'gate-nolog', old_string: 'Body.', new_string: 'One.' }, bare)
-    const second = await callTool(ctx, { action: 'patch', summary: 'test patch', name: 'gate-nolog', old_string: 'One.', new_string: 'Two.' }, bare)
-    expect(valueOf(first).ok, valueOf(first).message).toBe(true)
-    expect(valueOf(second).ok, valueOf(second).message).toBe(true)
+    expect(valueOf(first).ok).toBe(false)
+    expect(valueOf(first).message).toContain('SKILL_NOT_OBSERVED')
     expect(warns.filter(message => message.includes('read-before-write'))).toHaveLength(1)
   })
 
