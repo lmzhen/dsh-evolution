@@ -133,6 +133,7 @@ function isBusy(error: unknown): boolean {
 export class TargetLockSet {
   private readonly tails = new Map<string, Promise<unknown>>()
   private releaseError: Error | undefined
+  private readonly brokenKeys = new Set<string>()
 
   /** Last release failure; diagnostics only, never a reason to wedge the key queue. */
   get lastReleaseError(): Error | undefined { return this.releaseError }
@@ -219,6 +220,7 @@ export class TargetLockSet {
         await done
       } catch (error) {
         this.releaseError = error instanceof Error ? error : new Error(String(error))
+        this.brokenKeys.add(key)
       } finally {
         releaseGate()
         if (this.tails.get(key) === tail) this.tails.delete(key)
@@ -243,11 +245,52 @@ export class TargetLockSet {
     }
   }
 
-  private async withLockFile<T>(key: string, body: () => Promise<T>): Promise<T> {
-    const dir = join(this.home, '.authority', 'targets')
-    await mkdir(dir, { recursive: true })
+  /**
+   * Remove target lock files left by a release failure, but only when the
+   * recorded owner process is gone. A live owner is reported as skipped.
+   */
+  async repair(): Promise<{ readonly repaired: readonly string[]; readonly skipped: readonly string[] }> {
+    const repaired: string[] = []
+    const skipped: string[] = []
+    for (const key of [...this.brokenKeys]) {
+      const path = this.lockPath(key)
+      let raw: string
+      try {
+        raw = await readFile(path, 'utf8')
+      } catch (error) {
+        if ((error as { code?: unknown }).code === 'ENOENT') {
+          this.brokenKeys.delete(key)
+          repaired.push(key)
+        } else {
+          skipped.push(key)
+        }
+        continue
+      }
+      const pid = Number.parseInt(raw.trim(), 10)
+      if (Number.isInteger(pid) && pid > 0 && pid !== process.pid && isProcessAlive(pid)) {
+        skipped.push(key)
+        continue
+      }
+      try {
+        await rm(path, { force: true })
+        this.brokenKeys.delete(key)
+        repaired.push(key)
+      } catch {
+        skipped.push(key)
+      }
+    }
+    return { repaired, skipped }
+  }
+
+  private lockPath(key: string): string {
     const digest = createHash('sha256').update(key).digest('hex')
-    return await this.lock(join(dir, digest), body, { waitMs: this.waitMs })
+    return join(this.home, '.authority', 'targets', digest)
+  }
+
+  private async withLockFile<T>(key: string, body: () => Promise<T>): Promise<T> {
+    const path = this.lockPath(key)
+    await mkdir(dirname(path), { recursive: true })
+    return await this.lock(path, body, { waitMs: this.waitMs })
   }
 }
 

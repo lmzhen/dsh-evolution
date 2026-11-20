@@ -993,12 +993,13 @@ export class SkillLibrary {
   /** Recover every prepared tree-change snapshot in the shared unit store. */
   async recoverPreparedUnits(): Promise<MutationResult[]> {
     const home = dirname(this.root)
+    try { await this.lockPort().repair?.() } catch { /* diagnostics only */ }
     const unit = this.commitUnit({
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
       serial: this.serial,
       lock: this.lockPort(),
     })
-    const results = await unit.recoverPrepared()
+    const results = await this.rootGate.write(() => unit.recoverPrepared())
     await pruneTreeChangeUnits(this.io, home).catch(() => {})
     return results
   }

@@ -168,6 +168,8 @@ export interface MutationLockPort {
   acquire(targetKeys?: readonly string[]): Promise<MutationLockLease>
   /** True when this port locks per target key rather than the whole home. */
   readonly keyed?: boolean
+  /** Best-effort removal of stale target lock files left by a failed release. */
+  repair?(): Promise<{ readonly repaired: readonly string[]; readonly skipped: readonly string[] }>
 }
 
 export interface MutationSnapshotOp {

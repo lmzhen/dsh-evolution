@@ -73,6 +73,10 @@ export class TargetMutationLock implements MutationLockPort {
     if (targetKeys.length === 0) throw new Error('target mutation lock requires at least one target key')
     return await this.locks.acquireLease(targetKeys)
   }
+
+  async repair(): Promise<{ readonly repaired: readonly string[]; readonly skipped: readonly string[] }> {
+    return await this.locks.repair()
+  }
 }
 
 /** Routes keyed writes to the target lock set and keyless writes to the root fence. */
@@ -88,6 +92,10 @@ export class HybridMutationLock implements MutationLockPort {
     return targetKeys.length === 0
       ? await this.fallback.acquire()
       : await this.keyedLock.acquire(targetKeys)
+  }
+
+  async repair(): Promise<{ readonly repaired: readonly string[]; readonly skipped: readonly string[] }> {
+    return await this.keyedLock.repair()
   }
 }
 

@@ -931,6 +931,26 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.8 TargetLockSet repair + recovery gate
+
+- `MutationLockPort` 增加可选 `repair()`；
+- `TargetLockSet.repair()`：
+  - 只处理 release 失败记录的 key；
+  - 读锁文件 pid；
+  - 活进程 → skipped；
+  - 死亡/ENOENT → 删除锁文件并 repaired；
+- `TargetMutationLock` / `HybridMutationLock` 透传 repair；
+- `SkillLibrary.recoverPreparedUnits()` 先用 `rootGate.write` 包住 recovery，并在 recovery 前尝试 repair；
+  - 同进程 keyed simple 写会等 recovery 完成；
+  - 跨进程 recovery 窗口仍需后续收口。
+
+验证：
+
+```text
+mutation-recovery + authority-target-locks: 11 passed
+overlay build: 0
+```
+
 ### 2026-11-20：Phase P1.7 pre-tag 复跑
 
 第二次 pre-tag 静态门禁：

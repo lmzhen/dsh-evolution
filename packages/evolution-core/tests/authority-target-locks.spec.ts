@@ -88,6 +88,8 @@ describe('TargetLockSet', () => {
     const first = await locks.acquireLease(['skill::a'])
     await first.release()
     expect(locks.lastReleaseError?.message).toContain('release-failed')
+    const repaired = await locks.repair()
+    expect(repaired.repaired).toContain('skill::a')
     const second = await locks.acquireLease(['skill::a'])
     await second.release()
     expect(locks.size).toBe(0)
