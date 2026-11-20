@@ -905,6 +905,29 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.8 HybridMutationLock
+
+已完成：
+
+- `HybridMutationLock`：
+  - `targetKeys` 非空 → `TargetMutationLock`；
+  - `targetKeys` 空 → fallback（HomeFence root lock）。
+- 这样 simple 写可以走 keyed；结构/恢复/无 key 的 unit 仍走 root；
+- 2 个测试：keyless → fallback；keyed → 不碰 fallback。
+
+验证：
+
+```text
+mutation-authority-target-lock: 5 passed
+overlay build:                  0
+```
+
+边界：
+
+- 结构操作仍然没有 targetKeys，继续走 fallback；
+- 因此结构操作与 keyed simple 之间仍没有跨进程互斥；
+- 下一步必须把结构操作的 namespace/target keys 填进 UnitTransaction。
+
 ### 2026-11-20：Phase E.7 keyed 装配实证
 
 已完成：

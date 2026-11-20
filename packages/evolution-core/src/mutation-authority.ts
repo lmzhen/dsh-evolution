@@ -62,6 +62,20 @@ export class TargetMutationLock implements MutationLockPort {
   }
 }
 
+/** Routes keyed writes to the target lock set and keyless writes to the root fence. */
+export class HybridMutationLock implements MutationLockPort {
+  constructor(
+    private readonly keyed: TargetMutationLock,
+    private readonly fallback: MutationLockPort,
+  ) {}
+
+  async acquire(targetKeys: readonly string[] = []): Promise<MutationLockLease> {
+    return targetKeys.length === 0
+      ? await this.fallback.acquire()
+      : await this.keyed.acquire(targetKeys)
+  }
+}
+
 export function mutationLockFrom(ctx: { get?(name: string): unknown } | undefined): MutationLockPort | undefined {
   if (ctx?.get === undefined) return undefined
   const authority = ctx.get('evolutionMutationAuthority') as { readonly mutationLock?: MutationLockPort } | undefined
