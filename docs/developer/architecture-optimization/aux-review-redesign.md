@@ -225,8 +225,8 @@ interface ReviewToolChannel {
 
 ### 7.2 Native 通道
 
-- 直接从 frozen parent header 取工具 schema，过滤 review allowlist（`skill_manage`、`memory`、`skill`、`skill_search`、`read`、`glob`、`grep`、`review_done`、`review_wait`）。
-- 执行走现有 `tools.execute`，agent 使用 review parent proxy；只读/写工具分区。
+- 直接从 frozen parent header 取**完整工具 schema**，保持与父请求相同的前缀；runner 再追加 `review_done`/`review_wait`。模型侧不再裁剪 allowlist，避免工具目录提前差异。
+- 执行仍走现有 `tools.execute`，agent 使用 review parent proxy；但 channel 在执行前按 allowlist（`skill_manage`、`memory`、`skill`、`skill_search`、`read`、`glob`、`grep`）拦截：未在 allowlist 的调用返回 `isError` tool result，**不会执行**。提示词只作引导，不能当安全边界。
 - 写工具返回 `resource-busy` 时，runner 把错误作为 tool result 交给模型，不判 task failed。
 
 ### 7.3 PTC 通道
@@ -260,8 +260,8 @@ PTC 会话父 header 只有 `run_code`，且 `run_code` 的 nested dispatch 会 
 DeepSeek 的上下文缓存是前缀缓存。结构上 system/message 来自父 `deriveMessages()`，review instruction 追加在末尾；两种通道的 tools 目录不同：
 
 - **PTC**：顶层 tools 只含父 header 的 `run_code`，不插入合成完成工具；并按 PTC 路由回放父 `toolHistory()`。system/父 messages 与父请求一致，只有 review instruction 是追加后缀。
-- **native**：`nativeReviewToolChannel` 把父 tools 裁剪成 allowlist，并在末尾追加 `review_done`/`review_wait`。工具目录与父请求不同，按“字节前缀”理论会损失父 message 后缀；但真实 provider 的缓存单元还受 system/preset 与跨会话暖缓存影响，不能只凭结构断言。
-- 2026-11-20 实测（隔离 home，同一 prompt/三文件，`cacheRead/(input+cacheRead+cacheWrite)`，每模式 2 条 review）：
+- **native**：`nativeReviewToolChannel` 现在向模型发送父 header 的**完整工具目录**，执行层按 review allowlist 拦截（非 allowlist 返回 `isError`，不执行）；runner 只在末尾追加 `review_done`/`review_wait`。父工具目录保持一致，但合成工具仍是后缀差异；不能用提示词替代执行层限制。
+- 2026-11-20 实测（隔离 home，同一 prompt/三文件，`cacheRead/(input+cacheRead+cacheWrite)`，每模式 2 条 review；**这是 native 仍裁剪工具目录时的读数**）：
 
   | 实际模式 | toolMode | 首条 | 第二条 |
   |---|---|---:|---:|
@@ -270,7 +270,7 @@ DeepSeek 的上下文缓存是前缀缓存。结构上 system/message 来自父 
   | 创造 | native | 0.13 | 0.97 |
   | 极简 | native | 0.00 | 0.98 |
 
-  这说明 PTC 两条都复用良好；native 首条可能是冷缓存（创造/极简），第二条因 review-to-review 前缀而高；标准首条高，不能简单归因为“工具目录一定全部失效”。样本只有每模式 2 条，不能当作稳定结论。
+  这说明 PTC 两条都复用良好；native 首条可能是冷缓存（创造/极简），第二条因 review-to-review 前缀而高；标准首条高，不能简单归因为“工具目录一定全部失效”。样本只有每模式 2 条，不能当作稳定结论。**该读数发生在 native 改为全量父工具目录之前；当前实现需要用同样方法重测。**
 - 旧 `0.58.0` 的 aux 是 native 且使用父完整 tools + `toolHistory`；desktop activity v2 中 cordis 会话 134 条 review 的平均缓存命中约 **99.65%**，是旧实现基线。
 - activity v3 review 已记录可选 `toolMode`（native/ptc）和 `preset`（当前生效的 `agentPreset` 投影，不是创建 header）；尚无按模式聚合的 UI/接口，开发者可按这两个字段聚合缓存。
 - 若后续更多样本证明 native 首条持续显著低，正确修法是保留父完整工具目录，把 `review_done` 作为 in-history tool addition 追加在父前缀之后；不要简单恢复未过滤工具而失去审查工具约束。
@@ -714,3 +714,10 @@ interface EvolutionReviewActivityRecordV3 {
   - 新增 8 语言 key，生成物同步。
 - 真实 UI 截图（`D:/dsh/_e2e4-stats-ui3.png`）验证：汇总行显示完成/部分/超时/失败、平均轮数/工具调用；每行显示轮数、工具调用、等待次数。
 - 当前统计仍是开发者可见的轻量摘要，不做独立图表/大屏；缓存命中率仍不进主 UI。
+
+### Round 39（2026-11-20，native 缓存友好化）
+
+- 决策：不能只靠 review instruction 限制工具；提示词不是执行边界。改为 native channel 向模型发送**完整父工具目录**（保持前缀），在 `execute()` 前按 allowlist 拦截，未允许的调用返回 `isError` 且不执行。
+- 测试：`review-executor.spec.ts` 新增完整目录+阻断 bash 的用例；native 仍只执行 skill_manage，bash 结果为 error。
+- 仍未做：`review_done`/`review_wait` 仍是末尾合成工具，完整父前缀仍有一个后缀差异；如果缓存收益仍不够，后续改为 in-history tool addition。当前缓存读数需在 dev 版重测。
+- 缓存命中率指标不进入 UI；仅 activity/诊断读取。

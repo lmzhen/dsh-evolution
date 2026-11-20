@@ -369,3 +369,29 @@ it('replays parent tool history only for the PTC channel', async () => {
   })
   expect((model.requests[0] as { toolHistory?: unknown }).toolHistory).toBe(history)
 })
+
+it('keeps the parent tool catalog for cache while blocking non-allowlisted calls', async () => {
+  const base = parent()
+  const header = base.session.requestHeader()!
+  const p: ReviewParent = {
+    ...base,
+    session: {
+      ...base.session,
+      requestHeader: () => ({ ...header, tools: [...(header.tools ?? []), { name: 'bash', description: 'shell', parameters: {} }] }),
+    },
+  }
+  const seen: string[] = []
+  const channel = nativeReviewToolChannel(p, new Set(['skill_manage']), {
+    async execute(input) {
+      seen.push(...input.calls.map(call => call.name))
+      return { results: input.calls.map(call => ({ callId: call.id, result: { content: [{ type: 'text' as const, text: 'ok' }], isError: false } })) }
+    },
+  })
+  expect(channel.visibleTools.map(tool => tool.name)).toEqual(['skill_manage', 'bash'])
+  const result = await channel.execute([
+    { type: 'tool-call', id: ToolCallId('allowed'), name: 'skill_manage', arguments: '{}' },
+    { type: 'tool-call', id: ToolCallId('blocked'), name: 'bash', arguments: '{}' },
+  ], new AbortController().signal)
+  expect(seen).toEqual(['skill_manage'])
+  expect(result.results[1]?.result.isError).toBe(true)
+})

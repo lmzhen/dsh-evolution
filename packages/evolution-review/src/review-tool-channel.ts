@@ -2,9 +2,10 @@
  * Review tool transport boundary.
  *
  * The review runner owns completion/limits; a channel owns the concrete tool
- * protocol. Native sends the parent-visible tool schemas directly. PTC will
- * supply the same port from a detached review child; the runner never branches
- * on the platform tool mode.
+ * protocol. Native keeps the parent-visible tool catalog byte-identical for
+ * prefix caching and enforces the review allowlist at dispatch; PTC supplies the
+ * same port from a detached review child. The runner never branches on the
+ * platform tool mode.
  *
  * @module @deepseek-ai/dsh-evolution-review/review-tool-channel
  */
@@ -32,9 +33,25 @@ export function nativeReviewToolChannel(
   executionAgent: unknown = parent,
 ): ReviewToolChannel {
   const header = parent.session.requestHeader()
+  const blocked = (call: Parameters<ReviewToolPort['execute']>[0]['calls'][number]): ReviewToolOutcome => ({
+    callId: call.id,
+    result: {
+      content: [{ type: 'text', text: 'Tool "' + call.name + '" is not available in this background review; use the review tools or finish with review_done.' }],
+      isError: true,
+    },
+  })
   return {
     mode: 'native',
-    visibleTools: (header?.tools ?? []).filter(tool => toolAllow.has(tool.name)) as readonly ToolSchema[],
-    execute: (calls, signal) => tools.execute({ calls, signal, agent: executionAgent as ReviewParent }),
+    // Cache-stability: the provider sees the same catalog as the parent. The
+    // allowlist is enforced below, before any tool executes.
+    visibleTools: (header?.tools ?? []) as readonly ToolSchema[],
+    instruction: 'Use only the review tools in this catalog. Any other tool call is rejected before execution.',
+    async execute(calls, signal) {
+      const runnable = calls.filter(call => toolAllow.has(call.name))
+      if (runnable.length === 0) return { results: calls.map(blocked) }
+      const executed = await tools.execute({ calls: runnable, signal, agent: executionAgent as ReviewParent })
+      const byId = new Map(executed.results.map(result => [result.callId, result]))
+      return { results: calls.map(call => byId.get(call.id) ?? blocked(call)) }
+    },
   }
 }
