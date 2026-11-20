@@ -882,6 +882,25 @@ delete → service.remove()
 - 若最终复核不接受双 token，则回退为“只允许能同步取得完整内容的读作为写许可”；通用 read 不授权写，需用户在 skill 管理路径显式读。
 - 该回退会降低后台 review 的可用性，但不会产生错误的写许可。
 
+### 2026-11-20：Phase A.4 平台观察订阅
+
+已完成：
+
+- 新增 `packages/tool-skill-manage/src/skill-observations.ts`
+  - `installSkillObservationListener(ctx, root)`；
+  - 订阅平台 `fs/observed`；
+  - owner = `actor.agent.session`；
+  - 只接受 `present` 观察，交给 `recordFsSkillObservation`；
+  - store 随插件 effect dispose 清空。
+- `tool-skill-manage` apply 时安装 listener；
+- 3 个集成测试：同一 session 记录 body/support 版本、不同 session 不共享、非 skill 路径/absent/无 actor 不记录。
+
+边界：
+
+- listener 只记录，**不参与写入判定**；
+- store 目前是 tool plugin 内部对象，尚未暴露给 SkillWriteService；
+- 平台 `FsVersion` 仍是 opaque token，符合 DCR-1 的待复核状态。
+
 ### 2026-11-20：Phase A.2 平台观察入口映射
 
 已完成：
