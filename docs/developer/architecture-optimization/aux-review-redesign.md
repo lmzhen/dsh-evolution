@@ -566,3 +566,12 @@ interface EvolutionReviewActivityRecordV3 {
 - 从平台源码找到替代原 Proxy-child 的做法：`@deepseek-ai/dsh-scope` 的 `createScope(ctx, key, { parent })` 可以为“与平台 Agent 同对象的 scope key”创建真实 scoped context。平台 PTC 测试正是用 `createScope(inner, agent)` + scoped `setExecutor` 选择 PTC。
 - adapter `createReviewChildAgent` 现改为：child Session 用 SessionStore live create；child Agent 用 `Object.create(parent)` 且以该对象自身为 scope key；`createScope(parentCtx, childAgent, {parent: parentAgent})` 后把 `ctx` 设为 scoped ctx；PTC 模式下在 scoped ctx 动态挂载 `@deepseek-ai/dsh-tool-executor-ptc`。这样 `selectExecutor(childAgent)` 能命中 child scope 的 PTC executor，而不再是 root native executor。
 - 该做法仍未在真实 PTC host 复验：本轮重建 e2e host 时模型凭据不可用，PTC 会话未成功发请求；已确认 adapter/review 构建通过、adapter 单测通过。下一步必须在可用模型凭据的宿主上验证 `run_code` 选择、child dispatch、父 seq 不变。
+
+### Round 28（2026-11-20，平台 scope 方案单测验证）
+
+- 在真实 PTC 执行栈的临时 harness 中验证 adopted child scope：
+  - `ctx.tools.execute({ agent: childAgent, name: 'run_code' })` 命中 child scope 的 PTC executor；
+  - `run_code` 内 `tools.echo` 成功；
+  - 父 Session seq 保持 0；
+  - child Session seq > 0。
+- 这证明 `createScope + scoped PtcToolExecutor + Object.create(parent)` 的路径正确，解决了 Proxy child 的 executor-identity 问题；当前只差接入真实 AUX PTC 会话并验证 review_done/child dispatch/父 seq，和可用模型凭据下的宿主复验。
