@@ -1,3 +1,13 @@
+## 0.59.2 (2026-11-20) — PTC review 工具绑定 scope 修复
+
+> **缺陷**：0.59.1 的 PTC review 仍会在多个 `run_code` 之间丢失 `tools`；模型报告 `Object.keys(tools)` 为空，最终 `missing review_done`。
+>
+> **根因（平台代码级）**：平台 `ToolsService.resolve()` 返回的 `ResolvedToolSet` 的 `view(scope)` 实现是 `if (closed || scope !== agent) return empty`。0.59.1 用 **parent agent** resolve toolset，却用 **review child agent** 执行 `tools.execute`；PTC executor 在 `run_code` 内调用 `tools.schemas(child, toolSet)`，scope 不相等，返回空工具集。
+>
+> **修复**：PTC review channel 的 toolset 与 execution 使用同一个 **child agent** resolve/execute；SDK 组装、`review_done` 激活、toolset 生命周期保持 0.59.1 修复。SDK 解析与实际执行 scope 一致。
+>
+> **验证**：overlay build 0；review PTC/executor 定向测试 18 passed；真实 npm web PTC 验证在本版本发布后执行。
+
 ## 0.59.1 (2026-11-20) — 修复 PTC Aux Review 工具桥
 
 > **缺陷**：0.59.0 的 PTC AUX review 只有 `run_code` 可见，review 模型没有拿到 PTC executor 的 `tools:sdk` 系统提示，`tools.read`/`skill_manage`/`review_done` 均不可用；真实 npm web PTC 会话的 review 只能空跑后 `partial`。

@@ -50,7 +50,7 @@ it('resolves review_done from the child session when the ALS context is gone', a
   channel.dispose(); host.dispose()
 })
 
-it('resolves the nested PTC SDK from the parent toolset while executing as the child', async () => {
+it('resolves and executes the nested PTC SDK with the same child agent', async () => {
   let resolvedAgent: unknown
   let executedAgent: unknown
   const host = new PtcReviewToolHost({
@@ -66,9 +66,9 @@ it('resolves the nested PTC SDK from the parent toolset while executing as the c
   }, new ReviewWriteLocks())
   const child = { session: { id: 'review-child:aux-review-3:0' } }
   const parent = { session: { id: 'parent-review-3' } }
-  const channel = await host.channel('aux-review-3', [{ name: 'run_code' }], child, undefined, new Set(['skill_manage', 'read']), parent)
+  const channel = await host.channel('aux-review-3', [{ name: 'run_code' }], child, undefined, new Set(['skill_manage', 'read']))
   await channel.execute([], new AbortController().signal)
-  expect(resolvedAgent).toBe(parent)
+  expect(resolvedAgent).toBe(child)
   expect(executedAgent).toBe(child)
   channel.dispose(); host.dispose()
 })
