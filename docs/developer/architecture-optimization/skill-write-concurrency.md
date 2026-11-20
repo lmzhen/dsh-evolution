@@ -905,6 +905,36 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.7 keyed 装配实证
+
+已完成：
+
+- 测试用 `SkillLibrary` 注入：
+  ```ts
+  new TargetMutationLock(new TargetLockSet(home))
+  ```
+  作为 mutationLock；
+- 两个不同 skill 的 update：
+  - 通过 SlowIo 统计同时在途 IO；
+  - `maxActive > 1`，**真实并行**；
+- 同一 skill 的两次 update：
+  - `maxActive === 1`，**真实串行**；
+- 既有 root gate / target lock / CAS 全部保留。
+
+验证：
+
+```text
+skill-keyed-concurrency: 2 passed
+overlay build:           0
+```
+
+关键结论：
+
+- keyed 路径已经能提供不同 skill 的跨进程并行；
+- 同 skill 的 target lock + keyed mutation lock 仍串行；
+- 生产尚未切换，因为结构操作/恢复仍依赖 HomeFence root lock；
+- 需要 hybrid lock（空 keys 回退 HomeFence，有 keys 用 TargetLockSet）后才能生产启用。
+
 ### 2026-11-20：Phase E.6 SkillLibrary 填 target keys
 
 已完成：
