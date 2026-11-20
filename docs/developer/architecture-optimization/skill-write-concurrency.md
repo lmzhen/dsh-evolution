@@ -855,6 +855,31 @@ delete → service.remove()
 
 ## 14. 实施记录
 
+### 2026-11-20：Phase A.2 平台观察入口映射
+
+已完成：
+
+- 新增 `packages/evolution-core/src/skill-observation-source.ts`
+  - `skillTargetFromHostPath(root, hostPath)`：把平台 `fs/observed` 的 host path 映射为 `SKILL.md` / support-file target；
+  - 拒绝 root 外路径、root 自身、root 直属文件、相对路径；
+  - `recordFsSkillObservation(store, owner, root, observation)`：把平台 version 记为 present observation。
+- 7 个单测：body/support 映射、root 外拒绝、root 自身/直属文件拒绝、非法输入、非 skill 文件不记录、平台 token 保持 opaque。
+
+边界（刻意不做的）：
+
+- 尚未订阅 `fs/observed`；只是纯映射/记录入口；
+- 尚未决定 observation version 的最终模型；
+- 尚未改变任何写入行为。
+
+Phase A.3 需要先解决的设计选择：
+
+- 平台 `fs/observed` 的版本 token 是同步可得的，但不等于 skill 内容 sha；
+- 读工具可能是部分读，不能从结果文本安全推导整文件内容 hash；
+- 因此必须先定：
+  1. 平台 opaque `FsVersion` 作为 freshness token，写路径走平台 fs 的 CAS；或
+  2. 内容 sha256 作为唯一 version，并只在能同步取得完整内容时授权。
+- 本选择会影响 `SkillWriteService` 的 CAS 落点，不能在代码里混用两种 token 语义。
+
 ### 2026-11-20：Phase A.1 观察模型落地
 
 已完成：
