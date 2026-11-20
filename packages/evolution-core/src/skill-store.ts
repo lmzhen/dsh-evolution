@@ -60,6 +60,7 @@ import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { decideSkillWrite, type SkillWriteIntent, type SkillWriteRefusalReason } from './skill-write-intent.ts'
+import { SkillTargetLocks } from './skill-target-locks.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
 import { type ChangeSummary, type UnitHead, clipChangeSummary, contentRetentionFeedback, DEFAULT_SKILL_WRITE_SUMMARY_CHARS, HISTORY_DIR, loadVersionContent, loadVersions, normalizeChangeSummary, recordVersions, type HistoryFence, type RecordedVersions, type SkillVersion } from './skill-history.ts'
 import { getRecord, loadUsage, mutateUsage, suppressedFile, usageFile } from './usage.ts'
@@ -815,6 +816,8 @@ export class SkillLibrary {
    * one skill never interleave their read-modify-write (the cross-process layer
    * is the IO backend's transact lock; this chain is the second layer). */
   private readonly serial: <T>(task: () => Promise<T>) => Promise<T>
+  /** Transitional target locks (same key as SkillWriteService). */
+  private readonly targetLocks = new SkillTargetLocks()
   /** V10-03 (P2-18): see the constructor's threatExemptLabels. Empty by
    * default — the strict ANY-hit-blocks policy is unchanged. */
   private readonly threatExemptLabels: readonly string[]
@@ -888,6 +891,11 @@ export class SkillLibrary {
     }
     const runId = currentReviewContext()?.runId
     return { ...(runId === undefined ? {} : { runId }), moves, sources: roots.map(skill => ({ skill })) }
+  }
+
+  /** Transitional: serialize one target even while the root serial remains. */
+  private async withTarget<T>(targetKey: string, task: () => Promise<T>): Promise<T> {
+    return await this.targetLocks.withLock(targetKey, task)
   }
 
   private async withMutationLock<T>(task: () => Promise<T>): Promise<T> {
@@ -1786,7 +1794,7 @@ export class SkillLibrary {
     // the other single-file mutators on the in-process serial chain — a
     // concurrent update could otherwise pass its protection check before the
     // marker lands and rewrite a skill the user just froze.
-    return await this.serial(() => this.setPinnedCore(name, pinned, origin))
+    return await this.serial(() => this.withTarget('pin::' + name, () => this.setPinnedCore(name, pinned, origin)))
   }
 
   private async setPinnedCore(name: string, pinned: boolean, origin: WriteOrigin): Promise<SkillActionResult> {
@@ -1861,7 +1869,7 @@ export class SkillLibrary {
     // serialize queue (F-208 discipline, like update/patch) — two concurrent
     // create calls for one name used to both pass exists() and double-write
     // (double audit, double mutation event).
-    return await this.serial(() => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true)))
+    return await this.serial(() => this.withTarget('skill::' + normalized, () => this.withMutationLock(() => this.createCore(normalized, content, origin, options, true))))
   }
 
   private async createCore(
@@ -2019,7 +2027,7 @@ export class SkillLibrary {
     await this.ensureRecovered()
     // F-208: the whole read→validate→write runs under the in-process serialize
     // queue so two concurrent updates on one skill never interleave.
-    return await this.serial(() => this.updateCore(name, content, origin, anchor))
+    return await this.serial(() => this.withTarget('skill::' + name, () => this.updateCore(name, content, origin, anchor)))
   }
 
   private async updateCore(name: string, content: string, origin: WriteOrigin, anchor?: WriteAnchor): Promise<SkillActionResult> {
@@ -2101,7 +2109,8 @@ export class SkillLibrary {
     const name = rawName.trim()
     // F-208: the whole read→patch→write runs under the in-process serialize
     // queue so two concurrent patches on one skill never interleave.
-    return await this.serial(() => this.patchCore(name, oldString, newString, filePath, replaceAll, origin, anchor))
+    const key = 'skill::' + name + (filePath === '' ? '' : '::' + filePath.replace(/\\/g, '/'))
+    return await this.serial(() => this.withTarget(key, () => this.patchCore(name, oldString, newString, filePath, replaceAll, origin, anchor)))
   }
 
   /**

@@ -905,6 +905,31 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase D.5a simple mutator 持 target lock
+
+已完成：
+
+- `SkillLibrary` 增加过渡 targetLocks；
+- `setPinned` / `create` / `update` / `patch` 在现有 root serial 内再持对应 targetKey 锁：
+  - `pin::name`；
+  - `skill::name`；
+  - support patch 使用 `skill::name::path`；
+- 这一轮**不删除 root serial**，只让 library 与 service 共享同一 targetKey 语义；
+- 结构操作（archive/restore/consolidate）仍走旧 serial，避免 non-reentrant deadlock。
+
+验证：
+
+```text
+skill-store-cas + tool observed writes: 8 passed
+overlay build:                           0
+```
+
+边界：
+
+- target lock 与 root serial 同时存在，尚无并行收益；
+- writeSupportFile / removeSupportFile 的 target lock 与 structural gate 在下一轮接；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase D.4 锁替换前的重入地图
 
 替换 per-root serial 前，先固定现有调用图（避免把 deadlock 从 serial 搬到 gate）：
