@@ -1,3 +1,17 @@
+## 0.59.3 (2026-11-21) — 技能写入并发 / 防双写收口
+
+> **目标**：把 skill 写入的观察、版本、锁、CAS、审批 anchor、多文件 unit 与错误语义收口为单一权威层；不改变前台 prompt/inject 行为。
+>
+> **观察与版本**：平台 `fs/observed` 只作捕获栅栏，写入许可使用 LF 归一后的内容 sha256；owner 按 session / review child / curator run 隔离；HMR dispose 清空。
+>
+> **锁与并发**：per-target promise lock + root shared/exclusive gate；create/update/patch/write_file/remove_file 均要求先读后写；patch 默认单次替换、显式 replace_all 才全替；版本变化即使不同区域也返回 `SKILL_STALE_VERSION`。
+>
+> **keyed 锁（opt-in）**：`keyedSkillLocks: true` 时不同 skill 跨进程可并行、同 skill 串行；archive/restore/consolidate/commitMerge/recovery 使用 namespace/target keys 并统一字典序锁序；默认关闭，保持旧 HomeFence 行为。
+>
+> **修复的死锁/泄漏**：archive/restore 锁序 ABBA、commitMerge 重入门、nested merge 重复取 source lease、audit 持 lease 重取 fence、TargetLockSet release 失败 tail 泄漏、merge 启动恢复在 fence lease 下调单写。
+>
+> **验证**：定向 125 tests 串行全过；pre-tag 静态门禁 fail=0；本地注入真实 headless host（keyed=false/true 装配）create/update 与两个 host 并发 create 成功；独立复核 P0=0/P1=0。真实 npm web 升级验收在发布后执行。
+
 ## 0.59.2 (2026-11-20) — PTC review 工具绑定 scope 修复
 
 > **缺陷**：0.59.1 的 PTC review 仍会在多个 `run_code` 之间丢失 `tools`；模型报告 `Object.keys(tools)` 为空，最终 `missing review_done`。
