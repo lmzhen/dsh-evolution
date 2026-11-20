@@ -17,6 +17,7 @@
  * @module @deepseek-ai/dsh-evolution-core/authority
  */
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { createHash } from 'node:crypto'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { withFileLock as platformFileLock } from '@deepseek-ai/dsh-evolution-adapter/values'
@@ -119,6 +120,66 @@ function isBusy(error: unknown): boolean {
  * One home-wide writer authority. Every durable writer calls {@link HomeAuthority.runExclusive};
  * an operation that runs inside another held operation calls {@link HomeAuthority.runNested}.
  */
+/**
+ * Per-target cross-process locks for the scoped authority.
+ *
+ * Each key gets its own platform writer lock under
+ * `<home>/.authority/targets/<sha256(key)>.lock`; keys are acquired in lexical
+ * order. Different keys therefore do not exclude each other across processes,
+ * while one key remains mutually exclusive. This class is the kernel only; the
+ * mutation authority wires it into UnitTransaction after its behavior is
+ * proven.
+ */
+export class TargetLockSet {
+  private readonly tails = new Map<string, Promise<unknown>>()
+
+  constructor(
+    private readonly home: string,
+    private readonly waitMs = DEFAULT_WAIT_MS,
+    private readonly lock: typeof platformFileLock = platformFileLock,
+  ) {}
+
+  /**
+   * Run a task under all supplied target keys.
+   * @param keys - canonical target keys; duplicate/unsorted input is normalized.
+   * @param body - the critical section.
+   * @returns the body's value.
+   */
+  async run<T>(keys: readonly string[], body: () => Promise<T>): Promise<T> {
+    const ordered = [...new Set(keys)].sort()
+    return await this.acquire(ordered, 0, body)
+  }
+
+  /** Held target queues, for leak assertions. */
+  get size(): number {
+    return this.tails.size
+  }
+
+  private async acquire<T>(keys: readonly string[], index: number, body: () => Promise<T>): Promise<T> {
+    const key = keys[index]
+    if (key === undefined) return await body()
+    const prior = this.tails.get(key) ?? Promise.resolve()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const tail = prior.then(() => gate)
+    this.tails.set(key, tail)
+    await prior
+    try {
+      return await this.withLockFile(key, async () => await this.acquire(keys, index + 1, body))
+    } finally {
+      release()
+      if (this.tails.get(key) === tail) this.tails.delete(key)
+    }
+  }
+
+  private async withLockFile<T>(key: string, body: () => Promise<T>): Promise<T> {
+    const dir = join(this.home, '.authority', 'targets')
+    await mkdir(dir, { recursive: true })
+    const digest = createHash('sha256').update(key).digest('hex')
+    return await this.lock(join(dir, digest), body, { waitMs: this.waitMs })
+  }
+}
+
 export class HomeAuthority {
   private readonly options: HomeAuthorityOptions
   private readonly held = new Map<LockScope, number>()

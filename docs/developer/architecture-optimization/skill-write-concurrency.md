@@ -905,6 +905,31 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.2 target lock kernel
+
+已完成：
+
+- `authority.ts` 新增 `TargetLockSet`：
+  - `<home>/.authority/targets/<sha256(key)>.lock`；
+  - 多 key 去重 + 字典序获取；
+  - 进程内按 key FIFO；
+  - 跨进程 platform file lock；
+  - `size` 泄漏断言。
+- 3 个单测：同 key 串行、不同 key 并行、多 key 反向顺序不死锁。
+
+验证：
+
+```text
+authority-target-locks: 3 passed
+overlay build:          0
+```
+
+边界：
+
+- 只是 kernel，尚未接入 MutationAuthority / UnitTransaction；
+- HomeFence global tree lock 仍包住所有 skill 写；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.1 scoped authority 设计
 
 目标：让不同 skill target 的写入跨进程并行，同时保留同 target 互斥与结构操作互斥。
