@@ -11,6 +11,8 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 
+// platform-declaration anchor: sessionProjections is declared in core PLATFORM_SERVICE_PROBES.
+
 /** Family tools that must never be model-visible in the minimal preset. */
 export const MINIMAL_PRESET_DENY_TOOLS = [
   'memory',
