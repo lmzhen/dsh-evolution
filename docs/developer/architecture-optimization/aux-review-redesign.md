@@ -593,3 +593,14 @@ interface EvolutionReviewActivityRecordV3 {
 - 结论：`@deepseek-ai/dsh-tool-executor-ptc` 不由 family manifest 声明。平台 base bundle 内含该包，但 base/minimal 的 executor row 默认 `disabled: true`，PTC preset 才启用；因此它是“默认发行、按 preset 启用”的可选能力，不是 family 依赖。
 - adapter 新增 `PtcExecutorUnavailableError` 与 `loadPtcExecutor()`：只在 PTC 模式动态 import，检查 `apply`/`inject` shape，缺失或不兼容抛 `PTC_UNAVAILABLE`，不读版本号、不猜测平台版本；adapter 单测覆盖无 scoped parent 的 fail-closed。
 - 该选择保持 cohort/envelope 声明不变，代价是 PTC 集成属于平台内部 seam，必须在每个 cohort 的 PTC 真机验收覆盖；平台若提供稳定 PTC capability 再替换。
+
+### Round 31（2026-11-20，真实 PTC AUX 通过）
+
+- 在隔离 home + rc.5 host + dev9 家族包上，真实 PTC 会话触发 AUX，memory 与 skill 两个 task 均 `completed`：
+  - memory：requests=3、toolCalls=3、report 完整；
+  - skill：requests=4、toolCalls=4、report 完整；
+  - `run_code` 在 PTC 内实际执行；`review_done` 返回 `ok:true`。
+- 父 Session 的持久日志中没有任何 `tool/ptc-dispatch*` / `review-child` 帧；PTC dispatch 只进 child Session，父 Session seq 未被 PTC 写入。
+- 修复：PTC 嵌套执行跨 async 边界后 `currentReviewContext()` 可能不可见，`review_done` 曾返回 `ok:false`。现在 `controlFor` 在 ALS 缺失时按 child Session id 中的 taskId 解析 control；同时 PTC `review_done` 参数 schema 把 `memoryChanged/skillsChanged/unresolved` 改为必填，避免模型省略字段导致 report 解析失败。
+- 真实 UI 截图（`D:/dsh/_e2e2-ptc-ui.png`）：自动复查显示 PTC memory/skill 均“已完成”，并与旧 `review-timeout` / `missing review_done` 记录并存，证明 v3 兼容和状态区分。
+- 仍未做：PTC 并行/同 skill 冲突、真实 UI 的 failed/timeout 新记录、最终 pre-tag/CI 与独立复核。
