@@ -2618,13 +2618,13 @@ export class SkillLibrary {
     if (protectedSource !== undefined) return { ok: false, message: `来源技能「${protectedSource}」是受保护的内置技能。` }
     const limits = plan.limits ?? this.limits
     const serialized = options?.serialized === true
-    const run = async (): Promise<CommitMergeResult> => {
+    const run = async (sourceHeld: boolean): Promise<CommitMergeResult> => {
       // A nested merge already holds the home fence; its archive/restore bookkeeping
       // must run inline instead of queueing behind that same lease.
       const fenceHeld = plan.nested === true
       const keyed = this.keyedTargetLocks()
       const archive = async (name: string, archiveOptions: ArchiveOptions): Promise<SkillActionResult> => {
-        if (!fenceHeld) return await this.archive(name, archiveOptions, plan.origin, undefined, true)
+        if (!fenceHeld) return await this.archive(name, archiveOptions, plan.origin, undefined, true, sourceHeld)
         if (!keyed) return await this.archiveCore(name, archiveOptions, plan.origin, true)
         const lease = await this.lockPort().acquire([skillNamespaceKey(name)])
         try {
@@ -2634,7 +2634,7 @@ export class SkillLibrary {
         }
       }
       const restore = async (source: string): Promise<SkillActionResult> => {
-        if (!fenceHeld) return await this.restoreFromArchive(source, plan.origin, true)
+        if (!fenceHeld) return await this.restoreFromArchive(source, plan.origin, true, sourceHeld)
         if (!keyed) return await this.restoreFromArchiveCore(source, plan.origin, true)
         const lease = await this.lockPort().acquire([skillNamespaceKey(source)])
         try {
@@ -2939,8 +2939,19 @@ export class SkillLibrary {
       await plan.onPhase?.('unit-written')
       return { ok: true, message: `已把 ${sources.join(', ')} 合并进「${target}」。`, unitId, targetPath: dir, archived, mutations: 1 + sources.length }
     }
-    if (serialized) return await run()
-    return await this.rootGate.write(() => this.serial(run))
+    const acquireSourcesAndRun = async (): Promise<CommitMergeResult> => {
+      const sourceHeld = this.keyedTargetLocks() && sources.length > 0
+      const lease = sourceHeld
+        ? await this.lockPort().acquire(sources.map(skillNamespaceKey))
+        : undefined
+      try {
+        return serialized ? await run(sourceHeld) : await this.serial(() => run(sourceHeld))
+      } finally {
+        if (lease !== undefined) await lease.release()
+      }
+    }
+    if (serialized) return await acquireSourcesAndRun()
+    return await this.rootGate.write(acquireSourcesAndRun)
   }
 
   /**

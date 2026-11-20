@@ -931,6 +931,25 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.11 merge 统一 S→T 锁序
+
+复核发现 keyed 下 consolidate 为 S→T（sources 先、target 后），merge 为 T→S（target 先、sources 后），同 target/有交集时可能互锁。
+
+修复：
+
+- commitMerge 在 keyed 运行时先取全部 source namespace keys；
+- archive/restore 内部传 `namespaceHeld=true`，不重复取；
+- 然后 target tree unit 取 target keys；
+- consolidate 也已是 S→T；
+- 两类结构操作现在同一锁序，字典序多 key 获取由 TargetLockSet 保证。
+
+验证：
+
+```text
+commit-merge + fence-lease: 9 passed
+overlay build: 0
+```
+
 ### 2026-11-20：Phase P1.10 复核 P1 修复
 
 复核指出两项 P1，已修：
