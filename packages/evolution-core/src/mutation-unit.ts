@@ -160,7 +160,12 @@ export interface MutationLockLease {
 }
 
 export interface MutationLockPort {
-  acquire(): Promise<MutationLockLease>
+  /**
+   * Acquire the write lock. `targetKeys`, when supplied, asks a keyed backend
+   * to lock those skill targets instead of the whole root; a backend that only
+   * implements the root lock may ignore them.
+   */
+  acquire(targetKeys?: readonly string[]): Promise<MutationLockLease>
 }
 
 export interface MutationSnapshotOp {

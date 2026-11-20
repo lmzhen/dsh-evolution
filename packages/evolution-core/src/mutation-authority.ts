@@ -1,7 +1,8 @@
 import { HomeFence } from './home-fence.ts'
 import { LeaseStore } from './lease-store.ts'
 import type { EvolutionIoLike } from './io.ts'
-import type { MutationLockPort } from './mutation-unit.ts'
+import type { MutationLockLease, MutationLockPort } from './mutation-unit.ts'
+import { TargetLockSet } from './authority.ts'
 
 export interface MutationAuthorityOptions {
   readonly io: EvolutionIoLike
@@ -51,6 +52,16 @@ export class MutationAuthority {
 }
 
 /** Read the authority's fence adapter from a context; undefined means no authority is mounted. */
+/** A keyed MutationLockPort over TargetLockSet; empty key sets are refused, not silently unlocked. */
+export class TargetMutationLock implements MutationLockPort {
+  constructor(private readonly locks: TargetLockSet) {}
+
+  async acquire(targetKeys: readonly string[] = []): Promise<MutationLockLease> {
+    if (targetKeys.length === 0) throw new Error('target mutation lock requires at least one target key')
+    return await this.locks.acquireLease(targetKeys)
+  }
+}
+
 export function mutationLockFrom(ctx: { get?(name: string): unknown } | undefined): MutationLockPort | undefined {
   if (ctx?.get === undefined) return undefined
   const authority = ctx.get('evolutionMutationAuthority') as { readonly mutationLock?: MutationLockPort } | undefined

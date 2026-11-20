@@ -905,6 +905,28 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.4 MutationLockPort 支持 target keys
+
+已完成：
+
+- `MutationLockPort.acquire(targetKeys?: readonly string[])`；
+- 新增 `TargetMutationLock` 适配 `TargetLockSet.acquireLease`；
+  - 空 key 集合直接拒绝，避免无锁写；
+- 3 个测试：空 key 拒绝、同 key 串行、不同 key 并行。
+
+验证：
+
+```text
+mutation-authority-target-lock: 3 passed
+overlay build:                  0
+```
+
+边界：
+
+- 还没有 UnitTransaction/SkillLibrary 调用方传 targetKeys；
+- 生产仍用 HomeFence global lock；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase E.3 target lock lease
 
 已完成：
