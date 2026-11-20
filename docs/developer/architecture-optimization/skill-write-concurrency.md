@@ -905,6 +905,29 @@ delete → service.remove()
 skill-write-service: 6 passed
 ```
 
+### 2026-11-20：Phase E.12 全量定向回归
+
+在 keyed opt-in 装配（默认关闭）完成后跑全量定向套件：
+
+```text
+Test Files  11 passed
+Tests       113 passed
+Duration    200.50s
+```
+
+覆盖：
+
+- tool-skill-manage；
+- observed writes；
+- SkillWriteService；
+- root gate；
+- store serial / consolidate；
+- target locks / keyed authority；
+- mutation unit；
+- keyed concurrency。
+
+结论：配置开关未引入回归；下一步只剩真实 npm web 并发验收与默认开启决策。
+
 ### 2026-11-20：Phase E.12 authority plugin 配置开关
 
 已完成：
