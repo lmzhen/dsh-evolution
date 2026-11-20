@@ -2095,13 +2095,13 @@ export class SkillLibrary {
     return { ok: true, message: `技能「${name}」已更新。${warning}${retention === null ? '' : '\n' + retention}`, path: dir, ...(prepared.norm.changed ? { normalizedFrontmatterFields: prepared.norm.fields } : {}) }
   }
 
-  async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+  async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = this.authority.origin, anchor?: WriteAnchor): Promise<SkillActionResult> {
     await this.ensureRecovered()
     // One trim per entry: paths (dirOf), validation and messages all see the same name.
     const name = rawName.trim()
     // F-208: the whole read→patch→write runs under the in-process serialize
     // queue so two concurrent patches on one skill never interleave.
-    return await this.serial(() => this.patchCore(name, oldString, newString, filePath, replaceAll, origin))
+    return await this.serial(() => this.patchCore(name, oldString, newString, filePath, replaceAll, origin, anchor))
   }
 
   /**
@@ -2167,6 +2167,7 @@ export class SkillLibrary {
     filePath: string,
     replaceAll: boolean,
     origin: WriteOrigin,
+    anchor?: WriteAnchor,
   ): Promise<SkillActionResult> {
     // P1-1 (v14): patch was the ONE path-building mutator without the name
     // guard — `name = '../outside'` plus a `file_path` escaped the skills root
@@ -2275,6 +2276,8 @@ export class SkillLibrary {
       await this.cleanupGhostDir(target)
       return { ok: false, message: `文件不存在：${patchLabel}` }
     }
+    const verdict = anchorVerdict(anchor, current)
+    if (verdict !== 'match') return anchorRefusalFile(name, patchLabel, verdict)
     const outcome = compute(current)
     if (outcome.write === null) {
       if (outcome.hardCapHit !== undefined) await this.recordHardCapHit(name, outcome.hardCapHit.bodyChars, 'patch', outcome.hardCapHit.supportFiles)

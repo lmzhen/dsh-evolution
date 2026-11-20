@@ -882,6 +882,31 @@ delete → service.remove()
 - 若最终复核不接受双 token，则回退为“只允许能同步取得完整内容的读作为写许可”；通用 read 不授权写，需用户在 skill 管理路径显式读。
 - 该回退会降低后台 review 的可用性，但不会产生错误的写许可。
 
+### 2026-11-20：Phase C.2 服务改用现有 mutator 的锁内 anchor
+
+已完成：
+
+- `SkillLibrary.patch` 增加可选 `WriteAnchor` 参数；
+- `patchCore` 在锁内读当前内容后、literal 匹配前检查 anchor：
+  - 不一致 → `stale` / `anchor`；
+  - 与 `update` / `writeSupportFile` / `removeSupportFile` 的 anchor 语义一致。
+- `SkillWriteService` 不再走原始 `writeFileCas`：
+  - `updateBody` → `library.update(..., { sha256: observed })`；
+  - `patchBody` → `library.patch(..., { sha256: observed })`；
+  - `updateSupport` → `library.writeSupportFile(..., { sha256: observed })`。
+- 这样 service 复用了已有的：
+  - protection / badName / frontmatter / threat / limits 校验；
+  - UnitTransaction、audit、mutation event、history；
+  - serial + mutation lock + transact。
+- 新增服务测试仍全部通过：未读、owner 隔离、第二个 stale、absent support、patch/no-op。
+
+边界：
+
+- service 尚未被 tool 层调用；
+- `patchBody` 的 no-op 在 service 层先返回 `SKILL_INVALID`，不改 library 现有 noop 语义；
+- `create` / `remove` / 审批 / unit 尚未接入；
+- 平台 FsVersion 与 content sha 仍按 DCR-1 待复核。
+
 ### 2026-11-20：Phase C.1 SkillWriteService 读观察 + CAS
 
 已完成：
