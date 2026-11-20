@@ -882,6 +882,28 @@ delete → service.remove()
 - 若最终复核不接受双 token，则回退为“只允许能同步取得完整内容的读作为写许可”；通用 read 不授权写，需用户在 skill 管理路径显式读。
 - 该回退会降低后台 review 的可用性，但不会产生错误的写许可。
 
+### 2026-11-20：Phase C.1 SkillWriteService 读观察 + CAS
+
+已完成：
+
+- 新增 `packages/evolution-core/src/skill-write-service.ts`
+  - `SkillWriteService`：readBody / readSupport 记录 owner 观察；
+  - updateBody / patchBody / updateSupport 从观察取 expected，调用 `SkillLibrary.writeFileCas`；
+  - 错误码：`SKILL_NOT_OBSERVED` / `SKILL_NOT_FOUND` / `SKILL_STALE_VERSION` / `SKILL_ALREADY_EXISTS` / `SKILL_AMBIGUOUS_EDIT` / `SKILL_EDIT_NOT_FOUND` / `SKILL_INVALID`；
+  - 尚未接管 create / remove / 审批 / unit / tool 层。
+- 5 个服务测试：
+  - 未读写拒绝；
+  - owner 隔离；
+  - 两 owner 同版本，第二个 stale；
+  - absent support 观察 + 写拒绝；
+  - patch 成功 / no-op 拒绝。
+
+边界：
+
+- 服务是新增层，tool 层仍走原有路径；
+- `writeFileCas` 的版本仍按 contentHash 计算，平台 FsVersion 统一仍按 DCR-1 待复核；
+- 没有改变任何现有 create/update/patch 行为。
+
 ### 2026-11-20：Phase B.2 存储层锁内 CAS 原语
 
 已完成：
