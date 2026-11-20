@@ -931,6 +931,30 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-20：Phase P1.7 pre-tag 复跑
+
+第二次 pre-tag 静态门禁：
+
+```text
+pass=60
+fail=0
+cannotDecide=7（4 已登记 + 3 未登记）
+skipped=2
+```
+
+未登记 cannot-decide：
+
+- gate-07 / gate-24：本机 180s 预算内跑不完（arch-guards 单独跑已 OK）；
+- gate-18：平台契约上游比对输入不可用。
+
+其余环境缺失：
+
+- gate-01/05：无 harness-0.2.1 checkout；
+- gate-29：无 plane home；
+- gate-81：无健康语料。
+
+结论：静态门禁无 fail；剩余为环境输入/预算，不是代码失败。
+
 ### 2026-11-20：Phase E13 本地注入真机验收
 
 按用户选择做本地注入 web 验收（不是 npm 发布）。
