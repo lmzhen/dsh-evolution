@@ -884,6 +884,27 @@ delete → service.remove()
 
 - 若某平台 backend 的 `targetKey` 不是 host path，或版本格式不同，监听器不记录；该 read 不授权写，写路径返回 `SKILL_NOT_OBSERVED`。
 
+### 2026-11-20：Phase D.1 per-target 锁原语
+
+已完成：
+
+- 新增 `packages/evolution-core/src/skill-target-locks.ts`：
+  - `withLock(targetKey, task)`；
+  - `withLocks(targetKeys, task)`：去重 + 字典序获取；
+  - `size` 泄漏断言；
+  - 多 target 获取按序、释放逆序；
+- 4 个单测：
+  - 同 target 串行；
+  - 不同 target 并行；
+  - 相反顺序的多 target unit 不死锁；
+  - 去重且队列清空。
+
+边界：
+
+- 这是纯锁原语，尚未替换 SkillLibrary 的 per-root serial；
+- 尚未与 transactIo / HomeFence 组合；
+- 未 bump 版本，未发布。
+
 ### 2026-11-20：Phase C.8 remove_file 接入 observation
 
 已完成：
