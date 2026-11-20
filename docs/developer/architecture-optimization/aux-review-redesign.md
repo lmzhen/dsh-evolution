@@ -575,3 +575,15 @@ interface EvolutionReviewActivityRecordV3 {
   - 父 Session seq 保持 0；
   - child Session seq > 0。
 - 这证明 `createScope + scoped PtcToolExecutor + Object.create(parent)` 的路径正确，解决了 Proxy child 的 executor-identity 问题；当前只差接入真实 AUX PTC 会话并验证 review_done/child dispatch/父 seq，和可用模型凭据下的宿主复验。
+
+
+### Round 29（2026-11-20，PTC review_done 全链路单测）
+
+- 在真实 PTC 执行栈临时 harness 中跑通完整 child-scope PTC AUX 路径：
+  - `createReviewChildAgent(...,{ptc:true})` 创建 live child + child scope；
+  - scoped `@deepseek-ai/dsh-tool-executor-ptc` 被 `tools.execute` 选中；
+  - `run_code` 内调用 `tools.review_done` 成功；
+  - `channel.completion()` 返回结构化 report；
+  - 父 Session seq 保持 0，child seq > 0。
+- 这同时验证了 review_done 在 PTC 嵌套工具中可达，不再只是 echo 探针。
+- 测试为临时 harness，未入库（依赖平台 PTC 测试栈）；代码路径已在 adapter/review 构建与单测中通过。剩余是真实 AUX PTC 宿主复验。
