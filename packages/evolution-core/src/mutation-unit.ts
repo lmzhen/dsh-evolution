@@ -2,7 +2,7 @@ import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isCommittedWarning, isProcessAlive, TransactionNotInvokedError, transactIo } from './io.ts'
 import { exceedsContentLimit } from './frontmatter.ts'
-import { WriteKernel } from './write-kernel.ts'
+import { UnitKernel } from './unit-kernel.ts'
 import type { UnitClaimPort } from './unit-claim.ts'
 import type { MutationOwner } from './contract.ts'
 
@@ -284,7 +284,7 @@ export class MutationUnit {
   private readonly hooks: MutationUnitHooks | undefined
   private readonly context: MutationUnitContext | undefined
   private readonly validateWrite: ((op: TreeChangeOp) => string | null) | undefined
-  private readonly kernel: WriteKernel
+  private readonly kernel: UnitKernel
   private readonly transactGuard: boolean
   private readonly now: () => number
   private readonly journalId: string
@@ -310,7 +310,7 @@ export class MutationUnit {
     this.now = options.now ?? Date.now
     this.journalId = 'j-' + String(this.now()) + '-' + Math.random().toString(36).slice(2)
     const transact = options.transact
-    this.kernel = new WriteKernel({ io: this.io, ...(transact === undefined ? {} : { transact }), now: this.now })
+    this.kernel = new UnitKernel({ io: this.io, ...(transact === undefined ? {} : { transact }), now: this.now })
   }
 
   private async resolveTargetKeys(keys: readonly string[] | undefined): Promise<readonly string[] | undefined> {

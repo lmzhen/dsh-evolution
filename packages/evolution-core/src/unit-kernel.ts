@@ -2,8 +2,13 @@ import { isCommittedWarning, TransactionNotInvokedError, transactIo, type Evolut
 
 /** The four persistent writer kinds the family permits. */
 
+/** A unit whose targets were read and verified by prepare(); it carries no bytes. */
+export interface PreparedUnit {
+  readonly targets: readonly UnitTarget[]
+}
+
 /** One planned write: expected is the baseline read before the plan, next is the new bytes. */
-export interface WriteTarget {
+export interface UnitTarget {
   readonly path: string
   readonly expected: string | null
   readonly next: string | null
@@ -11,27 +16,27 @@ export interface WriteTarget {
 }
 
 /** A structured failure; conflict always means the target changed before/inside the write. */
-export interface WriteKernelError {
+export interface UnitKernelError {
   readonly code: 'cas-conflict' | 'write-failed' | 'compensation-blocked' | 'transact-not-invoked'
   readonly message: string
   readonly target: string
 }
 
 /** Outcome of one write or one multi-target commit. */
-export interface WriteKernelResult {
+export interface UnitKernelResult {
   readonly ok: boolean
   readonly changed: readonly string[]
-  readonly errors: readonly WriteKernelError[]
+  readonly errors: readonly UnitKernelError[]
   readonly warnings?: readonly string[] | undefined
 }
 
-export interface WriteKernelOptions {
+export interface UnitKernelOptions {
   readonly io: EvolutionIoLike
   readonly transact?: typeof transactIo | undefined
   readonly now?: (() => number) | undefined
 }
 
-export interface WriteOneOptions {
+export interface UnitWriteOneOptions {
   /** false is the create-under-root-lock retry seam: a mismatch defers instead of failing. */
   readonly guardBaseline?: boolean | undefined
 }
@@ -41,12 +46,12 @@ export interface WriteOneOptions {
  * transaction, never overwrite a concurrent value, and compensate only this
  * unit's own writes. Business state machines stay in their domain owners.
  */
-export class WriteKernel {
+export class UnitKernel {
   private readonly io: EvolutionIoLike
-  private readonly transact: WriteKernelOptions['transact']
+  private readonly transact: UnitKernelOptions['transact']
   private readonly now: () => number
 
-  constructor(options: WriteKernelOptions) {
+  constructor(options: UnitKernelOptions) {
     this.io = options.io
     this.transact = options.transact
     this.now = options.now ?? Date.now
@@ -91,7 +96,7 @@ export class WriteKernel {
    * defers (returns the current bytes) so a retrying transact can re-observe;
    * if no retry ever writes, the result is still a conflict.
    */
-  async writeOne(target: WriteTarget, options: WriteOneOptions = {}): Promise<WriteKernelResult> {
+  async writeOne(target: UnitTarget, options: UnitWriteOneOptions = {}): Promise<UnitKernelResult> {
     // A missing target is published with the filesystem's no-replace primitive
     // (hard link), so even a writer that ignores our locks cannot be silently
     // overwritten. Expected-present writes still go through the CAS transaction.
@@ -138,17 +143,26 @@ export class WriteKernel {
   }
 
   /**
-   * Write a plan in order. A preflight drift writes nothing; a later failure
-   * compensates only the targets this commit wrote, and only while they still
-   * hold this commit's bytes.
+   * Read and verify every target without writing. A drift returns one
+   * cas-conflict per target and leaves the filesystem untouched.
    */
-  async commit(targets: readonly WriteTarget[]): Promise<WriteKernelResult> {
+  async prepare(targets: readonly UnitTarget[]): Promise<{ readonly ok: true; readonly prepared: PreparedUnit } | { readonly ok: false; readonly errors: readonly UnitKernelError[] }> {
+    const errors: UnitKernelError[] = []
     for (const target of targets) {
       const current = await this.io.readText(target.path)
-      if (current !== target.expected) return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: 'target changed after plan: ' + target.path, target: target.path }] }
+      if (current !== target.expected) errors.push({ code: 'cas-conflict', message: 'target changed after plan: ' + target.path, target: target.path })
     }
-    const written: WriteTarget[] = []
-    for (const target of targets) {
+    return errors.length === 0 ? { ok: true, prepared: { targets } } : { ok: false, errors }
+  }
+
+  /**
+   * Commit a unit that already passed {@link prepare}. This is the only write
+   * point; a later failure compensates only the targets this commit wrote, and
+   * only while they still hold this commit's bytes.
+   */
+  async commitPrepared(prepared: PreparedUnit): Promise<UnitKernelResult> {
+    const written: UnitTarget[] = []
+    for (const target of prepared.targets) {
       const result = await this.writeOne(target)
       if (!result.ok) {
         const compensation = await this.compensate(written)
@@ -159,11 +173,18 @@ export class WriteKernel {
     return { ok: true, changed: written.map(item => item.path), errors: [] }
   }
 
+  /** Prepare then commit; a preflight drift writes nothing. */
+  async commit(targets: readonly UnitTarget[]): Promise<UnitKernelResult> {
+    const prepared = await this.prepare(targets)
+    if (!prepared.ok) return { ok: false, changed: [], errors: prepared.errors }
+    return await this.commitPrepared(prepared.prepared)
+  }
+
   /**
    * Restore a target to its before bytes only if it still holds the bytes this
    * unit wrote. A concurrent writer wins and the compensation is reported.
    */
-  async restore(target: { readonly path: string; readonly before: string | null; readonly after: string | null }): Promise<WriteKernelResult> {
+  async restore(target: { readonly path: string; readonly before: string | null; readonly after: string | null }): Promise<UnitKernelResult> {
     const result = await this.writeOne({ path: target.path, expected: target.after, next: target.before })
     if (result.ok) return result
     if (result.errors.some(error => error.code === 'cas-conflict')) {
@@ -172,8 +193,8 @@ export class WriteKernel {
     return result
   }
 
-  private async compensate(written: readonly WriteTarget[]): Promise<readonly WriteKernelError[]> {
-    const errors: WriteKernelError[] = []
+  private async compensate(written: readonly UnitTarget[]): Promise<readonly UnitKernelError[]> {
+    const errors: UnitKernelError[] = []
     for (const target of [...written].reverse()) {
       const result = await this.restore({ path: target.path, before: target.expected, after: target.next })
       if (!result.ok) errors.push(...result.errors)
