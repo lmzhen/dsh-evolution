@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7o 最终定向测试稳定复跑：skill-write-service 的未读拒绝用例在满载下 30s 超时，提升该用例超时到 60s（仅测试夹具，不改行为）；全量定向套件复跑 32 files / 320 tests passed，无失败。
+
 H7n 已完成 K6：`SkillWriteService.apply` 在写成功后记录 outcome observation 时捕获异常，已提交写不会因 observation 缓存失败变成工具失败；新增故障注入测试（observation.record 抛错，create 仍 ok 且文件存在）。
 
 H7m 已完成真实 approve 成功回放：新增测试依次暂存并 approve create/update/patch/write_file/remove_file，五个 plan 全部落地且 remove 后文件消失。至此真实 approve 的拒绝（stale/policy）与成功路径均有覆盖。K6 故障注入仍缺，机制上已无写后 re-read。

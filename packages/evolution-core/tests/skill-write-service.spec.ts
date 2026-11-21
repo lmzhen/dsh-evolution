@@ -27,7 +27,7 @@ describe('SkillWriteService observations', () => {
     const { service } = await setup()
     const result = await service.updateBody({}, 'write-service', body('new'))
     expect(result).toEqual(expect.objectContaining({ ok: false, code: 'SKILL_NOT_OBSERVED' }))
-  }, 30_000)
+  }, 60_000)
 
   it('allows a write after the same owner read, and keeps another owner unobserved', async () => {
     const { service, lib } = await setup()
