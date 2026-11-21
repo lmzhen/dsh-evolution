@@ -301,7 +301,7 @@ function planFromStaged(operation: SkillWriteArgs, origin: WriteOrigin): SkillWr
     return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'write', target: skillBodyTarget(name), content: operation.content ?? '', expect: anchor, ...anchor.kind === 'absent' ? { create: false } : {} }] }
   }
   if (operation.action === 'patch') {
-    if (anchor?.kind !== 'present') return undefined
+    if (anchor === undefined) return undefined
     const section = operation.section
     if (section !== undefined && section !== null) {
       if (typeof section.heading !== 'string' || typeof section.content !== 'string') return undefined
@@ -316,7 +316,7 @@ function planFromStaged(operation: SkillWriteArgs, origin: WriteOrigin): SkillWr
     return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'write', target: skillSupportTarget(name, operation.file_path), content: operation.file_content ?? '', expect: anchor }] }
   }
   if (operation.action === 'remove_file' && typeof operation.file_path === 'string' && operation.file_path !== '') {
-    if (anchor?.kind !== 'present') return undefined
+    if (anchor === undefined) return undefined
     return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'remove', target: skillSupportTarget(name, operation.file_path), expect: anchor }] }
   }
   return undefined

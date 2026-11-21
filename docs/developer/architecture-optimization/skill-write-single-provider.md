@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7b 已完成：`planFromStaged` 对 patch/remove 的 absent anchor 也生成 plan；现在所有暂存内容写入（create/update/patch/write_file/remove_file）都有完整 plan，approve 不再有空 plan 内容写入。
+
 H3c 已完成：tool 的 create/update/patch/patch.section/write_file/remove_file 全部走 plan；旧 anchor/直接路径改为读当前 bytes 构造显式 expect 后 `SkillWriteService.apply`，tool 不再调用 library 内容 mutator。新增 arch guard N40。
 
 H7a 已完成：新增 arch guard N38（`SkillTargetLocks` 只能由 provider 构造）与 N39（`SkillTarget.targetKey` 字面量只能出现在 observation target factory）；其余 L 项（tool 直调 library mutator、pending 必须带 plan）待 H3c/审批清理后再加，否则会以基线债形式存在。

@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7b staging plan 全覆盖
+
+- `planFromStaged` 支持 patch/remove absent anchor；
+- 所有 content staging 记录均带 plan；
+- tool 全包 112 passed，build 0。
+
 ### 2026-11-21：Phase H3c tool 内容写全 plan 化 + N40
 
 - tool 所有内容写走 plan/provider；旧 anchor/直接分支用显式 expect（读当前 bytes 或 staged anchor）；
