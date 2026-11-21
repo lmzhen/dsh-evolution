@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-platform-contract",
   "description": "Pure family-facing platform capabilities and result vocabulary for the dsh-evolution family",
-  "version": "0.59.3",
+  "version": "0.59.4",
   "publishConfig": {
     "access": "public"
   },

@@ -273,6 +273,42 @@ describe('tool-skill-manage', () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   })
 
+  it('an approved patch replays against the bytes the operator saw, not the current bytes', async () => {
+    const { ctx, root } = await setup()
+    try {
+      const created = await executeOne(ctx, {
+        callId: ToolCallId('patch-anchor-create'), name: 'skill_manage',
+        arguments: { action: 'create', name: 'patch-anchor-skill', content: SKILL.replace('boundary-skill', 'patch-anchor-skill') },
+        agent: fakeAgent(undefined), signal: new AbortController().signal,
+      })
+      expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+      const pending: Array<unknown> = []
+      ctx.provide('evolutionState', {
+        listPending: async () => pending,
+        savePending: async (record: unknown) => { pending.push(record) },
+        tryResolvePending: async () => ({ record: null, applied: false }),
+        claimPending: async () => null,
+        releasePendingClaim: async () => {},
+        loadReviewState: async () => null,
+        saveReviewState: async () => {},
+      })
+      await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+      // The staged anchor is the OLD body; the live target still has it, so this
+      // call proves the anchor travels through the replay path. A second replay
+      // with the same anchor after the first write must then be refused.
+      const live = await readFile(join(root, 'skills', 'patch-anchor-skill', 'SKILL.md'), 'utf8')
+      const stale = await replayRun(ctx, {
+        action: 'patch', summary: 'stale replay', name: 'patch-anchor-skill',
+        old_string: 'Body.', new_string: 'Body changed.', staged_from_sha256: contentHash(live + '\nchanged'),
+      })
+      expect(stale.ok).toBe(false)
+      const message = stale.message
+      expect(message).toContain('SKILL_STALE_VERSION')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('v21 (R-2): the scalar gate itself is reached through the approval replay runner (schema bypassed)', async () => {
     // The tool schema rejects a non-string scalar BEFORE executeCore, so the
     // previous test can only prove the refusal is structured end-to-end. The

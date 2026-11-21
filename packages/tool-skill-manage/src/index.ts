@@ -1018,7 +1018,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (owner !== undefined && (args.file_path ?? '') === '') {
             return toActionResult(await skillWriteService.patchBody(owner, name, args.old_string ?? '', args.new_string ?? '', args.replace_all === true, origin))
           }
-          return await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin)
+          return await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin, stagedAnchor)
         }
         if (typeof section.heading !== 'string' || typeof section.content !== 'string') {
           return { ok: false, message: 'patch.section 需要 heading 与 content。' }
@@ -1545,6 +1545,28 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // 'absent' when the file does not exist yet (create-on-write), and
         // likewise when the target is unreadable (P2-04: fail-closed, the
         // same posture as the skill anchor above).
+        // A patch is staged with the target bytes too: approving it after the target
+        // changed must replay against the bytes the operator saw, not against whatever
+        // the file became. The content hash is the same staged_from_sha256 anchor the
+        // update path uses; SkillLibrary.patch verifies it inside the write lock.
+        if (args.action === 'patch' && typeof args.name === 'string' && args.name !== '') {
+          const patchFile = typeof args.file_path === 'string' ? args.file_path : ''
+          let stageCurrent: string | null
+          try {
+            if (patchFile === '') {
+              stageCurrent = await library.read(args.name)
+            } else {
+              const probe = await library.readSupportFileProbe(args.name, patchFile)
+              if (isUnknown(probe)) return { ok: false, message: '目标当前读不到（' + probe.reason + '），无法核验暂存锚点 —— 先修好可读性再批准', skills: [] }
+              stageCurrent = isPresent(probe) ? probe.value : null
+            }
+          } catch (error) {
+            const rawCode = (error as { code?: unknown } | undefined)?.code
+            const code = typeof rawCode === 'string' ? rawCode : 'IO 失败'
+            return { ok: false, message: '目标当前读不到（' + code + '），无法核验暂存锚点 —— 先修好可读性再批准', skills: [] }
+          }
+          operation = { ...args, staged_from_sha256: stageCurrent === null ? 'absent' : contentHash(stageCurrent) }
+        }
         if ((args.action === 'write_file' || args.action === 'remove_file') && typeof args.name === 'string' && args.name !== '' && typeof args.file_path === 'string' && args.file_path !== '') {
           // S4-01 (G0/0.7): the same three-state read as the preview above - P2-04 had chosen
           // "unreadable anchors as absent" over "unanchored" without considering REFUSE; the library

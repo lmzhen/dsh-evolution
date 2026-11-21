@@ -1,3 +1,13 @@
+## 0.59.4 (2026-11-21) — 审批后并发 patch 的 anchor 回归修复
+
+> **缺陷**：两个会话在同一 skill 上先后 stage patch，批准时都成功应用；第二个 patch 基于旧内容却覆盖了新内容，出现重复片段（真实 npm web 验收：`beta line B B`）。
+>
+> **根因**：审批 staging 只为 update/write_file/remove_file 写入 `staged_from_sha256`，patch 没有 anchor；replay 也把 patch 直接交给 `SkillLibrary.patch` 而未带 anchor，锁内 CAS 无法判断“批准时已过期”。
+>
+> **修复**：patch stage 时按 body 或 support file 计算 anchor；replay 把 `stagedAnchor` 传入 `SkillLibrary.patch`，锁内校验失败返回 `SKILL_STALE_VERSION`，不自动重放旧 patch。
+>
+> **验证**：新增 stale replay 回归测试；真实 npm web 双会话并发 create + 审批通过，双会话 patch 复现后修复。
+
 ## 0.59.3 (2026-11-21) — 技能写入并发 / 防双写收口
 
 > **目标**：把 skill 写入的观察、版本、锁、CAS、审批 anchor、多文件 unit 与错误语义收口为单一权威层；不改变前台 prompt/inject 行为。

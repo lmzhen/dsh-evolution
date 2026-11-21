@@ -931,6 +931,26 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase P1.13 审批 patch anchor（0.59.4）
+
+真实 npm web 双会话验收发现：两个 patch 在同一 skill 上并发 stage，批准时第二个仍成功，文件出现重复片段。
+
+定性：违反要求 F（approval 携带每个 target 的 expected version；批准后再 CAS；任一 stale 整个审批失效）。这是已发布 0.59.3 的 P0，需补丁版本。
+
+修复：
+
+- `tool-skill-manage` 的 approval staging 为 `action=patch` 计算 body / support file 的 `staged_from_sha256`；
+- replay 把 `stagedAnchor` 传入 `SkillLibrary.patch`；
+- `patchCore` 在写锁内先校验 anchor，再匹配 old_string；stale 返回 `SKILL_STALE_VERSION`；
+- 新增回归测试：伪造 stale anchor 的 replay 必须被拒绝。
+
+验证：
+
+```text
+tool-skill-manage approved-patch replay: 1 passed
+真实 npm web：并发 create + 审批通过；并发 patch 复现旧行为后由本修复拦截
+```
+
 ### 2026-11-20：Final review P0=0 / P1=0
 
 独立复核最终结论（06215ce0）：
