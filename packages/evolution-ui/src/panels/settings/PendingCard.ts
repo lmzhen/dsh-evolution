@@ -33,6 +33,8 @@ export interface PendingCardFace {
    * captured once would pin the gate for the life of the fiber. Absent ⇒ the shipped default `auto`.
    */
   confirmMode?: () => 'auto' | 'ask'
+  /** Subscribe to settings changes; the card re-reads the effective value after each change. */
+  subscribeConfirmMode?: (listener: () => void) => () => void
   /** G5/W7 S4: the command-face fallback rendered with an unreachable/unauthenticated failure. */
   fallback?: FallbackHint | undefined
   /** Empty-state next step: open the skill history view when the workbench supplies it. */
@@ -47,8 +49,8 @@ export interface PendingCardFace {
  * future version must not silently turn the confirmation ON, and a typo must not turn it off. The
  * independent review flagged that this reader had no case at all (P2-11).
  */
-export function confirmModeFrom(user: unknown): 'auto' | 'ask' {
-  const value = typeof user === 'object' && user !== null ? (user as Record<string, unknown>).approvalConfirm : undefined
+export function confirmModeFrom(section: unknown): 'auto' | 'ask' {
+  const value = typeof section === 'object' && section !== null ? (section as Record<string, unknown>).approvalConfirm : undefined
   // Only an explicit `auto` may execute without a confirmation. Unknown, unloaded or
   // legacy `timeout` all take the safe branch; a legacy timeout must not auto-execute.
   return value === 'auto' ? 'auto' : 'ask'
@@ -95,7 +97,13 @@ export function PendingCard(props: PendingCardFace): ReactNode {
   const translate = (key: string, values?: Readonly<Record<string, string | number>>): string => t(key as MessageKey, values)
   // U-6: which entry is ARMED for a second click. `auto` (the default) never arms: an approval batch
   // must not be interrupted by a confirmation nobody asked for (31 号 §U-6 的风险行).
-  const confirmMode = props.confirmMode?.() ?? 'ask'
+  const readConfirmMode = (): 'auto' | 'ask' => props.confirmMode?.() ?? 'ask'
+  const [confirmMode, setConfirmMode] = useState<'auto' | 'ask'>(readConfirmMode)
+  useEffect(() => {
+    const sync = (): void => { setConfirmMode(readConfirmMode()) }
+    sync()
+    return props.subscribeConfirmMode?.(sync)
+  }, [props.confirmMode, props.subscribeConfirmMode])
   const [armed, setArmed] = useState<string | null>(null)
   const [state, setState] = useState<PendingState>(INITIAL_PENDING_STATE)
   const [open, setOpen] = useState(true)

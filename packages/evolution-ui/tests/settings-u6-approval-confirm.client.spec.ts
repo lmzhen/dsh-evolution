@@ -12,7 +12,7 @@
  * own element — so this asserts on a pure text node rather than on a paragraph shared with buttons.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { ApprovalApi, PendingRow } from '../src/panels/settings/api.ts'
 import { formatText, type MessageKey } from '../src/panels/settings/messages.ts'
@@ -73,6 +73,25 @@ describe('U-6: the approval confirmation gate (registry approvalConfirm)', () =>
     expect(confirmModeFrom('ask')).toBe('ask')
     expect(confirmModeFrom({ approvalConfirm: 'ASK' })).toBe('ask')
     expect(confirmModeFrom({ approvalConfirm: 'always' })).toBe('ask')
+  })
+
+  it('re-reads the effective gate when the settings subscription reports a change', async () => {
+    let mode: 'auto' | 'ask' = 'auto'
+    const listeners = new Set<() => void>()
+    const approve = vi.fn(async () => ({ ok: true as const, data: null }))
+    const props = {
+      ...face({ approve }, 'auto'),
+      confirmMode: () => mode,
+      subscribeConfirmMode: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    }
+    render(h(PendingCard, props))
+    fireEvent.click(await screen.findByText(formatText('approvalApprove')))
+    await waitFor(() => { expect(approve).toHaveBeenCalledWith('p-1') })
+    mode = 'ask'
+    act(() => { for (const listener of listeners) listener() })
+    fireEvent.click(screen.getByText(formatText('approvalApprove')))
+    expect(approve).toHaveBeenCalledTimes(1)
+    expect(await screen.findByText(named())).toBeDefined()
   })
 
   it('auto (the shipped default) decides on ONE click and shows no confirmation', async () => {

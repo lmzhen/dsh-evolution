@@ -108,6 +108,24 @@ describe('history client bundle: what it contributes, and what it takes back', (
     expect(Object.keys(face.history).sort()).toEqual(['format', 'loadBody', 'loadDiff', 'loadSkills', 'loadStats', 'loadVersions', 'markdownWords', 't', 'undo'])
   })
 
+  it('reads the effective config value and exposes a confirmation subscription', () => {
+    const seams = fakeSeams()
+    const listeners = new Set<() => void>()
+    let mode: 'auto' | 'ask' = 'auto'
+    const form = {
+      getSnapshot: () => ({ status: 'ready', value: { approvalConfirm: mode }, base: {}, user: {}, revision: 1, writable: true }),
+      subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    }
+    ;(seams.ctx as unknown as { get: (name: string) => unknown }).get = (name: string) => name === 'configForms' ? { get: () => form } : undefined
+    apply(seams.ctx as never)
+    const face = seams.faces[0] as { pending: { confirmMode?: () => string; subscribeConfirmMode?: (listener: () => void) => () => void } }
+    expect(face.pending.confirmMode?.()).toBe('auto')
+    expect(typeof face.pending.subscribeConfirmMode).toBe('function')
+    mode = 'ask'
+    for (const listener of listeners) listener()
+    expect(face.pending.confirmMode?.()).toBe('ask')
+  })
+
   it('T5-06/A61: a REFUSED dictionary registration is reported and the rest of the bundle still mounts', () => {
     const seams = fakeSeams({ refuseLocale: true })
     apply(seams.ctx as never)

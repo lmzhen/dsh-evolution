@@ -6,7 +6,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
-import { registerSurface, PAGE_SURFACE_CSS, ROUTES, type ConfigFormsSeat, type Translate } from '@lmzhen/dsh-evolution-client-kit'
+import { registerSurface, PAGE_SURFACE_CSS, ROUTES, type ConfigFormLike, type ConfigFormsSeat, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import { dictionaries as settingsDictionaries, NS as SETTINGS_NS } from '../../settings/messages.ts'
 import { bindLocale } from '@lmzhen/dsh-evolution-client-kit'
@@ -31,15 +31,36 @@ export function apply(ctx: ClientContext): void {
   // The platform settings shell owns this seat; read it lazily (the history panel may activate
   // before the shell exists) and never dispose it (it is not ours).
   const settingsSeat = (): ConfigFormsSeat | undefined => (ctx as unknown as { get?: (name: string) => unknown }).get?.('configForms') as ConfigFormsSeat | undefined
-  // U-6: unknown must never mean "auto-execute". The form starts at `ask`; the family
-  // describe answers with the user layer and flips to auto only when the operator chose it.
-  let approvalConfirmMode: 'auto' | 'ask' = 'ask'
-  const approvalForm = settingsSeat()?.get('evolution-approval')
-  const stopApprovalWatch = approvalForm?.subscribe(() => {
-    approvalConfirmMode = confirmModeFrom(approvalForm.getSnapshot().user)
+  // U-6: the form's `value` is the schema-resolved section (the effective word); `user`
+  // only says whether the operator overrode it. Read the effective value so the display
+  // and the click behavior cannot disagree, and keep a subscription so a settings write
+  // re-renders the pending card instead of changing a bare variable.
+  let approvalForm: ConfigFormLike | undefined
+  let stopApprovalWatch: (() => void) | undefined
+  const approvalListeners = new Set<() => void>()
+  const notifyApproval = (): void => { for (const listener of approvalListeners) listener() }
+  const bindApprovalSeat = (seat?: ConfigFormsSeat): void => {
+    const next = seat?.get('evolution-approval')
+    if (next === approvalForm) return
+    stopApprovalWatch?.()
+    stopApprovalWatch = undefined
+    approvalForm = next
+    stopApprovalWatch = next?.subscribe(notifyApproval)
+    notifyApproval()
+  }
+  bindApprovalSeat(settingsSeat())
+  // A settings shell may activate after this bundle. Wait for it lazily instead of making
+  // configForms a required inject (which would leave the whole workbench half pending in a
+  // deployment that does not compose settings).
+  ;(ctx as unknown as { inject?: (deps: readonly string[], callback: (scoped: unknown) => unknown) => unknown }).inject?.(['configForms'], (scoped) => {
+    bindApprovalSeat((scoped as { configForms?: ConfigFormsSeat }).configForms)
+    return () => { stopApprovalWatch?.(); stopApprovalWatch = undefined; approvalForm = undefined }
   })
-  if (stopApprovalWatch !== undefined) ctx.effect(() => stopApprovalWatch, 'evolution-history: approval confirm mode')
-  const confirmMode = (): 'auto' | 'ask' => approvalConfirmMode
+  const confirmMode = (): 'auto' | 'ask' => confirmModeFrom(approvalForm?.getSnapshot().value)
+  const subscribeConfirmMode = (listener: () => void): (() => void) => {
+    approvalListeners.add(listener)
+    return () => { approvalListeners.delete(listener) }
+  }
 
   const hasView = (view: 'merge' | 'health'): boolean => {
     try {
@@ -60,7 +81,7 @@ export function apply(ctx: ClientContext): void {
     markdownWords: { copy: t('markdown.copy'), copied: t('markdown.copied'), footnotes: t('markdown.footnotes') },
   })
   const approvalApi = createApprovalApi((input, init) => fetch(input, init))
-  const pendingFace = (): PendingCardFace => ({ t: pendingT, api: approvalApi, confirmMode, fallback: FALLBACKS.approval })
+  const pendingFace = (): PendingCardFace => ({ t: pendingT, api: approvalApi, confirmMode, subscribeConfirmMode, fallback: FALLBACKS.approval })
 
   const loadTaskCounts = async (): Promise<WorkbenchTaskCounts> => {
     const pending = approvalApi.pending().then(answer => answer.ok ? answer.data.length : 0).catch(() => 0)
