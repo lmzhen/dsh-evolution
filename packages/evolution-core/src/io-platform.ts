@@ -15,6 +15,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { withFileLock } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { EvolutionIo } from './io-registry.ts'
 
 interface PlatformTarget {
@@ -81,10 +82,14 @@ async function readOrNull(fs: PlatformFs, path: string): Promise<string | null> 
  * @param fs - the platform filesystem service (structurally `ctx.fs`).
  * @returns the provider, ready for `ctx.evolutionIo.registerProvider`.
  */
-export function platformEvolutionIo(fs: PlatformFs): EvolutionIo {
+export function platformEvolutionIo(
+  fs: PlatformFs,
+  options: { readonly withFileLock?: <T>(path: string, task: () => Promise<T>) => Promise<T> } = {},
+): EvolutionIo {
+  const lock = options.withFileLock
   return {
     name: 'platform',
-    processScope: 'single-process',
+    processScope: lock === undefined ? 'single-process' : 'cross-process',
     async readText(path) {
       return await readOrNull(fs, path)
     },
@@ -153,6 +158,7 @@ export function platformEvolutionIo(fs: PlatformFs): EvolutionIo {
       }
     },
     async transact(path, task) {
+      const run = async (): Promise<void> => {
       const target = await fs.resolve(path)
       const info = await fs.stat(target)
       const current = info === undefined ? null : await fs.readText(target)
@@ -179,6 +185,9 @@ export function platformEvolutionIo(fs: PlatformFs): EvolutionIo {
       if (current === null) throw new Error('platform file vanished during transact: ' + path)
       if (current === '') await fs.writeText(target, next, { kind: 'replaceIfVersion', version: info.version })
       else await fs.editText(target, { oldString: current, newString: next, replaceAll: false }, { version: info.version })
+      }
+      if (lock === undefined) await run()
+      else await lock(path, run)
     },
   }
 }
@@ -193,5 +202,5 @@ export const inject = ['evolutionIo', 'fs']
 export function apply(ctx: Context): void {
   const fs = (ctx as unknown as { readonly fs?: PlatformFs }).fs
   if (fs === undefined) throw new Error('evolution-io-platform requires the platform fs service')
-  ctx.effect(() => ctx.evolutionIo.registerProvider(platformEvolutionIo(fs), { default: true }), 'evolution-io-platform.provider')
+  ctx.effect(() => ctx.evolutionIo.registerProvider(platformEvolutionIo(fs, { withFileLock }), { default: true }), 'evolution-io-platform.provider')
 }

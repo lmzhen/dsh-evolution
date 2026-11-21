@@ -77,3 +77,18 @@
 - 验证：curator + review + state + approval 31 files / 244 tests passed；build 0。
 - 仍未迁移：`.usage.json`、mutation audit/event 等 home sidecar 仍是单进程 transact；A2 仍为部分收口。
 
+## 9. 追加：home sidecar 的平台文件锁
+
+- `platformEvolutionIo(fs, { withFileLock })`：
+  - 注入平台 `withFileLock` 时，`transact` 在平台文件锁内执行；
+  - `processScope` 变为 `cross-process`；未注入时保持 `single-process`（测试/旧调用）。
+- `apply()` 始终注入平台 `withFileLock`，所以生产 io-platform 的 `.usage.json`、`.mutations.json`、evolution event 的 RMW 都是跨进程互斥。
+- 新增 `io-platform.spec` 用例：注入锁后 transact 在 lock/unlock 之间执行，processScope=cross-process。
+- A2 至此：
+  - approval：reload + executed marker；
+  - review：lease + reload；
+  - curator：lease + reload；
+  - home sidecar：平台文件锁包住 transact；
+  - 生产 platform io 由 `medium-declaration` 声明 cross-process。
+- 残余（已登记）：executed marker 不自动清理；runner 成功到 marker 落盘之间崩溃仍可能重放一次。
+

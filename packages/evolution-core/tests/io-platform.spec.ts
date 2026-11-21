@@ -75,6 +75,23 @@ describe('platformEvolutionIo', () => {
     expect(await io.readText('/skills/a/SKILL.md')).toBe('one')
   })
 
+  it('runs transact under injected cross-process lock', async () => {
+    const order: string[] = []
+    const io = platformEvolutionIo(fakeFs(), {
+      withFileLock: async (path, task) => {
+        order.push('lock:' + path)
+        const result = await task()
+        order.push('unlock')
+        return result
+      },
+    })
+    expect(io.processScope).toBe('cross-process')
+    await io.writeText('/skills/a/SKILL.md', 'old')
+    await io.transact!('/skills/a/SKILL.md', async current => current === 'old' ? 'new' : current)
+    expect(order).toEqual(['lock:/skills/a/SKILL.md', 'unlock'])
+    expect(await io.readText('/skills/a/SKILL.md')).toBe('new')
+  })
+
   it('transacts a present file through a guarded edit and rejects stale versions', async () => {
     const io = platformEvolutionIo(fakeFs())
     await io.writeText('/skills/a/SKILL.md', 'old')
