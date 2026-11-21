@@ -24,6 +24,7 @@
 - C3/P1-3：merge `isOwnerActive` 已改为 `runs.hasOwner()`，见 [20](20-c3-owner-liveness.md)。
 - C2/P1-2：staging 复用前清 merged，reject/discard 等关闭行统一清 stage，见 [21](21-c2-staging-generation.md)。
 - B1/P1-3+P1-5：list 名字进入模型 content；strict 空视图不再拒绝首个 create，见 [22](22-b1-list-catalog.md)。
+- 03/P1-2：curator restoreSnapshot 的 state 写改为 transact 并保留当前 paused，见 [23](23-p1-curator-restore-pause.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
@@ -184,3 +185,4 @@
 | [20-c3-owner-liveness.md](20-c3-owner-liveness.md) | C3/P1-3：cross-face owner 判据统一 hasOwner |
 | [21-c2-staging-generation.md](21-c2-staging-generation.md) | C2/P1-2：authoring 前清 merged，关闭行统一 dropStage |
 | [22-b1-list-catalog.md](22-b1-list-catalog.md) | B1/P1-3+P1-5：list 名字可见、strict 空 catalog 放行首个 create |
+| [23-p1-curator-restore-pause.md](23-p1-curator-restore-pause.md) | 03/P1-2：restoreSnapshot 保留并发 pause |

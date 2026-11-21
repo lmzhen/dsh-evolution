@@ -461,7 +461,8 @@ describe('evolution-curator', () => {
     const restored = await ctx.evolutionCurator.restoreSnapshot()
     expect(restored.ok).toBe(true)
     expect((await skills.list()).map(item => item.name)).toContain('pre-skill')
-    expect(saved).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: false })
+    // P1-2: the snapshot's bookkeeping comes back, but the concurrent operator pause survives.
+    expect(saved).toEqual({ lastRunAt: 1, runCount: 0, lastSummary: 'seed', paused: true })
   })
 
   it('auto-start boot check catches up a due persisted state after a restart', async () => {
@@ -1540,7 +1541,7 @@ Body of ${name}.
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: yaml }
         yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
-        yield { type: 'finish', reason: 'stop' }
+        yield { type: 'finish', reason: { kind: 'stop' } }
       },
     })
     await ctx.plugin(EvolutionIoRegistry)
@@ -1581,7 +1582,7 @@ Body of ${name}.
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: yaml }
         yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
-        yield { type: 'finish', reason: 'stop' }
+        yield { type: 'finish', reason: { kind: 'stop' } }
       },
     })
     await ctx.plugin(EvolutionIoRegistry)
@@ -1628,7 +1629,7 @@ Body of ${name}.
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: emptyYaml }
         yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
-        yield { type: 'finish', reason: 'stop' }
+        yield { type: 'finish', reason: { kind: 'stop' } }
       },
     })
     await ctx.plugin(EvolutionIoRegistry)
@@ -1664,7 +1665,7 @@ Body of ${name}.
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: pruneYaml }
         yield { type: 'block-end', index: 0, block: { type: 'text', text: pruneYaml } }
-        yield { type: 'finish', reason: 'stop' }
+        yield { type: 'finish', reason: { kind: 'stop' } }
       },
     })
     await ctx.plugin(EvolutionIoRegistry)
@@ -1698,7 +1699,7 @@ Body of ${name}.
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: emptyYaml }
         yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
-        yield { type: 'finish', reason: 'stop' }
+        yield { type: 'finish', reason: { kind: 'stop' } }
       },
     })
     await ctx.plugin(EvolutionIoRegistry)
@@ -1722,7 +1723,7 @@ Body of ${name}.
         yield { type: 'block-start', index: 0, blockType: 'text' }
         yield { type: 'text-delta', index: 0, text: yaml }
         yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
-        yield { type: 'finish', reason: 'stop' }
+        yield { type: 'finish', reason: { kind: 'stop' } }
       },
     })
     await ctx.plugin(EvolutionIoRegistry)
@@ -2161,7 +2162,7 @@ it('P1-10 (v38): an unvalidated usage-sidecar key reaches no path, no suppressio
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'text-delta', index: 0, text: emptyYaml }
       yield { type: 'block-end', index: 0, block: { type: 'text', text: emptyYaml } }
-      yield { type: 'finish', reason: 'stop' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
     },
   })
   await ctx.plugin(EvolutionIoRegistry)
@@ -2227,7 +2228,7 @@ it('P2-17 (v38): a FAILED archive does not read as "already archived" for its me
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'text-delta', index: 0, text: yaml }
       yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
-      yield { type: 'finish', reason: 'stop' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
     },
   })
   await ctx.plugin(EvolutionIoRegistry)
@@ -2293,7 +2294,7 @@ it('P2-18 (v38): the executed consolidation carries its mode into the run report
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'text-delta', index: 0, text: yaml }
       yield { type: 'block-end', index: 0, block: { type: 'text', text: yaml } }
-      yield { type: 'finish', reason: 'stop' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
     },
   })
   await ctx.plugin(EvolutionIoRegistry)

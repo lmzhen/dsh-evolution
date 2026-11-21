@@ -953,7 +953,17 @@ export class EvolutionCurator extends Service {
     const stateExtra = result.extras?.find(extra => extra.name === 'curator-state.json')
     if (stateExtra && stateService) {
       try {
-        await stateService.saveCuratorState(JSON.parse(stateExtra.content) as CuratorStateRecordShape)
+        const snapshot = JSON.parse(stateExtra.content) as CuratorStateRecordShape
+        // P1-2: restore rewinds BOOKKEEPING, never the operator's pause. A concurrent
+        // setPaused() queued before this transaction must survive; the old whole-record
+        // saveCuratorState flattened it back to the snapshot's paused:false.
+        await stateService.transactCuratorState(current => ({
+          ...(snapshot.schemaVersion === undefined ? {} : { schemaVersion: snapshot.schemaVersion }),
+          lastRunAt: snapshot.lastRunAt,
+          runCount: snapshot.runCount,
+          lastSummary: snapshot.lastSummary,
+          paused: current?.paused ?? snapshot.paused,
+        }))
       } catch (error) {
         // The tree restore already landed; a failed state write must not turn
         // a completed rollback into an error — but it is observable.
