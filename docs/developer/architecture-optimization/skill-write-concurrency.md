@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7m approve 成功回放
+
+- 真实 approve create/update/patch/write_file/remove_file；
+- 五个 plan 全部落地；
+- tool-skill-manage 46 passed；
+- K6 故障注入仍缺，已无写后 re-read。
+
 ### 2026-11-21：Phase H7l 双 web host 尝试
 
 - 3083/3084 双 host、双独立会话；

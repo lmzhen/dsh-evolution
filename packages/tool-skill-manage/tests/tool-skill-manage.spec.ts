@@ -967,6 +967,62 @@ it('P1-2: a plan replay re-checks policy-protection at approve time', async () =
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
+it('P2-APPROVE: real approve() replays create/update/patch/write_file/remove_file plans', async () => {
+  const root = await tempHome('dsh-approve-flow-')
+  const previousHome = process.env.DSH_HOME
+  process.env.DSH_HOME = root
+  const ctx = await mountStateStack(root, { evolution: true, approval: true })
+  await mountAgentLoopTestDependencies(ctx)
+  await ctx.plugin(SkillUsageRegistry, { root })
+  await ctx.plugin(ToolSkillManage)
+  const skillPath = (): string => join(root, 'skills', 'approve-flow', 'SKILL.md')
+  const supportPath = (): string => join(root, 'skills', 'approve-flow', 'references', 'a.md')
+  const skillRead = (name: string): readonly unknown[] => [
+    { type: 'tool/call', data: { callId: 'r-' + name, name: 'skill', arguments: JSON.stringify({ name }) } },
+    { type: 'tool/result', data: { isError: false, message: { source: { callId: 'r-' + name }, content: [] } } },
+  ]
+  const fileRead = (path: string): readonly unknown[] => [
+    { type: 'tool/call', data: { callId: 'f-' + path, name: 'read', arguments: JSON.stringify({ file_path: path }) } },
+    { type: 'tool/result', data: { isError: false, message: { source: { callId: 'f-' + path }, content: [] } } },
+  ]
+  const session = (events: readonly unknown[]) => ({ id: 'approve-flow', header: { origin: 'subagent' }, readEvents: () => events })
+  const stage = async (args: Record<string, unknown>, events: readonly unknown[]): Promise<void> => {
+    const result = await executeOne(ctx, {
+      callId: ToolCallId('approve-' + Math.random()),
+      name: 'skill_manage',
+      arguments: args,
+      agent: { session: session(events) } as unknown as Agent,
+      signal: new AbortController().signal,
+    })
+    expect((result.value as { pending_id?: string } | undefined)?.pending_id).toBeTruthy()
+  }
+  const approveOne = async (): Promise<void> => {
+    const pending = await ctx.evolutionApproval.list('pending')
+    expect(pending.length).toBe(1)
+    const approved = await ctx.evolutionApproval.approve(pending[0]!.id, { channel: 'command', principal: 'owner', deploymentAllowsRemote: false } as never)
+    expect(approved.ok, approved.message).toBe(true)
+  }
+  const body = (text: string): string => `---\nname: approve-flow\ndescription: Approve flow fixture.\n---\n\n${text}\n`
+  await stage({ action: 'create', name: 'approve-flow', content: body('one') }, [])
+  await approveOne()
+  expect(await readFile(skillPath(), 'utf8')).toContain('one')
+  await stage({ action: 'update', name: 'approve-flow', content: body('two') }, skillRead('approve-flow'))
+  await approveOne()
+  expect(await readFile(skillPath(), 'utf8')).toContain('two')
+  await stage({ action: 'patch', summary: 'approve patch', name: 'approve-flow', old_string: 'two', new_string: 'three' }, skillRead('approve-flow'))
+  await approveOne()
+  expect(await readFile(skillPath(), 'utf8')).toContain('three')
+  await stage({ action: 'write_file', name: 'approve-flow', file_path: 'references/a.md', file_content: 'support' }, fileRead(join(root, 'skills', 'approve-flow', 'references', 'a.md')))
+  await approveOne()
+  expect(await readFile(supportPath(), 'utf8')).toBe('support')
+  await stage({ action: 'remove_file', name: 'approve-flow', file_path: 'references/a.md' }, fileRead(join(root, 'skills', 'approve-flow', 'references', 'a.md')))
+  await approveOne()
+  await expect(readFile(supportPath(), 'utf8')).rejects.toThrow()
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
 it('OPT-01: an update/write_file lands through the REAL runtime with the approval service mounted — the stage anchor must never be written onto the frozen `args` (P0 regression pin)', async () => {
   const { ctx, root, previousHome } = await setup()
   // The DEFAULT bundles (host/all) mount evolution-approval with enabled:false —
