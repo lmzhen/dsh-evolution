@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H4a 删除 service 私有锁
+
+- `SkillWriteService` 不再持有 `SkillTargetLocks`；legacy 方法直接调用 library；
+- 锁只保留在 provider/library；
+- tool 全包 115 passed，overlay build 0；
+- target identity realpath 留在 H4b。
+
 ### 2026-11-21：Phase H3a approval 保存并重放 plan
 
 已完成：

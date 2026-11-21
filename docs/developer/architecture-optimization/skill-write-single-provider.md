@@ -566,6 +566,15 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - `patch(file_path)` 不再绕过 service；
 - approval replay（`stagedAnchor` 或 owner undefined）暂留旧路径，H3 改为重放 plan。
 
+### H4a 落地记录（2026-11-21）
+
+- 删除 `SkillWriteService` 的私有 `SkillTargetLocks`；
+- legacy service 方法（updateBody/patchBody/updateSupport/removeSupport）直接调用 library，锁只在 provider；
+- tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
+- tool 全包 115 passed，overlay build 0。
+
+H4b 待做：target identity realpath / nearest-ancestor；`SkillTargetLocks` 的 root owner 与 fake IO fallback。
+
 ### 20. H3 设计：approval 保存并重放 plan
 
 H3 分两步：H3a 先让新暂存记录带 plan、replay 走 plan；H3b 再拒绝无 plan 的旧记录。
