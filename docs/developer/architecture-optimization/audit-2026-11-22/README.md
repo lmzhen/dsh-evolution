@@ -20,6 +20,7 @@
 - R0-3 / B5 与 R0-4 / D1：已在 main 源码修复（platform 4.1 调用约定、LLM aborted 终态），见 [13](13-r0-platform-contract-design.md)。
 - R0-5 / F1-F2：已在 main 源码修复（effective config value + 惰性 settings 订阅），见 [14](14-r0-ui-confirm-design.md)。
 - R0-6 / E3：已在 main 源码修复（dist tarball artifact 绑定 + release 门），见 [15](15-r0-release-evidence-design.md)。
+- R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
 ## 方法
@@ -172,3 +173,4 @@
 | [13-r0-platform-contract-design.md](13-r0-platform-contract-design.md) | R0-3/B5 + R0-4/D1 平台调用约定与 LLM 终态设计与实现 |
 | [14-r0-ui-confirm-design.md](14-r0-ui-confirm-design.md) | R0-5/F1-F2 UI 确认 effective value 与 settings 订阅 |
 | [15-r0-release-evidence-design.md](15-r0-release-evidence-design.md) | R0-6/E3 evidence 绑定实际 dist tarball 与 release 门 |
+| [16-r0-meta-gate-design.md](16-r0-meta-gate-design.md) | R0-7/E7 argv-ci-parity 进 ledger、替换登记、mutation 签名刷新 |

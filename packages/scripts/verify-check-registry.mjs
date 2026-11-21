@@ -9,8 +9,8 @@
  * the meta-gate's observations are consumed as JSON, the closure is computed from the two data
  * homes, and an axis nobody can measure is reported cannot-decide rather than green.
  *
- * Axes: closure / executability / no-placeholders / expiry-due / falsifiability-carrier /
- * mutation-coverage / producer-wiring. Every non-zero gap must be registered in the checks
+ * Axes: closure / argv-ci-parity / executability / no-placeholders / expiry-due /
+ * falsifiability-carrier / mutation-coverage / producer-wiring. Every non-zero gap must be registered in the checks
  * fact's pendingAxes with a measured row count, a reason, an expiry and an owner - a live count
  * that differs from the registered one is the violation this ledger is for.
  *
@@ -98,7 +98,7 @@ const registeredOf = (axis) => (Array.isArray(register) ? register.find((entry) 
 const axes = []
 const addAxis = (axis, live, state, detail) => axes.push({ axis, live, registered: registeredOf(axis) === undefined ? null : registeredOf(axis).rows, state, detail })
 addAxis('closure', missingDeclarations.length + staleDeclarations.length, missingDeclarations.length + staleDeclarations.length === 0 ? 'pass' : 'fail', missingDeclarations.length + staleDeclarations.length === 0 ? 'both homes name the same checks' : 'missing declarations: ' + missingDeclarations.join(',') + '; stale declarations: ' + staleDeclarations.join(','))
-for (const [axis, criterion] of [['executability', 'executability'], ['no-placeholders', 'no-placeholders'], ['expiry-due', 'expiry-due'], ['falsifiability-carrier', 'falsifiability-carrier']]) {
+for (const [axis, criterion] of [['argv-ci-parity', 'argv-ci-parity'], ['executability', 'executability'], ['no-placeholders', 'no-placeholders'], ['expiry-due', 'expiry-due'], ['falsifiability-carrier', 'falsifiability-carrier']]) {
   const live = liveCount(criterion)
   const entry = registeredOf(axis)
   if (live === 0) { addAxis(axis, 0, 'pass', 'no live observation'); continue }

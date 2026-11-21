@@ -437,9 +437,11 @@ let parityChecked = 0
 // Substitution table (G0-0.4 stage 2): flags the composite action legitimately adds or swaps,
 // each with the reason it is NOT drift. A mismatch outside this table still fires.
 const ARGV_CI_SUBSTITUTIONS = {
+  'gate-16': 'ci runs the same profile-bundle verifier against a real home instead of --self-test',
   'gate-25': 'ci adds --upstream: it additionally requires upstream alignment',
   'gate-27': 'ci adds --our-scope: it narrows the platform range check further',
   'gate-28': 'ci runs the --self-test form of the same verifier',
+  'gate-49': 'ci runs the probe lane form (--probes with a baseline reporter) instead of --coverage',
 }
 let paritySubstituted = 0
 for (const gate of manifestGates) {
@@ -456,7 +458,7 @@ for (const gate of manifestGates) {
   if (ARGV_CI_SUBSTITUTIONS[gate.id] !== undefined) { paritySubstituted += 1; continue }
   if (!ciSets.includes(mf)) note('argv-ci-parity', gate.id, 'flag mismatch: manifest [' + mf + '] vs action.yml ' + JSON.stringify(ciSets) + ' for ' + script)
 }
-if (!argv.includes('--json')) console.log('argv-ci-parity: compared ' + parityChecked + ' gate(s) also invoked by the composite action; ' + paritySubstituted + ' registered substitution(s); mismatches are observations (report-only)')
+if (!argv.includes('--json')) console.log('argv-ci-parity: compared ' + parityChecked + ' gate(s) also invoked by the composite action; ' + paritySubstituted + ' registered substitution(s)')
 // G2/M5: the registry is a LEDGER over these observations. It consumes this object instead of
 // re-deriving them (a second implementation of a discovery is how two counts start to differ).
 if (argv.includes('--json')) {
