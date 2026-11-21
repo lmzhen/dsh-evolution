@@ -2174,12 +2174,12 @@ export class SkillLibrary {
    * @param origin - write face.
    * @returns the normalized result, with before/after body sizes.
    */
-  async patchSection(rawName: string, edit: SkillSectionEdit, origin: WriteOrigin = this.authority.origin): Promise<SkillActionResult> {
+  async patchSection(rawName: string, edit: SkillSectionEdit, origin: WriteOrigin = this.authority.origin, anchor?: WriteAnchor): Promise<SkillActionResult> {
     await this.ensureRecovered()
-    return await this.patchSectionCore(rawName.trim(), edit, origin)
+    return await this.patchSectionCore(rawName.trim(), edit, origin, anchor)
   }
 
-  private async patchSectionCore(name: string, edit: SkillSectionEdit, origin: WriteOrigin): Promise<SkillActionResult> {
+  private async patchSectionCore(name: string, edit: SkillSectionEdit, origin: WriteOrigin, anchor?: WriteAnchor): Promise<SkillActionResult> {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
     if (typeof edit.heading !== 'string' || edit.heading.trim() === '') return { ok: false, message: '章节改写需要非空 heading。' }
@@ -2192,6 +2192,8 @@ export class SkillLibrary {
       return unreadableTarget(name, error)
     }
     if (md === null) return { ok: false, message: `技能「${name}」不存在。` }
+    const verdict = anchorVerdict(anchor, md)
+    if (verdict !== 'match') return anchorRefusalFile(name, 'SKILL.md', verdict)
     const block = frontmatterBlock(md)
     if (!block) return { ok: false, message: 'SKILL.md 没有有效的 frontmatter；拒绝章节改写。' }
     const header = block.lines.slice(0, block.end + 1).join('\n')

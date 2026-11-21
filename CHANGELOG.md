@@ -1,3 +1,11 @@
+## 0.59.5 (2026-11-21) — section patch 审批 anchor 补齐
+
+> **缺陷**：0.59.4 修复了 body/support patch 的审批 anchor，但 `patch.section` 在 replay 时不传 `staged_from_sha256`，staging 后并发改写同一 body 仍会用旧 section 内容覆盖新内容。
+>
+> **修复**：section patch 的 stage 锚定 SKILL.md body（忽略同传的 file_path）；replay 把 `stagedAnchor` 传入 `patchSection`；锁内读 md 后先校验 anchor，stale 返回 `SKILL_STALE_VERSION`。
+>
+> **验证**：新增 section stale replay 回归；tool-skill-manage 44 passed。
+
 ## 0.59.4 (2026-11-21) — 审批后并发 patch 的 anchor 回归修复
 
 > **缺陷**：两个会话在同一 skill 上先后 stage patch，批准时都成功应用；第二个 patch 基于旧内容却覆盖了新内容，出现重复片段（真实 npm web 验收：`beta line B B`）。

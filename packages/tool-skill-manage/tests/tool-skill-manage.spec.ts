@@ -309,6 +309,39 @@ describe('tool-skill-manage', () => {
     }
   })
 
+  it('an approved section patch replays against the staged body anchor', async () => {
+    const { ctx } = await setup()
+    try {
+      const content = '---\nname: section-anchor-skill\ndescription: section anchor probe\n---\n## Details\nold text\n'
+      const created = await executeOne(ctx, {
+        callId: ToolCallId('section-anchor-create'), name: 'skill_manage',
+        arguments: { action: 'create', name: 'section-anchor-skill', content },
+        agent: fakeAgent(undefined), signal: new AbortController().signal,
+      })
+      expect((created.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+      const pending: Array<unknown> = []
+      ctx.provide('evolutionState', {
+        listPending: async () => pending,
+        savePending: async (record: unknown) => { pending.push(record) },
+        tryResolvePending: async () => ({ record: null, applied: false }),
+        claimPending: async () => null,
+        releasePendingClaim: async () => {},
+        loadReviewState: async () => null,
+        saveReviewState: async () => {},
+      })
+      await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
+      const stale = await replayRun(ctx, {
+        action: 'patch', summary: 'stale section replay', name: 'section-anchor-skill',
+        section: { heading: 'Details', content: 'replacement' },
+        staged_from_sha256: contentHash(content + '\nchanged'),
+      })
+      expect(stale.ok).toBe(false)
+      expect(stale.message).toContain('SKILL_STALE_VERSION')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('v21 (R-2): the scalar gate itself is reached through the approval replay runner (schema bypassed)', async () => {
     // The tool schema rejects a non-string scalar BEFORE executeCore, so the
     // previous test can only prove the refusal is structured end-to-end. The

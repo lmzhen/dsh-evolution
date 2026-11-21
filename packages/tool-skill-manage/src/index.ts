@@ -1028,7 +1028,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           content: section.content,
           ...typeof section.start === 'string' ? { start: section.start } : {},
           ...typeof section.end === 'string' ? { end: section.end } : {},
-        }, origin)
+        }, origin, stagedAnchor)
       },
       delete: () => library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {}, undefined, change),
       write_file: async () => {
@@ -1550,7 +1550,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // the file became. The content hash is the same staged_from_sha256 anchor the
         // update path uses; SkillLibrary.patch verifies it inside the write lock.
         if (args.action === 'patch' && typeof args.name === 'string' && args.name !== '') {
-          const patchFile = typeof args.file_path === 'string' ? args.file_path : ''
+          const sectionPatch = args.section !== undefined && args.section !== null
+          const patchFile = !sectionPatch && typeof args.file_path === 'string' ? args.file_path : ''
           let stageCurrent: string | null
           try {
             if (patchFile === '') {

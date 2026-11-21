@@ -931,6 +931,24 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase P1.14 section patch anchor（0.59.5）
+
+独立复核 0.59.4 发现 P1：`patch.section` 的 approval replay 未校验 staged anchor，staging 后并发改写 body 仍可能覆盖新 section。
+
+修复：
+
+- section patch staging 始终锚定 SKILL.md body，忽略同时传入的 file_path；
+- `patchSection(rawName, edit, origin, anchor?)` 在锁内读 md 后先校验 anchor；stale 返回 `SKILL_STALE_VERSION`；
+- replay 把 `stagedAnchor` 传入 `patchSection`；
+- 新增 section stale replay 回归测试。
+
+验证：
+
+```text
+tool-skill-manage: 44 passed (section stale replay)
+overlay build: 0
+```
+
 ### 2026-11-21：Phase P1.13 审批 patch anchor（0.59.4）
 
 真实 npm web 双会话验收发现：两个 patch 在同一 skill 上并发 stage，批准时第二个仍成功，文件出现重复片段。
