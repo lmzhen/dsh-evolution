@@ -1,5 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
+import { createHash } from 'node:crypto'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { TargetLockSet } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
@@ -76,6 +78,34 @@ describe('TargetLockSet', () => {
     const next = await locks.acquireLease(['skill::a', 'skill::b'])
     await next.release()
     expect(locks.size).toBe(0)
+  })
+
+  it('A4: repair honors an existing takeover claim and rechecks the record', async () => {
+    const home = await tempRoot('dsh-target-locks-claim-')
+    let lockPath = ''
+    const failing = async (path: string, body: () => Promise<unknown>): Promise<void> => {
+      lockPath = path + '.lock'
+      await writeFile(lockPath, String(process.pid) + '\n', 'utf8')
+      await body()
+      throw new Error('release-failed')
+    }
+    const locks = new TargetLockSet(home, 5_000, failing as never)
+    const first = await locks.acquireLease(['skill::a'])
+    await first.release()
+    const dead = '999999\n'
+    await writeFile(lockPath, dead, 'utf8')
+    const claim = lockPath + '.takeover-' + createHash('sha256').update(dead).digest('hex').slice(0, 16)
+    await writeFile(claim, 'other-contender\n', 'utf8')
+    try {
+      const blocked = await locks.repair()
+      expect(blocked.skipped).toContain('skill::a')
+      expect(await readFile(lockPath, 'utf8')).toBe(dead)
+    } finally {
+      await rm(claim, { force: true })
+    }
+    const repaired = await locks.repair()
+    expect(repaired.repaired).toContain('skill::a')
+    await expect(readFile(lockPath, 'utf8')).rejects.toThrow()
   })
 
   it('does not wedge a key when lock release itself fails', async () => {

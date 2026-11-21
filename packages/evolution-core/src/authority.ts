@@ -18,7 +18,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, rm } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { withFileLock as platformFileLock } from '@deepseek-ai/dsh-evolution-adapter/values'
 import { isProcessAlive } from './io.ts'
@@ -254,39 +254,16 @@ export class TargetLockSet {
     const skipped: string[] = []
     for (const key of [...this.brokenKeys]) {
       const path = this.lockPath(key) + '.lock'
-      let raw: string
+      let removed = false
       try {
-        raw = await readFile(path, 'utf8')
-      } catch (error) {
-        if ((error as { code?: unknown }).code === 'ENOENT') {
-          this.brokenKeys.delete(key)
-          repaired.push(key)
-        } else {
-          skipped.push(key)
-        }
-        continue
-      }
-      const pid = Number.parseInt(raw.trim(), 10)
-      if (Number.isInteger(pid) && pid > 0 && pid !== process.pid && isProcessAlive(pid)) {
-        skipped.push(key)
-        continue
-      }
-      try {
-        await rm(path, { force: true })
-        try {
-          await readFile(path, 'utf8')
-          skipped.push(key)
-        } catch (error) {
-          if ((error as { code?: unknown }).code === 'ENOENT') {
-            this.brokenKeys.delete(key)
-            repaired.push(key)
-          } else {
-            skipped.push(key)
-          }
-        }
+        removed = await removeExitedLock(path)
       } catch {
-        skipped.push(key)
+        removed = false
       }
+      if (removed) {
+        this.brokenKeys.delete(key)
+        repaired.push(key)
+      } else skipped.push(key)
     }
     return { repaired, skipped }
   }
@@ -300,6 +277,59 @@ export class TargetLockSet {
     const path = this.lockPath(key)
     await mkdir(dirname(path), { recursive: true })
     return await this.lock(path, body, { waitMs: this.waitMs })
+  }
+}
+
+/**
+ * Remove a lock file only through the platform's takeover claim protocol: write a claim named
+ * after the exact recorded holder, re-read under it, then remove only if the record and its dead
+ * PID are unchanged. A repair that rm()s directly can delete a lock another contender acquired
+ * after the dead holder's.
+ * @param lockPath - the lock file to remove.
+ * @returns true when this call removed it (or it was already absent).
+ */
+async function removeExitedLock(lockPath: string): Promise<boolean> {
+  let record: string
+  try {
+    record = await readFile(lockPath, 'utf8')
+  } catch (error) {
+    if ((error as { code?: unknown }).code === 'ENOENT') return true
+    throw error
+  }
+  const pid = Number.parseInt(record.trim(), 10)
+  if (Number.isInteger(pid) && pid > 0 && pid !== process.pid && isProcessAlive(pid)) return false
+  const claim = lockPath + '.takeover-' + createHash('sha256').update(record).digest('hex').slice(0, 16)
+  try {
+    await writeFile(claim, String(process.pid) + '\n', { mode: 0o600, flag: 'wx' })
+  } catch (error) {
+    const code = (error as { code?: unknown }).code
+    if (code === 'EEXIST' || code === 'EPERM') return false
+    throw error
+  }
+  try {
+    let again: string
+    try {
+      again = await readFile(lockPath, 'utf8')
+    } catch (error) {
+      if ((error as { code?: unknown }).code === 'ENOENT') return true
+      throw error
+    }
+    if (again !== record) return false
+    const againPid = Number.parseInt(again.trim(), 10)
+    if (Number.isInteger(againPid) && againPid > 0 && againPid !== process.pid && isProcessAlive(againPid)) return false
+    try {
+      await rm(lockPath, { force: true })
+    } catch {
+      return false
+    }
+    try {
+      await readFile(lockPath, 'utf8')
+      return false
+    } catch (error) {
+      return (error as { code?: unknown }).code === 'ENOENT'
+    }
+  } finally {
+    await rm(claim, { force: true }).catch(() => {})
   }
 }
 
@@ -442,17 +472,7 @@ export class HomeAuthority {
   async repair(): Promise<'noop' | 'repaired'> {
     if (this.pending === undefined || this.held.size > 0) return 'noop'
     const lockPath = this.lockBase + '.lock'
-    let holder: number | undefined
-    try {
-      const raw = await readFile(lockPath, 'utf8')
-      const pid = Number.parseInt(raw.trim(), 10)
-      holder = Number.isInteger(pid) && pid > 0 ? pid : undefined
-    } catch (error) {
-      if ((error as { code?: unknown }).code !== 'ENOENT') throw error
-      holder = undefined
-    }
-    if (holder !== undefined && holder !== process.pid && isProcessAlive(holder)) return 'noop'
-    await rm(lockPath, { force: true })
+    if (!await removeExitedLock(lockPath)) return 'noop'
     this.pending = undefined
     return 'repaired'
   }
