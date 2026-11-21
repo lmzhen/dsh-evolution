@@ -211,3 +211,4 @@
 | [34-p2-dead-switch.md](34-p2-dead-switch.md) | P2：删除 manifest 新鲜度死开关 |
 | [35-e2-real-gates.md](35-e2-real-gates.md) | E2：四条 architecture 门禁真实执行 |
 | [36-p2-platform-types.md](36-p2-platform-types.md) | P2：sendMessage/configEditor 类型对齐 |
+| [37-p2-acceptance-read.md](37-p2-acceptance-read.md) | P2：验收夹具读失败不当空 |

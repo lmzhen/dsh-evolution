@@ -8,6 +8,21 @@
  */
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+
+/** Absent is a fixture state; an unreadable/invalid file is not. */
+async function readOptional(path) {
+  try { return await readFile(path, 'utf8') } catch (error) {
+    if ((error && error.code) === 'ENOENT') return null
+    throw error
+  }
+}
+
+/** Parse a fixture JSON file; absence yields the supplied empty value. */
+async function readJson(path, empty) {
+  const raw = await readOptional(path)
+  if (raw === null) return empty
+  return JSON.parse(raw)
+}
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -51,8 +66,7 @@ export async function writeManagedSkill(home, name, body) {
     }],
   }, null, 2) + '\n')
   const usagePath = join(home, 'skills', '.usage.json')
-  let map = {}
-  try { map = JSON.parse(await readFile(usagePath, 'utf8')) } catch {}
+  const map = await readJson(usagePath, {})
   if (map[name] === undefined) {
     map[name] = {
       created_by: null, use_count: 0, view_count: 0, patch_count: 0,
@@ -79,8 +93,7 @@ export async function seedPendingMerge(home, { a, b, target = a, now = new Date(
   const { key, id } = rowIdOf(a, b)
   const statePath = join(home, 'evolution', 'merge', 'merge-state.json')
   await mkdir(join(home, 'evolution', 'merge'), { recursive: true })
-  let raw = null
-  try { raw = await readFile(statePath, 'utf8') } catch {}
+  const raw = await readOptional(statePath)
   if (raw !== null) {
     const parsed = JSON.parse(raw)
     if (parsed.schemaVersion !== 3) throw new Error('seedPendingMerge: existing state is schema ' + String(parsed.schemaVersion) + '; use a clean acceptance profile')
@@ -118,8 +131,7 @@ export async function seedArchivedUsage(home, name, archivedAt, reason = 'G0 acc
   await writeFile(join(archiveDir, '.archive-name'), name + '\n')
   await writeFile(join(archiveDir, '.archive-reason'), reason + '\n')
   const usagePath = join(home, 'skills', '.usage.json')
-  let map = {}
-  try { map = JSON.parse(await readFile(usagePath, 'utf8')) } catch {}
+  const map = await readJson(usagePath, {})
   map[name] = {
     created_by: null, use_count: 0, view_count: 0, patch_count: 0,
     last_used_at: null, last_viewed_at: null, last_patched_at: null,
