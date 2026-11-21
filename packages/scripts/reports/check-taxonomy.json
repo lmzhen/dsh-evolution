@@ -76,6 +76,7 @@
         "gate-82"
       ],
       "specs": [
+        "evolution-adapter::tests/llm.spec.ts",
         "evolution-adapter::tests/review-child.spec.ts",
         "evolution-client-kit::tests/data-table.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
@@ -101,6 +102,7 @@
         "evolution-core::tests/health-baseline.spec.ts",
         "evolution-core::tests/home-fence.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
+        "evolution-core::tests/io-platform.spec.ts",
         "evolution-core::tests/learn-prompt.spec.ts",
         "evolution-core::tests/lease-store.spec.ts",
         "evolution-core::tests/model-surface-ledger.spec.ts",
@@ -147,6 +149,7 @@
         "evolution-core::tests/state-store.spec.ts",
         "evolution-core::tests/text-budgets.spec.ts",
         "evolution-core::tests/text-metrics.spec.ts",
+        "evolution-core::tests/unit-kernel.spec.ts",
         "evolution-curator::tests/unit-undo-plan.spec.ts",
         "evolution-host::tests/decide-requires.spec.ts",
         "evolution-host::tests/gate-scheduler.spec.ts",
@@ -173,6 +176,7 @@
         "evolution-merge::tests/undo-resume-skip.spec.ts",
         "evolution-merge::tests/undo-resume.spec.ts",
         "evolution-review::tests/redact.spec.ts",
+        "evolution-review::tests/review-debt.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
@@ -344,6 +348,7 @@
         "evolution-activity::tests/activity-version-gate.spec.ts",
         "evolution-activity::tests/learning-graph/graph-write-gate.spec.ts",
         "evolution-activity::tests/replay/replay.spec.ts",
+        "evolution-adapter::tests/llm.spec.ts",
         "evolution-adapter::tests/review-child.spec.ts",
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
@@ -398,6 +403,9 @@
         "evolution-core::tests/home-fence.spec.ts",
         "evolution-core::tests/host-routes.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
+        "evolution-core::tests/io-platform.domain.spec.ts",
+        "evolution-core::tests/io-platform.integration.spec.ts",
+        "evolution-core::tests/io-platform.spec.ts",
         "evolution-core::tests/io.spec.ts",
         "evolution-core::tests/learn-prompt.spec.ts",
         "evolution-core::tests/lease-store.spec.ts",
@@ -497,6 +505,7 @@
         "evolution-core::tests/unit-engine-single-source.spec.ts",
         "evolution-core::tests/unit-head.spec.ts",
         "evolution-core::tests/unit-journal.spec.ts",
+        "evolution-core::tests/unit-kernel.spec.ts",
         "evolution-core::tests/unit-members.spec.ts",
         "evolution-core::tests/unit-prune3.spec.ts",
         "evolution-core::tests/unit-storage.spec.ts",
@@ -635,7 +644,6 @@
         "evolution-merge::tests/gates/rg3b-selection.spec.ts",
         "evolution-merge::tests/gates/rg4-lock-order.spec.ts",
         "evolution-merge::tests/gates/rg4-pid-reuse.spec.ts",
-        "evolution-merge::tests/gates/rg4-two-process.spec.ts",
         "evolution-merge::tests/gates/rg4a-command-catalog.spec.ts",
         "evolution-merge::tests/gates/rg4a-dispatch.spec.ts",
         "evolution-merge::tests/gates/rg4c-optional.spec.ts",
@@ -647,7 +655,6 @@
         "evolution-merge::tests/gates/rg6-doctor.spec.ts",
         "evolution-merge::tests/gates/rg6-kill-client.spec.ts",
         "evolution-merge::tests/gates/rg6-restart.spec.ts",
-        "evolution-merge::tests/gates/rg7-install.spec.ts",
         "evolution-merge::tests/history-port.spec.ts",
         "evolution-merge::tests/host-capabilities.spec.ts",
         "evolution-merge::tests/ledger-v2.spec.ts",
@@ -718,6 +725,7 @@
         "evolution-merge::tests/unit-claim.spec.ts",
         "evolution-merge::tests/wire.spec.ts",
         "evolution-review::tests/redact.spec.ts",
+        "evolution-review::tests/review-debt.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
@@ -1008,6 +1016,7 @@
         "evolution-activity::tests/activity-version-gate.spec.ts",
         "evolution-activity::tests/learning-graph/graph-write-gate.spec.ts",
         "evolution-activity::tests/replay/replay.spec.ts",
+        "evolution-adapter::tests/llm.spec.ts",
         "evolution-adapter::tests/review-child.spec.ts",
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
@@ -1062,6 +1071,9 @@
         "evolution-core::tests/home-fence.spec.ts",
         "evolution-core::tests/host-routes.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
+        "evolution-core::tests/io-platform.domain.spec.ts",
+        "evolution-core::tests/io-platform.integration.spec.ts",
+        "evolution-core::tests/io-platform.spec.ts",
         "evolution-core::tests/io.spec.ts",
         "evolution-core::tests/learn-prompt.spec.ts",
         "evolution-core::tests/lease-store.spec.ts",
@@ -1161,6 +1173,7 @@
         "evolution-core::tests/unit-engine-single-source.spec.ts",
         "evolution-core::tests/unit-head.spec.ts",
         "evolution-core::tests/unit-journal.spec.ts",
+        "evolution-core::tests/unit-kernel.spec.ts",
         "evolution-core::tests/unit-members.spec.ts",
         "evolution-core::tests/unit-prune3.spec.ts",
         "evolution-core::tests/unit-storage.spec.ts",
@@ -1299,7 +1312,6 @@
         "evolution-merge::tests/gates/rg3b-selection.spec.ts",
         "evolution-merge::tests/gates/rg4-lock-order.spec.ts",
         "evolution-merge::tests/gates/rg4-pid-reuse.spec.ts",
-        "evolution-merge::tests/gates/rg4-two-process.spec.ts",
         "evolution-merge::tests/gates/rg4a-command-catalog.spec.ts",
         "evolution-merge::tests/gates/rg4a-dispatch.spec.ts",
         "evolution-merge::tests/gates/rg4c-optional.spec.ts",
@@ -1311,7 +1323,6 @@
         "evolution-merge::tests/gates/rg6-doctor.spec.ts",
         "evolution-merge::tests/gates/rg6-kill-client.spec.ts",
         "evolution-merge::tests/gates/rg6-restart.spec.ts",
-        "evolution-merge::tests/gates/rg7-install.spec.ts",
         "evolution-merge::tests/history-port.spec.ts",
         "evolution-merge::tests/host-capabilities.spec.ts",
         "evolution-merge::tests/ledger-v2.spec.ts",
@@ -1382,6 +1393,7 @@
         "evolution-merge::tests/unit-claim.spec.ts",
         "evolution-merge::tests/wire.spec.ts",
         "evolution-review::tests/redact.spec.ts",
+        "evolution-review::tests/review-debt.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
@@ -1595,6 +1607,7 @@
         "evolution-activity::tests/learning-graph/graph.spec.ts",
         "evolution-activity::tests/replay/replay.spec.ts",
         "evolution-activity::tests/threat/threat-guard.spec.ts",
+        "evolution-adapter::tests/llm.spec.ts",
         "evolution-adapter::tests/review-child.spec.ts",
         "evolution-agent::tests/agent-composition.spec.ts",
         "evolution-agent::tests/row-contract.spec.ts",
@@ -1657,6 +1670,9 @@
         "evolution-core::tests/home-fence.spec.ts",
         "evolution-core::tests/host-routes.spec.ts",
         "evolution-core::tests/instance-scope.spec.ts",
+        "evolution-core::tests/io-platform.domain.spec.ts",
+        "evolution-core::tests/io-platform.integration.spec.ts",
+        "evolution-core::tests/io-platform.spec.ts",
         "evolution-core::tests/io.spec.ts",
         "evolution-core::tests/learn-prompt.spec.ts",
         "evolution-core::tests/lease-store.spec.ts",
@@ -1759,6 +1775,7 @@
         "evolution-core::tests/unit-engine-single-source.spec.ts",
         "evolution-core::tests/unit-head.spec.ts",
         "evolution-core::tests/unit-journal.spec.ts",
+        "evolution-core::tests/unit-kernel.spec.ts",
         "evolution-core::tests/unit-members.spec.ts",
         "evolution-core::tests/unit-prune3.spec.ts",
         "evolution-core::tests/unit-storage.spec.ts",
@@ -1907,7 +1924,6 @@
         "evolution-merge::tests/gates/rg3b-selection.spec.ts",
         "evolution-merge::tests/gates/rg4-lock-order.spec.ts",
         "evolution-merge::tests/gates/rg4-pid-reuse.spec.ts",
-        "evolution-merge::tests/gates/rg4-two-process.spec.ts",
         "evolution-merge::tests/gates/rg4a-command-catalog.spec.ts",
         "evolution-merge::tests/gates/rg4a-dispatch.spec.ts",
         "evolution-merge::tests/gates/rg4c-optional.spec.ts",
@@ -1919,7 +1935,6 @@
         "evolution-merge::tests/gates/rg6-doctor.spec.ts",
         "evolution-merge::tests/gates/rg6-kill-client.spec.ts",
         "evolution-merge::tests/gates/rg6-restart.spec.ts",
-        "evolution-merge::tests/gates/rg7-install.spec.ts",
         "evolution-merge::tests/history-port.spec.ts",
         "evolution-merge::tests/host-capabilities.spec.ts",
         "evolution-merge::tests/ledger-v2.spec.ts",
@@ -1991,6 +2006,7 @@
         "evolution-merge::tests/wire.spec.ts",
         "evolution-preset::tests/preset.spec.ts",
         "evolution-review::tests/redact.spec.ts",
+        "evolution-review::tests/review-debt.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
         "evolution-review::tests/review-executor-skill-write.spec.ts",
         "evolution-review::tests/review-executor.spec.ts",
@@ -2165,11 +2181,11 @@
   "counts": {
     "fast": {
       "gates": 62,
-      "specs": 128
+      "specs": 132
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 436
+      "specs": 440
     },
     "ci-only": {
       "gates": 10,
@@ -2177,16 +2193,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 436
+      "specs": 440
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 508
+      "specs": 512
     }
   },
   "specs": {
-    "total": 508,
-    "marked": 508,
+    "total": 512,
+    "marked": 512,
     "unmarked": 0
   }
 }
