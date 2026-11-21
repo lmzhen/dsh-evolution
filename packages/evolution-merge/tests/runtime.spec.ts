@@ -66,6 +66,26 @@ it('rejects a pending row into the skipped queue', async () => {
   expect((await loadMergeState(io, home)).state.rows[0]).toMatchObject({ state: 'skipped', origin: 'human' })
 })
 
+it('C2: rejecting a row drops its staging tree', async () => {
+  const home = await tempRoot('dsh-merge-runtime-reject-stage-')
+  const io = nodeEvolutionIo()
+  const key = pairKey('alpha-skill', 'beta-skill')
+  const row: MergeRow = { id: rowIdOf(key), pairKey: key, a: 'alpha-skill', b: 'beta-skill', state: 'pending', queue: 'pending', createdAt: 'x', updatedAt: 'x', stagingRef: 'stage-reject' }
+  await seedRow(io, home, row)
+  await io.writeText(join(home, 'merge', 'staging-index', row.id + '.json'), JSON.stringify({ rowId: row.id, pairKey: key, ref: 'stage-reject', expiresAt: 9999999999999, createdAt: 1, state: 'present' }))
+  await io.writeText(join(home, 'merge', 'runs', 'stage-reject', 'merged', 'umbrella', 'SKILL.md'), 'old')
+  const deps: MergeRuntimeDeps = {
+    io, home, registry: {} as MergeRuntimeDeps['registry'], skills: {} as SkillLibrary, now: () => 1,
+    params: { mergeModelsRoot: '', mergeApproval: false, mergeSkippedTtlDays: 0, mergeRunTimeoutMinutes: 0, mergePairTimeoutMinutes: 15 },
+    platformWrite: false, channel: { open: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), continueTurn: async () => ({ kind: 'unavailable', code: 'x', reason: 'x' }), dispose: async () => {} },
+    parent: {}, allow: [], timeoutMinutes: 0, cards: async () => [], screeningForRun: async () => [],
+  }
+  const runtime = createMergeRuntime(deps)
+  expect(await runtime.execute({ verb: 'reject', id: row.id })).toMatchObject({ ok: true })
+  expect(await io.exists(join(home, 'merge', 'staging-index', row.id + '.json'))).toBe(false)
+  expect(await io.exists(join(home, 'merge', 'runs', 'stage-reject'))).toBe(false)
+})
+
 it('restores a skipped row and clears a resume row', async () => {
   const home = await tempRoot('dsh-merge-runtime-clear-')
   const io = nodeEvolutionIo()

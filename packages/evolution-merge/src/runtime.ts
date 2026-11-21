@@ -28,7 +28,7 @@ import { loadMergeState } from './state.ts'
 import { pairLedger } from './domain/pair-ledger.ts'
 import { readCommitReceipts } from './commit-receipt.ts'
 import { runUndoOperation } from './undo-operation.ts'
-import { readStageIndex } from './domain/stage-aggregate.ts'
+import { dropStage, readStageIndex } from './domain/stage-aggregate.ts'
 import { skillLibraryUndoPort } from './adapters/undo.ts'
 import { mergeDoctor } from './doctor.ts'
 import { formatReconcileReport, reconcileMergeState } from './domain/reconcile.ts'
@@ -118,6 +118,12 @@ export interface MergeRuntimeDeps {
   readonly fence?: { run<T>(body: () => Promise<T>): Promise<T> }
 }
 
+async function dropRuntimeStage(io: EvolutionIoLike, home: string, row: { readonly id: string; readonly stagingRef?: string }, now: number): Promise<void> {
+  let ref = row.stagingRef
+  if (ref === undefined) ref = (await readStageIndex(io, home, row.id, now))?.ref
+  await dropStage(io, home, row.id, ref)
+}
+
 async function removeRuntimeRow(io: EvolutionIoLike, home: string, id: string, event: 'superseded' | 'restored' | 'committed', unitId?: string, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<boolean> {
   return await pairLedger(io, home, fence).transact(tx => {
     const current = tx.rows().find(item => item.id === id)
@@ -204,6 +210,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (existing?.state === 'skipped' || (existing?.state === 'fuse' && existing.failure?.retryable === false)) {
           const dropped = await removeRuntimeRow(deps.io, deps.home, existing.id, 'superseded', undefined, deps.fence)
           if (!dropped) return fail('pair', 'row-changed', '清理可替换行时发现并发修改：' + existing.id, '运行 /evolution merge status 后重试')
+          await dropRuntimeStage(deps.io, deps.home, existing, deps.now())
           cleared = true
         }
         if (existing?.state === 'verify' && existing.runId !== undefined && (await deps.isOwnerActive?.(existing.runId)) === true) {
@@ -350,6 +357,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           return tx.transition(row.id, { type: 'skipped', reason: 'rejected', origin: 'human' }, current.version).ok
         })
         if (!changed) return fail('reject', 'row-not-pending', '该行不是 pending，或已被并发修改：' + command.id, '运行 /evolution merge status ' + command.id + ' 后重试', row.runId)
+        await dropRuntimeStage(deps.io, deps.home, row, deps.now())
         return { ok: true, text: '已拒绝合并：' + command.id }
       }
       if (command.verb === 'reconcile') {
@@ -403,6 +411,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (row.state !== 'pending' && row.state !== 'approved' && row.state !== 'fuse') return fail('discard', 'row-not-discardable', '该行状态是 ' + row.state + '，不可丢弃：' + command.id, '只有 pending/approved/fuse 行可丢弃', row.runId)
         const dropped = await removeRuntimeRow(deps.io, deps.home, row.id, 'superseded', undefined, deps.fence)
         if (!dropped) return fail('discard', 'row-changed', '丢弃时发现并发修改：' + command.id, '运行 /evolution merge status ' + command.id + ' 后重试')
+        await dropRuntimeStage(deps.io, deps.home, row, deps.now())
         return { ok: true, text: '已丢弃合并行：' + command.id }
       }
       if (command.verb === 'undo') {
@@ -421,6 +430,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
         if (row === undefined || row.state !== 'skipped') return fail('skipped', 'row-not-found', '找不到可恢复的 skipped 行：' + command.restore, '运行 /evolution merge skipped 查看跳过队列', command.restore)
         const dropped = await removeRuntimeRow(deps.io, deps.home, row.id, 'restored', undefined, deps.fence)
         if (!dropped) return fail('skipped', 'row-changed', '恢复时发现并发修改：' + row.id, '运行 /evolution merge status 后重试')
+        await dropRuntimeStage(deps.io, deps.home, row, deps.now())
         return { ok: true, text: '已恢复参与筛选：' + row.id }
       }
       if (command.verb === 'resume') {
@@ -429,6 +439,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           if (cleared === undefined) return fail('resume', 'row-not-found', '找不到要清除的行：' + command.clear, '运行 /evolution merge status 查看当前队列')
           const dropped = await removeRuntimeRow(deps.io, deps.home, cleared.id, 'superseded', undefined, deps.fence)
           if (!dropped) return fail('resume', 'row-changed', '清除时发现并发修改：' + cleared.id, '运行 /evolution merge status 后重试')
+          await dropRuntimeStage(deps.io, deps.home, cleared, deps.now())
           return { ok: true, text: '已清除合并行：' + cleared.id }
         }
         const loaded = await loadMergeState(deps.io, deps.home)
@@ -517,6 +528,7 @@ export function createMergeRuntime(deps: MergeRuntimeDeps): MergeCommandService 
           if (missingSource !== undefined) {
             const dropped = await removeRuntimeRow(deps.io, deps.home, candidate.id, 'superseded', undefined, deps.fence)
             if (!dropped) return fail('approve', 'row-changed', 'source-gone，但行已被并发修改，未清理：' + candidate.id, '运行 /evolution merge status ' + candidate.id + ' 后重试')
+            await dropRuntimeStage(deps.io, deps.home, candidate, deps.now())
             return fail('approve', 'source-gone', missingSource + ' 已不在 family-managed 技能库，已从 active 队列清除', '重新 pair 该技能对；剩余行用 /evolution merge discard ' + candidate.id, candidate.runId)
           }
           const sourceExpected = candidate.decision?.sourceRevisionRef ?? candidate.sourceRevisionRef

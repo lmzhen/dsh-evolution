@@ -22,6 +22,7 @@
 - R0-6 / E3：已在 main 源码修复（dist tarball artifact 绑定 + release 门），见 [15](15-r0-release-evidence-design.md)。
 - C1/P1-1：merge 恢复 branch B 已增加 rollback 兜底，见 [19](19-c1-recovery-fallback.md)。
 - C3/P1-3：merge `isOwnerActive` 已改为 `runs.hasOwner()`，见 [20](20-c3-owner-liveness.md)。
+- C2/P1-2：staging 复用前清 merged，reject/discard 等关闭行统一清 stage，见 [21](21-c2-staging-generation.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
@@ -180,3 +181,4 @@
 | [18-phase-c-unit-kernel.md](18-phase-c-unit-kernel.md) | Phase C 第一步：UnitKernel 接管 WriteKernel，prepare/commitPrepared |
 | [19-c1-recovery-fallback.md](19-c1-recovery-fallback.md) | C1/P1-1：merge 恢复分支 B 的 rollback 兜底 |
 | [20-c3-owner-liveness.md](20-c3-owner-liveness.md) | C3/P1-3：cross-face owner 判据统一 hasOwner |
+| [21-c2-staging-generation.md](21-c2-staging-generation.md) | C2/P1-2：authoring 前清 merged，关闭行统一 dropStage |

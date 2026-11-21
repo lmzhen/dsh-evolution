@@ -133,6 +133,12 @@ export async function dropStage(io: EvolutionIoLike, home: string, rowId: string
     await io.remove(tree).catch(error => onError?.(tree, error))
   }
 }
+export async function resetStageTree(io: EvolutionIoLike, home: string, ref: string): Promise<void> {
+  const tree = safeRunTree(home, ref)
+  if (tree === null) throw new Error('invalid staging ref: ' + JSON.stringify(ref))
+  await io.remove(join(tree, 'merged'))
+}
+
 export interface StageCleanupFailure { readonly path: string; readonly message: string }
 export interface StageCleanupResult { readonly removed: readonly string[]; readonly expired: readonly string[]; readonly kept: readonly string[]; readonly orphans: readonly string[]; readonly failures: readonly StageCleanupFailure[] }
 /** Bounded cleanup: reserved/present TTL, pending/verify stale index removal, terminal/absent rows, orphan trees. */

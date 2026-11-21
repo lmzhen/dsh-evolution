@@ -1,8 +1,10 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
+import { join } from 'node:path'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { pairKey, runNewChildAuthoring, stageKeyOf, writeStagedFile, type CommitPort, type ConversationChannelLike, type MergeDecision, type MergeRow, type SkillCard } from '../src/index.ts'
+import { pairKey, readStagedTree, runNewChildAuthoring, stageKeyOf, writeStagedFile, type CommitPort, type ConversationChannelLike, type MergeDecision, type MergeRow, type SkillCard } from '../src/index.ts'
+import { createStaging } from '../src/staging.ts'
 import { legacyUnit } from './support/legacy-unit.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
@@ -33,6 +35,33 @@ it('opens a new child, authors staging and commits', async () => {
   const result = await runNewChildAuthoring({ io, home, runId: 'run-1', cards, channel, parent: {}, allow: [], timeoutMs: 1000, commitPort: commitPort(), now: () => 200 }, row, decision, new AbortController().signal)
   expect(result).toMatchObject({ kind: 'merged', unitId: 'u-1', manifestFiles: expect.arrayContaining(['SKILL.md']), criteria: { decision: 'merge', validation: 'required', commit: 'required', archive: 'sources', evidence: 'receipt' }, validationIssues: [] })
   expect(disposed).toBe(1)
+})
+
+it('C2: a reused stage starts from an empty merged tree', async () => {
+  const home = await tempRoot('dsh-merge-new-child-reset-')
+  const io = nodeEvolutionIo()
+  const stageKey = stageKeyOf('run-6', pairKey('alpha-skill', 'beta-skill'))
+  const created = await createStaging(io, home, { runId: stageKey, target: 'umbrella', sources: cards.map(card => ({ name: card.name, body: card.body, files: [] })), promptVersion: 'x', ttlDays: 7, now: () => 1 })
+  expect(created.ok).toBe(true)
+  await io.writeText(join(home, 'merge', 'runs', stageKey, 'merged', 'umbrella', 'references', 'old.md'), 'old bytes')
+  let sawCleanTree = false
+  let sawCleanAfterWrite = false
+  const channel: ConversationChannelLike = {
+    async open() { return { kind: 'ok', childId: 'child-6', turn: { text: 'standby', stopReason: 'completed' } } },
+    async continueTurn() {
+      const before = await readStagedTree(io, home, stageKey)
+      sawCleanTree = before.kind === 'unknown'
+      await writeStagedFile(io, home, stageKey, 'SKILL.md', BODY('umbrella'))
+      const after = await readStagedTree(io, home, stageKey)
+      sawCleanAfterWrite = after.kind === 'present' && !after.value.files.some(file => file.path === 'references/old.md')
+      return { kind: 'ok', childId: 'child-6', turn: { text: JSON.stringify({ target: 'umbrella', files: ['SKILL.md'] }), stopReason: 'completed' } }
+    },
+    async dispose() {},
+  }
+  const result = await runNewChildAuthoring({ io, home, runId: 'run-6', cards, channel, parent: {}, allow: [], timeoutMs: 1000, commitPort: commitPort(), now: () => 200 }, { ...row, stagingRef: stageKey }, decision, new AbortController().signal)
+  expect(result, JSON.stringify(result)).toMatchObject({ kind: 'merged' })
+  expect(sawCleanTree).toBe(true)
+  expect(sawCleanAfterWrite).toBe(true)
 })
 
 it('fails when the child writes no staging', async () => {

@@ -9,7 +9,7 @@ import type { SkillCard } from './skill-card.ts'
 import type { ConversationChannelLike } from './channel-port.ts'
 import { buildRound2Prompt, STANDBY_PROMPT } from './prompts.ts'
 import { stageKeyOf, stagingRoot } from './staging.ts'
-import { createStageTree, readStageEntry, readStageTree, setStageTreeTarget, dropStage } from './domain/stage-aggregate.ts'
+import { createStageTree, readStageEntry, readStageTree, resetStageTree, setStageTreeTarget, dropStage } from './domain/stage-aggregate.ts'
 import { pairKey } from './contracts.ts'
 import { readStagedTree } from './staged-tree.ts'
 import { validateStagedTree, hasBlockingFinding } from './rules.ts'
@@ -69,6 +69,9 @@ export async function runNewChildAuthoring(
   if (expiredStage && stageEntry !== null) await dropStage(options.io, options.home, row.id, stageEntry.ref)
   const existing = expiredStage ? { kind: 'absent' as const } : await readStageTree(options.io, options.home, stageKey)
   if (existing.kind === 'present') {
+    // C2: a reused stage must not carry the previous attempt's merged files into this one.
+    // The target is re-authored from an empty merged/<target>; the source tree is untouched.
+    try { await resetStageTree(options.io, options.home, stageKey) } catch (error) { return { kind: 'failed', failure: { stage: 'author', code: 'staging-reset', message: error instanceof Error ? error.message : String(error), retryable: true, retryFrom: 'agent2' } } }
     await setStageTreeTarget(options.io, options.home, stageKey, decision.target, decision.mode)
   } else {
     const staging = await createStageTree(options.io, options.home, {
