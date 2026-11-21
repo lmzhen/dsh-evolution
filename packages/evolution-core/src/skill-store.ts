@@ -34,7 +34,7 @@
  */
 
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
-import { realpath as realpathFs } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { authorityFrom, type WriteAuthority } from './write-authority.ts'
 import { resolveCitations } from './citations.ts'
@@ -951,7 +951,7 @@ export class SkillLibrary {
     // Fake/virtual IO roots do not exist on this host: fall back to the logical key
     // so two library instances over the same virtual root still share one queue.
     try {
-      await realpathFs(this.root)
+      realpathSync.native(this.root)
     } catch {
       return targetKey
     }
@@ -968,7 +968,7 @@ export class SkillLibrary {
     let identity: string | undefined
     while (true) {
       try {
-        identity = join(await realpathFs(cursor), ...suffix.reverse())
+        identity = join(realpathSync.native(cursor), ...suffix.reverse())
         break
       } catch {
         const parent = dirname(cursor)

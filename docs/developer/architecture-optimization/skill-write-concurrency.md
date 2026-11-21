@@ -932,6 +932,14 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-22：Phase H7t 上游锁对照
+
+- 复核 fs-local withLock/withLocks、writeTarget、atomic create；
+- 修复 canonicalTargetKey 与 skillHostIdentity 的 realpath API 分裂；
+- 定向 skill-store 66 + 相关 85 passed；
+- 0.59.6 不含此修复，列入下个补丁候选；
+- P2：apply 单 op、双锁层、root map 原字符串键。
+
 ### 2026-11-22：Phase H7s 发布后 npm web 验收
 
 - h7post 从 registry 装 22 个 0.59.6；

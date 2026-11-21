@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7t 上游 fs 编辑器锁/并发对照（0.59.6 发布后复核）：核心机制已吸收——realpath target identity、per-target promise lock、锁内 read→CAS→write、create/overwrite 分离、observation 只由读结果产生、跨进程 authority 锁；与上游 `fs-local` 的 `withLock/withLocks` 同构。复核发现一处 P1：`canonicalTargetKey` 用 async `realpath`，`skillHostIdentity` 用 `realpathSync.native`，Windows 8.3/别名路径会把锁 key 与 observation key 拆成两个身份；已改为同一 native realpath，并加 8.3 对照测试（skill-store 66 passed、相关 85 passed）。该修复不在 0.59.6 发布字节内，作为下个补丁候选。剩余 P2：`SkillLibrary.apply` 仍只接受 1-op；in-process lock 与 cross-process TargetLockSet 双实现；root lock map 仍按原始 root 字符串建键。
+
 H7s 发布后 npm web 验收：新建 `h7post` 独立 profile，从 registry 安装全部 22 个 `@lmzhen/*@0.59.6`；`dsh web --profile h7post --port 3085` 启动无 mixed-family 警告，页面 200；安装的 core 0.59.6 含 `SystemSkillWriter`。确认发布字节可用。
 
 H7r 发布完成：修复 virtual-root IO 下两个 SkillLibrary 实例的 target lock key 回退（root 不存在时用逻辑 key，恢复 shared-root-queue G1/1.4），tag `v0.59.6` 指向 `67255012`，GitHub release run 44926000840 **success**（pack/validate/cohort/desktop/publish/verify 全绿）；npm 已可查 `@lmzhen/dsh-evolution-all@0.59.6` 与 `@lmzhen/dsh-tool-skill-manage@0.59.6`。

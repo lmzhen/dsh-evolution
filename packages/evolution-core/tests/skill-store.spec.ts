@@ -7,6 +7,8 @@ import { contentHash, SKILL_NAME_RE, loadSuppressedNames, loadUsage, nodeEvoluti
 import { authoringFeedback } from '@deepseek-ai/dsh-evolution-core/skills'
 import { frontmatterCatalogInvalid, parseFrontmatter, relatedSkillNames, validateFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { resolveSkillsRoot, RESTRUCTURE_TARGET_RE, SkillLibrary, skillsRoot } from '@deepseek-ai/dsh-evolution-core/skills'
+import { skillBodyTarget } from '@deepseek-ai/dsh-evolution-core/skills'
+import { fakeIo } from '../../test-support/fake-io.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 
 /**
@@ -1269,3 +1271,14 @@ it('v35 C9: a support-file remove honours its anchor and keeps drifted bytes', a
   expect((await lib.removeSupportFile('remove-skill', 'references/gone.md', 'foreground', { sha256: current })).ok).toBe(true)
 })
 
+// Identity must be derived from the same native realpath as the observation
+// bridge; async realpath preserves a Windows 8.3 spelling and would split the
+// lock key from the observed key.
+it.runIf(process.platform === 'win32')('canonical lock identity expands 8.3 root spellings like skillHostIdentity', async () => {
+  const shortRoot = new SkillLibrary('C:\\PROGRA~1', fakeIo())
+  const longRoot = new SkillLibrary('C:\\Program Files', fakeIo())
+  const target = skillBodyTarget('identity-probe')
+  const short = await shortRoot.identify(target)
+  const long = await longRoot.identify(target)
+  expect(short.identityKey).toBe(long.identityKey)
+})
