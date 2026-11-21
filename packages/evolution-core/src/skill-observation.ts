@@ -12,6 +12,8 @@
  *
  * @module @deepseek-ai/dsh-evolution-core/skill-observation
  */
+import { createHash } from 'node:crypto'
+import { realpathSync } from 'node:fs'
 import { contentHash } from './mutations.ts'
 
 /** The skill content version used by all observations and write intents. */
@@ -40,6 +42,8 @@ export interface SkillTarget {
   readonly skill: string
   readonly relPath: string
   readonly targetKey: string
+  /** Canonical realpath-derived lock/observation identity, when the caller can resolve it. */
+  readonly identityKey?: string
 }
 
 /** One authoritative read observation. */
@@ -112,6 +116,21 @@ function normalizeRelPath(relPath: string): string {
  * review task from retaining its reads; disposal blocks HMR from carrying stale
  * observations into a new implementation generation.
  */
+/** The key a target uses in an observation map; identity wins over the logical key. */
+function observationKey(target: SkillTarget): string {
+  return target.identityKey ?? target.targetKey
+}
+
+/** Canonical realpath identity for an existing host path, matching SkillLibrary's lock key. */
+export function skillHostIdentity(hostPath: string): string | undefined {
+  try {
+    const real = realpathSync(hostPath).replaceAll('\\', '/')
+    return 'skillpath:' + createHash('sha256').update(real).digest('hex')
+  } catch {
+    return undefined
+  }
+}
+
 export class SkillObservationStore {
   private byOwner = new WeakMap<SkillObservationOwner, Map<string, SkillObservation>>()
 
@@ -127,7 +146,7 @@ export class SkillObservationStore {
       reads = new Map()
       this.byOwner.set(owner, reads)
     }
-    reads.set(target.targetKey, observation)
+    reads.set(observationKey(target), observation)
   }
 
   /**
@@ -135,7 +154,9 @@ export class SkillObservationStore {
    * @returns the observation, or `undefined` when this owner never read it.
    */
   get(owner: SkillObservationOwner, target: SkillTarget): SkillObservation | undefined {
-    return this.byOwner.get(owner)?.get(target.targetKey)
+    const reads = this.byOwner.get(owner)
+    if (reads === undefined) return undefined
+    return reads.get(observationKey(target)) ?? reads.get(target.targetKey)
   }
 
   /**

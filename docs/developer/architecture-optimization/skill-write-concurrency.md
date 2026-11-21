@@ -932,6 +932,14 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H4b2 observation/plan identity
+
+- `SkillTarget.identityKey` + `SkillLibrary.identify`；
+- service 的 read/plan 使用 identity target；
+- `fs/observed` listener 用 `skillHostIdentity` 记录 identity，observation store 以 identity 为主键并保留逻辑键兼容；
+- 定向 137 passed，build 0；
+- unit targetKeys 仍逻辑键，留 H4b3。
+
 ### 2026-11-21：Phase H4b1 canonical in-process lock identity
 
 - `SkillLibrary.withTarget` 将逻辑 targetKey 经 realpath / nearest-existing-ancestor 转成 `skillpath:<sha256>`；

@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H4b2 已完成：`SkillTarget` 增加可选 `identityKey`；`SkillLibrary.identify` 用同一 `canonicalTargetKey` 生成；service read/plan 使用 identify；平台 `fs/observed` listener 用 `skillHostIdentity` 记录 identity；observation store 以 identity 为主键，并暂时保留逻辑键兼容旧测试/旧记录。unit targetKeys 仍逻辑键，H4b3 统一。
+
 H4b1 已完成：`SkillLibrary.withTarget` 把逻辑 `skill::name::path` 解析为 realpath（缺失文件用最近存在祖先）并 sha256 成 `skillpath:<hash>`，绑定进程内 per-target 锁；观测/审批 targetKey 与跨进程 unit key 仍是逻辑键，H4b2 再统一。
 
 H4b 待做：target identity 进入 observation/approval/unit；fake IO 明确 weaker identity。

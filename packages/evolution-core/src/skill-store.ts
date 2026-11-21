@@ -63,7 +63,7 @@ import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { decideSkillWrite, type SkillWriteIntent, type SkillWriteRefusalReason } from './skill-write-intent.ts'
 import type { SkillWriteOp, SkillWritePlan, SkillWriteResult } from './skill-write-plan.ts'
-import { skillNamespaceKey } from './skill-observation.ts'
+import { skillNamespaceKey, type SkillTarget } from './skill-observation.ts'
 import { SkillTargetLocks } from './skill-target-locks.ts'
 import { SkillRootGate } from './skill-root-gate.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
@@ -916,6 +916,16 @@ export class SkillLibrary {
   /** Transitional: serialize one target even while the root serial remains. */
   private async withTarget<T>(targetKey: string, task: () => Promise<T>): Promise<T> {
     return await this.targetLocks.withLock(await this.canonicalTargetKey(targetKey), task)
+  }
+
+  /**
+   * Attach the canonical realpath identity to one observation target.
+   * @param target - logical skill target.
+   * @returns the target with `identityKey`; the logical targetKey is unchanged.
+   */
+  async identify(target: SkillTarget): Promise<SkillTarget> {
+    const key = target.relPath === '' ? 'skill::' + target.skill : 'skill::' + target.skill + '::' + target.relPath
+    return { ...target, identityKey: await this.canonicalTargetKey(key) }
   }
 
   /**

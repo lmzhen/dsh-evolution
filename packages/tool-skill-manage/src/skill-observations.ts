@@ -13,7 +13,7 @@ import { readFileSync, statSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-fs'
 import { contentHash } from '@deepseek-ai/dsh-evolution-core'
-import { SkillObservationStore, recordFsSkillObservation } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillObservationStore, recordFsSkillObservation, skillHostIdentity } from '@deepseek-ai/dsh-evolution-core/skills'
 
 /** Actor shape the platform carries on `fs/observed`. */
 type ObservationActor = { agent?: { session?: object } } | undefined
@@ -26,7 +26,7 @@ type ObservationActor = { agent?: { session?: object } } | undefined
  */
 export function installSkillObservationListener(ctx: Context, root: string, store: SkillObservationStore = new SkillObservationStore()): SkillObservationStore {
   ctx.effect(() => () => store.clear(), 'tool-skill-manage.skill-observations')
-  ctx.on('fs/observed', (target, observation, actor) => {
+  ctx.on('fs/observed', (fsTarget, observation, actor) => {
     if (observation.kind !== 'present') return
     const owner = (actor as ObservationActor)?.agent?.session
     if (owner === undefined) return
@@ -35,7 +35,7 @@ export function installSkillObservationListener(ctx: Context, root: string, stor
     // when the platform version still matches before/after the read: if a writer
     // changed the file between the tool's read and this listener, no observation
     // is recorded (the next write must re-read), never a newer-content licence.
-    const hostPath = String(target.targetKey)
+    const hostPath = String(fsTarget.targetKey)
     const version = String(observation.version)
     if (skillPlatformVersion(hostPath) !== version) return
     let content: string
@@ -45,10 +45,12 @@ export function installSkillObservationListener(ctx: Context, root: string, stor
       return
     }
     if (skillPlatformVersion(hostPath) !== version) return
-    recordFsSkillObservation(store, owner, root, {
+    const recorded = recordFsSkillObservation(store, owner, root, {
       hostPath,
       version: contentHash(content),
     })
+    const identityKey = recorded === undefined ? undefined : skillHostIdentity(hostPath)
+    if (recorded !== undefined && identityKey !== undefined) store.record(owner, { ...recorded, identityKey }, { kind: 'present', version: contentHash(content) })
   })
   return store
 }

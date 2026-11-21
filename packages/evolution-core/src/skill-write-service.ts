@@ -57,7 +57,7 @@ export class SkillWriteService {
    * @returns the body, or null when absent.
    */
   async readBody(owner: SkillWriteOwner, name: string): Promise<string | null> {
-    const target = skillBodyTarget(name)
+    const target = await this.library.identify(skillBodyTarget(name))
     const content = await this.library.read(name)
     this.record(owner, target, content)
     return content
@@ -71,7 +71,7 @@ export class SkillWriteService {
    * @returns the bytes, or null when absent.
    */
   async readSupport(owner: SkillWriteOwner, name: string, filePath: string): Promise<string | null> {
-    const target = skillSupportTarget(name, filePath)
+    const target = await this.library.identify(skillSupportTarget(name, filePath))
     const content = await this.library.readSupportFile(name, filePath)
     this.record(owner, target, content)
     return content
@@ -106,7 +106,7 @@ export class SkillWriteService {
    * @returns the plan or a typed refusal.
    */
   async planUpdate(owner: SkillWriteOwner, name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillWritePlanResult> {
-    const target = skillBodyTarget(name)
+    const target = await this.library.identify(skillBodyTarget(name))
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return planRefusal(observed.kind)
     return {
@@ -143,7 +143,7 @@ export class SkillWriteService {
     origin: WriteOrigin = 'foreground',
   ): Promise<SkillWritePlanResult> {
     if (input.section !== undefined) {
-      const target = skillBodyTarget(name)
+      const target = await this.library.identify(skillBodyTarget(name))
       const observed = this.observations.requirePresent(owner, target)
       if (!('version' in observed)) return planRefusal(observed.kind)
       return {
@@ -160,7 +160,8 @@ export class SkillWriteService {
       }
     }
     const filePath = input.filePath ?? ''
-    const target = filePath === '' ? skillBodyTarget(name) : skillSupportTarget(name, filePath)
+    const logicalTarget = filePath === '' ? skillBodyTarget(name) : skillSupportTarget(name, filePath)
+    const target = await this.library.identify(logicalTarget)
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return planRefusal(observed.kind)
     return {
@@ -197,7 +198,7 @@ export class SkillWriteService {
     content: string,
     origin: WriteOrigin = 'foreground',
   ): Promise<SkillWritePlanResult> {
-    const target = skillSupportTarget(name, filePath)
+    const target = await this.library.identify(skillSupportTarget(name, filePath))
     const observed = this.observations.get(owner, target)
     if (observed === undefined) {
       // This read decides absent vs existing; it is not recorded as a read
@@ -227,7 +228,7 @@ export class SkillWriteService {
    * @returns the plan or a typed refusal.
    */
   async planRemoveSupport(owner: SkillWriteOwner, name: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillWritePlanResult> {
-    const target = skillSupportTarget(name, filePath)
+    const target = await this.library.identify(skillSupportTarget(name, filePath))
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return planRefusal(observed.kind)
     return {
@@ -283,7 +284,7 @@ export class SkillWriteService {
    * @returns write outcome or a typed refusal.
    */
   async updateBody(owner: SkillWriteOwner, name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillWriteServiceResult> {
-    const target = skillBodyTarget(name)
+    const target = await this.library.identify(skillBodyTarget(name))
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
     const result = await this.library.update(name, content, origin, anchorOf(observed.version))
@@ -308,7 +309,7 @@ export class SkillWriteService {
     replaceAll = false,
     origin: WriteOrigin = 'foreground',
   ): Promise<SkillWriteServiceResult> {
-    const target = skillBodyTarget(name)
+    const target = await this.library.identify(skillBodyTarget(name))
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
     const result = await this.library.patch(name, oldString, newString, '', replaceAll, origin, anchorOf(observed.version))
@@ -325,7 +326,7 @@ export class SkillWriteService {
    * @returns write outcome or a typed refusal.
    */
   async updateSupport(owner: SkillWriteOwner, name: string, filePath: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillWriteServiceResult> {
-    const target = skillSupportTarget(name, filePath)
+    const target = await this.library.identify(skillSupportTarget(name, filePath))
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
     const result = await this.library.writeSupportFile(name, filePath, content, origin, anchorOf(observed.version))
@@ -335,7 +336,7 @@ export class SkillWriteService {
 
   /** Remove a support file only after this owner read it at the observed version. */
   async removeSupport(owner: SkillWriteOwner, name: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillWriteServiceResult> {
-    const target = skillSupportTarget(name, filePath)
+    const target = await this.library.identify(skillSupportTarget(name, filePath))
     const observed = this.observations.requirePresent(owner, target)
     if (!('version' in observed)) return refusal(observed.kind)
     const result = await this.library.removeSupportFile(name, filePath, origin, anchorOf(observed.version))
@@ -349,7 +350,7 @@ export class SkillWriteService {
    * existing unread file is refused rather than overwritten.
    */
   async writeSupport(owner: SkillWriteOwner, name: string, filePath: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillWriteServiceResult> {
-    const target = skillSupportTarget(name, filePath)
+    const target = await this.library.identify(skillSupportTarget(name, filePath))
     const observed = this.observations.get(owner, target)
     if (observed === undefined) {
       const current = await this.library.readSupportFile(name, filePath)
