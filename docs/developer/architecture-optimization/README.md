@@ -68,3 +68,12 @@
 - 改分层/包边界/阶段/发布门写 DCR。
 - 新发现先入 27 §9 backlog，不擅自扩 Phase。
 - Phase 0 只做基线/夹具/端口清单，不改生产行为。
+
+## 6. 2026-11-22 全量只读审计
+
+- 入口：[audit-2026-11-22/README.md](audit-2026-11-22/README.md)
+- 范围：23 个源码包、tool-skill-manage、UI/client 两半、平台接缝、测试/门禁/发布证据；HEAD `564431ac`。
+- 方法：8 个上下文隔离的只读子智能体分域审计，根代理去重与抽检；未修改源码。
+- 当前读数：P0=1、P1=28、P2/技术债约 117 条。
+- 系统框架：[10-system-framework.md](audit-2026-11-22/10-system-framework.md)（八不变量、七平面、六失效模式、V 模型）。
+- 修复顺序见 [09-remediation-plan.md](audit-2026-11-22/09-remediation-plan.md)。
