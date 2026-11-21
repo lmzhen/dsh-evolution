@@ -916,6 +916,9 @@ walkCitationSurface(familyRoot, (path, text) => {
       if (cited.startsWith('.') || cited.startsWith('/') || cited.startsWith('@') || cited.includes('://')) continue
       if (familyChildren.has(head)) continue
       if (head === 'packages') {
+        // The family's own package paths are not platform citations: in the mirror they name this
+        // repo's packages/evolution*/ tree, and in the overlay they name the copied family surface.
+        if ((segments[1] ?? '') === 'evolution' || (segments[1] ?? '').startsWith('evolution-')) continue
         if (FAMILY_OWNED_UNDER_PACKAGES.has(segments[1] ?? '')) continue
         if (resolveCitation(familyRoot, segments.slice(1).join('/')) !== '') continue
       } else if (head !== 'apps' && !(segments.includes('src') && PLATFORM_ROOTS.has(head))) continue

@@ -37,6 +37,7 @@
 - E5：平台耦合账本改为 expected/both，strict 判 unknown/过期/tree 陈旧，见 [33](33-e5-test-lines.md)。
 - P2：删除 `SKIP_MANIFEST_FRESHNESS` 死开关，见 [34](34-p2-dead-switch.md)。
 - A2 部分：approval 增加 durable executed marker，挡住 stale pending 的重复回放；见 [38](38-a2-executed-marker.md)。
+- D2：契约检测过滤 family 路径并对 rc.5 strict 通过；见 [39](39-d2-contract-strict.md)。
 - E2：gate-13/14/15 改为真实检查，gate-75 改为 action step，见 [35](35-e2-real-gates.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
@@ -214,3 +215,4 @@
 | [36-p2-platform-types.md](36-p2-platform-types.md) | P2：sendMessage/configEditor 类型对齐 |
 | [37-p2-acceptance-read.md](37-p2-acceptance-read.md) | P2：验收夹具读失败不当空 |
 | [38-a2-executed-marker.md](38-a2-executed-marker.md) | A2 部分：审批跨进程执行标记 |
+| [39-d2-contract-strict.md](39-d2-contract-strict.md) | D2：平台契约 strict 对准 rc.5 |

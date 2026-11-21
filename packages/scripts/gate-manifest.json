@@ -320,14 +320,13 @@
     {
       "id": "gate-18",
       "kind": "script",
-      "human": "`node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/_upstream/dsh-upstream-0.2.2-rc.5 --accept-recorded`",
+      "human": "`node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/_upstream/dsh-upstream-0.2.2-rc.5`",
       "argv": [
         "node",
         "packages/scripts/verify-platform-contract.mjs",
         "packages",
         "--upstream",
-        "D:/dsh/_upstream/dsh-upstream-0.2.2-rc.5",
-        "--accept-recorded"
+        "D:/dsh/_upstream/dsh-upstream-0.2.2-rc.5"
       ],
       "tree": "mirror",
       "profiles": [
