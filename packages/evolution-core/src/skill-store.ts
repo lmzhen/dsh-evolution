@@ -4002,7 +4002,7 @@ export class SkillLibrary {
         return await this.writeSupportFile(op.target.skill, op.target.relPath, op.content, origin, anchor)
       }
       case 'patch': {
-        const anchor: WriteAnchor = { sha256: op.expect.version }
+        const anchor: WriteAnchor = op.expect.kind === 'absent' ? { absent: true } : { sha256: op.expect.version }
         return await this.patch(
           op.target.skill,
           op.oldString,
@@ -4018,7 +4018,7 @@ export class SkillLibrary {
           op.target.skill,
           op.section,
           origin,
-          { sha256: op.expect.version },
+          op.expect.kind === 'absent' ? { absent: true } : { sha256: op.expect.version },
         )
       case 'remove':
         if (op.target.relPath === '') {
@@ -4028,7 +4028,7 @@ export class SkillLibrary {
           op.target.skill,
           op.target.relPath,
           origin,
-          { sha256: op.expect.version },
+          op.expect.kind === 'absent' ? { absent: true } : { sha256: op.expect.version },
         )
     }
   }

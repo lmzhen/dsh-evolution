@@ -906,6 +906,26 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     return toActionResult(await skillWriteService.apply(plan.plan, owner))
   }
 
+  /** Apply an explicit-anchor plan without an observation (approval replay/direct path). */
+  async function applyExplicitPlan(plan: SkillWritePlan, owner?: object): Promise<SkillActionResult> {
+    return toActionResult(await skillWriteService.apply(plan, owner))
+  }
+
+  /** Current bytes of one target, for the non-observation explicit path only. */
+  async function explainCurrent(target: ReturnType<typeof skillBodyTarget>): Promise<{ kind: 'absent' } | { kind: 'present'; version: string }> {
+    const current = target.relPath === '' ? await library.read(target.skill) : await library.readSupportFile(target.skill, target.relPath)
+    return current === null ? { kind: 'absent' } : { kind: 'present', version: contentHash(current) }
+  }
+
+  function expectFromAnchor(anchor: WriteAnchor): { kind: 'absent' } | { kind: 'present'; version: string } {
+    return 'absent' in anchor ? { kind: 'absent' } : { kind: 'present', version: anchor.sha256 }
+  }
+
+  /** Build an explicit target with canonical identity. */
+  async function explicitTarget(name: string, filePath: string): Promise<ReturnType<typeof skillBodyTarget>> {
+    return await library.identify(filePath === '' ? skillBodyTarget(name) : skillSupportTarget(name, filePath))
+  }
+
   async function executeCore(
     args: SkillWriteArgs,
     origin: WriteOrigin = 'foreground',
@@ -1041,21 +1061,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const simpleActions: Record<string, () => Promise<SkillActionResult>> = {
       create: async () => {
         feedbackLines.push(...await duplicateHintLines(name, candidateDescription, crossSourceView))
-        if (owner !== undefined && stagedAnchor === undefined) {
-          const planned = await skillWriteService.planCreate(owner, name, args.content ?? '', origin, origin !== 'foreground')
-          if (!planned.ok) return { ok: false, message: planned.code + ': ' + planned.message, skills: [] }
-          const created = await skillWriteService.apply(planned.plan, owner)
-          return toActionResult(created)
-        }
-        const created = await library.create(name, args.content ?? '', origin, { managed: origin !== 'foreground' })
-        if (created.ok && owner !== undefined) await skillWriteService.observeBodyWrite(owner, name)
-        return created
+        const planned = await skillWriteService.planCreate(owner ?? {}, name, args.content ?? '', origin, origin !== 'foreground')
+        if (!planned.ok) return { ok: false, message: planned.code + ': ' + planned.message, skills: [] }
+        return toActionResult(await skillWriteService.apply(planned.plan, owner))
       },
         update: async () => {
           if (owner !== undefined && stagedAnchor === undefined) {
             return await applyPlanned(skillWriteService.planUpdate(owner, name, args.content ?? '', origin), owner)
           }
-          return library.update(name, args.content ?? '', origin, stagedAnchor)
+          const target = await explicitTarget(name, '')
+          const expect = stagedAnchor === undefined ? await explainCurrent(target) : expectFromAnchor(stagedAnchor)
+          return await applyExplicitPlan({
+            origin,
+            ops: [{ kind: 'write', target, content: args.content ?? '', expect, ...expect.kind === 'absent' ? { create: false } : {} }],
+          }, owner)
         },
       patch: async () => {
         const section = args.section
@@ -1080,23 +1099,31 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
             ...(sectionEdit === undefined ? {} : { section: sectionEdit }),
           }, origin), owner)
         }
-        if (sectionEdit === undefined) {
-          return await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin, stagedAnchor)
-        }
-        return await library.patchSection(name, sectionEdit, origin, stagedAnchor)
+        const target = await explicitTarget(name, sectionEdit === undefined ? args.file_path ?? '' : '')
+        const expect = stagedAnchor === undefined ? await explainCurrent(target) : expectFromAnchor(stagedAnchor)
+        return await applyExplicitPlan({
+          origin,
+          ops: [sectionEdit === undefined
+            ? { kind: 'patch', target, oldString: args.old_string ?? '', newString: args.new_string ?? '', replaceAll: args.replace_all === true, expect }
+            : { kind: 'patchSection', target, section: sectionEdit, expect }],
+        }, owner)
       },
       delete: () => library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {}, undefined, change),
       write_file: async () => {
         if (owner !== undefined && stagedAnchor === undefined) {
           return await applyPlanned(skillWriteService.planWriteSupport(owner, name, args.file_path ?? '', args.file_content ?? '', origin), owner)
         }
-        return library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor)
+        const target = await explicitTarget(name, args.file_path ?? '')
+        const expect = stagedAnchor === undefined ? await explainCurrent(target) : expectFromAnchor(stagedAnchor)
+        return await applyExplicitPlan({ origin, ops: [{ kind: 'write', target, content: args.file_content ?? '', expect }] }, owner)
       },
       remove_file: async () => {
         if (owner !== undefined && stagedAnchor === undefined) {
           return await applyPlanned(skillWriteService.planRemoveSupport(owner, name, args.file_path ?? '', origin), owner)
         }
-        return library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor)
+        const target = await explicitTarget(name, args.file_path ?? '')
+        const expect = stagedAnchor === undefined ? await explainCurrent(target) : expectFromAnchor(stagedAnchor)
+        return await applyExplicitPlan({ origin, ops: [{ kind: 'remove', target, expect }] }, owner)
       },
       pin: () => library.setPinned(name, true, origin),
       unpin: () => library.setPinned(name, false, origin),

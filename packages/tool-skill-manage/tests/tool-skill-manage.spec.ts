@@ -1086,7 +1086,7 @@ it('v30 REV-03: a staged support-file write refuses to replay when the file chan
     file_content: 'v2\n', staged_from_sha256: 'absent',
   })
   expect(staleAbsent.ok).toBe(false)
-  expect(staleAbsent.message).toContain('在这次写入暂存之后发生了变化')
+  expect(staleAbsent.message).toContain('SKILL_STALE_VERSION')
   // An anchor matching the CURRENT bytes (v1) still authorizes the overwrite.
   const freshV2 = await replayRun(ctx, {
     action: 'write_file', name: 'anchor-skill', file_path: 'references/api.md',

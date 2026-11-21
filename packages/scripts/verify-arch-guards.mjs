@@ -261,6 +261,10 @@
  *        `machine.kind = event-mode`), whose table is the set's ONE home (A98 / finding O-1).
  *   N38. `SkillTargetLocks` is constructed only by the skill provider (`evolution-core/src/skill-store.ts`):
  *        a second lock table would split the single-target queue again.
+ *   N40. `tool-skill-manage` never calls a provider content mutator (`update`/`patch`/`patchSection`/
+ *        `writeSupportFile`/`removeSupportFile`) directly: every content write goes through
+ *        `SkillWriteService.apply(plan)`. Structural actions (archive/pin/restructure/extract) stay
+ *        on the library and are not part of this rule.
  *   N39. a `SkillTarget.targetKey` literal exists only in the observation target factory
  *        (`evolution-core/src/skill-observation.ts`): every other target is built through
  *        skillBodyTarget/skillSupportTarget/skillTargetFromHostPath so identity stays single-sourced.
@@ -1682,6 +1686,11 @@ function walk(dir) {
       // N39: target-key literals only in the observation target factory.
       if (rel.includes('/src/') && rel !== 'evolution-core/src/skill-observation.ts' && /(?:^|[^.\w])targetKey\s*:\s*['"`]/.test(text)) {
         violations.push(`${rel}: spells a SkillTarget.targetKey literal outside the observation target factory`)
+      }
+      // N40: the tool's content writes use the plan/provider seam only.
+      if (rel.startsWith('tool-skill-manage/src/')) {
+        const direct = [...text.matchAll(/\blibrary\.(update|patch|patchSection|writeSupportFile|removeSupportFile)\s*\(/g)]
+        for (const match of direct) violations.push(`${rel}: direct library.${match[1]}(...) content mutator — route through SkillWriteService.apply(plan)`)
       }
       // N10 (v39, S3.4 rule ④): new platform service probe — see docblock.
       {

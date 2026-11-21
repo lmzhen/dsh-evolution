@@ -38,18 +38,18 @@ export type SkillWriteOp =
     readonly oldString: string
     readonly newString: string
     readonly replaceAll: boolean
-    readonly expect: { readonly kind: 'present'; readonly version: string }
+    readonly expect: SkillWriteExpect
   }
   | {
     readonly kind: 'patchSection'
     readonly target: SkillTarget
     readonly section: SkillSectionEdit
-    readonly expect: { readonly kind: 'present'; readonly version: string }
+    readonly expect: SkillWriteExpect
   }
   | {
     readonly kind: 'remove'
     readonly target: SkillTarget
-    readonly expect: { readonly kind: 'present'; readonly version: string }
+    readonly expect: SkillWriteExpect
   }
 
 /** The complete write a caller intends to commit. */

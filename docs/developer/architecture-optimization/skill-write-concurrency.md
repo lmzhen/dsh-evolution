@@ -932,6 +932,14 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H3c tool 内容写全 plan 化 + N40
+
+- tool 所有内容写走 plan/provider；旧 anchor/直接分支用显式 expect（读当前 bytes 或 staged anchor）；
+- 删除 tool 对 `library.update/patch/patchSection/writeSupportFile/removeSupportFile` 的直接调用；
+- `SkillWriteOp.patch/remove.expect` 扩展为 `SkillWriteExpect`，provider 支持 absent anchor；
+- N40 arch guard；
+- tool 112 passed + core plan/service，build 0。
+
 ### 2026-11-21：Phase H7a arch guards
 
 - N38：`SkillTargetLocks` 只允许 provider 构造；
