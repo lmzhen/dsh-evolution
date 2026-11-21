@@ -1,3 +1,11 @@
+## 0.59.6 (2026-11-22) — skill 写入单 Provider 重构
+
+- 引入 SkillWritePlan/apply，tool/审批/内部 writer 统一走单 provider；
+- target lock/identity 收敛到 realpath 规范键；
+- observation 只由读/写结果产生，移除写前 seed 与写后 re-read；
+- 审批保存完整 plan，旧 pending 无 plan 明确拒绝；
+- curator/merge/undo 迁移 SystemSkillWriter。
+
 ## 0.59.5 (2026-11-21) — section patch 审批 anchor 补齐
 
 > **缺陷**：0.59.4 修复了 body/support patch 的审批 anchor，但 `patch.section` 在 replay 时不传 `staged_from_sha256`，staging 后并发改写同一 body 仍会用旧 section 内容覆盖新内容。
