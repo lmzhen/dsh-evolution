@@ -566,6 +566,24 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - `patch(file_path)` 不再绕过 service；
 - approval replay（`stagedAnchor` 或 owner undefined）暂留旧路径，H3 改为重放 plan。
 
+### 20. H3 设计：approval 保存并重放 plan
+
+H3 分两步：H3a 先让新暂存记录带 plan、replay 走 plan；H3b 再拒绝无 plan 的旧记录。
+
+H3a 已完成：
+
+- 新增 tool 侧 `planFromStaged(operation, origin)`：把带 anchor 的 create/update/patch/write_file/remove_file 转成 `SkillWritePlan`；
+- approval `args` 增加 `plan`；
+- replay runner 优先 `skillWriteService.apply(plan)`，无 plan 才走旧 `executeCore`；
+- update 目标缺失（anchor absent）暂无 plan，继续旧路径；H3b 再决定是拒绝还是新增 update-only op。
+
+H3b 待做：
+
+- 旧 pending 无 plan 明确拒绝并要求重新发起；
+- 删除 per-action `staged_from_sha256` staging 分支，planFromStaged 改为 service 生成；
+- approval preview 改为 plan diff；
+- 测试旧记录拒绝与新 plan 重放。
+
 ### 19.5 H2 落地记录（2026-11-21）
 
 已按本节完成 H2：

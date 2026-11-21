@@ -31,7 +31,7 @@ import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, computeDedupGroups, nearDuplicateSummaries, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_SKILL_WRITE_SUMMARY_CHARS, newSkillLibrary, normalizeChangeSummary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type ChangeSummary, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import { installSkillObservationListener } from './skill-observations.ts'
-import { SkillObservationStore, SkillWriteService, type SkillWritePlanResult, type SkillWriteServiceResult } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillObservationStore, SkillWriteService, skillBodyTarget, skillSupportTarget, type SkillWritePlan, type SkillWritePlanResult, type SkillWriteServiceResult } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fuzzyPatch } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
@@ -278,6 +278,46 @@ function formatProposal(raw: string): string {
  * @param args - the staged record's args: `{ operation }`.
  * @returns the before/after pair, or why there is none to show.
  */
+function stagedAnchorOf(operation: SkillWriteArgs): { kind: 'absent' } | { kind: 'present'; version: string } | undefined {
+  const raw = operation.staged_from_sha256
+  if (raw === undefined || raw === '') return undefined
+  return raw === 'absent' ? { kind: 'absent' } : { kind: 'present', version: raw }
+}
+
+function planFromStaged(operation: SkillWriteArgs, origin: WriteOrigin): SkillWritePlan | undefined {
+  const name = typeof operation.name === 'string' ? operation.name.trim() : ''
+  if (name === '') return undefined
+  const anchor = stagedAnchorOf(operation)
+  const summary = typeof operation.summary === 'string' ? operation.summary : undefined
+  if (operation.action === 'create') {
+    return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'createSkill', skill: name, content: operation.content ?? '', ...(origin === 'foreground' ? {} : { managed: true }) }] }
+  }
+  if (operation.action === 'update') {
+    if (anchor?.kind !== 'present') return undefined
+    return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'write', target: skillBodyTarget(name), content: operation.content ?? '', expect: anchor }] }
+  }
+  if (operation.action === 'patch') {
+    if (anchor?.kind !== 'present') return undefined
+    const section = operation.section
+    if (section !== undefined && section !== null) {
+      if (typeof section.heading !== 'string' || typeof section.content !== 'string') return undefined
+      return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'patchSection', target: skillBodyTarget(name), section: { heading: section.heading, content: section.content, ...typeof section.start === 'string' ? { start: section.start } : {}, ...typeof section.end === 'string' ? { end: section.end } : {} }, expect: anchor }] }
+    }
+    const filePath = typeof operation.file_path === 'string' ? operation.file_path : ''
+    const target = filePath === '' ? skillBodyTarget(name) : skillSupportTarget(name, filePath)
+    return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'patch', target, oldString: operation.old_string ?? '', newString: operation.new_string ?? '', replaceAll: operation.replace_all === true, expect: anchor }] }
+  }
+  if (operation.action === 'write_file' && typeof operation.file_path === 'string' && operation.file_path !== '') {
+    if (anchor === undefined) return undefined
+    return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'write', target: skillSupportTarget(name, operation.file_path), content: operation.file_content ?? '', expect: anchor }] }
+  }
+  if (operation.action === 'remove_file' && typeof operation.file_path === 'string' && operation.file_path !== '') {
+    if (anchor?.kind !== 'present') return undefined
+    return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'remove', target: skillSupportTarget(name, operation.file_path), expect: anchor }] }
+  }
+  return undefined
+}
+
 async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promise<PreviewAnswer> {
   const wrapped = (args ?? {}) as { operation?: SkillWriteArgs }
   const operation = wrapped.operation ?? {}
@@ -1609,7 +1649,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           // origin (review channel for any subagent) AND the library origin
           // (a delegated subagent stays 'subagent'), so replay preserves the
           // pinned-guard distinction instead of folding subagent to review.
-          args: { operation, origin: reviewOrigin, libraryOrigin },
+          args: { operation, ...(planFromStaged(operation, libraryOrigin) === undefined ? {} : { plan: planFromStaged(operation, libraryOrigin) }), origin: reviewOrigin, libraryOrigin },
           origin: reviewOrigin,
           // 0.3.20 (N-1): session id rides along so the approval service can
           // derive the platform override (see tool-memory for the rationale).

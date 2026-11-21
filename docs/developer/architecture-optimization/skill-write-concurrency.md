@@ -932,6 +932,16 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H3a approval 保存并重放 plan
+
+已完成：
+
+- approval staging 为 create/update(有 anchor)/patch/write_file/remove_file 生成 `SkillWritePlan`，存进 `args.plan`；
+- replay runner 优先 `SkillWriteService.apply(plan)`，无 plan 回到旧 `executeCore`；
+- 既有 approval 测试 96 passed，tool 全包 111 passed，overlay build 0。
+
+H3b 待做：旧 pending 无 plan 拒绝、删除 per-action anchor 分支、preview 走 plan。
+
 ### 2026-11-21：Phase H2 tool 写动作接入 plan
 
 H2 把 `tool-skill-manage` 的直接写路径切到 `SkillWriteService.plan` / `SkillLibrary.apply`，approval replay 暂留旧路径（H3 再切）。
