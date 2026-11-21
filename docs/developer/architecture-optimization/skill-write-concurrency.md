@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H4b1 canonical in-process lock identity
+
+- `SkillLibrary.withTarget` 将逻辑 targetKey 经 realpath / nearest-existing-ancestor 转成 `skillpath:<sha256>`；
+- 同一 host 文件的不同拼写/软链在进程内共享一把 promise lock；
+- observation/approval/跨进程 unit key 仍逻辑键，H4b2 统一；
+- tool + core 定向 119 passed，build 0。
+
 ### 2026-11-21：Phase H4a 删除 service 私有锁
 
 - `SkillWriteService` 不再持有 `SkillTargetLocks`；legacy 方法直接调用 library；

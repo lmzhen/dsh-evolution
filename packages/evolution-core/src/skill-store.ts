@@ -34,6 +34,8 @@
  */
 
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { realpath as realpathFs } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { authorityFrom, type WriteAuthority } from './write-authority.ts'
 import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
@@ -913,7 +915,41 @@ export class SkillLibrary {
 
   /** Transitional: serialize one target even while the root serial remains. */
   private async withTarget<T>(targetKey: string, task: () => Promise<T>): Promise<T> {
-    return await this.targetLocks.withLock(targetKey, task)
+    return await this.targetLocks.withLock(await this.canonicalTargetKey(targetKey), task)
+  }
+
+  /**
+   * Canonical in-process lock identity for one skill target key.
+   *
+   * A logical `skill::name::path` key is resolved through realpath (or the
+   * nearest existing ancestor for a not-yet-created file) and hashed, so two
+   * spellings/symlinks of the same host file share one promise-lock queue. The
+   * logical targetKey stays the observation/approval key until the observation
+   * resolver phase; this method only fixes the provider lock identity.
+   * @param targetKey - the family's logical skill target key.
+   * @returns the canonical lock key, or the input for non-skill keys.
+   */
+  private async canonicalTargetKey(targetKey: string): Promise<string> {
+    if (!targetKey.startsWith('skill::')) return targetKey
+    const rest = targetKey.slice('skill::'.length)
+    const [name, ...tail] = rest.split('::')
+    if (name === undefined || name === '') return targetKey
+    const rel = tail.join('::')
+    const dir = this.dirOf(name)
+    const namespace = rel === '*'
+    const path = namespace ? dir : join(dir, ...rel.replace(/\\/g, '/').split('/').filter(Boolean))
+    let identity = path
+    try {
+      identity = await realpathFs(path)
+    } catch {
+      try {
+        identity = join(await realpathFs(dirname(path)), basename(path))
+      } catch {
+        return targetKey
+      }
+    }
+    const digest = createHash('sha256').update(identity.replace(/\\/g, '/')).digest('hex')
+    return 'skillpath:' + digest + (namespace ? '::*' : '')
   }
 
   private async withMutationLock<T>(task: () => Promise<T>, targetKeys?: readonly string[]): Promise<T> {
