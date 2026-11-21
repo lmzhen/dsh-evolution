@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7q 最终发布确认：用户于 2026-11-22 明确选择 **0.59.6 补丁版** 并确认“现在发布”。独立复核（bc434345..HEAD）结论：新 P0=0、新 P1=0，原 P1-1/P1-2 仍关闭，可进入发布候选。发布动作：推送 main 后创建 tag `v0.59.6`，由 release 工作流按 tag 版本打包/发布 22 个包。
+
 H7p 发布候选验收：最终定向套件 32 files / 320 tests passed；`run-gates local` pass=57 fail=0 cannotDecide=4(registered) skipped=1；`prepare-release --scope @lmzhen --version 0.59.5 --dev-build` 产出 22 个 tarball；`smoke-packed-install` 22 个 tarball 全部可 import 且 bundle patch 存在；`audit-release-tarballs --version 0.59.5` OK。
 
 H7o 最终定向测试稳定复跑：skill-write-service 的未读拒绝用例在满载下 30s 超时，提升该用例超时到 60s（仅测试夹具，不改行为）；全量定向套件复跑 32 files / 320 tests passed，无失败。

@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-22：Phase H7q 最终发布确认
+
+- 用户确认 0.59.6 补丁版、现在发布；
+- 独立复核新 P0/P1=0，原 P1 关闭；
+- tag v0.59.6。
+
 ### 2026-11-21：Phase H7p 发布候选验收
 
 - 定向 32 files / 320 tests passed；
