@@ -37,7 +37,8 @@ export function overlayCandidates(env = process.env) {
   const workspace = resolve(REPO_ROOT, "..")
   const list = []
   if (typeof env.EVOLUTION_OVERLAY_ROOT === "string" && env.EVOLUTION_OVERLAY_ROOT !== "") list.push(resolve(env.EVOLUTION_OVERLAY_ROOT))
-  for (const name of ["harness-0.2.1", "deepseek-harness"]) list.push(join(workspace, name))
+  // Newest workspace build line first; the two historical names remain fallbacks for older beds.
+  for (const name of ["harness-rc3", "harness-0.2.1", "deepseek-harness"]) list.push(join(workspace, name))
   list.push(resolve(PACKAGES_ROOT, ".."))
   return unique(list)
 }

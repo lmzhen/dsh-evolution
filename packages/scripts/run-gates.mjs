@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { validate, counts, render, actionBlock, exitCodeFor, EXIT } from './gates/report.mjs'
 import { createAsyncRunner, decideRequires, clampConcurrency, runTasks } from './gates/runner.mjs'
 import { LANES } from './gates/model.mjs'
-import { softOverlay } from './lib-env.mjs'
+import { resolveAdapter, softOverlay } from './lib-env.mjs'
 import { familyVersion } from './lib-family-version.mjs'
 import { exemptionProblems } from './lib-exemptions.mjs'
 
@@ -95,7 +95,7 @@ const identityFor = (lane) => ({
   face: 'unknown',
   channel: 'src',
   platformLine: 'unknown',
-  adapterSha: sha8(join('D:', 'dsh', '_tools', 'lib-line.mjs')),
+  adapterSha: sha8(resolveAdapter() ?? join('D:', 'dsh', '_tools', 'lib-line.mjs')),
   policySha: policySha8(join(HERE, 'family-facts.json')),
   familyVersion: (() => { try { return JSON.parse(readFileSync(join(MIRROR_ROOT, 'package.json'), 'utf8')).version } catch { return 'unknown' } })(),
   readerSha: sha8(join(HERE, 'lib-param-registry.mjs')),
