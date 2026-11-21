@@ -220,3 +220,4 @@
 | [40-p2-tool-register.md](40-p2-tool-register.md) | P2：工具注册缺失可见 |
 | [41-e7-falsifiability.md](41-e7-falsifiability.md) | E7：falsifiability-carrier 清零 |
 | [42-p2-merge-decision-route.md](42-p2-merge-decision-route.md) | P2：merge decision 路由单源 |
+| [43-p2-ledger-orphans.md](43-p2-ledger-orphans.md) | P2：mutation ledger 拒绝孤儿 |

@@ -369,6 +369,8 @@ if (probesWanted || listWanted) {
     let ledger = { schemaVersion: 1, generatedBy: 'packages/scripts/verify-mutations.mjs --probes', generatedAt: new Date().toISOString(), records: [] }
     if (existsSync(ledgerPath)) { try { const existing = JSON.parse(readBytes(ledgerPath, 'utf8')); if (Array.isArray(existing.records)) ledger = { ...ledger, ...existing, records: existing.records } } catch { /* a damaged ledger is replaced */ } }
     const byProbe = new Map(ledger.records.filter((record) => record !== null && typeof record === 'object').map((record) => [record.probe, record]))
+    const knownProbeIds = new Set(probeRegistry.map((probe) => probe.id))
+    for (const probeId of byProbe.keys()) if (!knownProbeIds.has(probeId)) byProbe.delete(probeId)
     // Stamp ONLY the probes that actually proved red: a signature on an unproven probe would
     // describe a tree for a claim nobody demonstrated.
     const provenIds = new Set(proven.map((entry) => entry.id))

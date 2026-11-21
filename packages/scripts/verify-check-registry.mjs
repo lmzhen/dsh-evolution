@@ -128,14 +128,16 @@ try {
 const probeRegistry = Array.isArray(manifest.probes) ? manifest.probes : []
 const PROBE_ROOT = resolve(HERE, '..')
 const ledgerByProbe = new Map(ledgerRecords.filter((record) => record !== null && typeof record === 'object').map((record) => [record.probe, record]))
+const knownProbeIds = new Set(probeRegistry.map((probe) => probe.id))
+const orphanRecords = ledgerRecords.filter((record) => record !== null && typeof record === 'object' && !knownProbeIds.has(record.probe))
 const uncoveredProbes = probeRegistry.filter((probe) => {
   const record = ledgerByProbe.get(probe.id)
   if (record === undefined || typeof record.signature !== 'string') return true
   try { return probeSignature(PROBE_ROOT, probe) !== record.signature } catch { return true }
 })
-addMeasuredAxis('mutation-coverage', ledgerProblem === null ? uncoveredProbes.length : probeRegistry.length,
+addMeasuredAxis('mutation-coverage', ledgerProblem === null ? uncoveredProbes.length + orphanRecords.length : probeRegistry.length,
   ledgerProblem === null
-    ? 'ledger signatures match ' + String(probeRegistry.length - uncoveredProbes.length) + '/' + String(probeRegistry.length) + ' probe(s)' + (uncoveredProbes.length === 0 ? '' : ' — stale/missing: ' + uncoveredProbes.map((probe) => probe.id).slice(0, 8).join(','))
+    ? 'ledger signatures match ' + String(probeRegistry.length - uncoveredProbes.length) + '/' + String(probeRegistry.length) + ' probe(s)' + (uncoveredProbes.length === 0 ? '' : ' — stale/missing: ' + uncoveredProbes.map((probe) => probe.id).slice(0, 8).join(',')) + (orphanRecords.length === 0 ? '' : ' — orphan records: ' + orphanRecords.map((record) => record.probe).slice(0, 8).join(','))
     : ledgerProblem)
 // producer-wiring: every `requires` producer a check declaration names must be wired somewhere a
 // reader can find it — a manifest row (producer row) or the CI action that runs before the check.
