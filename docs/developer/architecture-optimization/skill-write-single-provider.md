@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7d 已获得跨进程 npm 包写证据：在 lab profile（file tarball 0.59.5）上用两个并发 headless 进程对同一 `race-h7` 做 skill read + sleep barrier + patch/update；history 每次只增加一个版本，另一个写入被 old_string/版本检查拒绝，未出现双写。`dsh web --profile h7lab --port 3083` 页面 200，证明 npm 包可在 web profile 装载；双 web session 的 create/patch 并发仍待补。
+
 H7c 验收准备（进行中）：用 `prepare-release --scope @lmzhen --version 0.59.5 --dev-build` 生成 22 个发布 tarball；在 `D:\dsh-homes\web\profiles\h7lab` 用 pnpm 安装 file tarball，启动独立 web host `http://127.0.0.1:3083`（token 略）。首轮发现同版本 0.59.5 的 peer 依赖被 pnpm 解析到 registry 旧 core，lab 内用本地 tarball 覆盖旧 core 目录后 host 启动成功；这是本地同版本安装的解析现象，不是发布链代码缺陷。真机并发 create/patch 验收待完成。
 
 H7b 已完成：`planFromStaged` 对 patch/remove 的 absent anchor 也生成 plan；现在所有暂存内容写入（create/update/patch/write_file/remove_file）都有完整 plan，approve 不再有空 plan 内容写入。

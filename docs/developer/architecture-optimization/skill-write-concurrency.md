@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7d 跨进程 npm 包并发证据
+
+- lab profile h7headless，两个并发 headless 进程对同一 skill read+sleep+write；
+- 每次 history 只增一个版本，另一写入被拒；无双写；
+- h7lab web 3083 page 200；
+- 双 web session 并发仍待补。
+
 ### 2026-11-21：Phase H7c 真机验收准备（进行中）
 
 - prepare-release 0.59.5 dev tarball 22 个；
