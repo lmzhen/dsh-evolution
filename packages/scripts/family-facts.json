@@ -183,26 +183,7 @@
               "expiry": "release gate: the row can move into the action once the platform project graph typechecks in the released checkout"
             }
           ],
-          "machineLocal": [
-            {
-              "script": "check-tsconfigs.cjs",
-              "reason": "tsconfig registration for the overlay layout",
-              "expiry": "S1.8 follow-up: port into packages/scripts",
-              "owner": "toolchain"
-            },
-            {
-              "script": "check-manifests.cjs",
-              "reason": "manifest version uniformity across the two trees",
-              "expiry": "S1.8 follow-up: port into packages/scripts",
-              "owner": "toolchain"
-            },
-            {
-              "script": "mirror-sync.mjs",
-              "reason": "mirror <-> overlay parity check",
-              "expiry": "S1.8 follow-up: port into packages/scripts",
-              "owner": "toolchain"
-            }
-          ],
+          "machineLocal": [],
           "ciOnly": [
             {
               "script": "audit-release-tarballs.mjs",
@@ -613,7 +594,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "960b1f53dc3ac03d9e345ed1aa0393e00901ad5bf0e3ec394e643f0e6886ad76",
+        "sha256": "ae40dd773e3cf638cd0166257662991254cc3ba1290cbcfca5896f59ee5db67d",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -669,6 +650,21 @@
             "id": "gate-12",
             "tier": "fast",
             "criterion": "verify-param-channel-parity"
+          },
+          {
+            "id": "gate-13",
+            "tier": "fast",
+            "criterion": "verify-family-tsconfigs"
+          },
+          {
+            "id": "gate-14",
+            "tier": "fast",
+            "criterion": "verify-manifest-uniformity"
+          },
+          {
+            "id": "gate-15",
+            "tier": "fast",
+            "criterion": "verify-layout-sync-local"
           },
           {
             "id": "gate-17",
@@ -889,11 +885,6 @@
             "id": "gate-72",
             "tier": "fast",
             "criterion": "requirements.selftest"
-          },
-          {
-            "id": "gate-75",
-            "tier": "fast",
-            "criterion": "verify-layout-sync"
           },
           {
             "id": "gate-76",
@@ -1772,30 +1763,6 @@
             "condition": "release gate: either split the row into real argv rows or keep the exemption; the executability axis already counts it",
             "renewal": "Renewed at 0.57.0 (expiry 0.60.0): the stated condition is still unmet in 0.49; this is a registered debt, not a pass."
           },
-          "gate-13": {
-            "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.60.0",
-            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
-            "condition": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted",
-            "renewal": "Renewed at 0.57.0 (expiry 0.60.0): the three audit-v37 helpers still run outside packages/scripts; the S1.8 port has not happened; this is a registered debt, not a pass."
-          },
-          "gate-14": {
-            "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.60.0",
-            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
-            "condition": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted",
-            "renewal": "Renewed at 0.57.0 (expiry 0.60.0): the three audit-v37 helpers still run outside packages/scripts; the S1.8 port has not happened; this is a registered debt, not a pass."
-          },
-          "gate-15": {
-            "reason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three as machine-local",
-            "owner": "scripts/verify-mutations",
-            "expiry": "0.60.0",
-            "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
-            "condition": "release gate: if the three helpers are ported into packages/scripts (the S1.8 follow-up named in their register), they become normal rows and this exemption is deleted",
-            "renewal": "Renewed at 0.57.0 (expiry 0.60.0): the three audit-v37 helpers still run outside packages/scripts; the S1.8 port has not happened; this is a registered debt, not a pass."
-          },
           "gate-16": {
             "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
             "owner": "scripts/verify-mutations",
@@ -1899,14 +1866,6 @@
             "plan": "run the row on a build line that carries the health baseline and replace this exemption with a proven record; the row stays counted until then",
             "condition": "release gate: revisit when the CI lane supplies the baseline",
             "renewal": "Renewed at 0.57.0 (expiry 0.60.0): a bare overlay still has no health-baseline corpora, so the row cannot decide before mutation; this is a registered debt, not a pass."
-          },
-          "gate-75": {
-            "reason": "the layout-sync row is localSafe=false: its argv uses a CI workspace-relative path (../packages/scripts) that does not resolve on a dev machine, so the baseline is red before any mutation",
-            "owner": "scripts/gates",
-            "expiry": "0.60.0",
-            "plan": "prove the row in the CI workspace where the relative path resolves, or replace the argv with a layout-neutral pair; the row stays counted until then",
-            "condition": "release gate: revisit when the path is layout-neutral or the CI lane runs it",
-            "renewal": "Renewed at 0.57.0 (expiry 0.60.0): the argv still uses the CI-relative ../packages/scripts pair; this is a registered debt, not a pass."
           },
           "gate-59": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",

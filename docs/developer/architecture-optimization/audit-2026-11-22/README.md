@@ -36,6 +36,7 @@
 - E6：删除两个永久跳过的门禁仿真测试，见 [32](32-e6-remove-skips.md)。
 - E5：平台耦合账本改为 expected/both，strict 判 unknown/过期/tree 陈旧，见 [33](33-e5-test-lines.md)。
 - P2：删除 `SKIP_MANIFEST_FRESHNESS` 死开关，见 [34](34-p2-dead-switch.md)。
+- E2：gate-13/14/15 改为真实检查，gate-75 改为 action step，见 [35](35-e2-real-gates.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
@@ -208,3 +209,4 @@
 | [32-e6-remove-skips.md](32-e6-remove-skips.md) | E6：删除永久跳过测试 |
 | [33-e5-test-lines.md](33-e5-test-lines.md) | E5：平台耦合账本可判据化 |
 | [34-p2-dead-switch.md](34-p2-dead-switch.md) | P2：删除 manifest 新鲜度死开关 |
+| [35-e2-real-gates.md](35-e2-real-gates.md) | E2：四条 architecture 门禁真实执行 |

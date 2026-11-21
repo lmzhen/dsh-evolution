@@ -234,51 +234,58 @@
     },
     {
       "id": "gate-13",
-      "kind": "external",
-      "human": "`node D:/dsh/audit-v37/check-tsconfigs.cjs`",
+      "kind": "script",
+      "human": "node packages/scripts/verify-family-tsconfigs.mjs packages",
       "argv": [
         "node",
-        "D:/dsh/audit-v37/check-tsconfigs.cjs"
+        "packages/scripts/verify-family-tsconfigs.mjs",
+        "packages"
       ],
-      "tree": "machine-local",
-      "profiles": [],
-      "reason": "tsconfig registration for the overlay layout",
-      "owner": "toolchain",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
       "lanes": [
-        "machine-local"
+        "local",
+        "ci-static"
       ]
     },
     {
       "id": "gate-14",
-      "kind": "external",
-      "human": "`node D:/dsh/audit-v37/check-manifests.cjs`",
+      "kind": "script",
+      "human": "node packages/scripts/verify-manifest-uniformity.mjs packages",
       "argv": [
         "node",
-        "D:/dsh/audit-v37/check-manifests.cjs"
+        "packages/scripts/verify-manifest-uniformity.mjs",
+        "packages"
       ],
-      "tree": "machine-local",
-      "profiles": [],
-      "reason": "manifest version uniformity across the two trees",
-      "owner": "toolchain",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
       "lanes": [
-        "machine-local"
+        "local",
+        "ci-static"
       ]
     },
     {
       "id": "gate-15",
-      "kind": "external",
-      "human": "`node D:/dsh/audit-v37/mirror-sync.mjs check`",
+      "kind": "script",
+      "human": "node packages/scripts/verify-layout-sync-local.mjs",
       "argv": [
         "node",
-        "D:/dsh/audit-v37/mirror-sync.mjs",
-        "check"
+        "packages/scripts/verify-layout-sync-local.mjs"
       ],
-      "tree": "machine-local",
-      "profiles": [],
-      "reason": "mirror <-> overlay parity check",
-      "owner": "toolchain",
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
       "lanes": [
-        "machine-local"
+        "local",
+        "ci-static"
       ]
     },
     {
@@ -1208,23 +1215,14 @@
     },
     {
       "id": "gate-75",
-      "kind": "script",
+      "kind": "step",
       "human": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
-      "argv": [
-        "node",
-        "packages/evolution/scripts/verify-layout-sync.mjs",
-        "packages/evolution/scripts",
-        "../packages/scripts"
-      ],
+      "argv": null,
       "tree": "overlay",
-      "profiles": [
-        "local",
-        "ci"
-      ],
-      "localSafe": false,
-      "localSafeReason": "CI workspace-relative path — not resolvable on a dev machine",
+      "profiles": [],
+      "command": "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
+      "runBy": "action",
       "lanes": [
-        "local",
         "ci-static"
       ]
     },

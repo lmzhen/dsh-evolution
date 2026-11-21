@@ -47,9 +47,9 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 10 | `node packages/scripts/verify-param-registry.mjs packages --strict` | mirror |
 | 11 | `node packages/scripts/verify-bundle-rows.mjs packages --strict` | mirror |
 | 12 | `node packages/scripts/verify-param-channel-parity.mjs packages --strict` | mirror |
-| 13 | `node D:/dsh/audit-v37/check-tsconfigs.cjs` | machine-local |
-| 14 | `node D:/dsh/audit-v37/check-manifests.cjs` | machine-local |
-| 15 | `node D:/dsh/audit-v37/mirror-sync.mjs check` | machine-local |
+| 13 | node packages/scripts/verify-family-tsconfigs.mjs packages | mirror |
+| 14 | node packages/scripts/verify-manifest-uniformity.mjs packages | mirror |
+| 15 | node packages/scripts/verify-layout-sync-local.mjs | mirror |
 | 16 | `node packages/scripts/verify-profile-bundles.mjs --self-test` | mirror |
 | 17 | `node packages/scripts/verify-doc-facts.mjs packages --strict --require-repo-docs` | mirror |
 | 18 | `node packages/scripts/verify-platform-contract.mjs packages --upstream D:/dsh/_upstream/dsh-upstream-0.2.2-rc.5 --accept-recorded` | mirror |

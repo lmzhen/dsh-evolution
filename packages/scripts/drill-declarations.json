@@ -184,18 +184,6 @@
       "noDrillReason": "this row declares no single command (composite cell: several commands in one table row), so there is no argv a mutation could run - it cannot be mutation-proven",
       "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
     },
-    "gate-13": {
-      "noDrillReason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "gate-14": {
-      "noDrillReason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
-    "gate-15": {
-      "noDrillReason": "machine-local register row: its argv runs a tool tree OUTSIDE the reviewed repo (the audit-v37 helpers), so no mutation inside this repo can red it; verify-check-registry already registers these three",
-      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
-    },
     "gate-16": {
       "noDrillReason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture ",
       "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
@@ -339,10 +327,6 @@
       "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
       "owner": "ci"
     },
-    "gate-75": {
-      "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
-      "owner": "ci"
-    },
     "gate-76": {
       "noDrillReason": "new composite-action gate; its drill is not yet recorded in the mutation ledger",
       "owner": "ci"
@@ -365,6 +349,18 @@
     },
     "gate-82": {
       "noDrillReason": "catalog-level drill is manual (delete a key or change a placeholder); no mutation-ledger entry is registered yet"
+    },
+    "gate-13": {
+      "noDrillReason": "real in-repo tsconfig/manifest/layout check; no mutation fixture yet, so the row stays a registered carrier gap until 0.60.0",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-14": {
+      "noDrillReason": "real in-repo tsconfig/manifest/layout check; no mutation fixture yet, so the row stays a registered carrier gap until 0.60.0",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "gate-15": {
+      "noDrillReason": "real in-repo tsconfig/manifest/layout check; no mutation fixture yet, so the row stays a registered carrier gap until 0.60.0",
+      "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
     }
   }
 }

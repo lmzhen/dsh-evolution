@@ -92,33 +92,27 @@ export const guards = [
   }),
 
   gate("gate-13", {
-    kind: "external",
-    tree: "machine-local",
-    title: "`node D:/dsh/audit-v37/check-tsconfigs.cjs`",
-    argv: ["node","D:/dsh/audit-v37/check-tsconfigs.cjs"],
-    lanes: ["machine-local"],
-    reason: "tsconfig registration for the overlay layout",
-    owner: "toolchain",
+    kind: "script",
+    tree: "mirror",
+    title: "node packages/scripts/verify-family-tsconfigs.mjs packages",
+    argv: ["node","packages/scripts/verify-family-tsconfigs.mjs","packages"],
+    lanes: ["local","ci-static"],
   }),
 
   gate("gate-14", {
-    kind: "external",
-    tree: "machine-local",
-    title: "`node D:/dsh/audit-v37/check-manifests.cjs`",
-    argv: ["node","D:/dsh/audit-v37/check-manifests.cjs"],
-    lanes: ["machine-local"],
-    reason: "manifest version uniformity across the two trees",
-    owner: "toolchain",
+    kind: "script",
+    tree: "mirror",
+    title: "node packages/scripts/verify-manifest-uniformity.mjs packages",
+    argv: ["node","packages/scripts/verify-manifest-uniformity.mjs","packages"],
+    lanes: ["local","ci-static"],
   }),
 
   gate("gate-15", {
-    kind: "external",
-    tree: "machine-local",
-    title: "`node D:/dsh/audit-v37/mirror-sync.mjs check`",
-    argv: ["node","D:/dsh/audit-v37/mirror-sync.mjs","check"],
-    lanes: ["machine-local"],
-    reason: "mirror <-> overlay parity check",
-    owner: "toolchain",
+    kind: "script",
+    tree: "mirror",
+    title: "node packages/scripts/verify-layout-sync-local.mjs",
+    argv: ["node","packages/scripts/verify-layout-sync-local.mjs"],
+    lanes: ["local","ci-static"],
   }),
 
   gate("gate-17", {
@@ -497,13 +491,12 @@ export const guards = [
   }),
 
   gate("gate-75", {
-    kind: "script",
+    kind: "step",
     tree: "overlay",
     title: "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
-    argv: ["node","packages/evolution/scripts/verify-layout-sync.mjs","packages/evolution/scripts","../packages/scripts"],
-    lanes: ["local","ci-static"],
-    localSafe: false,
-    localSafeReason: "CI workspace-relative path — not resolvable on a dev machine",
+    command: "node packages/evolution/scripts/verify-layout-sync.mjs packages/evolution/scripts ../packages/scripts",
+    lanes: ["ci-static"],
+    runBy: "action",
   }),
 
   gate("gate-76", {
