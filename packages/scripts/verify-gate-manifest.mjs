@@ -56,10 +56,12 @@ const problems = []
 // The generator computes its view root from its own location: that is the family mirror layout.
 // In the released-upstream overlay its parent-of-parent is the platform tree and carries no
 // CONTRIBUTING.md, so the probe is only meaningful where that file exists (the mirror verifier
-// still owns the freshness check; the overlay gate must not turn a layout into a red).
+// still owns the freshness check; the overlay gate must not turn a layout into a red). There is
+// deliberately no env bypass: the manifest is generated from this registry, so a stale view is
+// always a defect, never a deployment choice.
 const freshnessHome = resolve(root, '..')
 const freshnessArmed = existsSync(join(freshnessHome, 'CONTRIBUTING.md')) && existsSync(join(root, 'scripts', 'gen-gate-manifest.mjs'))
-if (process.env.SKIP_MANIFEST_FRESHNESS !== '1' && freshnessArmed) {
+if (freshnessArmed) {
   const probe = spawnSync(process.execPath, [join(root, 'scripts', 'gen-gate-manifest.mjs'), '--check'], { encoding: 'utf8' })
   if (probe.status !== 0) {
     const tail = String(probe.stderr || probe.stdout || '').split('\n').filter((l) => l.trim() !== '').slice(-1)[0] || '(no output)'
