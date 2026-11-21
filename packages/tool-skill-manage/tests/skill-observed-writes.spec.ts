@@ -1,5 +1,5 @@
 // @tier fast
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -188,6 +188,78 @@ describe('tool observed writes', () => {
       emitRead(ctx, ownerB, join(root, 'skills', 'patch-gate', 'SKILL.md'))
       const section = await call(ctx, ownerB, { action: 'patch', summary: 'test patch', name: 'patch-gate', section: { heading: 'Details', content: 'new section' } }, 'patch-section-observed')
       expect((section.value as { ok?: boolean }).ok).toBe(true)
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    }
+  }, 30_000)
+
+  it('serializes two owners patching the same support file from the same observation (K2)', async () => {
+    const { ctx, root } = await setup()
+    const ownerA = agent()
+    const ownerB = agent()
+    try {
+      await call(ctx, ownerA, { action: 'create', name: 'patch-race', content: skill('patch-race', 'body') }, 'patch-race-create')
+      await call(ctx, ownerA, { action: 'write_file', name: 'patch-race', file_path: 'references/race.md', file_content: 'alpha\nbeta\n' }, 'patch-race-write')
+      const path = join(root, 'skills', 'patch-race', 'references', 'race.md')
+      emitRead(ctx, ownerA, path)
+      emitRead(ctx, ownerB, path)
+      const [a, b] = await Promise.all([
+        call(ctx, ownerA, { action: 'patch', summary: 'race A', name: 'patch-race', file_path: 'references/race.md', old_string: 'alpha', new_string: 'ALPHA' }, 'patch-race-a'),
+        call(ctx, ownerB, { action: 'patch', summary: 'race B', name: 'patch-race', file_path: 'references/race.md', old_string: 'beta', new_string: 'BETA' }, 'patch-race-b'),
+      ])
+      const okA = (a.value as { ok?: boolean }).ok === true
+      const okB = (b.value as { ok?: boolean }).ok === true
+      expect([okA, okB].filter(Boolean)).toHaveLength(1)
+      const failure = (okA ? b.value : a.value) as { message?: string }
+      expect(failure.message ?? '').toContain('SKILL_STALE_VERSION')
+      const content = await (await import('node:fs/promises')).readFile(path, 'utf8')
+      expect(content).toBe(okA ? 'ALPHA\nbeta\n' : 'alpha\nBETA\n')
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    }
+  }, 30_000)
+
+  it('treats a directory alias as the same support target for lock and observation (K7)', async () => {
+    const { ctx, root } = await setup()
+    const ownerA = agent()
+    const ownerB = agent()
+    try {
+      await call(ctx, ownerA, { action: 'create', name: 'alias-race', content: skill('alias-race', 'body') }, 'alias-race-create')
+      await call(ctx, ownerA, { action: 'write_file', name: 'alias-race', file_path: 'references/real.md', file_content: 'alpha\nbeta\n' }, 'alias-race-write')
+      await symlink(join(root, 'skills', 'alias-race', 'references'), join(root, 'skills', 'alias-race', 'alias-dir'), process.platform === 'win32' ? 'junction' : 'dir')
+      emitRead(ctx, ownerA, join(root, 'skills', 'alias-race', 'references', 'real.md'))
+      emitRead(ctx, ownerB, join(root, 'skills', 'alias-race', 'alias-dir', 'real.md'))
+      const [a, b] = await Promise.all([
+        call(ctx, ownerA, { action: 'patch', summary: 'alias A', name: 'alias-race', file_path: 'references/real.md', old_string: 'alpha', new_string: 'ALPHA' }, 'alias-race-a'),
+        call(ctx, ownerB, { action: 'patch', summary: 'alias B', name: 'alias-race', file_path: 'alias-dir/real.md', old_string: 'beta', new_string: 'BETA' }, 'alias-race-b'),
+      ])
+      const okA = (a.value as { ok?: boolean }).ok === true
+      const okB = (b.value as { ok?: boolean }).ok === true
+      expect([okA, okB].filter(Boolean)).toHaveLength(1)
+      const content = await (await import('node:fs/promises')).readFile(join(root, 'skills', 'alias-race', 'references', 'real.md'), 'utf8')
+      expect(content).toBe(okA ? 'ALPHA\nbeta\n' : 'alpha\nBETA\n')
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    }
+  }, 30_000)
+
+  it('allows exactly one concurrent tool create of the same skill (K8)', async () => {
+    const { ctx, root } = await setup()
+    const ownerA = agent()
+    const ownerB = agent()
+    try {
+      const [a, b] = await Promise.all([
+        call(ctx, ownerA, { action: 'create', name: 'create-skill-race', content: skill('create-skill-race', 'from A') }, 'create-skill-race-a'),
+        call(ctx, ownerB, { action: 'create', name: 'create-skill-race', content: skill('create-skill-race', 'from B') }, 'create-skill-race-b'),
+      ])
+      const okA = (a.value as { ok?: boolean }).ok === true
+      const okB = (b.value as { ok?: boolean }).ok === true
+      expect([okA, okB].filter(Boolean)).toHaveLength(1)
+      const content = await (await import('node:fs/promises')).readFile(join(root, 'skills', 'create-skill-race', 'SKILL.md'), 'utf8')
+      expect(content).toContain(okA ? 'from A' : 'from B')
     } finally {
       await ctx.fiber.dispose()
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })

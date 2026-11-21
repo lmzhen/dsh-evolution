@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7g 验收矩阵 K2/K7/K8
+
+- K2 两 owner 同 support patch：恰一成功、另一 SKILL_STALE_VERSION；
+- K7 目录 junction alias：同 observation/lock，恰一成功；
+- K8 tool 级并发 create：恰一成功；
+- skill-observed-writes 10 passed。
+
 ### 2026-11-21：Phase H7f 独立复核 P1 修复
 
 - P1-1：patch outcome.after 改为 onDisk；support 尾随换行回归；
