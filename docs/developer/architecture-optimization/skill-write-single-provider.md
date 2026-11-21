@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7c 验收准备（进行中）：用 `prepare-release --scope @lmzhen --version 0.59.5 --dev-build` 生成 22 个发布 tarball；在 `D:\dsh-homes\web\profiles\h7lab` 用 pnpm 安装 file tarball，启动独立 web host `http://127.0.0.1:3083`（token 略）。首轮发现同版本 0.59.5 的 peer 依赖被 pnpm 解析到 registry 旧 core，lab 内用本地 tarball 覆盖旧 core 目录后 host 启动成功；这是本地同版本安装的解析现象，不是发布链代码缺陷。真机并发 create/patch 验收待完成。
+
 H7b 已完成：`planFromStaged` 对 patch/remove 的 absent anchor 也生成 plan；现在所有暂存内容写入（create/update/patch/write_file/remove_file）都有完整 plan，approve 不再有空 plan 内容写入。
 
 H3c 已完成：tool 的 create/update/patch/patch.section/write_file/remove_file 全部走 plan；旧 anchor/直接路径改为读当前 bytes 构造显式 expect 后 `SkillWriteService.apply`，tool 不再调用 library 内容 mutator。新增 arch guard N40。

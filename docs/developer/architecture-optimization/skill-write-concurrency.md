@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7c 真机验收准备（进行中）
+
+- prepare-release 0.59.5 dev tarball 22 个；
+- lab profile pnpm file 安装，独立 host 3083 启动；
+- 同版本 peer 被 registry 旧 core 解析，lab 覆盖后启动；
+- 真机并发 create/patch 待做。
+
 ### 2026-11-21：Phase H7b staging plan 全覆盖
 
 - `planFromStaged` 支持 patch/remove absent anchor；
