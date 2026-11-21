@@ -1,15 +1,15 @@
 {
-  "note": "0.59.4 patch: approval patch replay carries the staged content-hash anchor; concurrent web create evidence (a5/b5) and approval staged patches; web profile upgrade needs pnpm install --force after version switch.",
-  "familyVersion": "0.59.4",
+  "note": "0.59.5 patch: section patch approval replay carries the staged body anchor; body/support patch anchor from 0.59.4; real web concurrent create and patch evidence on 0.59.4.",
+  "familyVersion": "0.59.5",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.4",
+      "familyVersion": "0.59.5",
       "startedAt": "2026-11-20T08:00:36.463Z",
       "artifactSha256": "53cc79ca89d915ab3ee53fef33387f1d9401a635c29d71e39ed70c13ca2b8bda",
       "inputsSha256": "a84b4cd86df7a4f85132184c5f4f1b4558738e0ca7ee4db07452739666eed863",
-      "commit": "857744b9",
+      "commit": "",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.4",
+      "familyVersion": "0.59.5",
       "startedAt": "2026-11-20T08:00:36.463Z",
       "artifactSha256": "53cc79ca89d915ab3ee53fef33387f1d9401a635c29d71e39ed70c13ca2b8bda",
       "inputsSha256": "a84b4cd86df7a4f85132184c5f4f1b4558738e0ca7ee4db07452739666eed863",
-      "commit": "857744b9",
+      "commit": "",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -49,11 +49,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.4",
+      "familyVersion": "0.59.5",
       "startedAt": "2026-11-20T08:00:36.463Z",
       "artifactSha256": "53cc79ca89d915ab3ee53fef33387f1d9401a635c29d71e39ed70c13ca2b8bda",
       "inputsSha256": "a84b4cd86df7a4f85132184c5f4f1b4558738e0ca7ee4db07452739666eed863",
-      "commit": "857744b9",
+      "commit": "",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
@@ -66,11 +66,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.4",
+      "familyVersion": "0.59.5",
       "startedAt": "2026-11-20T08:00:36.463Z",
       "artifactSha256": "53cc79ca89d915ab3ee53fef33387f1d9401a635c29d71e39ed70c13ca2b8bda",
       "inputsSha256": "a84b4cd86df7a4f85132184c5f4f1b4558738e0ca7ee4db07452739666eed863",
-      "commit": "857744b9",
+      "commit": "",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
