@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7s 发布后 npm web 验收：新建 `h7post` 独立 profile，从 registry 安装全部 22 个 `@lmzhen/*@0.59.6`；`dsh web --profile h7post --port 3085` 启动无 mixed-family 警告，页面 200；安装的 core 0.59.6 含 `SystemSkillWriter`。确认发布字节可用。
+
 H7r 发布完成：修复 virtual-root IO 下两个 SkillLibrary 实例的 target lock key 回退（root 不存在时用逻辑 key，恢复 shared-root-queue G1/1.4），tag `v0.59.6` 指向 `67255012`，GitHub release run 44926000840 **success**（pack/validate/cohort/desktop/publish/verify 全绿）；npm 已可查 `@lmzhen/dsh-evolution-all@0.59.6` 与 `@lmzhen/dsh-tool-skill-manage@0.59.6`。
 
 H7q 最终发布确认：用户于 2026-11-22 明确选择 **0.59.6 补丁版** 并确认“现在发布”。独立复核（bc434345..HEAD）结论：新 P0=0、新 P1=0，原 P1-1/P1-2 仍关闭，可进入发布候选。发布动作：推送 main 后创建 tag `v0.59.6`，由 release 工作流按 tag 版本打包/发布 22 个包。

@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-22：Phase H7s 发布后 npm web 验收
+
+- h7post 从 registry 装 22 个 0.59.6；
+- host 3085 启动无 mixed-family 警告，页面 200；
+- core 含 SystemSkillWriter。
+
 ### 2026-11-22：Phase H7r 0.59.6 发布完成
 
 - 修复 virtual-root lock key 回退；
