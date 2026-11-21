@@ -932,6 +932,15 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H3b approval replay plan + 旧记录拒绝
+
+- `WriteRunner(args, {replayed})`；approve 传 `replayed:true`；
+- 有 plan → `SkillWriteService.apply(plan)`；无 plan 的新旧内容记录在 approve 时明确拒绝；
+- plan replay 前 `applyLimits()`，收紧 cap 仍生效；
+- update 缺失目标用 `create:false` plan 保留 update-only 语义；
+- tool 全包 111 passed，build 0；
+- per-action anchor 分支仍在，H3c 删除。
+
 ### 2026-11-21：Phase H4b4 unit targetKeys canonical
 
 - `MutationUnitOptions.targetKeyResolver`；apply/recover/undo 三处 lock acquire 前统一 canonical 化；

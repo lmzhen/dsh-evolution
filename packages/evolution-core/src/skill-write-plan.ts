@@ -29,6 +29,8 @@ export type SkillWriteOp =
     readonly target: SkillTarget
     readonly content: string
     readonly expect: SkillWriteExpect
+    /** false keeps update semantics: a missing target is NOT_FOUND, never a create. */
+    readonly create?: boolean
   }
   | {
     readonly kind: 'patch'

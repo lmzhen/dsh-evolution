@@ -62,7 +62,7 @@ function isProcessAlive(pid: number): boolean {
 
 export type { PendingKind, PendingRecord, PendingStatus }
 
-export type WriteRunner = (args: unknown) => Promise<{ ok: boolean; message: string }>
+export type WriteRunner = (args: unknown, context?: { readonly replayed: boolean }) => Promise<{ ok: boolean; message: string }>
 
 /**
  * What one staged write WOULD store, resolved by the package that owns its replay.
@@ -740,7 +740,7 @@ export class EvolutionApproval extends Service {
       return { ok: false, message: `没有为类型「${record.kind}」注册回放运行器。` }
     }
     try {
-      const result = await runner(record.args)
+      const result = await runner(record.args, { replayed: true })
       if (!result.ok) {
         await this.state().releasePendingClaim(id, claimId)
         // v32 REV-07: a replay that fails on staleness/not-found was usually

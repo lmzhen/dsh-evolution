@@ -110,7 +110,7 @@ type SkillWriteExpect =
 
 type SkillWriteOp =
   | { readonly kind: 'createSkill'; readonly skill: string; readonly content: string; readonly managed?: boolean }
-  | { readonly kind: 'write'; readonly target: SkillTarget; readonly content: string; readonly expect: SkillWriteExpect }
+  | { readonly kind: 'write'; readonly target: SkillTarget; readonly content: string; readonly expect: SkillWriteExpect; readonly create?: boolean }
   | { readonly kind: 'patch'; readonly target: SkillTarget; readonly oldString: string; readonly newString: string; readonly replaceAll: boolean; readonly expect: { readonly kind: 'present'; readonly version: string } }
   | { readonly kind: 'patchSection'; readonly target: SkillTarget; readonly section: SkillSectionEdit; readonly expect: { readonly kind: 'present'; readonly version: string } }
   | { readonly kind: 'remove'; readonly target: SkillTarget; readonly expect: { readonly kind: 'present'; readonly version: string } }
@@ -572,6 +572,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - legacy service 方法（updateBody/patchBody/updateSupport/removeSupport）直接调用 library，锁只在 provider；
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
+
+H3b 已完成：approval replay 优先用 `args.plan`；`WriteRunner` 增加 `context.replayed`，approve 路径对无 plan 的旧内容写入明确拒绝；plan replay 前重新 `applyLimits()`，避免绕过收紧后的 cap；update 目标缺失用 `write` + `expect absent` + `create:false` 保留 update-only 语义。per-action anchor staging 分支尚未删除（H3c）。
 
 H4b4 已完成：`MutationUnitOptions.targetKeyResolver` 在 apply/recover/undo 三处 lock acquire 前统一 canonical 化；`SkillLibrary.commitUnit` 与 `withMutationLock` 均注入 `canonicalLockKeys`，跨进程 unit targetKeys 与 in-process/observation identity 使用同一 `skillpath:<hash>`。
 

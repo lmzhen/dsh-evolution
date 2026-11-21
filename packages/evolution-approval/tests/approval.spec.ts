@@ -152,6 +152,27 @@ describe('evolution-approval', () => {
 
   })
 
+  it('tells the runner whether this call is a pending replay', async () => {
+    const home = await tempRoot('dsh-approval-replay-context-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    const contexts: Array<{ replayed: boolean } | undefined> = []
+    ctx.evolutionApproval.registerRunner('skill', async (_args, context) => {
+      contexts.push(context)
+      return { ok: true, message: 'ok' }
+    })
+    const decision = await ctx.evolutionApproval.request({
+      kind: 'skill', summary: 'skill write', args: { operation: { action: 'update', name: 'x' } }, origin: 'background_review',
+    })
+    expect(decision.action).toBe('staged')
+    const pending = await ctx.evolutionApproval.list('pending')
+    const approved = await ctx.evolutionApproval.approve(pending[0]!.id, AUDIT)
+    expect(approved.ok).toBe(true)
+    expect(contexts[0]).toEqual({ replayed: true })
+    const direct = await ctx.evolutionApproval.run('skill', { operation: { action: 'update', name: 'x' } }, { interface: 'background_review' })
+    expect(direct.ok).toBe(true)
+    expect(contexts[1]).toBeUndefined()
+  })
+
   it('keeps a pending record when the runner fails and retains rejection audit', async () => {
     const home = await tempRoot('dsh-approval-fail-')
     const ctx = await mountStateStack(home, { evolution: true, approval: true })

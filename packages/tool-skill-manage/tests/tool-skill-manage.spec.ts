@@ -1006,7 +1006,7 @@ it('P1-13: a staged update of a missing skill is refused when the skill appears 
   // the freshly created content was replaced by the staged bytes.
   const replayed = await replayRun(ctx, operation as Record<string, unknown>, 'foreground')
   expect(replayed.ok).toBe(false)
-  expect(replayed.message).toContain('在这次写入暂存之后发生了变化')
+  expect(replayed.message).toContain('SKILL_STALE_VERSION')
   const onDisk = await readFile(join(root, 'skills', 'late-skill', 'SKILL.md'), 'utf8')
   expect(onDisk).toContain('lifecycle boundary test')
   if (previousHome === undefined) delete process.env.DSH_HOME
@@ -1048,7 +1048,7 @@ it('P1-13: approving the staged update is refused once the skill exists', async 
   const approved = await ctx.evolutionApproval.approve(decision.pending_id as string)
   // Pre-fix this returned ok:true and the created content was replaced.
   expect(approved.ok).toBe(false)
-  expect(approved.message).toContain('在这次写入暂存之后发生了变化')
+  expect(approved.message).toContain('SKILL_STALE_VERSION')
   const onDisk = await readFile(join(root, 'skills', 'no-anchor-skill', 'SKILL.md'), 'utf8')
   expect(onDisk).toContain('lifecycle boundary test')
   if (previousHome === undefined) delete process.env.DSH_HOME

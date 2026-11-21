@@ -3980,7 +3980,8 @@ export class SkillLibrary {
       case 'write': {
         if (op.target.relPath === '') {
           if (op.expect.kind === 'absent') {
-            return await this.create(op.target.skill, op.content, origin)
+            if (op.create !== false) return await this.create(op.target.skill, op.content, origin)
+            return await this.update(op.target.skill, op.content, origin, { absent: true })
           }
           return await this.update(op.target.skill, op.content, origin, { sha256: op.expect.version })
         }

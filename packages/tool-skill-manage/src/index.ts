@@ -278,6 +278,10 @@ function formatProposal(raw: string): string {
  * @param args - the staged record's args: `{ operation }`.
  * @returns the before/after pair, or why there is none to show.
  */
+function isContentWriteAction(action: unknown): boolean {
+  return action === 'create' || action === 'update' || action === 'patch' || action === 'write_file' || action === 'remove_file'
+}
+
 function stagedAnchorOf(operation: SkillWriteArgs): { kind: 'absent' } | { kind: 'present'; version: string } | undefined {
   const raw = operation.staged_from_sha256
   if (raw === undefined || raw === '') return undefined
@@ -293,8 +297,8 @@ function planFromStaged(operation: SkillWriteArgs, origin: WriteOrigin): SkillWr
     return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'createSkill', skill: name, content: operation.content ?? '', ...(origin === 'foreground' ? {} : { managed: true }) }] }
   }
   if (operation.action === 'update') {
-    if (anchor?.kind !== 'present') return undefined
-    return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'write', target: skillBodyTarget(name), content: operation.content ?? '', expect: anchor }] }
+    if (anchor === undefined) return undefined
+    return { origin, ...(summary === undefined ? {} : { summary }), ops: [{ kind: 'write', target: skillBodyTarget(name), content: operation.content ?? '', expect: anchor, ...anchor.kind === 'absent' ? { create: false } : {} }] }
   }
   if (operation.action === 'patch') {
     if (anchor?.kind !== 'present') return undefined
@@ -1690,9 +1694,20 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.inject(['evolutionApproval'], (approvalCtx) => {
     const approval = (approvalCtx as unknown as { evolutionApproval: ApprovalLike }).evolutionApproval
     const preview: WritePreview = async args => await previewSkillWrite(library, args)
-    const dispose = approval.registerRunner('skill', (args) => {
-      const wrapped = (args ?? {}) as { operation?: SkillWriteArgs; origin?: 'foreground' | 'background_review'; libraryOrigin?: 'foreground' | 'subagent' | 'background_review' }
+    const dispose = approval.registerRunner('skill', (args, replayContext) => {
+      const wrapped = (args ?? {}) as { operation?: SkillWriteArgs; plan?: SkillWritePlan; origin?: 'foreground' | 'background_review'; libraryOrigin?: 'foreground' | 'subagent' | 'background_review' }
       const operation = wrapped.operation ?? {}
+      const replayPlan = wrapped.plan
+      if (replayPlan === undefined && replayContext?.replayed === true && isContentWriteAction(operation.action)) {
+        return Promise.resolve({ ok: false, message: '旧的暂存技能写入没有 plan/intent，已拒绝无 anchor 回放；请重新发起这次写入。', skills: [] })
+      }
+      const replay = (gateView?: readonly SkillSummary[]): Promise<SkillActionResult> => replayPlan === undefined
+        ? executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review', gateView)
+        : (applyLimits(), skillWriteService.apply(replayPlan)).then(result => ({
+          ok: result.ok,
+          message: result.ok || result.code === undefined ? result.message : result.code + ': ' + result.message,
+          skills: [],
+        }))
       // S1-B2: the replay re-runs the cross-source gate the tool path ran at
       // staging time — the catalog ranking may have changed while the write
       // sat pending. Same action exemptions as the tool path.
@@ -1701,10 +1716,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         return crossSourceRefusal(operation.name, 'replay').then((gate) => {
           if (gate.refusal !== null) return { ok: false, message: `${gate.refusal}（在批准时重新检查：该写入暂存期间目录排名发生了变化）`, skills: [] }
           // The replay reuses the gate's own observation too (A20): the re-checked write pays one pass.
-          return executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review', gate.view ?? undefined)
+          return replay(gate.view ?? undefined)
         })
       }
-      return executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review')
+      return replay()
     }, preview)
     approvalCtx.effect(() => dispose, 'tool-skill-manage.approval-runner')
   })
