@@ -164,4 +164,56 @@ describe('tool observed writes', () => {
     }
   }, 30_000)
 
+  it('requires an observation for support patching and section patching', async () => {
+    const { ctx, root } = await setup()
+    const ownerA = agent()
+    const ownerB = agent()
+    try {
+      await call(ctx, ownerA, { action: 'create', name: 'patch-gate', content: skill('patch-gate', '## Details\nold') }, 'patch-gate-create')
+      const wrote = await call(ctx, ownerA, { action: 'write_file', name: 'patch-gate', file_path: 'references/a.md', file_content: 'support' }, 'patch-gate-write')
+      expect((wrote.value as { ok?: boolean }).ok).toBe(true)
+
+      const unreadSupport = await call(ctx, ownerB, { action: 'patch', summary: 'test patch', name: 'patch-gate', file_path: 'references/a.md', old_string: 'support', new_string: 'changed' }, 'patch-support-unread')
+      expect((unreadSupport.value as { ok?: boolean }).ok).toBe(false)
+      expect((unreadSupport.value as { message?: string }).message ?? '').toContain('read the skill target before writing it')
+
+      const unreadSection = await call(ctx, ownerB, { action: 'patch', summary: 'test patch', name: 'patch-gate', section: { heading: 'Details', content: 'changed' } }, 'patch-section-unread')
+      expect((unreadSection.value as { ok?: boolean }).ok).toBe(false)
+      expect((unreadSection.value as { message?: string }).message ?? '').toContain('read the skill target before writing it')
+
+      emitRead(ctx, ownerB, join(root, 'skills', 'patch-gate', 'references', 'a.md'))
+      const support = await call(ctx, ownerB, { action: 'patch', summary: 'test patch', name: 'patch-gate', file_path: 'references/a.md', old_string: 'support', new_string: 'changed' }, 'patch-support-observed')
+      expect((support.value as { ok?: boolean; message?: string }).ok, (support.value as { message?: string }).message).toBe(true)
+
+      emitRead(ctx, ownerB, join(root, 'skills', 'patch-gate', 'SKILL.md'))
+      const section = await call(ctx, ownerB, { action: 'patch', summary: 'test patch', name: 'patch-gate', section: { heading: 'Details', content: 'new section' } }, 'patch-section-observed')
+      expect((section.value as { ok?: boolean }).ok).toBe(true)
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    }
+  }, 30_000)
+
+  it('allows one concurrent create of the same absent support file', async () => {
+    const { ctx, root } = await setup()
+    const ownerA = agent()
+    const ownerB = agent()
+    try {
+      await call(ctx, ownerA, { action: 'create', name: 'create-race', content: skill('create-race', 'body') }, 'create-race-create')
+      const options = { action: 'write_file', name: 'create-race', file_path: 'references/a.md' }
+      const [a, b] = await Promise.all([
+        call(ctx, ownerA, { ...options, file_content: 'from A' }, 'create-race-a'),
+        call(ctx, ownerB, { ...options, file_content: 'from B' }, 'create-race-b'),
+      ])
+      const okA = (a.value as { ok?: boolean }).ok === true
+      const okB = (b.value as { ok?: boolean }).ok === true
+      expect([okA, okB].filter(Boolean)).toHaveLength(1)
+      const content = await (await import('node:fs/promises')).readFile(join(root, 'skills', 'create-race', 'references', 'a.md'), 'utf8')
+      expect(content).toBe(okA ? 'from A' : 'from B')
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    }
+  }, 30_000)
+
 })

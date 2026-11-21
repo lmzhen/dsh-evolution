@@ -31,7 +31,7 @@ import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, computeDedupGroups, nearDuplicateSummaries, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_SKILL_WRITE_SUMMARY_CHARS, newSkillLibrary, normalizeChangeSummary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type ChangeSummary, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import { installSkillObservationListener } from './skill-observations.ts'
-import { SkillObservationStore, SkillWriteService, type SkillWriteServiceResult } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillObservationStore, SkillWriteService, type SkillWritePlanResult, type SkillWriteServiceResult } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fuzzyPatch } from '@deepseek-ai/dsh-evolution-core'
 import { anchorVerdict, normalizeFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { createSubagentChannel } from '@deepseek-ai/dsh-evolution-core'
@@ -851,8 +851,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   /** Convert a SkillWriteService result to the tool's legacy action result. */
   function toActionResult(result: SkillWriteServiceResult): SkillActionResult {
     return result.ok
-      ? { ok: true, message: result.message, ...(result.noop === true ? { noop: true } : {}) }
+      ? { ok: true, message: result.message, ...(result.noop === true ? { noop: true } : {}), ...(result.path === undefined ? {} : { path: result.path }), ...(result.normalizedFrontmatterFields === undefined ? {} : { normalizedFrontmatterFields: [...result.normalizedFrontmatterFields] }) }
       : { ok: false, message: result.code === undefined ? result.message : result.code + ': ' + result.message }
+  }
+
+  /** Apply one planned write through the single provider. */
+  async function applyPlanned(planned: Promise<SkillWritePlanResult>, owner: object | undefined): Promise<SkillActionResult> {
+    const plan = await planned
+    if (!plan.ok) return { ok: false, message: plan.code + ': ' + plan.message }
+    return toActionResult(await skillWriteService.apply(plan.plan, owner))
   }
 
   async function executeCore(
@@ -1002,44 +1009,60 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const simpleActions: Record<string, () => Promise<SkillActionResult>> = {
       create: async () => {
         feedbackLines.push(...await duplicateHintLines(name, candidateDescription, crossSourceView))
+        if (owner !== undefined && stagedAnchor === undefined) {
+          const planned = await skillWriteService.planCreate(owner, name, args.content ?? '', origin, origin !== 'foreground')
+          if (!planned.ok) return { ok: false, message: planned.code + ': ' + planned.message, skills: [] }
+          const created = await skillWriteService.apply(planned.plan, owner)
+          return toActionResult(created)
+        }
         const created = await library.create(name, args.content ?? '', origin, { managed: origin !== 'foreground' })
         if (created.ok && owner !== undefined) await skillWriteService.observeBodyWrite(owner, name)
         return created
       },
         update: async () => {
           if (owner !== undefined && stagedAnchor === undefined) {
-            return toActionResult(await skillWriteService.updateBody(owner, name, args.content ?? '', origin))
+            return await applyPlanned(skillWriteService.planUpdate(owner, name, args.content ?? '', origin), owner)
           }
           return library.update(name, args.content ?? '', origin, stagedAnchor)
         },
       patch: async () => {
         const section = args.section
-        if (section === undefined) {
-          if (owner !== undefined && (args.file_path ?? '') === '') {
-            return toActionResult(await skillWriteService.patchBody(owner, name, args.old_string ?? '', args.new_string ?? '', args.replace_all === true, origin))
+        let sectionEdit: { heading: string; content: string; start?: string; end?: string } | undefined
+        if (section !== undefined) {
+          if (typeof section.heading !== 'string' || typeof section.content !== 'string') {
+            return { ok: false, message: 'patch.section 需要 heading 与 content。' }
           }
+          sectionEdit = {
+            heading: section.heading,
+            content: section.content,
+            ...typeof section.start === 'string' ? { start: section.start } : {},
+            ...typeof section.end === 'string' ? { end: section.end } : {},
+          }
+        }
+        if (owner !== undefined && stagedAnchor === undefined) {
+          return await applyPlanned(skillWriteService.planPatch(owner, name, {
+            ...args.old_string === undefined ? {} : { oldString: args.old_string },
+            ...args.new_string === undefined ? {} : { newString: args.new_string },
+            replaceAll: args.replace_all === true,
+            ...args.file_path === undefined ? {} : { filePath: args.file_path },
+            ...(sectionEdit === undefined ? {} : { section: sectionEdit }),
+          }, origin), owner)
+        }
+        if (sectionEdit === undefined) {
           return await library.patch(name, args.old_string ?? '', args.new_string ?? '', args.file_path ?? '', args.replace_all === true, origin, stagedAnchor)
         }
-        if (typeof section.heading !== 'string' || typeof section.content !== 'string') {
-          return { ok: false, message: 'patch.section 需要 heading 与 content。' }
-        }
-        return await library.patchSection(name, {
-          heading: section.heading,
-          content: section.content,
-          ...typeof section.start === 'string' ? { start: section.start } : {},
-          ...typeof section.end === 'string' ? { end: section.end } : {},
-        }, origin, stagedAnchor)
+        return await library.patchSection(name, sectionEdit, origin, stagedAnchor)
       },
       delete: () => library.archive(name, args.absorbed_into ? { absorbedInto: args.absorbed_into } : {}, undefined, change),
       write_file: async () => {
         if (owner !== undefined && stagedAnchor === undefined) {
-          return toActionResult(await skillWriteService.writeSupport(owner, name, args.file_path ?? '', args.file_content ?? '', origin))
+          return await applyPlanned(skillWriteService.planWriteSupport(owner, name, args.file_path ?? '', args.file_content ?? '', origin), owner)
         }
         return library.writeSupportFile(name, args.file_path ?? '', args.file_content ?? '', origin, stagedAnchor)
       },
       remove_file: async () => {
         if (owner !== undefined && stagedAnchor === undefined) {
-          return toActionResult(await skillWriteService.removeSupport(owner, name, args.file_path ?? '', origin))
+          return await applyPlanned(skillWriteService.planRemoveSupport(owner, name, args.file_path ?? '', origin), owner)
         }
         return library.removeSupportFile(name, args.file_path ?? '', origin, stagedAnchor)
       },

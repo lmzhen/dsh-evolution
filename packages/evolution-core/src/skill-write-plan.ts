@@ -74,4 +74,10 @@ export interface SkillWriteResult {
   readonly message: string
   readonly outcomes: readonly SkillWriteOutcome[]
   readonly warnings?: readonly string[]
+  /** Frontmatter keys the write normalized for catalog-loadable YAML. */
+  readonly normalizedFrontmatterFields?: readonly string[]
+  readonly path?: string
+  /** The provider refused because an expected version/absence no longer held. */
+  readonly stale?: true
+  readonly noop?: boolean
 }

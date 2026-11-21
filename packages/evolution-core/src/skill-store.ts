@@ -3908,7 +3908,15 @@ export class SkillLibrary {
       return { ok: false, message: 'multi-op skill write plans are not implemented in H1', outcomes: [] }
     }
     const result = await this.applyOne(op, plan.origin)
-    return { ok: result.ok, message: result.message, outcomes: [] }
+    return {
+      ok: result.ok,
+      message: result.message,
+      outcomes: [],
+      ...(result.stale === true ? { stale: true as const } : {}),
+      ...(result.noop === true ? { noop: true } : {}),
+      ...(result.path === undefined ? {} : { path: result.path }),
+      ...(result.normalizedFrontmatterFields === undefined ? {} : { normalizedFrontmatterFields: result.normalizedFrontmatterFields }),
+    }
   }
 
   private async applyOne(op: SkillWriteOp, origin: WriteOrigin): Promise<SkillActionResult> {

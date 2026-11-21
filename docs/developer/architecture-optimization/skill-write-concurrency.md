@@ -932,7 +932,29 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
-### 2026-11-21：Phase H1 plan 层类型与单 op apply
+### 2026-11-21：Phase H2 tool 写动作接入 plan
+
+H2 把 `tool-skill-manage` 的直接写路径切到 `SkillWriteService.plan` / `SkillLibrary.apply`，approval replay 暂留旧路径（H3 再切）。
+
+已完成：
+
+- `SkillWriteService` 新增：
+  - `planCreate` / `planUpdate` / `planPatch` / `planWriteSupport` / `planRemoveSupport`；
+  - `apply(plan, owner?)`，成功后再记录 observation（H5 改为直接用 outcome）。
+- tool `simpleActions` 的 create/update/patch/write_file/remove_file 在 `owner !== undefined && stagedAnchor === undefined` 时统一走 plan；
+- `patch.section` 和 `patch(file_path)` 不再绕过 service；
+- support create 的 absent 分支变成 `createIfAbsent`，两个并发创建只允许一个成功；
+- 保持 `normalizedFrontmatterFields` / `path` / `noop` 结果字段，create 的 frontmatter 提示与 write_file no-op 不回归；
+- 新增测试：support patch / section patch 无观察拒绝、读后成功、两个 session 并发创建同一 support 只成功一个；
+- 既有 tool 定向套件 91 passed，overlay build 0。
+
+边界：
+
+- approval replay、旧 pending 记录仍是旧路径；
+- observation 写后仍是 re-read，H5 用 provider outcome 替换；
+- 锁仍在 service/library 两处，H4 收敛。
+
+
 
 读完 `skill-write-intent.ts`、`write-kernel.ts`、`mutation-unit.ts` 后修正了单 Provider 方案的第一版类型：**不新增第二套底层 intent/CAS 内核**，plan 层只表达“领域动作 + 期望版本”，provider 再映射到现有 `SkillWriteIntent` / `decideSkillWrite` / `MutationUnit`。
 

@@ -137,6 +137,10 @@ interface SkillWriteResult {
   readonly message: string
   readonly outcomes: readonly SkillWriteOutcome[]
   readonly warnings?: readonly string[]
+  readonly stale?: true
+  readonly noop?: boolean
+  readonly normalizedFrontmatterFields?: readonly string[]
+  readonly path?: string
 }
 ```
 
@@ -516,5 +520,73 @@ H1 边界：
 - tool 路径未改变，仍走旧 service/library 分支；
 - `SkillWriteService.plan()`、observation→expect、approval plan、锁收敛都未开始；
 - H2 才把 tool 全部写动作切到 plan；H3 approval；H4 单锁与 target identity；H5 observation。
+
+## 19. H2 设计（tool 写动作接入 plan）
+
+H2 只改 tool 的“直接写”路径；approval replay 仍在旧 library 分支，H3 再切 plan。
+
+### 19.1 Service API
+
+```ts
+type SkillWritePlanResult =
+  | { ok: true; plan: SkillWritePlan }
+  | { ok: false; code: SkillWriteErrorCode; message: string }
+
+planCreate(owner, name, content, origin, managed): Promise<SkillWritePlanResult>
+planUpdate(owner, name, content): Promise<SkillWritePlanResult>
+planPatch(owner, name, { oldString, newString, replaceAll, filePath, section }): Promise<SkillWritePlanResult>
+planWriteSupport(owner, name, filePath, content): Promise<SkillWritePlanResult>
+planRemoveSupport(owner, name, filePath): Promise<SkillWritePlanResult>
+apply(plan, owner?): Promise<SkillWriteServiceResult>
+```
+
+### 19.2 action → plan 映射
+
+| tool action | plan op | observation |
+|---|---|---|
+| create | `createSkill` | 不需要，createIfAbsent |
+| update | `write` + expect version | 必须 present |
+| patch body | `patch` + expect version | body 必须 present |
+| patch support | `patch` + expect version | support 必须 present |
+| patch section | `patchSection` + expect version | body 必须 present；忽略 file_path |
+| write_file absent | `write` + expect absent | 允许未观察；kernel 用 createIfAbsent |
+| write_file existing | `write` + expect version | 必须 present |
+| remove_file | `remove` + expect version | 必须 present |
+
+`write_file` 的“未观察且不存在”分支仍要读一次当前状态来决定 absent/present；这次读不写 observation，不构成写授权，真正的拒绝由 kernel 的 `createIfAbsent` 完成。
+
+### 19.3 tool 改动
+
+- `executeCore` 的 create/update/patch/write_file/remove_file，在 `owner !== undefined && stagedAnchor === undefined` 时统一：
+  1. `service.plan...`
+  2. `service.apply(plan)`
+  3. 结果转 `SkillActionResult`
+- 删除 tool 内 `library.update/patch/patchSection/writeSupportFile/removeSupportFile` 的直接分支；
+- `patch.section` 不再绕过 service；
+- `patch(file_path)` 不再绕过 service；
+- approval replay（`stagedAnchor` 或 owner undefined）暂留旧路径，H3 改为重放 plan。
+
+### 19.5 H2 落地记录（2026-11-21）
+
+已按本节完成 H2：
+
+- service 新增 `planCreate/planUpdate/planPatch/planWriteSupport/planRemoveSupport` 与 `apply(plan, owner?)`；
+- tool 的 create/update/patch/write_file/remove_file 在直接写路径统一 plan 化；
+- `patch.section` 与 `patch(file_path)` 不再绕过 service；
+- support absent 使用 `createIfAbsent`；
+- 保留 `normalizedFrontmatterFields` / `path` / `noop`，旧结果字段不丢失；
+- 新增 support/section 未读拒绝、读后成功、并发 support create 测试；
+- 既有 tool 定向 91 passed，overlay build 0。
+
+H2 边界：approval replay 仍是旧路径；observation 写后仍 re-read；锁仍在 service/library 两处。
+
+### 19.4 H2 验收
+
+- support patch 未读 → `SKILL_NOT_OBSERVED`；读过 → 成功；
+- section patch 未读 → `SKILL_NOT_OBSERVED`；读过 → 成功；
+- `write_file` 并发创建同一 absent support：一个成功，另一个 `SKILL_ALREADY_EXISTS` / `SKILL_STALE_VERSION`；
+- update/patch/body 既有测试不回退；
+- H1 plan seam 测试继续通过；
+- overlay build 0、定向测试通过。
 
 

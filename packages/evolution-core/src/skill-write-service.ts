@@ -10,9 +10,10 @@
  * @module @deepseek-ai/dsh-evolution-core/skill-write-service
  */
 import { contentHash } from './mutations.ts'
-import type { SkillLibrary, WriteAnchor, WriteOrigin } from './skill-store.ts'
+import type { SkillLibrary, SkillSectionEdit, WriteAnchor, WriteOrigin } from './skill-store.ts'
 import type { SkillObservationStore } from './skill-observation.ts'
 import { skillBodyTarget, skillSupportTarget } from './skill-observation.ts'
+import type { SkillWritePlan } from './skill-write-plan.ts'
 import { SkillTargetLocks } from './skill-target-locks.ts'
 
 /** Exact execution identity for observations. */
@@ -30,7 +31,12 @@ export type SkillWriteErrorCode =
 
 /** Result of one service operation. */
 export type SkillWriteServiceResult =
-  | { readonly ok: true; readonly message: string; readonly noop?: boolean; readonly content?: string | null }
+  | { readonly ok: true; readonly message: string; readonly noop?: boolean; readonly content?: string | null; readonly path?: string; readonly normalizedFrontmatterFields?: readonly string[] }
+  | { readonly ok: false; readonly code: SkillWriteErrorCode; readonly message: string }
+
+/** Result of planning one write action. */
+export type SkillWritePlanResult =
+  | { readonly ok: true; readonly plan: SkillWritePlan }
   | { readonly ok: false; readonly code: SkillWriteErrorCode; readonly message: string }
 
 /**
@@ -72,6 +78,204 @@ export class SkillWriteService {
     const content = await this.library.readSupportFile(name, filePath)
     this.record(owner, target, content)
     return content
+  }
+
+  /**
+   * Plan a create. Creation is createIfAbsent by definition and needs no prior
+   * read; the provider's `create` path keeps managed/protection semantics.
+   * @param owner - writer identity (unused for create, kept for a uniform API).
+   * @param name - skill name.
+   * @param content - full body.
+   * @param managed - add the managed marker (non-foreground origin).
+   * @returns the plan or a typed refusal.
+   */
+  async planCreate(owner: SkillWriteOwner, name: string, content: string, origin: WriteOrigin = 'foreground', managed = false): Promise<SkillWritePlanResult> {
+    void owner
+    return {
+      ok: true,
+      plan: {
+        origin,
+        ops: [{ kind: 'createSkill', skill: name, content, ...(managed ? { managed: true } : {}) }],
+      },
+    }
+  }
+
+  /**
+   * Plan a full body replacement from this owner's observation.
+   * @param owner - exact writer.
+   * @param name - skill name.
+   * @param content - next body.
+   * @param origin - write face.
+   * @returns the plan or a typed refusal.
+   */
+  async planUpdate(owner: SkillWriteOwner, name: string, content: string, origin: WriteOrigin = 'foreground'): Promise<SkillWritePlanResult> {
+    const target = skillBodyTarget(name)
+    const observed = this.observations.requirePresent(owner, target)
+    if (!('version' in observed)) return planRefusal(observed.kind)
+    return {
+      ok: true,
+      plan: {
+        origin,
+        ops: [{ kind: 'write', target, content, expect: { kind: 'present', version: observed.version } }],
+      },
+    }
+  }
+
+  /**
+   * Plan a literal patch against a body or support target.
+   *
+   * A section patch always targets the body and ignores `filePath`; that is the
+   * same contract the library has always had, but now it is explicit in the
+   * plan instead of a tool branch.
+   * @param owner - exact writer.
+   * @param name - skill name.
+   * @param input - literal edit or section edit.
+   * @param origin - write face.
+   * @returns the plan or a typed refusal.
+   */
+  async planPatch(
+    owner: SkillWriteOwner,
+    name: string,
+    input: {
+      readonly oldString?: string
+      readonly newString?: string
+      readonly replaceAll?: boolean
+      readonly filePath?: string
+      readonly section?: SkillSectionEdit
+    },
+    origin: WriteOrigin = 'foreground',
+  ): Promise<SkillWritePlanResult> {
+    if (input.section !== undefined) {
+      const target = skillBodyTarget(name)
+      const observed = this.observations.requirePresent(owner, target)
+      if (!('version' in observed)) return planRefusal(observed.kind)
+      return {
+        ok: true,
+        plan: {
+          origin,
+          ops: [{
+            kind: 'patchSection',
+            target,
+            section: input.section,
+            expect: { kind: 'present', version: observed.version },
+          }],
+        },
+      }
+    }
+    const filePath = input.filePath ?? ''
+    const target = filePath === '' ? skillBodyTarget(name) : skillSupportTarget(name, filePath)
+    const observed = this.observations.requirePresent(owner, target)
+    if (!('version' in observed)) return planRefusal(observed.kind)
+    return {
+      ok: true,
+      plan: {
+        origin,
+        ops: [{
+          kind: 'patch',
+          target,
+          oldString: input.oldString ?? '',
+          newString: input.newString ?? '',
+          replaceAll: input.replaceAll === true,
+          expect: { kind: 'present', version: observed.version },
+        }],
+      },
+    }
+  }
+
+  /**
+   * Plan a full support-file write. A newly observed/absent file is
+   * createIfAbsent; an already observed file is replaceIfVersion. An unread
+   * existing file is refused instead of overwritten.
+   * @param owner - exact writer.
+   * @param name - skill name.
+   * @param filePath - support path.
+   * @param content - next bytes.
+   * @param origin - write face.
+   * @returns the plan or a typed refusal.
+   */
+  async planWriteSupport(
+    owner: SkillWriteOwner,
+    name: string,
+    filePath: string,
+    content: string,
+    origin: WriteOrigin = 'foreground',
+  ): Promise<SkillWritePlanResult> {
+    const target = skillSupportTarget(name, filePath)
+    const observed = this.observations.get(owner, target)
+    if (observed === undefined) {
+      // This read decides absent vs existing; it is not recorded as a read
+      // observation. The real createIfAbsent guard is the kernel anchor.
+      const current = await this.library.readSupportFile(name, filePath)
+      if (current !== null) return notObserved()
+      return { ok: true, plan: { origin, ops: [{ kind: 'write', target, content, expect: { kind: 'absent' } }] } }
+    }
+    if (observed.kind === 'absent') {
+      return { ok: true, plan: { origin, ops: [{ kind: 'write', target, content, expect: { kind: 'absent' } }] } }
+    }
+    return {
+      ok: true,
+      plan: {
+        origin,
+        ops: [{ kind: 'write', target, content, expect: { kind: 'present', version: observed.version } }],
+      },
+    }
+  }
+
+  /**
+   * Plan removing one support file from this owner's observation.
+   * @param owner - exact writer.
+   * @param name - skill name.
+   * @param filePath - support path.
+   * @param origin - write face.
+   * @returns the plan or a typed refusal.
+   */
+  async planRemoveSupport(owner: SkillWriteOwner, name: string, filePath: string, origin: WriteOrigin = 'foreground'): Promise<SkillWritePlanResult> {
+    const target = skillSupportTarget(name, filePath)
+    const observed = this.observations.requirePresent(owner, target)
+    if (!('version' in observed)) return planRefusal(observed.kind)
+    return {
+      ok: true,
+      plan: {
+        origin,
+        ops: [{ kind: 'remove', target, expect: { kind: 'present', version: observed.version } }],
+      },
+    }
+  }
+
+  /**
+   * Apply one plan through the provider and record the committed result for
+   * this owner. The re-read is temporary H2 bookkeeping; H5 replaces it with
+   * the provider's `SkillWriteOutcome`, so a post-commit read failure can never
+   * turn a landed write into a tool failure.
+   * @param plan - the write plan.
+   * @param owner - exact writer identity; omitted by internal callers that do
+   * not own observations.
+   * @returns the service-level result.
+   */
+  async apply(plan: SkillWritePlan, owner?: SkillWriteOwner): Promise<SkillWriteServiceResult> {
+    const result = await this.library.apply(plan)
+    if (result.ok && owner !== undefined) await this.observePlan(plan, owner)
+    return actionResult(result)
+  }
+
+  private async observePlan(plan: SkillWritePlan, owner: SkillWriteOwner): Promise<void> {
+    for (const op of plan.ops) {
+      try {
+        if (op.kind === 'remove') {
+          this.observations.record(owner, op.target, { kind: 'absent' })
+          continue
+        }
+        if (op.kind === 'createSkill') {
+          await this.readBody(owner, op.skill)
+          continue
+        }
+        if (op.target.relPath === '') await this.readBody(owner, op.target.skill)
+        else await this.readSupport(owner, op.target.skill, op.target.relPath)
+      } catch {
+        // H2 compatibility: a post-commit observation read must not change the
+        // write outcome. H5 records from SkillWriteOutcome instead.
+      }
+    }
   }
 
   /**
@@ -199,10 +403,18 @@ function refusal(kind: 'unobserved' | 'absent'): SkillWriteServiceResult {
     : { ok: false, code: 'SKILL_NOT_FOUND', message: 'skill target does not exist' }
 }
 
+function planRefusal(kind: 'unobserved' | 'absent'): SkillWritePlanResult {
+  return refusal(kind) as SkillWritePlanResult
+}
+
+function notObserved(): SkillWritePlanResult {
+  return planRefusal('unobserved')
+}
+
 function anchorOf(version: string): WriteAnchor { return { sha256: version } }
 
-function actionResult(result: { ok: boolean; message: string; noop?: boolean; stale?: true; anchor?: 'match' | 'drift' | 'missing' }): SkillWriteServiceResult {
-  if (result.ok) return { ok: true, message: result.message, ...(result.noop === true ? { noop: true } : {}) }
+function actionResult(result: { ok: boolean; message: string; noop?: boolean; stale?: true; anchor?: 'match' | 'drift' | 'missing'; path?: string; normalizedFrontmatterFields?: readonly string[] }): SkillWriteServiceResult {
+  if (result.ok) return { ok: true, message: result.message, ...(result.noop === true ? { noop: true } : {}), ...(result.path === undefined ? {} : { path: result.path }), ...(result.normalizedFrontmatterFields === undefined ? {} : { normalizedFrontmatterFields: result.normalizedFrontmatterFields }) }
   if (result.stale === true) return { ok: false, code: 'SKILL_STALE_VERSION', message: result.message }
   return { ok: false, code: 'SKILL_INVALID', message: result.message }
 }
