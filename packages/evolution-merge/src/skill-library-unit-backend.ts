@@ -1,8 +1,28 @@
 /** G2 adapter: core UnitBackend over the existing SkillLibrary. */
-import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
+import { contentHash } from '@deepseek-ai/dsh-evolution-core'
+import { SystemSkillWriter, skillBodyTarget, skillSupportTarget, type SkillLibrary, type SkillWritePlan } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { UnitBackend, UnitCommitResult, UnitPlan } from './unit-protocol.ts'
 
+const SYSTEM_ORIGIN = 'background_review' as const
+
+function expectedOf(current: string | null): { kind: 'absent' } | { kind: 'present'; version: string } {
+  return current === null ? { kind: 'absent' } : { kind: 'present', version: contentHash(current) }
+}
+
+function bodyPlan(name: string, content: string, current: string | null): SkillWritePlan {
+  return { origin: SYSTEM_ORIGIN, ops: [{ kind: 'write', target: skillBodyTarget(name), content, expect: expectedOf(current) }] }
+}
+
+function supportPlan(name: string, path: string, content: string | null, current: string | null): SkillWritePlan {
+  const target = skillSupportTarget(name, path)
+  return content === null
+    ? { origin: SYSTEM_ORIGIN, ops: [{ kind: 'remove', target, expect: { kind: 'present', version: contentHash(current ?? '') } }] }
+    : { origin: SYSTEM_ORIGIN, ops: [{ kind: 'write', target, content, expect: expectedOf(current) }] }
+}
+
+
 export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {
+  const writer = new SystemSkillWriter(skills)
   return {
     async readSkill(name) { return await skills.read(name) },
     async readSupportFile(name, path) {
@@ -35,17 +55,19 @@ export function skillLibraryUnitBackend(skills: SkillLibrary): UnitBackend {
     },
     async restoreTarget(name, body) {
       if (body === null) { await skills.archive(name, { reason: 'unit-rollback' }); return }
-      const result = await skills.update(name, body)
+      const result = await writer.apply(bodyPlan(name, body, await skills.read(name)))
       if (!result.ok) throw new Error(result.message)
     },
     async restoreSupportFile(name, path, content) {
-      const result = content === null ? await skills.removeSupportFile(name, path) : await skills.writeSupportFile(name, path, content)
+      const current = await skills.readSupportFile(name, path)
+      const result = await writer.apply(supportPlan(name, path, content, current))
       if (!result.ok) throw new Error(result.message)
     },
     async restoreSource(name, body) {
       const restored = await skills.restoreFromArchive(name)
       if (restored.ok) return
-      const result = await skills.update(name, body)
+      const current = await skills.read(name)
+      const result = await writer.apply(bodyPlan(name, body, current))
       if (!result.ok) throw new Error(result.message)
     },
   }

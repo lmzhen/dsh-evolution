@@ -23,6 +23,7 @@ declare module '@deepseek-ai/dsh-llm' {
 import z from '@deepseek-ai/schemastery'
 import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, SKILL_NAME_RE, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, AUTHORING_SPLIT_LINE_CHARS } from '@deepseek-ai/dsh-evolution-core'
 import { relatedSkillNames } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SystemSkillWriter, skillBodyTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
 /** Shape of one history index file (only the field this reading needs). */
@@ -2394,19 +2395,21 @@ export class EvolutionCurator extends Service {
       return { ok: false, message: `技能「${name}」的版本 v${target} 虽在索引里，但它的存储内容读不出来 —— 拒绝瞎猜、不做写入。` }
     }
     // The anchor is the bytes we just read: a concurrent change between the read and the write is
-    // refused by the library, which is the same protection every other staged write gets.
-    const anchor: WriteAnchor = { sha256: liveHash }
-    const result = await this.skills.update(name, content, 'foreground', anchor)
-    if (!result.ok) return result
+    // refused by the provider, which is the same protection every other staged write gets.
+    const outcome = await new SystemSkillWriter(this.skills).apply({
+      origin: 'foreground',
+      ops: [{ kind: 'write', target: skillBodyTarget(name), content, expect: { kind: 'present', version: liveHash } }],
+    })
+    if (!outcome.ok) return { ok: false, message: outcome.message }
     // The library answers `noop` when the target content already equals the live bytes (a --to naming
     // the live version is the ordinary way there): reporting "this undo is itself a new version" for a
     // write that never happened would be false.
-    if (result.noop === true) {
+    if (outcome.noop === true) {
       return { ok: true, message: `「${name}」已持有 v${target} 的内容 —— 未写入任何内容，也没有记录新版本。` }
     }
     return {
       ok: true,
-      message: `${result.message} （已撤销到 v${target} —— 仅内容：标记、使用计数与策展状态不变，且这次撤销本身就是一个新版本。）`,
+      message: `${outcome.message} （已撤销到 v${target} —— 仅内容：标记、使用计数与策展状态不变，且这次撤销本身就是一个新版本。）`,
     }
   }
 

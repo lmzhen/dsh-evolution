@@ -9,7 +9,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { contentHash } from '@deepseek-ai/dsh-evolution-core'
-import { SkillLibrary, skillBodyTarget, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillLibrary, SystemSkillWriter, skillBodyTarget, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const body = (name: string, text = 'Body.'): string => `---\nname: ${name}\ndescription: plan seam fixture\n---\n${text}\n`
 
@@ -118,5 +118,21 @@ it('refuses a multi-op plan until the unit phase is implemented', async () => {
     expect(result.message).toContain('multi-op')
   } finally {
     await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('SystemSkillWriter applies an explicit snapshot plan without session observation', async () => {
+  const { root, lib } = await setup()
+  try {
+    expect((await lib.create('system-skill', body('system-skill', 'seed'), 'foreground')).ok).toBe(true)
+    const writer = new SystemSkillWriter(lib)
+    const applied = await writer.apply({
+      origin: 'background_review',
+      ops: [{ kind: 'write', target: skillBodyTarget('system-skill'), content: body('system-skill', 'system'), expect: { kind: 'present', version: contentHash(body('system-skill', 'seed')) } }],
+    })
+    expect(applied.ok).toBe(true)
+    expect(await lib.read('system-skill')).toContain('system')
+  } finally {
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
   }
 })

@@ -932,6 +932,14 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H6a SystemSkillWriter
+
+- 新增 `SystemSkillWriter.apply(plan)`；
+- merge restoreTarget/restoreSupportFile/restoreSource 迁移到显式 plan；
+- curator 单技能 undo 正文迁移到显式 anchor plan；
+- provider + merge + curator 定向 89 passed，build 0；
+- curator snapshot restore 与 unit-undo support 仍走 library，H6b 继续。
+
 ### 2026-11-21：Phase H5b skill read bridge，删除写前 seed
 
 - 删除 `executeCore` 的 legacy 写前 read/seed；
