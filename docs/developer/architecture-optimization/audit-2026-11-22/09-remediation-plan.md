@@ -1,6 +1,6 @@
 # 全量审计修复路线
 
-基于 [README.md](README.md) 的 P0/P1/技术债。R0-1（P0-1）、R0-2（A1）、R0-3（B5）、R0-4（D1）、R0-5（F1-F2）已于 2026-11-22 在 main 源码实现，尚未发布，见 [12-r0-observation-plan-design.md](12-r0-observation-plan-design.md) 与 [13-r0-platform-contract-design.md](13-r0-platform-contract-design.md)。先定级再排期；所有行为修复必须带定向测试，验证链修复必须能对旧数据变红。
+基于 [README.md](README.md) 的 P0/P1/技术债。R0-1（P0-1）、R0-2（A1）、R0-3（B5）、R0-4（D1）、R0-5（F1-F2）、R0-6（E3）已于 2026-11-22 在 main 源码实现，尚未发布，见 [12-r0-observation-plan-design.md](12-r0-observation-plan-design.md) 与 [13-r0-platform-contract-design.md](13-r0-platform-contract-design.md)。先定级再排期；所有行为修复必须带定向测试，验证链修复必须能对旧数据变红。
 
 ## 批次 0：先止血（1–3 天）
 

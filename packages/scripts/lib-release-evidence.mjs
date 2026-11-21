@@ -173,6 +173,26 @@ export function validateReleaseEvidence(evidence, options = {}) {
       if (spike !== undefined && spike.familyVersion !== evidence.familyVersion) problems.push('release: spike ' + id + ' was measured on ' + String(spike.familyVersion) + ', not ' + String(evidence.familyVersion))
       if (spike !== undefined && spike.commit !== measuredCommit) problems.push('release: spike ' + id + ' was measured on commit ' + String(spike.commit) + ', not the measured family commit ' + String(measuredCommit))
     }
+    const artifacts = evidence.artifacts
+    const measuredHashes = new Set()
+    if (!isObject(artifacts) || !Array.isArray(artifacts.files) || artifacts.files.length === 0) {
+      problems.push('release: artifacts must list the measured dist tarballs')
+    } else {
+      if (artifacts.count !== artifacts.files.length) problems.push('release: artifacts.count must equal artifacts.files.length')
+      for (const [index, file] of artifacts.files.entries()) {
+        if (!isObject(file) || !nonEmptyString(file.name) || typeof file.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(file.sha256)) {
+          problems.push('release: artifacts.files[' + String(index) + '] must carry a name and sha256')
+          continue
+        }
+        measuredHashes.add(file.sha256)
+      }
+      if (measuredHashes.size === 0) problems.push('release: artifacts carries no usable sha256')
+    }
+    for (const spike of Array.isArray(evidence.spikes) ? evidence.spikes : []) {
+      if (isObject(spike) && nonEmptyString(spike.spike) && measuredHashes.size > 0 && !measuredHashes.has(spike.artifactSha256)) {
+        problems.push('release: spike ' + spike.spike + ' artifactSha256 is not one of the measured dist artifacts')
+      }
+    }
     if (evidence.traceability === undefined || evidence.traceability === null) problems.push('release: traceability reading is required')
     else if (evidence.traceability.covered !== TRACEABILITY_TOTAL) problems.push('release: traceability must cover all ' + String(TRACEABILITY_TOTAL) + ' items')
   }

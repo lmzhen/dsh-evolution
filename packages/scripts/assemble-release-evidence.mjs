@@ -19,6 +19,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { validateReleaseEvidence } from './lib-release-evidence.mjs'
+import { readDistArtifacts } from './lib-release-artifacts.mjs'
 import { familyVersion } from './lib-family-version.mjs'
 
 const argv = process.argv.slice(2)
@@ -26,12 +27,13 @@ const flag = (name) => { const index = argv.indexOf(name); const value = index >
 // P2-39: a positional is any token that is neither a flag nor the VALUE of a
 // value-taking flag. The previous list missed --gates-from-manifest, so a
 // flags-first invocation read its profile ("ci") as the evidence path.
-const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest', '--gates-report', '--cohort-evidence', '--measured-commit', '--commit', '--tag', '--version'])
+const VALUE_FLAGS = new Set(['--rehearsal', '--ci-face', '--os', '--gates-from-manifest', '--gates-report', '--cohort-evidence', '--measured-commit', '--commit', '--tag', '--version', '--dist'])
 const file = argv.find((arg, index) => !arg.startsWith('--') && !VALUE_FLAGS.has(argv[index - 1]))
 const rehearsalPath = flag('--rehearsal')
 const ciFace = flag('--ci-face') || process.env.GITHUB_WORKFLOW_REF || ''
 const os = flag('--os') || process.env.RUNNER_OS || ''
 const gatesFromManifest = flag('--gates-from-manifest')
+const distDir = flag('--dist')
 const gatesReport = flag('--gates-report')
 const cohortEvidence = flag('--cohort-evidence')
 const measuredCommitArg = flag('--measured-commit')
@@ -40,6 +42,11 @@ const tag = flag('--tag')
 const version = (flag('--version') || process.env.RELEASE_VERSION || '').replace(/^v/, '')
 const release = argv.includes('--release')
 const check = argv.includes('--check')
+let artifacts
+if (distDir !== '') {
+  try { artifacts = readDistArtifacts(resolve(distDir)) } catch (error) { console.error('assemble-release-evidence: cannot bind dist artifacts (' + (error instanceof Error ? error.message : String(error)) + ')'); process.exit(2) }
+}
+if (release && artifacts === undefined) { console.error('assemble-release-evidence: --dist <packed dist> is required at the release gate (cannot decide)'); process.exit(2) }
 if (file === undefined || file === '') { console.error('assemble-release-evidence: usage: <release-evidence.json> --rehearsal <inputs.json> [--ci-face <ref>] [--os <os>] [--gates-report <run-gates.json>] [--commit <sha>] [--tag <v...>] [--release] [--check]'); process.exit(2) }
 const evidencePath = resolve(file)
 if (!existsSync(evidencePath)) { console.error('assemble-release-evidence: no staging evidence at ' + evidencePath + ' (cannot decide)'); process.exit(2) }

@@ -308,6 +308,7 @@ jobs:
             --rehearsal packages/evolution/scripts/release-evidence-rehearsal.json \
             --cohort-evidence "$RUNNER_TEMP/cohort-evidence/cohort-evidence.json" \
             --measured-commit "$MEASURED_COMMIT" \
+            --dist packages/evolution/dist \
             --gates-report ci-gates.json \
             --ci-face "$GITHUB_WORKFLOW_REF" --os "$RUNNER_OS" \
             --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME" --release
@@ -319,6 +320,7 @@ jobs:
           # S1-S4 must be PASS (blocked is an environment gap, never a pass). A failure here stops
           # the publish before npm receives a byte.
           node packages/evolution/scripts/verify-release-evidence.mjs packages/evolution/dist/release-evidence.json --release \
+            --dist packages/evolution/dist \
             --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME"
 
       - name: Audit the artifacts about to be published

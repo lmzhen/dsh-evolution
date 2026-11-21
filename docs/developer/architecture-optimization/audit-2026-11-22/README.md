@@ -19,6 +19,7 @@
 - R0-2 / A1：已在 main 源码修复（prepare 期间跳过 create 直接 audit/notify），见 [12](12-r0-observation-plan-design.md)。
 - R0-3 / B5 与 R0-4 / D1：已在 main 源码修复（platform 4.1 调用约定、LLM aborted 终态），见 [13](13-r0-platform-contract-design.md)。
 - R0-5 / F1-F2：已在 main 源码修复（effective config value + 惰性 settings 订阅），见 [14](14-r0-ui-confirm-design.md)。
+- R0-6 / E3：已在 main 源码修复（dist tarball artifact 绑定 + release 门），见 [15](15-r0-release-evidence-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
 ## 方法
@@ -170,3 +171,4 @@
 | [11-target-architecture.md](11-target-architecture.md) | 综合目标架构：HomeFS/UnitKernel/PlanService/StateStore/Projection/Assurance、旧组件去留、迁移与验收 |
 | [13-r0-platform-contract-design.md](13-r0-platform-contract-design.md) | R0-3/B5 + R0-4/D1 平台调用约定与 LLM 终态设计与实现 |
 | [14-r0-ui-confirm-design.md](14-r0-ui-confirm-design.md) | R0-5/F1-F2 UI 确认 effective value 与 settings 订阅 |
+| [15-r0-release-evidence-design.md](15-r0-release-evidence-design.md) | R0-6/E3 evidence 绑定实际 dist tarball 与 release 门 |

@@ -9,10 +9,11 @@ import { describe, expect, it, vi } from 'vitest'
 vi.setConfig({ testTimeout: 30_000 })
 import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import {
   EVIDENCE_SCHEMA_VERSION as EVIDENCE_SCHEMA_VERSION_RAW,
@@ -70,6 +71,7 @@ function releasable(): Record<string, unknown> {
     ciFace: { os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' },
     gates: [{ id: 'gate-01', ok: true, reading: 'passed', criterionEvaluated: true }],
     spikes: SPIKE_IDS.map(id => spike(id)),
+    artifacts: { count: 1, files: [{ name: 'family.tgz', sha256: 'b'.repeat(64) }] },
     traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52, planned: false },
   }
 }
@@ -80,6 +82,7 @@ interface EvidenceDoc {
   gates: unknown[]
   ciFace?: { workflowRef: string }
   traceability?: { covered: number }
+  artifacts?: { count: number; files: Array<{ name: string; sha256: string }> }
 }
 
 interface ExecFailure { code?: number; stdout?: string; stderr?: string }
@@ -124,6 +127,9 @@ describe('release-evidence schema v2', () => {
       ['rehearsal status', (doc) => { doc.evidenceStatus = 'rehearsal' }],
       ['missing platformLine', (doc) => { delete doc.platformLine }],
       ['non-object platformLine', (doc) => { doc.platformLine = '0.2.2-rc.1' }],
+      ['missing artifacts', (doc) => { delete doc.artifacts }],
+      ['artifact hash not measured', (doc) => { (doc.artifacts as Record<string, unknown>).files = [{ name: 'family.tgz', sha256: 'd'.repeat(64) }] }],
+      ['artifact count mismatch', (doc) => { (doc.artifacts as Record<string, unknown>).count = 2 }],
     ]
     for (const [label, mutate] of cases) {
       const doc = releasable()
@@ -194,8 +200,11 @@ describe('release-evidence schema v2', () => {
       for (const spike of inherited.spikes) spike.familyVersion = '0.0.1'
       const inheritedPath = join(dir, 'inherited.json')
       await writeFile(inheritedPath, JSON.stringify(inherited), 'utf8')
+      const dist = join(dir, 'dist')
+      await mkdir(dist)
+      await writeFile(join(dist, 'family.tgz'), 'inherited artifact', 'utf8')
       const result = await run(process.execPath, [assembleScript, evidencePath,
-        '--rehearsal', inheritedPath,
+        '--rehearsal', inheritedPath, '--dist', dist,
         '--ci-face', 'release.yml@refs/tags/v' + FAMILY_VERSION, '--os', 'linux',
         '--commit', 'a'.repeat(40), '--tag', 'v' + FAMILY_VERSION,
         '--version', FAMILY_VERSION, '--release'], { encoding: 'utf8' })
@@ -215,10 +224,16 @@ async function runAssemble(
   const dir = await mkdtemp(join(tmpdir(), 'assemble-evidence-'))
   const evidencePath = join(dir, 'release-evidence.json')
   const inputsPath = join(dir, 'rehearsal.json')
+  const dist = join(dir, 'dist')
+  await mkdir(dist)
+  const artifact = join(dist, 'family.tgz')
+  await writeFile(artifact, 'release artifact fixture', 'utf8')
+  const artifactSha256 = createHash('sha256').update(readFileSync(artifact)).digest('hex')
+  const normalized = { ...(inputs as Record<string, unknown>), ...(Array.isArray((inputs as { spikes?: unknown }).spikes) ? { spikes: ((inputs as { spikes: Array<Record<string, unknown>> }).spikes).map(entry => ({ ...entry, artifactSha256 })) } : {}) }
   await writeFile(evidencePath, JSON.stringify(staging), 'utf8')
-  await writeFile(inputsPath, JSON.stringify(inputs), 'utf8')
+  await writeFile(inputsPath, JSON.stringify(normalized), 'utf8')
   try {
-    const result = await run(process.execPath, [assembleScript, evidencePath, '--rehearsal', inputsPath, ...extra], { encoding: 'utf8' })
+    const result = await run(process.execPath, [assembleScript, evidencePath, '--rehearsal', inputsPath, '--dist', dist, ...extra], { encoding: 'utf8' })
       .then(out => ({ code: 0, stdout: out.stdout, stderr: out.stderr }))
       .catch((error: unknown) => {
         const failure = execFailure(error)
@@ -286,6 +301,35 @@ describe('release-evidence assembly (W3 injection)', () => {
     expect(doc.spikes).toHaveLength(4)
     expect(doc.ciFace).toEqual({ os: 'linux', workflowRef: 'release.yml@refs/tags/v0.27.0' })
     await rm(dir, { recursive: true, force: true })
+  })
+
+  it('refuses a release assembly without the packed dist (cannot decide)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'assemble-no-dist-'))
+    const evidencePath = join(dir, 'release-evidence.json')
+    const inputsPath = join(dir, 'rehearsal.json')
+    await writeFile(evidencePath, JSON.stringify(staging()), 'utf8')
+    await writeFile(inputsPath, JSON.stringify(rehearsalInputs()), 'utf8')
+    try {
+      const result = await run(process.execPath, [assembleScript, evidencePath, '--rehearsal', inputsPath, '--ci-face', 'release.yml@refs/tags/v0.27.0', '--os', 'linux', '--release', '--version', FAMILY_VERSION], { encoding: 'utf8' })
+        .then(() => ({ code: 0, stderr: '' })).catch((error: unknown) => ({ code: execFailure(error).code ?? 1, stderr: execFailure(error).stderr ?? '' }))
+      expect(result.code).toBe(2)
+      expect(result.stderr).toContain('--dist')
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+
+  it('refuses evidence whose recorded artifacts do not match the dist bytes', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'verify-artifact-mismatch-'))
+    const evidencePath = join(dir, 'release-evidence.json')
+    const dist = join(dir, 'dist')
+    await mkdir(dist)
+    await writeFile(join(dist, 'family.tgz'), 'actual bytes', 'utf8')
+    await writeFile(evidencePath, JSON.stringify(releasable()), 'utf8')
+    try {
+      const result = await run(process.execPath, [script, evidencePath, '--release', '--version', FAMILY_VERSION, '--dist', dist], { encoding: 'utf8' })
+        .then(() => ({ code: 0, stderr: '' })).catch((error: unknown) => ({ code: execFailure(error).code ?? 1, stderr: execFailure(error).stderr ?? '' }))
+      expect(result.code).toBe(1)
+      expect(result.stderr).toContain('artifacts')
+    } finally { await rm(dir, { recursive: true, force: true }) }
   })
 
   it('refuses a rehearsal snapshot that is not release-complete', async () => {

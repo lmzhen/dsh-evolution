@@ -13,11 +13,12 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { EVIDENCE_SCHEMA_VERSION, validateReleaseEvidence } from './lib-release-evidence.mjs'
+import { verifyEvidenceArtifacts } from './lib-release-artifacts.mjs'
 import { readPlatformLine, resolvePlatformLineRoot } from './lib-platform-line.mjs'
 import { familyVersion } from './lib-family-version.mjs'
 
 const argv = process.argv.slice(2)
-const VALUE_FLAGS = new Set(['--commit', '--tag', '--version'])
+const VALUE_FLAGS = new Set(['--commit', '--tag', '--version', '--dist'])
 const file = argv.find((arg, index) => !arg.startsWith('--') && !VALUE_FLAGS.has(argv[index - 1]))
 const valueOf = (name) => { const index = argv.indexOf(name); const value = index >= 0 ? argv[index + 1] : undefined; return value !== undefined && !value.startsWith('--') ? value : '' }
 const release = argv.includes('--release')
@@ -25,6 +26,7 @@ const json = argv.includes('--json')
 const expectedCommit = valueOf('--commit')
 const expectedTag = valueOf('--tag')
 const version = (valueOf('--version') || process.env.RELEASE_VERSION || '').replace(/^v/, '')
+const dist = valueOf('--dist')
 if (file === undefined) { console.error('verify-release-evidence: usage: <release-evidence.json> [--release] [--json] [--commit <sha>] [--tag <v...>]'); process.exit(2) }
 const path = resolve(file)
 if (!existsSync(path)) { console.error('verify-release-evidence: no evidence at ' + path + ' (cannot decide)'); process.exit(2) }
@@ -46,6 +48,9 @@ try {
   if (evidence?.platformLine?.contract !== line.contract) problems.push('platformLine.contract differs from platform-line.json')
 } catch (error) {
   problems.push('platform-line.json could not be read: ' + (error instanceof Error ? error.message : String(error)))
+}
+if (dist !== '') {
+  try { problems.push(...verifyEvidenceArtifacts(evidence, dist)) } catch (error) { console.error('verify-release-evidence: cannot bind dist artifacts (' + (error instanceof Error ? error.message : String(error)) + ')'); process.exit(2) }
 }
 if (problems.length > 0) {
   if (json) console.log(JSON.stringify({ ok: false, release, problems }, null, 2))
