@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H4b4 unit targetKeys canonical
+
+- `MutationUnitOptions.targetKeyResolver`；apply/recover/undo 三处 lock acquire 前统一 canonical 化；
+- `SkillLibrary.commitUnit`/`withMutationLock` 注入 canonical resolver；
+- 跨进程 unit key、in-process 锁、observation identity 共用 `skillpath:<hash>`；
+- tool + core 定向 148 passed，build 0。
+
 ### 2026-11-21：Phase H4b3 observation 单 identity
 
 - observation store 不再记录逻辑键，只认 `identityKey`；

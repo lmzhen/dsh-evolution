@@ -226,6 +226,8 @@ export interface MutationUnitOptions {
   targetKeys?: readonly string[]
   /** Recovery-only: derive keys from the snapshot being recovered. */
   targetKeysForSnapshot?: (snapshot: { readonly ops: readonly { readonly target: string }[] }) => readonly string[]
+  /** Resolve logical target keys to the backend's canonical lock identity. */
+  targetKeyResolver?: (keys: readonly string[]) => Promise<readonly string[]> | readonly string[]
   /** Explicit escape for a caller that already holds the home fence (nested merge/skill write). */
   nested?: boolean
   journal?: MutationJournalPort
@@ -274,6 +276,7 @@ export class MutationUnit {
   private readonly lock: MutationLockPort
   private readonly targetKeys: readonly string[] | undefined
   private readonly targetKeysForSnapshot: MutationUnitOptions['targetKeysForSnapshot'] | undefined
+  private readonly targetKeyResolver: MutationUnitOptions['targetKeyResolver'] | undefined
   private readonly journal: MutationJournalPort | undefined
   private readonly snapshots: MutationSnapshotPort | undefined
   private readonly claim: UnitClaimPort | undefined
@@ -310,6 +313,11 @@ export class MutationUnit {
     this.kernel = new WriteKernel({ io: this.io, ...(transact === undefined ? {} : { transact }), now: this.now })
   }
 
+  private async resolveTargetKeys(keys: readonly string[] | undefined): Promise<readonly string[] | undefined> {
+    if (keys === undefined || this.targetKeyResolver === undefined) return keys
+    return await this.targetKeyResolver(keys)
+  }
+
   preview(request: MutationRequest): MutationPreviewResult {
     const validation = validateMutationRequest(request, this.limits)
     return {
@@ -330,7 +338,7 @@ export class MutationUnit {
     return await this.serial(async () => {
       let lease: MutationLockLease
       try {
-        lease = await this.lock.acquire(this.targetKeys)
+        lease = await this.lock.acquire(await this.resolveTargetKeys(this.targetKeys))
       } catch (error) {
         const code = error instanceof TransactionNotInvokedError ? 'transact-not-invoked' : 'unit-fence-failed'
         return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }
@@ -461,7 +469,7 @@ export class MutationUnit {
     return await this.serial(async () => {
       let lease: MutationLockLease
       try {
-        lease = await this.lock.acquire(this.targetKeysForSnapshot?.(snapshot) ?? this.targetKeys)
+        lease = await this.lock.acquire(await this.resolveTargetKeys(this.targetKeysForSnapshot?.(snapshot) ?? this.targetKeys))
       } catch (error) {
         const code = error instanceof TransactionNotInvokedError ? 'transact-not-invoked' : 'unit-fence-failed'
         return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }
@@ -515,7 +523,7 @@ export class MutationUnit {
     return await this.serial(async () => {
       let lease: MutationLockLease
       try {
-        lease = await this.lock.acquire(this.targetKeys)
+        lease = await this.lock.acquire(await this.resolveTargetKeys(this.targetKeys))
       } catch (error) {
         return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'lock-failed', message: error instanceof Error ? error.message : String(error) }] }
       }

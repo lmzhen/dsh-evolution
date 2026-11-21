@@ -573,6 +573,10 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H4b4 已完成：`MutationUnitOptions.targetKeyResolver` 在 apply/recover/undo 三处 lock acquire 前统一 canonical 化；`SkillLibrary.commitUnit` 与 `withMutationLock` 均注入 `canonicalLockKeys`，跨进程 unit targetKeys 与 in-process/observation identity 使用同一 `skillpath:<hash>`。
+
+H4b 完成；下一阶段 H5。
+
 H4b3 已完成：observation store 只以 `identityKey` 为键，不再同时记录逻辑键；`fs/observed` listener 用 `realpathSync.native` 生成与 `SkillLibrary.canonicalTargetKey` 相同的 identity（修复 Windows 8.3 短路径与异步 realpath 不一致）。unit targetKeys 仍未 canonical 化，H4b4 处理。
 
 H4b2 已完成：`SkillTarget` 增加可选 `identityKey`；`SkillLibrary.identify` 用同一 `canonicalTargetKey` 生成；service read/plan 使用 identify；平台 `fs/observed` listener 用 `skillHostIdentity` 记录 identity；observation store 以 identity 为主键，并暂时保留逻辑键兼容旧测试/旧记录。unit targetKeys 仍逻辑键，H4b3 统一。

@@ -918,6 +918,11 @@ export class SkillLibrary {
     return await this.targetLocks.withLock(await this.canonicalTargetKey(targetKey), task)
   }
 
+  /** Canonicalize several logical target keys for one lock acquisition. */
+  private async canonicalLockKeys(keys: readonly string[]): Promise<readonly string[]> {
+    return await Promise.all(keys.map(key => this.canonicalTargetKey(key)))
+  }
+
   /**
    * Attach the canonical realpath identity to one observation target.
    * @param target - logical skill target.
@@ -967,7 +972,8 @@ export class SkillLibrary {
     // Fail closed: a missing authority/lock is an assembly error, not a reason to run
     // the write outside the fence. The old catch-and-fallback inverted this guard: the
     // "refusing an unfenced production write" error itself took the fallback path.
-    const lease = await this.lockPort().acquire(targetKeys)
+    const keys = targetKeys === undefined ? undefined : await this.canonicalLockKeys(targetKeys)
+    const lease = await this.lockPort().acquire(keys)
     try {
       return await task()
     } finally {
@@ -982,6 +988,7 @@ export class SkillLibrary {
       io: this.io,
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
+      targetKeyResolver: keys => this.canonicalLockKeys(keys),
       ...options,
     })
   }
