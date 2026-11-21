@@ -197,6 +197,22 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     expect(screen.queryByText('late')).toBeNull()
   })
 
+  it('F4: a failed preview is retried by clicking the same row again', async () => {
+    let calls = 0
+    const loadBody = vi.fn(async (_name: string, v: number) => {
+      calls += 1
+      if (calls === 1) throw new Error('network')
+      return { v, display: '# retry', chars: 7, truncated: false }
+    })
+    render(createElement(SkillHistoryPanel, makeFace({ loadBody })))
+    await openSkill('alpha')
+    await waitFor(() => { expect(loadBody).toHaveBeenCalled() })
+    const previews = (): HTMLElement[] => screen.getAllByRole('button', { name: /^preview\./ })
+    fireEvent.click(previews()[0]!)
+    await screen.findByText('# retry')
+    expect(loadBody.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
   it('P2-30: a stale read cannot erase a newer generation that is already ready', async () => {
     const slow = deferred<{ v: number; display: string; chars: number; truncated: boolean }>()
     const loadBody = vi.fn((name: string, v: number) => name === 'alpha'

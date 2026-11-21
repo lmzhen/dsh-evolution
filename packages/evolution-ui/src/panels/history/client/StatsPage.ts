@@ -55,6 +55,8 @@ const SORT_OPTIONS: readonly { readonly key: SkillStatsSortKey; readonly label: 
  */
 export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
+  const [refreshFailure, setRefreshFailure] = useState<string | undefined>(undefined)
+  const [retryToken, setRetryToken] = useState(0)
   const layout = face.layout
   const tableRef = useRef<HTMLDivElement | null>(null)
   const hiddenInMedium = new Set(['supportFiles', 'versions', 'viewCount', 'feedbackRate30d', 'lastAt'])
@@ -68,14 +70,18 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
     // load has no data to preserve.
     setLoad(current => current.status === 'ready' ? current : { status: 'loading' })
     void face.loadStats().then(snapshot => {
-      if (live) setLoad({ status: 'ready', snapshot })
+      if (!live) return
+      setRefreshFailure(undefined)
+      setLoad({ status: 'ready', snapshot })
     }).catch((error: unknown) => {
-      if (live) setLoad(current => current.status === 'ready'
-        ? current
-        : { status: 'failed', message: error instanceof Error ? error.message : String(error) })
+      if (!live) return
+      const message = error instanceof Error ? error.message : String(error)
+      // F3: a failed REFRESH keeps the last good table but must not pretend it is fresh.
+      setRefreshFailure(message)
+      setLoad(current => current.status === 'ready' ? current : { status: 'failed', message })
     })
     return () => { live = false }
-  }, [face.loadStats, face.statsRevision])
+  }, [face.loadStats, face.statsRevision, retryToken])
 
   const snapshot = load.status === 'ready' ? load.snapshot : null
   const visible = useMemo(() => {
@@ -281,6 +287,9 @@ export function StatsPage(face: StatsFace): ReturnType<typeof createElement> {
       : load.status === 'loading'
         ? createElement('div', { className: 'evo-stats-loading' }, face.t('loading'))
         : createElement('div', { className: 'evo-stats-table-card', ref: tableRef },
+          refreshFailure === undefined ? null : createElement('div', { className: 'evo-stats-refresh-failure', role: 'status' },
+            createElement('span', null, face.t('stats.failed') + face.t('stats.colon') + refreshFailure),
+            createElement('button', { type: 'button', className: 'evo-stats-refresh-retry', onClick: () => { setRetryToken(current => current + 1) } }, face.t('refresh'))),
           createElement('div', { className: 'evo-stats-table-head' },
             createElement('strong', null, face.t('stats.tableTitle')),
             createElement('span', null, face.t('stats.tableHint'))),
@@ -344,6 +353,8 @@ export const STATS_CSS = [
   '.evo-stats-filter{height:32px;padding:0 11px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:8px;background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-secondary,#6f766d);font:inherit;font-size:11.5px;font-weight:600;cursor:pointer}',
   '.evo-stats-filter.is-active{border-color:#bdd3c8;background:var(--evo-accent-weak,#e7f0eb);color:var(--evo-accent,#2f6b58)}',
   '.evo-stats-filter:focus-visible,.evo-stats-skill-name:focus-visible{outline:var(--evo-focus-ring,2px solid #2f6b58);outline-offset:2px}',
+  '.evo-stats-refresh-failure{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#f0eee8);background:var(--dsw-alias-bg-warning,#fff8e6);color:var(--dsw-alias-label-secondary,#6f766d);font-size:11.5px}',
+  '.evo-stats-refresh-retry{border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:2px 8px}',
   '.evo-stats-table-card{border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:12px;background:var(--dsw-alias-bg-layer-1,#fff);overflow:hidden;min-height:0}',
   '.evo-stats-table-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#f0eee8)}',
   '.evo-stats-table-head strong{font-size:12px;font-weight:650;color:var(--dsw-alias-label-primary,#20261f)}',

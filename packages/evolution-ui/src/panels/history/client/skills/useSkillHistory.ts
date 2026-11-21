@@ -241,13 +241,17 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
    */
   const toggle = (v: number, kind: OpenKind): void => {
     if (selected === undefined) return
+    const cached = kind === 'diff' ? diffs.get(v) : bodies.get(v)
     if (expanded !== undefined && expanded.v === v && expanded.kind === kind) {
-      setExpanded(undefined)
-      return
+      // A FAILED expansion is not an answer: clicking it again retries instead of collapsing.
+      if (cached?.kind !== 'failed') {
+        setExpanded(undefined)
+        return
+      }
     }
     setExpanded({ v, kind })
     // A cached answer costs nothing and must not invalidate a read already in flight.
-    if (kind === 'diff' ? diffs.has(v) : bodies.has(v)) return
+    if (cached !== undefined && cached.kind !== 'failed') return
     const name = selected
     // Both lazy reads take the SAME ticket as a rows read: a slow reply for a skill the operator has
     // already left must not land in the next skill's map, where the version numbers would name a

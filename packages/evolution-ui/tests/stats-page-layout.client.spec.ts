@@ -1,7 +1,7 @@
 // @tier pre-tag
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { StatsPage, type StatsFace } from '../src/panels/history/client/StatsPage.ts'
 import type { SkillStatsRow, SkillStatsSnapshot } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -54,6 +54,24 @@ describe('stats page presentation', () => {
     const view = render(createElement(StatsPage, face('narrow')))
     await waitFor(() => { expect(view.container.querySelectorAll('.evo-stats-card')).toHaveLength(2) })
     expect(view.container.querySelector('.evo-data-table')).toBeNull()
+  })
+
+  it('F3: a failed refresh keeps the table but shows a retry strip', async () => {
+    let calls = 0
+    const loadStats = vi.fn(async () => {
+      calls += 1
+      if (calls === 2) throw new Error('unauthorized')
+      return snapshot()
+    })
+    const base = face('wide')
+    const view = render(createElement(StatsPage, { ...base, loadStats, statsRevision: 0 }))
+    await waitFor(() => { expect(view.container.querySelectorAll('thead th').length).toBe(11) })
+    view.rerender(createElement(StatsPage, { ...base, loadStats, statsRevision: 1 }))
+    await waitFor(() => { expect(view.container.querySelector('.evo-stats-refresh-failure')).not.toBeNull() })
+    expect(view.container.textContent).toContain('unauthorized')
+    expect(view.container.textContent).toContain('refresh')
+    fireEvent.click(view.container.querySelector('.evo-stats-refresh-retry') as HTMLButtonElement)
+    await waitFor(() => { expect(view.container.querySelector('.evo-stats-refresh-failure')).toBeNull() })
   })
 
   it('renders unreadable as its own actionable status, not Unknown', async () => {
