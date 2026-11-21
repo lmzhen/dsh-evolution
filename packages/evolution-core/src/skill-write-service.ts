@@ -252,7 +252,14 @@ export class SkillWriteService {
    */
   async apply(plan: SkillWritePlan, owner?: SkillWriteOwner): Promise<SkillWriteServiceResult> {
     const result = await this.library.apply(plan)
-    if (result.ok && owner !== undefined) await this.observeOutcomes(result, owner)
+    if (result.ok && owner !== undefined) {
+      try {
+        await this.observeOutcomes(result, owner)
+      } catch {
+        // The write is already committed; an observation-cache failure must not
+        // turn a landed write into a tool failure (K6).
+      }
+    }
     return actionResult(result)
   }
 

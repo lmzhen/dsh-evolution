@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7n K6 observation failure
+
+- observation.record 抛错被捕获；
+- 已提交写仍成功；
+- 故障注入测试 7 passed。
+
 ### 2026-11-21：Phase H7m approve 成功回放
 
 - 真实 approve create/update/patch/write_file/remove_file；

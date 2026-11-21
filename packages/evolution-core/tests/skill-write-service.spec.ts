@@ -1,5 +1,5 @@
 // @tier fast
-import { rm } from 'node:fs/promises'
+import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -76,6 +76,17 @@ describe('SkillWriteService observations', () => {
       expect.objectContaining({ ok: true }),
     )
   }, 30_000)
+  it('keeps a committed write successful when observation recording throws (K6)', async () => {
+    const { service, lib } = await setup()
+    const observations = (service as unknown as { observations: { record: (...args: never[]) => void } }).observations
+    observations.record = () => { throw new Error('observation cache failed') }
+    const plan = await service.planCreate({}, 'obs-fail', body('committed').replace('name: write-service', 'name: obs-fail'), 'foreground')
+    expect(plan.ok).toBe(true)
+    const result = await service.apply(plan.plan, {})
+    expect(result.ok).toBe(true)
+    expect(await readFile(join(lib.root, 'obs-fail', 'SKILL.md'), 'utf8')).toContain('committed')
+  }, 30_000)
+
   it('keeps a review child owner independent from its parent session', async () => {
     const { service } = await setup()
     const parent = { kind: 'parent-session' }
