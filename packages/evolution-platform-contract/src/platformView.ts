@@ -11,5 +11,6 @@ export interface PluginInventoryPort {
 }
 
 export interface ConfigEditorPort {
-  configuration?(): Promise<unknown>
+  /** The platform returns the array synchronously; callers may still await a non-promise. */
+  configuration?(): unknown
 }

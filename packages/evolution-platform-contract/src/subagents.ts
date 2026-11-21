@@ -14,5 +14,5 @@ export interface SubagentSendOptions {
 export interface SubagentsPort {
   getProvider(name: string): unknown
   start(spec: unknown): Promise<SubagentActivationPort>
-  sendMessage?(sender: unknown, targetId: string, content: unknown, options?: SubagentSendOptions): Promise<unknown>
+  sendMessage?(sender: unknown, targetId: string, content: unknown, options: SubagentSendOptions): Promise<unknown>
 }

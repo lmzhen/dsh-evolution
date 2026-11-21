@@ -24,7 +24,7 @@ interface PluginInventoryServiceLike {
 }
 
 interface ConfigEditorServiceLike {
-  configuration?(): Promise<unknown>
+  configuration?(): unknown
 }
 
 export function pluginManagerPort(ctx: Context): PluginManagerPort | undefined {

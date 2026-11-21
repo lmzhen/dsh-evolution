@@ -17,7 +17,7 @@ export type {
 interface SubagentsServiceLike {
   getProvider(name: string): unknown
   startActivation(spec: unknown): Promise<SubagentActivationPort>
-  sendMessage?(sender: unknown, targetId: string, content: unknown, options?: SubagentSendOptions): Promise<unknown>
+  sendMessage?(sender: unknown, targetId: string, content: unknown, options: SubagentSendOptions): Promise<unknown>
 }
 
 /** Resolve the subagents port; undefined means the host has no subagents service. */
@@ -31,7 +31,7 @@ export function subagentsPort(ctx: Context): SubagentsPort | undefined {
     getProvider: (name) => subagents.getProvider(name),
     start: (spec) => subagents.startActivation(spec),
     ...(typeof subagents.sendMessage === 'function'
-      ? { sendMessage: (sender: unknown, targetId: string, content: unknown, options?: SubagentSendOptions) => subagents.sendMessage!(sender, targetId, content, options) }
+      ? { sendMessage: (sender: unknown, targetId: string, content: unknown, options: SubagentSendOptions) => subagents.sendMessage!(sender, targetId, content, options) }
       : {}),
   }
 }
