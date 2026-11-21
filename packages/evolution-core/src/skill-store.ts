@@ -948,6 +948,13 @@ export class SkillLibrary {
    */
   private async canonicalTargetKey(targetKey: string): Promise<string> {
     if (!targetKey.startsWith('skill::')) return targetKey
+    // Fake/virtual IO roots do not exist on this host: fall back to the logical key
+    // so two library instances over the same virtual root still share one queue.
+    try {
+      await realpathFs(this.root)
+    } catch {
+      return targetKey
+    }
     const rest = targetKey.slice('skill::'.length)
     const [name, ...tail] = rest.split('::')
     if (name === undefined || name === '') return targetKey
