@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7a arch guards
+
+- N38：`SkillTargetLocks` 只允许 provider 构造；
+- N39：`targetKey` 字面量只允许出现在 `skill-observation.ts` 的 target factory；
+- arch guard 42 rules clean；
+- tool 直调 library mutator 与 pending plan 强制仍待 H3c/审批清理。
+
 ### 2026-11-21：Phase H6b curator snapshot/unit-undo
 
 - curator snapshot `writeSkill` 读当前 bytes 后构造显式 plan；

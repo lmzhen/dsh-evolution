@@ -259,6 +259,11 @@
  *        in the docblock above the declaration, and the declaration agrees with the dispatch site. The
  *        list is not restated: it comes from the fact's home (`evolution-core/README.md`,
  *        `machine.kind = event-mode`), whose table is the set's ONE home (A98 / finding O-1).
+ *   N38. `SkillTargetLocks` is constructed only by the skill provider (`evolution-core/src/skill-store.ts`):
+ *        a second lock table would split the single-target queue again.
+ *   N39. a `SkillTarget.targetKey` literal exists only in the observation target factory
+ *        (`evolution-core/src/skill-observation.ts`): every other target is built through
+ *        skillBodyTarget/skillSupportTarget/skillTargetFromHostPath so identity stays single-sourced.
  *   N37. family production code reads no DEPRECATED platform session-log accessor
  *        (`snapshotEvents`/`eventAt`/`ownEvents`): the read-before-write fallback takes the family
  *        structural view (`readEvents`), and the projection registry's capability probe is the one
@@ -1669,6 +1674,14 @@ function walk(dir) {
       // N7 (v39, S3.1): SkillLibrary construction site.
       if (rel.includes('/src/') && SKILL_LIBRARY_RE.test(text) && !rel.startsWith(`${CORE_SRC}/`) && !SKILL_LIBRARY_TODO.has(rel)) {
         violations.push(`${rel}: new SkillLibrary(...) outside core's newSkillLibrary() helper (root/limits parsing is single-sourced) — build it with newSkillLibrary({ config, io, limits?, ctx?, threatExemptLabels? })`)
+      }
+      // N38: one lock table owner (the provider).
+      if (rel.includes('/src/') && rel !== 'evolution-core/src/skill-store.ts' && /new\s+SkillTargetLocks\b/.test(text)) {
+        violations.push(`${rel}: constructs SkillTargetLocks outside the skill provider (one per-target lock table)`)
+      }
+      // N39: target-key literals only in the observation target factory.
+      if (rel.includes('/src/') && rel !== 'evolution-core/src/skill-observation.ts' && /(?:^|[^.\w])targetKey\s*:\s*['"`]/.test(text)) {
+        violations.push(`${rel}: spells a SkillTarget.targetKey literal outside the observation target factory`)
       }
       // N10 (v39, S3.4 rule ④): new platform service probe — see docblock.
       {
