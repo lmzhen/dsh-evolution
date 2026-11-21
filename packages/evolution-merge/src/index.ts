@@ -354,10 +354,9 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
         const curator = (ctx as unknown as { get(key: string): unknown }).get('evolutionCurator') as { isBlocked?: (name: string) => Promise<boolean> } | undefined
         return (await curator?.isBlocked?.(name)) === true
       },
-      isOwnerActive: (runId) => {
-        const run = runs.find(runId)
-        return run !== undefined && run.state === 'running'
-      },
+      // C3: cross-face owner truth is the shared runs index + pid liveness, not this
+      // process's foreign cache (which only refreshes on load()). hasOwner() re-reads.
+      isOwnerActive: async (runId) => await runs.hasOwner(runId),
       async cards(signal) {
         if (signal.aborted) return []
         return await readSkillCards(skills)

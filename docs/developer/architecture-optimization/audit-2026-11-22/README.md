@@ -21,6 +21,7 @@
 - R0-5 / F1-F2：已在 main 源码修复（effective config value + 惰性 settings 订阅），见 [14](14-r0-ui-confirm-design.md)。
 - R0-6 / E3：已在 main 源码修复（dist tarball artifact 绑定 + release 门），见 [15](15-r0-release-evidence-design.md)。
 - C1/P1-1：merge 恢复 branch B 已增加 rollback 兜底，见 [19](19-c1-recovery-fallback.md)。
+- C3/P1-3：merge `isOwnerActive` 已改为 `runs.hasOwner()`，见 [20](20-c3-owner-liveness.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
@@ -178,3 +179,4 @@
 | [17-phase-b-platform-io.md](17-phase-b-platform-io.md) | Phase B 第一步：平台 fs 后端适配器；已切生产 composition |
 | [18-phase-c-unit-kernel.md](18-phase-c-unit-kernel.md) | Phase C 第一步：UnitKernel 接管 WriteKernel，prepare/commitPrepared |
 | [19-c1-recovery-fallback.md](19-c1-recovery-fallback.md) | C1/P1-1：merge 恢复分支 B 的 rollback 兜底 |
+| [20-c3-owner-liveness.md](20-c3-owner-liveness.md) | C3/P1-3：cross-face owner 判据统一 hasOwner |
