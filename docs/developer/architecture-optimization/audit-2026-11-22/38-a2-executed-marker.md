@@ -55,3 +55,14 @@
 - 验证：state/state-domain/approval/curator 19 files / 200 tests passed；build 0。
 - 仍未迁移：review/curator 自身写计数时没有每次 reload；它们要在 Phase D 接入 StateStore。
 
+## 7. 追加：review counter 事务
+
+- `withReviewStateLock` 现在：
+  - 保持 in-process 队列；
+  - authority 挂载时 acquire `review-state:<session>` lease（busy 短暂等待，超时 warn）；
+  - lease 内 `evolutionState.reload()`，再执行 load→advance→save；
+  - 最后释放 lease。
+- 覆盖 review 的三处 counter RMW：段末清零、turn/end advance、debt consume。
+- 验证：review + state + approval + curator 31 files / 244 tests passed；build 0。
+- 仍未迁移：curator state 的跨进程 RMW 仍走 domain 缓存，Phase D 统一 StateStore。
+

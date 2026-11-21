@@ -526,7 +526,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   const reviewStateLocks = sessionState.add('reviewStateLocks', new Map<SessionId, Promise<unknown>>())
   async function withReviewStateLock<T>(id: SessionId, task: () => Promise<T>): Promise<T> {
     const previous = reviewStateLocks.get(id) ?? Promise.resolve()
-    const next = previous.catch(() => {}).then(task)
+    const next = previous.catch(() => {}).then(async () => {
+      const authority = ctx.get('evolutionMutationAuthority') as {
+        lease: {
+          acquire(owner: 'foreground', runId: string): Promise<{ ok: true; token: unknown } | { ok: false }>
+          release(token: unknown): Promise<void>
+        }
+      } | undefined
+      let token: unknown
+      if (authority !== undefined) {
+        for (let attempt = 0; attempt < 50; attempt += 1) {
+          const acquired = await authority.lease.acquire('foreground', 'review-state:' + id)
+          if (acquired.ok) { token = acquired.token; break }
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+        if (token === undefined) ctx.logger.warn('dsh-evolution-review: review-state lease busy for ' + id + '; counters may be refreshed under contention')
+      }
+      try {
+        const state = ctx.get('evolutionState') as { reload?: () => Promise<void> } | undefined
+        await state?.reload?.()
+        return await task()
+      } finally {
+        if (token !== undefined && authority !== undefined) await authority.lease.release(token)
+      }
+    })
     reviewStateLocks.set(id, next)
     try {
       return await next
