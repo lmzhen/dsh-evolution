@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H6b curator snapshot/unit-undo
+
+- curator snapshot `writeSkill` 读当前 bytes 后构造显式 plan；
+- unit-undo sink 的 updateSkill/writeSupportFile/removeSupportFile 改走 `SystemSkillWriter`；
+- curator/unit-undo/tree-lock 定向 82 passed，build 0；
+- 带 `undoUnitId` 的 removeSupportFile 与 manual unit-undo 循环留 H6c。
+
 ### 2026-11-21：Phase H6a SystemSkillWriter
 
 - 新增 `SystemSkillWriter.apply(plan)`；

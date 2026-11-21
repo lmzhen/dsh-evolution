@@ -23,8 +23,19 @@ declare module '@deepseek-ai/dsh-llm' {
 import z from '@deepseek-ai/schemastery'
 import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, SKILL_NAME_RE, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, AUTHORING_SPLIT_LINE_CHARS } from '@deepseek-ai/dsh-evolution-core'
 import { relatedSkillNames } from '@deepseek-ai/dsh-evolution-core/skills'
-import { SystemSkillWriter, skillBodyTarget } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SystemSkillWriter, skillBodyTarget, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
+
+function systemAction(result: SkillWriteResult): SkillActionResult {
+  if (!result.ok) return { ok: false, message: result.message }
+  return {
+    ok: true,
+    message: result.message,
+    ...(result.noop === true ? { noop: true } : {}),
+    ...(result.path === undefined ? {} : { path: result.path }),
+    ...(result.normalizedFrontmatterFields === undefined ? {} : { normalizedFrontmatterFields: [...result.normalizedFrontmatterFields] }),
+  }
+}
 
 /** Shape of one history index file (only the field this reading needs). */
 type RawIndex = { versions?: unknown[] }
@@ -47,7 +58,7 @@ import { planUnitUndoAcross, type UnitUndoMember, unitMembersAreComplete } from 
 import { parseFrontmatter } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type SkillHealthVerdict } from '@deepseek-ai/dsh-evolution-core/skills'
 import { evolutionHome, DEFAULT_CURATOR_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS, DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS, clampedNumber, clampOnce, liveBool, unwrapLive, pickWithPolicy, userSetKeys } from '@deepseek-ai/dsh-evolution-core'
-import { type SkillActionResult } from '@deepseek-ai/dsh-evolution-core/skills'
+import { type SkillActionResult, type SkillWriteResult } from '@deepseek-ai/dsh-evolution-core/skills'
 import { DEFAULT_HEALTH_THRESHOLDS, softBodyTokenBudget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { INSTANCE_KEYS, HomeAuthority, claimInstance, contentHash, isPresent, isUnknown, paramRowId, probeList, probeText, readNumberParam, releaseInstance, reportTime, reportsSweepLockTarget, sweepReports as sweepRunReports, sessionLastEventTime, transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { entryTarget } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -1361,10 +1372,18 @@ export class EvolutionCurator extends Service {
         return listed.find(entry => entry.name === name)?.content
       },
       writeSkill: async (name: string, content: string) => {
-        // The fourth argument is the byte anchor, and its only shapes are { absent } and { sha256 }
-        // (WriteAnchor). An unconditional update is what this restore path always did.
-        await this.skills.update(name, content, 'background_review')
-        void name
+        const current = await this.skills.read(name)
+        const outcome = await new SystemSkillWriter(this.skills).apply({
+          origin: 'background_review',
+          ops: [{
+            kind: 'write',
+            target: skillBodyTarget(name),
+            content,
+            expect: current === null ? { kind: 'absent' } : { kind: 'present', version: contentHash(current) },
+            ...(current === null ? { create: false } : {}),
+          }],
+        })
+        if (!outcome.ok) throw new Error(outcome.message)
       },
       note: (text: string) => { this.ctx.logger.info('evolution-curator: ' + text) },
     }
@@ -2514,6 +2533,7 @@ export class EvolutionCurator extends Service {
           })
         }
         const plan = planUnitUndoAcross(crossMembers)
+        const writer = new SystemSkillWriter(this.skills)
         const sink: UnitUndoSink = {
           readSkill: skill => this.skills.read(skill),
           readSupport: (skill, path) => this.skills.readSupportFile(skill, path),
@@ -2523,9 +2543,23 @@ export class EvolutionCurator extends Service {
           },
           restoreFromArchive: skill => this.skills.restoreFromArchive(skill, 'foreground'),
           archive: (skill, reason) => this.skills.archive(skill, { reason }, 'foreground'),
-          updateSkill: (skill, body, anchor) => this.skills.update(skill, body, 'foreground', anchor),
-          writeSupportFile: (skill, path, body, anchor) => this.skills.writeSupportFile(skill, path, body, 'foreground', anchor),
-          removeSupportFile: (skill, path, anchor) => this.skills.removeSupportFile(skill, path, 'foreground', anchor),
+          updateSkill: async (skill, body, anchor) => systemAction(await writer.apply({
+            origin: 'foreground',
+            ops: [{ kind: 'write', target: skillBodyTarget(skill), content: body, expect: { kind: 'present', version: anchor.sha256 } }],
+          })),
+          writeSupportFile: async (skill, path, body, anchor) => systemAction(await writer.apply({
+            origin: 'foreground',
+            ops: [{
+              kind: 'write',
+              target: skillSupportTarget(skill, path),
+              content: body,
+              expect: anchor === undefined ? { kind: 'absent' } : { kind: 'present', version: anchor.sha256 },
+            }],
+          })),
+          removeSupportFile: async (skill, path, anchor) => systemAction(await writer.apply({
+            origin: 'foreground',
+            ops: [{ kind: 'remove', target: skillSupportTarget(skill, path), expect: { kind: 'present', version: anchor.sha256 } }],
+          })),
         }
         const result = await executeUnitUndo(plan, sink)
         return { ok: result.ok, message: result.message }

@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H6b 已完成：curator snapshot `writeSkill` 改为读当前 bytes 后构造显式 plan；unit-undo 的 `updateSkill`/`writeSupportFile`/`removeSupportFile` sink 回调全部改走 `SystemSkillWriter`；剩余直接 `removeSupportFile` 的 `undoUnitId` 路径与 manual unit-undo 循环留 H6c（plan op 尚无 unitId 字段）。
+
 H6a 已完成：新增 `SystemSkillWriter.apply(plan)`（无 session observation，仍走 provider 锁/unit/audit）；merge 的 restoreTarget/restoreSupportFile/restoreSource 迁移为显式 snapshot plan；curator 单技能 undo 的正文恢复迁移为显式 anchor plan；新增 provider 测试。curator 的 snapshot restore 与 unit-undo support 回调仍直接用 library，H6b 继续。
 
 H5b 已完成：删除写前 legacy seed；`installSkillObservationListener` 增加 `session/event` 桥：记录 `skill` 工具的 tool/call，在 tool/result 文本中解析 skill 内容与 base dir，读取 SKILL.md 并校验渲染 instructions 等于当前 body 后，以 `skillHostIdentity` 记录 read-time observation。非 directory provider、stale body 不记录。剩余缺口：平台 `skill` 工具仍不发 fs/observed，桥依赖渲染文本格式，列为 DEFERRED 上游推动项。
