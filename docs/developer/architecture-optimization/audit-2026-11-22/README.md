@@ -216,3 +216,4 @@
 | [37-p2-acceptance-read.md](37-p2-acceptance-read.md) | P2：验收夹具读失败不当空 |
 | [38-a2-executed-marker.md](38-a2-executed-marker.md) | A2 部分：审批跨进程执行标记 |
 | [39-d2-contract-strict.md](39-d2-contract-strict.md) | D2：平台契约 strict 对准 rc.5 |
+| [40-p2-tool-register.md](40-p2-tool-register.md) | P2：工具注册缺失可见 |

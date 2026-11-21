@@ -26,10 +26,19 @@ export function toolsPort(ctx: Context): ToolsPort | undefined {
   }
 }
 
-/** Register one family tool through the port; a missing service yields a no-op disposer. */
+/**
+ * Register one family tool through the port; a missing service yields a no-op disposer and a warning.
+ * P2-4: the old silent no-op let a composition with the family rows before the platform tools row
+ * load a host with no evolution tools and no diagnostic.
+ */
 export function registerEvolutionTool(
   ctx: Context,
   definition: ToolDefinition,
 ): () => void {
-  return toolsPort(ctx)?.register(definition) ?? (() => {})
+  const port = toolsPort(ctx)
+  if (port === undefined) {
+    ctx.logger.warn('evolution-adapter: tools service is not mounted; family tool "' + definition.name + '" was not registered')
+    return () => {}
+  }
+  return port.register(definition)
 }
