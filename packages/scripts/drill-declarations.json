@@ -361,6 +361,18 @@
     "gate-15": {
       "noDrillReason": "real in-repo tsconfig/manifest/layout check; no mutation fixture yet, so the row stays a registered carrier gap until 0.60.0",
       "source": "the mutation-exemption register (verify-mutations prints it every run with its expiry)"
+    },
+    "ci-only-20": {
+      "noDrillReason": "overlay-only CI row: the mutation prover applies its fixture in the mirror, so this row cannot see the patch by design; CI static lane runs the real check"
+    },
+    "ci-only-21": {
+      "noDrillReason": "overlay-only CI row: the mutation prover applies its fixture in the mirror, so this row cannot see the patch by design; CI static lane runs the real check"
+    },
+    "ci-only-23": {
+      "noDrillReason": "overlay-only CI row: the mutation prover applies its fixture in the mirror, so this row cannot see the patch by design; CI static lane runs the real check"
+    },
+    "ci-only-26": {
+      "noDrillReason": "overlay-only CI row: the mutation prover applies its fixture in the mirror, so this row cannot see the patch by design; CI static lane runs the real check"
     }
   }
 }

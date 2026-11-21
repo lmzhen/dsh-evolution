@@ -38,6 +38,7 @@
 - P2：删除 `SKIP_MANIFEST_FRESHNESS` 死开关，见 [34](34-p2-dead-switch.md)。
 - A2 部分：approval 增加 durable executed marker，挡住 stale pending 的重复回放；见 [38](38-a2-executed-marker.md)。
 - D2：契约检测过滤 family 路径并对 rc.5 strict 通过；见 [39](39-d2-contract-strict.md)。
+- E7 剩余：4 条 ci-only 行补 noDrillReason，falsifiability-carrier live=0；见 [41](41-e7-falsifiability.md)。
 - E2：gate-13/14/15 改为真实检查，gate-75 改为 action step，见 [35](35-e2-real-gates.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
@@ -114,7 +115,7 @@
 | E4 | CI 套件不加载 `vitest.family.config.mjs`，档位/alias/超时策略悬空 | 08-P1-2；`gates/unit.mjs:14,16`、`family-facts.json:485-486` | 本地/CI 执行集合和策略不一致 | 报告实测 |
 | E5 | 平台耦合账本 175 条全 `pending/unknown`，`--strict` 永不红，tree 已落后 HEAD | 08-P1-3；`family-test-lines.json:2-11`、`verify-test-lines.mjs:51-84` | 新增/迁移 spec 不改变登记也能绿 | 报告实测 |
 | E6 | 两个永久跳过的门禁仿真仍计入 lane：rg4-two-process 整文件 skip；rg7-install 依赖本机绝对路径/skipIf | 08-P1-4；`rg4-two-process.spec.ts:8`、`rg7-install.spec.ts:9,13` | 门禁读数含永不执行成员 | 代码确认 |
-| E7 | 元门禁核心判据 report-only；2 条 argv 漂移、4 条无 falsifiability carrier 仍 exit 0 | 08-P1-5；`verify-gate-manifest.mjs:432-476` | 表行与实际执行继续漂移 | 报告实测 |
+| E7 | 元门禁核心判据 report-only；2 条 argv 漂移、4 条无 falsifiability carrier 仍 exit 0 | 08-P1-5；`verify-gate-manifest.mjs:432-476` | 已收口：argv parity 进 registry，4 条 ci-only 行补 noDrillReason，轴 0 live | 报告实测 |
 | F1 | “批准前先确认”显示 `auto`，实际一律 `ask`：读 seat 的 user 层并 `?? 'ask'` | 07-P0-1（本表按 P1）；`PendingCard.ts:50-55,98`、`history/client/index.ts:36-39` | 默认部署每次批准多一次点击，界面值与行为相反 | 已抽检确认 |
 | F2 | settings 座在 apply 时只取一次，且订阅回调不触发渲染 | 07-P1-1；`history/client/index.ts:33-42` | 显式选择“直接执行”不生效/要刷新 | 代码确认，触发依赖时序 |
 | F3 | 数据总览刷新失败静默保留旧表，无失败提示 | 07-P1-2；`StatsPage.ts:65-76` | 宿主重启/401 时旧数据当新数据 | 代码确认 |
@@ -217,3 +218,4 @@
 | [38-a2-executed-marker.md](38-a2-executed-marker.md) | A2 部分：审批跨进程执行标记 |
 | [39-d2-contract-strict.md](39-d2-contract-strict.md) | D2：平台契约 strict 对准 rc.5 |
 | [40-p2-tool-register.md](40-p2-tool-register.md) | P2：工具注册缺失可见 |
+| [41-e7-falsifiability.md](41-e7-falsifiability.md) | E7：falsifiability-carrier 清零 |
