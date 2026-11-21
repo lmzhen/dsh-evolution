@@ -892,6 +892,32 @@ export class EvolutionCurator extends Service {
   }
 
   /** Optional curator-state service (evolution-state-json / storage-domain). */
+  /** A2: refresh the medium and hold the cross-process curator-state lease for one RMW. */
+  private async withCuratorState<T>(task: () => Promise<T>): Promise<T> {
+    const authority = this.ctx.get('evolutionMutationAuthority') as {
+      lease: {
+        acquire(owner: 'foreground', runId: string): Promise<{ ok: true; token: unknown } | { ok: false }>
+        release(token: unknown): Promise<void>
+      }
+    } | undefined
+    let token: unknown
+    if (authority !== undefined) {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        const acquired = await authority.lease.acquire('foreground', 'curator-state')
+        if (acquired.ok) { token = acquired.token; break }
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+      if (token === undefined) this.ctx.logger.warn('evolution-curator: curator-state lease busy; a concurrent process may still be writing the record')
+    }
+    try {
+      const state = this.ctx.get('evolutionState') as { reload?: () => Promise<void> } | undefined
+      await state?.reload?.()
+      return await task()
+    } finally {
+      if (token !== undefined && authority !== undefined) await authority.lease.release(token)
+    }
+  }
+
   private curatorStateService(): {
     loadCuratorState(): Promise<CuratorStateRecordShape | null>
     saveCuratorState(record: CuratorStateRecordShape): Promise<void>
@@ -902,7 +928,12 @@ export class EvolutionCurator extends Service {
       saveCuratorState(record: CuratorStateRecordShape): Promise<void>
       transactCuratorState(task: (current: CuratorStateRecordShape | null) => CuratorStateRecordShape | null): Promise<void>
     } | undefined
-    return service
+    if (service === undefined) return undefined
+    return {
+      loadCuratorState: () => this.withCuratorState(() => service.loadCuratorState()),
+      saveCuratorState: record => this.withCuratorState(() => service.saveCuratorState(record)),
+      transactCuratorState: task => this.withCuratorState(() => service.transactCuratorState(task)),
+    }
   }
 
   /**

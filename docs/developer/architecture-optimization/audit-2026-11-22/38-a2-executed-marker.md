@@ -66,3 +66,14 @@
 - 验证：review + state + approval + curator 31 files / 244 tests passed；build 0。
 - 仍未迁移：curator state 的跨进程 RMW 仍走 domain 缓存，Phase D 统一 StateStore。
 
+## 8. 追加：curator-state 事务
+
+- `curatorStateService()` 返回包装器；load/save/transact 全部：
+  - authority 挂载时 acquire `curator-state` lease（busy 短暂等待，超时 warn）；
+  - lease 内 `evolutionState.reload()`；
+  - 再执行 domain 的 load/save/transact；
+  - 最后释放 lease。
+- 这样 curator 的 pause/restore/run-bookkeeping 不再以进程缓存为唯一读判据。
+- 验证：curator + review + state + approval 31 files / 244 tests passed；build 0。
+- 仍未迁移：`.usage.json`、mutation audit/event 等 home sidecar 仍是单进程 transact；A2 仍为部分收口。
+
