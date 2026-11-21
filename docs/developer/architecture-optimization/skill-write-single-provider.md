@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7h 真机 web 单会话证据：isolated Chromium 打开 lab host `http://127.0.0.1:3083`，新建会话后模型调用 `skill` 读取 `race-h7` 并成功 `skill_manage write_file` 写 `references/webrace.txt`（回复 DONE-WEB-A，无错误）。这证明 npm tarball 安装的 web profile 能完成真实 skill read→write 链路；**双 web session 并发**证据仍未拿到（单次会话 4 秒完成，第二次未及时并发）。
+
 H7g 验收矩阵补齐：新增 K2（两 owner 同 support patch 同一 observation，恰一成功、另一 SKILL_STALE_VERSION、磁盘只落一个改动）、K7（目录 junction alias 与真实路径共享 observation/lock，恰一成功且 target 文件只变一次）、K8（tool 级两 owner 并发 create 同名 skill，恰一成功、磁盘只有胜者内容）。K6 故障注入未做，但机制已无写后 re-read，create-tree-reads 读计数作为间接证据。
 
 H7f 独立复核 P1 修复：① `patchCore` 的 outcome `after` 从 `writeContent` 改为真正落盘的 `onDisk`，避免 patch 成功后同一 owner 立刻假 stale；新增 support 尾随换行回归。② approval plan replay 在 `apply` 前重跑执行点门禁（policy-protection、patch summary、descriptionStrict），并用真实 `approve()` 补“暂存后加入 protectedSkillNames → 拒绝”证据。`run-gates local` 复跑 pass=57/fail=0/cannotDecide=4/skipped=1。

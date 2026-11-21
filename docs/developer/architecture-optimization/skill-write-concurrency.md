@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7h web 单会话真机证据
+
+- isolated Chromium + lab host 3083；
+- 模型 `skill` 读取 race-h7 后 `write_file` 成功；
+- 双 web session 并发仍待补。
+
 ### 2026-11-21：Phase H7g 验收矩阵 K2/K7/K8
 
 - K2 两 owner 同 support patch：恰一成功、另一 SKILL_STALE_VERSION；
