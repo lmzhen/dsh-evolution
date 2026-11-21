@@ -577,6 +577,8 @@ H3c 已完成：tool 的 create/update/patch/patch.section/write_file/remove_fil
 
 H7a 已完成：新增 arch guard N38（`SkillTargetLocks` 只能由 provider 构造）与 N39（`SkillTarget.targetKey` 字面量只能出现在 observation target factory）；其余 L 项（tool 直调 library mutator、pending 必须带 plan）待 H3c/审批清理后再加，否则会以基线债形式存在。
 
+H6c 已完成：`remove` op 增加可选 `unitId`，provider 透传给 `removeSupportFile`；curator manual unit-undo loop 的 support remove/write 与正文恢复全部迁到 `SystemSkillWriter.apply`。curator/src 已无直接 library 内容 mutator 调用。
+
 H6b 已完成：curator snapshot `writeSkill` 改为读当前 bytes 后构造显式 plan；unit-undo 的 `updateSkill`/`writeSupportFile`/`removeSupportFile` sink 回调全部改走 `SystemSkillWriter`；剩余直接 `removeSupportFile` 的 `undoUnitId` 路径与 manual unit-undo 循环留 H6c（plan op 尚无 unitId 字段）。
 
 H6a 已完成：新增 `SystemSkillWriter.apply(plan)`（无 session observation，仍走 provider 锁/unit/audit）；merge 的 restoreTarget/restoreSupportFile/restoreSource 迁移为显式 snapshot plan；curator 单技能 undo 的正文恢复迁移为显式 anchor plan；新增 provider 测试。curator 的 snapshot restore 与 unit-undo support 回调仍直接用 library，H6b 继续。

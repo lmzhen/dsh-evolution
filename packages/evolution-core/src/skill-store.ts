@@ -4029,6 +4029,7 @@ export class SkillLibrary {
           op.target.relPath,
           origin,
           op.expect.kind === 'absent' ? { absent: true } : { sha256: op.expect.version },
+          op.unitId,
         )
     }
   }

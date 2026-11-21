@@ -50,6 +50,7 @@ export type SkillWriteOp =
     readonly kind: 'remove'
     readonly target: SkillTarget
     readonly expect: SkillWriteExpect
+    readonly unitId?: string
   }
 
 /** The complete write a caller intends to commit. */

@@ -26,6 +26,10 @@ import { relatedSkillNames } from '@deepseek-ai/dsh-evolution-core/skills'
 import { SystemSkillWriter, skillBodyTarget, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 
+function anchorExpect(anchor: WriteAnchor): { kind: 'absent' } | { kind: 'present'; version: string } {
+  return 'absent' in anchor ? { kind: 'absent' } : { kind: 'present', version: anchor.sha256 }
+}
+
 function systemAction(result: SkillWriteResult): SkillActionResult {
   if (!result.ok) return { ok: false, message: result.message }
   return {
@@ -2593,16 +2597,20 @@ export class EvolutionCurator extends Service {
     const undoUnitId = `u-undo-${Date.now().toString(36)}`
     const reverted: string[] = []
     const done = (): string => (reverted.length === 0 ? '无' : reverted.join(', '))
+    const writer = new SystemSkillWriter(this.skills)
     for (const op of ops) {
-      const result = op.remove
-        ? await this.skills.removeSupportFile(name, op.path, 'foreground', op.anchor, undoUnitId)
-        : await this.skills.writeSupportFile(name, op.path, op.bytes, 'foreground', op.anchor)
-      if (!result.ok) return { ok: false, message: `「${op.path}」：${result.message} —— 撤销未完成（已回退：${done()}）。` }
+      const outcome = await writer.apply(op.remove
+        ? { origin: 'foreground', ops: [{ kind: 'remove', target: skillSupportTarget(name, op.path), expect: anchorExpect(op.anchor), unitId: undoUnitId }] }
+        : { origin: 'foreground', ops: [{ kind: 'write', target: skillSupportTarget(name, op.path), content: op.bytes, expect: anchorExpect(op.anchor) }] })
+      if (!outcome.ok) return { ok: false, message: `「${op.path}」：${outcome.message} —— 撤销未完成（已回退：${done()}）。` }
       reverted.push(op.path)
     }
     if (plan.bodyPreUnitHash !== undefined && bodyBytes !== null) {
-      const result = await this.skills.update(name, bodyBytes, 'foreground', { sha256: contentHash(live) })
-      if (!result.ok) return { ok: false, message: `正文：${result.message} —— 撤销未完成（已回退：${done()}）。` }
+      const outcome = await writer.apply({
+        origin: 'foreground',
+        ops: [{ kind: 'write', target: skillBodyTarget(name), content: bodyBytes, expect: { kind: 'present', version: contentHash(live) } }],
+      })
+      if (!outcome.ok) return { ok: false, message: `正文：${outcome.message} —— 撤销未完成（已回退：${done()}）。` }
       reverted.push('SKILL.md')
     }
     return { ok: true, message: `已按单元撤销「${name}」：${reverted.join(', ')}（撤销单元 ${undoUnitId}，被撤单元 ${unit}）。` }

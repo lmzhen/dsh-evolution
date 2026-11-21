@@ -947,6 +947,13 @@ overlay build:          0
 - arch guard 42 rules clean；
 - tool 直调 library mutator 与 pending plan 强制仍待 H3c/审批清理。
 
+### 2026-11-21：Phase H6c curator manual undo
+
+- `remove` plan op 增加 unitId；
+- curator manual unit-undo 的 support remove/write 与 body 恢复迁到 SystemSkillWriter；
+- curator/src 无直接 library 内容 mutator；
+- curator + unit-undo 81 passed，build 0。
+
 ### 2026-11-21：Phase H6b curator snapshot/unit-undo
 
 - curator snapshot `writeSkill` 读当前 bytes 后构造显式 plan；
