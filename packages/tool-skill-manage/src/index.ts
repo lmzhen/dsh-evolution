@@ -500,6 +500,8 @@ interface SkillWriteArgs {
   staged_from_sha256?: string
   /** B1-2: digest of the skill trees the structural action reads (delete/restructure/extract). */
   staged_tree_sha256?: string
+  /** B1-2: the exact extract plan the operator previewed; replay executes this plan, not a rebuild. */
+  staged_extract_plan?: SkillPlan
 }
 
 /**
@@ -1099,6 +1101,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       if (action === 'extract' && Array.isArray(args.extract)) {
         for (const item of args.extract) if (typeof item?.to_skill === 'string' && item.to_skill !== '') names.push(item.to_skill)
       }
+      if (action === 'extract' && args.staged_extract_plan !== undefined) {
+        names.push(args.staged_extract_plan.source, args.staged_extract_plan.target.name)
+      }
       const current = await stagedTreeDigest(library, names)
       if (current !== args.staged_tree_sha256) {
         return { ok: false, message: 'SKILL_STALE_VERSION: 结构写入的输入树在这次暂存之后发生了变化，批准会执行另一份字节；请重新预览并暂存。', skills: [] }
@@ -1240,14 +1245,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
         }
       }
-      const built = result === undefined
-        ? await buildExtractPlanFromLibrary(library, {
-          source,
-          items,
-          ...(outcome === undefined ? {} : { outcome }),
-          ...(ownerCovers === undefined ? {} : { ownerCovers }),
-        })
-        : { ok: false as const, message: result.message }
+      const storedPlan = args.dry_run === true ? undefined : args.staged_extract_plan
+      const built = storedPlan !== undefined && typeof storedPlan === 'object' && typeof (storedPlan as { source?: unknown }).source === 'string'
+        ? { ok: true as const, plan: storedPlan, candidates: [] as Array<never>, warnings: storedPlan.warnings }
+        : result === undefined
+          ? await buildExtractPlanFromLibrary(library, {
+            source,
+            items,
+            ...(outcome === undefined ? {} : { outcome }),
+            ...(ownerCovers === undefined ? {} : { ownerCovers }),
+          })
+          : { ok: false as const, message: result.message }
       if (!built.ok) {
         result = { ok: false, message: built.message }
       } else {
@@ -1740,9 +1748,21 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           if (args.action === 'extract' && Array.isArray(args.extract)) {
             for (const item of args.extract) if (typeof item?.to_skill === 'string' && item.to_skill !== '') names.push(item.to_skill)
           }
+          let stagedExtractPlan: SkillPlan | undefined
+          if (args.action === 'extract') {
+            const built = await buildExtractPlanFromLibrary(library, {
+              source: typeof args.name === 'string' ? args.name : '',
+              items: Array.isArray(args.extract) ? args.extract : [],
+              ...(args.outcome === undefined ? {} : { outcome: args.outcome }),
+              ...(args.owner_covers === undefined ? {} : { ownerCovers: args.owner_covers }),
+            })
+            if (!built.ok) return { ok: false, message: built.message, skills: [] }
+            stagedExtractPlan = built.plan
+            names.push(built.plan.source, built.plan.target.name)
+          }
           const digest = await stagedTreeDigest(library, names)
           if (digest === undefined) return { ok: false, message: '目标当前读不到，无法绑定结构写入的暂存树 —— 先修好可读性再批准', skills: [] }
-          operation = { ...operation, staged_tree_sha256: digest }
+          operation = { ...operation, staged_tree_sha256: digest, ...(stagedExtractPlan === undefined ? {} : { staged_extract_plan: stagedExtractPlan }) }
         }
         const decision = await approval.request({
           kind: 'skill',

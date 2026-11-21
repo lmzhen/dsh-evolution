@@ -49,11 +49,11 @@ replay：
 - 读当前 body；absent → unavailable；
 - 返回 `{available:true,path:'SKILL.md',before,after:null}`。
 
-### 3.3 未完成
+### 3.3 结构 plan 的落点
 
-- restructure 仍无字节预览（需要导出 restructure planner/projection）；
-- extract 的完整 `ExtractPlanDraft` 仍不在 pending 中，回放仍重新 build；
-- 因此 B1-2 仍不能标记 fully closed；本轮只消除输入树漂移和 delete 盲批。
+- restructure：预览与 store 共用 `projectRestructureMarkdown`，回放仍用同一 moves + tree digest 校验。
+- extract：暂存时 `buildExtractPlanFromLibrary` 生成 `ExtractPlanDraft`，写入 `operation.staged_extract_plan`；回放直接 `library.extract(plan)`，不再重读重建。plan 自带 source/target anchors，漂移由 library 拒绝。
+- 至此 delete/restructure/extract 的审批都绑定到“操作者看到的字节/plan”，B1-2 收口。
 
 ## 4. 测试
 
@@ -67,4 +67,5 @@ replay：
 - delete 预览返回 before body / after null。
 - 追加 restructure 预览：核心导出 `projectRestructureMarkdown`，预览给出 SKILL.md after 与每个 references 文件 before/after；与 store 共用同一 planner。
 - approval-preview + tool-skill-manage：10 files / 121 tests passed；build 0。
-- B1-2 仍未 fully closed：extract 仍缺完整 `ExtractPlanDraft` 落 pending，回放仍重新 build；待 PlanService 组。
+- extract 追加：暂存保存 `ExtractPlanDraft`，回放直接执行该 plan；`staged_tree_sha256` 覆盖 source/target。
+- tool-skill-manage 全量 10 files / 121 tests passed；build 0。
