@@ -885,7 +885,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     const scope = callingScope(ctx)
     try {
       const summaries = await catalog.list(scope === undefined ? undefined : { scope })
-      if (summaries.length === 0) return probeUnknown(`the catalog view is empty in the ${scope === undefined ? 'global' : 'calling'} scope`)
+      // An EMPTY but readable view is a fact (this scope has no skills), not an
+      // unverifiable check. Treating it as unknown made strictCrossSource reject the
+      // first create forever. A failed/absent catalog still returns unknown below.
+      if (summaries.length === 0) return probePresent({ winner: undefined, view: [] })
       return probePresent({ winner: summaries.find(summary => summary.name === name), view: summaries })
     } catch (error) {
       return probeUnknown(`the catalog lookup failed (${error instanceof Error ? error.message : String(error)})`)
@@ -986,7 +989,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (action === 'list') {
       try {
         const list = await library.list()
-        return { ok: true, message: `已列出 ${list.length} 个技能。`, skills: list.map(s => s.name) }
+        const names = list.map(s => s.name)
+        return { ok: true, message: names.length === 0 ? '没有找到技能。' : `已列出 ${names.length} 个技能：${names.join('、')}`, skills: names }
       } catch (error) {
         return { ok: false, message: `skill_manage list：技能目录树扫描失败（${error instanceof Error ? error.message : String(error)}）。`, skills: [] }
       }

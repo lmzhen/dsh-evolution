@@ -14,6 +14,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import SkillUsageRegistry from '@deepseek-ai/dsh-evolution-skill-discovery/usage'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
+import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import * as Catalog from '@deepseek-ai/dsh-evolution-skill-discovery/catalog'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -58,3 +59,20 @@ it('T2-05/A20: one create reads each existing SKILL.md once (no second whole-tre
   expect(skillMdReads).toBe(names.length + 1)
   await ctx.fiber.dispose()
 })
+it('B1: an empty catalog view in strictCrossSource does not block the first create', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-strict-empty-'))
+  const ctx = new Context()
+  await mountAgentLoopTestDependencies(ctx)
+  await ctx.plugin(SkillRegistry)
+  await ctx.plugin(EvolutionIoRegistry)
+  await ctx.plugin(NodeIo)
+  await ctx.plugin(SkillUsageRegistry, { root: await mkdtemp(join(tmpdir(), 'dsh-strict-empty-usage-')) })
+  await ctx.plugin(Catalog, { root })
+  await ctx.plugin(ToolSkillManage, { root, strictCrossSource: true })
+  const tool = ctx.tools.get('skill_manage')!
+  const execArg = { agent: fakeAgent(undefined) } as unknown as Parameters<typeof tool.execute>[1]
+  const created = await tool.execute({ action: 'create', name: 'first-skill', content: body('first-skill') }, execArg) as { ok: boolean; message: string }
+  expect(created.ok, created.message).toBe(true)
+  await ctx.fiber.dispose()
+})
+
