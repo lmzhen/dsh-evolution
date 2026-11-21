@@ -123,3 +123,11 @@ export function apply(ctx) { ctx.effect(() => ctx.evolutionIo.registerProvider(p
   `evolution-io-platform`；`HOST_ROW_IDS`/`HOST_ROW_NAMES` 同步。
 - host composition / bundle mutual-exclusion / dependency closure / contract：24 tests passed。
 - `io-node` 保留为测试/standalone legacy backend；下一步 UnitKernel 完成后再删除生产依赖。
+
+## 7. 领域级集成（2026-11-22，未发布）
+
+- 新增 `io-platform.domain.spec.ts`：真实 `LocalFileSystem` + 真实 `SkillLibrary`，
+  create/update/writeSupportFile 全部通过；证明平台后端不只是单测适配。
+- 对照发现：`EvolutionIoLike.list` 的契约是“目录缺失读作空”，平台 `listDir` 会抛
+  `FS_NOT_FOUND`；adapter 已补 missing→[]，其他错误继续上抛。
+- 3 files / 6 tests passed（unit + real fs-local + real SkillLibrary）。

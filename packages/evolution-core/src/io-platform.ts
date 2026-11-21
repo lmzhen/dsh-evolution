@@ -102,7 +102,14 @@ export function platformEvolutionIo(fs: PlatformFs): EvolutionIo {
     },
     async list(path) {
       const target = await fs.resolve(path)
-      return (await fs.listDir(target)).map((entry) => entry.name)
+      try {
+        return (await fs.listDir(target)).map((entry) => entry.name)
+      } catch (error) {
+        // EvolutionIoLike contract: a missing directory reads as empty; any
+        // other failure surfaces so an unreadable tree is never silent.
+        if (isMissing(error)) return []
+        throw error
+      }
     },
     async exists(path) {
       const target = await fs.resolve(path)
