@@ -190,12 +190,20 @@ export function apply(ctx: Context): void {
     return domain
   }
 
+  async function reload(): Promise<void> {
+    const current = domain
+    domain = null
+    opening = null
+    if (current !== null) await current.close()
+  }
+
   // S1-D2: one warn per provider instance for the pending re-key repair
   // (same latch discipline as the json provider's P2-5 warn).
   let pendingKeyWarned = false
 
-  const provider: EvolutionStateStorage = {
+  const rawProvider: EvolutionStateStorage = {
     name: PROVIDER_DOMAIN,
+    reload,
 
     async loadReviewState(sessionId) {
       // C-2 (v18): return a DEEP copy — the caller (advanceReview) mutates the
@@ -552,10 +560,34 @@ export function apply(ctx: Context): void {
     },
   }
 
+  // A2: every provider call and a reload share one queue, and an idle queue starts a call
+  // synchronously so an in-flight open is visible to the dispose hook (E-17).
+  let providerQueue: Promise<unknown> = Promise.resolve()
+  let providerBusy = false
+  function withProvider<T>(task: () => Promise<T>): Promise<T> {
+    if (!providerBusy) {
+      providerBusy = true
+      const run = task()
+      providerQueue = run.then(() => { providerBusy = false }, () => { providerBusy = false })
+      return run
+    }
+    const run = providerQueue.then(task, task)
+    providerQueue = run.then(() => undefined, () => undefined)
+    return run
+  }
+  const provider: EvolutionStateStorage = new Proxy(rawProvider, {
+    get(target, key) {
+      const value = Reflect.get(target, key)
+      if (typeof value !== 'function') return value
+      return (...args: unknown[]) => withProvider(async () => await value.apply(target, args))
+    },
+  })
+
   ctx.effect(() => {
     const dispose = ctx.evolutionStateStorage.registerProvider(provider)
     return async () => {
       dispose()
+      await providerQueue.catch(() => {})
       // 0.3.17 (E-17): an in-flight open (still inside its retry budget) used
       // to resolve AFTER disposal and left the freshly opened domain unclosed —
       // a fast enable/disable cycle leaked a handle. Wait for it, then close.

@@ -44,3 +44,14 @@
 - approval.approve 在 lease 前后各查一次 executed marker，成功 replay 后写 marker。
 - 新增成功路径 marker 测试与“预置 marker 时 runner 不执行”负例；approval 3 files / 56 tests passed；build 0。
 - A2 仍为部分收口：review/curator counter 跨进程更新未迁移 StateStore。
+
+## 6. 追加：domain provider reload
+
+- `EvolutionStateStorage.reload?()`；domain provider 在 **provider 队列**内 close→reopen：
+  - 所有 provider 调用与 reload 共享一个队列；
+  - 空闲队列同步启动调用，E-17 dispose 仍能看到 in-flight open；
+  - reload 前无并发 provider 调用，避免 `DomainError: domain already open/closed`。
+- `approve` 在 lease 内、marker 检查前 `state.reload()`，因此 B 的 claim 读取的是介质现状，不是进程缓存。
+- 验证：state/state-domain/approval/curator 19 files / 200 tests passed；build 0。
+- 仍未迁移：review/curator 自身写计数时没有每次 reload；它们要在 Phase D 接入 StateStore。
+

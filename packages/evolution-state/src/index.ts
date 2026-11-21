@@ -91,6 +91,11 @@ export class EvolutionState extends Service {
     return this.ctx.evolutionStateStorage.provider(this.providerName || undefined)
   }
 
+  /** A2: refresh the mounted provider before a decision reads pending state. */
+  reload(): Promise<void> {
+    return this.storage().reload?.() ?? Promise.resolve()
+  }
+
   loadReviewState(sessionId: string): Promise<ReviewStateRecord | null> {
     return this.storage().loadReviewState(sessionId)
   }

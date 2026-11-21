@@ -82,6 +82,8 @@ export interface PendingResolution {
 /** Provider seam for durable evolution state; implementations own the medium. */
 export interface EvolutionStateStorage {
   readonly name: string
+  /** Re-read the durable medium; providers authoritative in memory omit this. */
+  reload?(): Promise<void>
   loadReviewState(sessionId: string): Promise<ReviewStateRecord | null>
   saveReviewState(sessionId: string, record: ReviewStateRecord): Promise<void>
   loadCuratorState(): Promise<CuratorStateRecord | null>

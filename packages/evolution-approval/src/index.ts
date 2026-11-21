@@ -303,6 +303,11 @@ export class EvolutionApproval extends Service {
     return this.ctx.evolutionState
   }
 
+  private async refreshState(): Promise<void> {
+    const state = this.state() as EvolutionState & { reload?: () => Promise<void> }
+    await state.reload?.()
+  }
+
   /** A2: a durable executed marker is the cross-process idempotency barrier for one pending id. */
   private approvalIo(): EvolutionIoLike | undefined {
     const registry = this.ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
@@ -538,6 +543,7 @@ export class EvolutionApproval extends Service {
     await this.expireStale()
     if (await this.alreadyExecuted(id)) return { ok: false, message: '待批准写入「' + id + '」已执行过（跨进程记录），不会重复回放。' }
     const result = await this.withApprovalLease(id, async () => {
+      await this.refreshState()
       if (await this.alreadyExecuted(id)) return { ok: false, message: '待批准写入「' + id + '」已执行过（跨进程记录），不会重复回放。' }
       const resolved = await this.dedupe(`approve:${id}`, () => this.doApprove(id, audit))
       if (resolved.ok) await this.markExecuted(id)
