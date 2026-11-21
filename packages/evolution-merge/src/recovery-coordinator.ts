@@ -84,12 +84,19 @@ export async function recoverCommitUnits(options: {
       continue
     }
     if (branch === 'B') {
-      const result = await options.unit.rollForward(journal.unitId)
-      if (result.ok) {
+      const forward = await options.unit.rollForward(journal.unitId)
+      if (forward.ok) {
         let projection: Awaited<ReturnType<typeof projectRecoveredUnit>>
-        try { projection = await projectRecoveredUnit({ io: options.io, home: options.home, runId: journal.runId, unitId: journal.unitId, evidence: result.evidence, now: options.now, ...(options.runs === undefined ? {} : { runs: options.runs }), ...(options.onProjectionPhase === undefined ? {} : { onPhase: options.onProjectionPhase }) }) } catch (error) { projection = { ok: false, action: 'projection-threw', message: error instanceof Error ? error.message : String(error) } }
-        reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: projection.ok ? 'rollForward' : 'blocked', ok: projection.ok, ...(projection.ok ? { evidenceSha256: evidenceSha256(result.evidence) } : { code: 'projection-failed', message: projection.message }) })
-      } else reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'rollForward', ok: false, code: result.code, message: result.message })
+        try { projection = await projectRecoveredUnit({ io: options.io, home: options.home, runId: journal.runId, unitId: journal.unitId, evidence: forward.evidence, now: options.now, ...(options.runs === undefined ? {} : { runs: options.runs }), ...(options.onProjectionPhase === undefined ? {} : { onPhase: options.onProjectionPhase }) }) } catch (error) { projection = { ok: false, action: 'projection-threw', message: error instanceof Error ? error.message : String(error) } }
+        reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: projection.ok ? 'rollForward' : 'blocked', ok: projection.ok, ...(projection.ok ? { evidenceSha256: evidenceSha256(forward.evidence) } : { code: 'projection-failed', message: projection.message }) })
+        continue
+      }
+      // C1: a target-written unit whose source checkpoints are incomplete cannot roll forward
+      // by construction. The same journal state rolls back; leaving it blocked would pin the
+      // target under busyTarget forever and let resume re-absorb an already-merged target.
+      const back = await options.unit.rollback({ unitId: journal.unitId, reason: 'startup recovery branch B: rollForward failed: ' + forward.code + ' ' + forward.message })
+      if (back.ok) reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'rollback', ok: true })
+      else reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'blocked', ok: false, code: back.code, message: back.message + '; rollForward: ' + forward.code + ' ' + forward.message })
       continue
     }
     reports.push({ unitId: journal.unitId, runId: journal.runId, phase: journal.phase, branch, action: 'blocked', ok: false, code: 'unit-recovery-blocked' })

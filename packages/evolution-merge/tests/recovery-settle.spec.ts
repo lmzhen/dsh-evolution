@@ -18,14 +18,22 @@ import { writeUndoReceipt } from '../src/domain/undo-receipt.ts'
 const evidence: UnitEvidenceRecord = { schemaVersion: 1, unitId: 'u-1', runId: 'run-1', planDigest: 'd', state: 'complete', target: { before: 'old', after: 'new', supportDigest: '', created: false }, sources: [{ name: 'b', before: 'b', after: null, archived: true, absorbedInto: 'new' }], mutations: 1, at: 1 }
 const journal: UnitJournal = { schemaVersion: 1, unitId: 'u-1', runId: 'run-1', planDigest: 'd', target: 'new', sources: ['b'], phase: 'committed', storageKey: 'k', snapshotSha256: 's', updatedAt: 1 }
 
-function fakeUnit(): UnitTransaction {
+function fakeUnit(overrides: Partial<UnitTransaction> = {}): UnitTransaction {
   return {
     async prepare() { throw new Error('not used') }, async commit() { throw new Error('not used') }, async verify() { return evidence },
     async rollback() { return { ok: false as const, code: 'unit-committed' as const, message: 'no' } },
     async finalize() { return { ok: true as const, evidence } },
     async rollForward() { return { ok: true as const, evidence } },
     async cancel() { return { ok: false, phase: 'none' } },
+    ...overrides,
   }
+}
+
+async function homeWithJournal(phase: UnitJournal['phase']): Promise<string> {
+  const home = await tempRoot('dsh-recovery-branch-b-')
+  await mkdir(join(home, 'merge', 'unit-journals'), { recursive: true })
+  await writeFile(join(home, 'merge', 'unit-journals', 'u.json'), JSON.stringify({ ...journal, phase }))
+  return home
 }
 
 async function homeWithRun(row: Record<string, unknown>): Promise<string> {
@@ -59,6 +67,28 @@ it('ignores a legacy tree-change journal left in the merge directory (P1-4)', as
   const reports = await recoverCommitUnits({ io, home, unit: fakeUnit(), now: () => 6 })
   expect(reports).toHaveLength(1)
   expect(reports[0]).toMatchObject({ action: 'none', ok: true, code: 'skill-unit-skipped' })
+})
+
+it('C1: a failed branch-B rollForward falls back to rollback', async () => {
+  const home = await homeWithJournal('target-written')
+  const io = nodeEvolutionIo()
+  const reports = await recoverCommitUnits({ io, home, now: () => 6, unit: fakeUnit({
+    async rollForward() { return { ok: false as const, code: 'unit-rollback-blocked' as const, message: 'source checkpoint missing' } },
+    async rollback() { return { ok: true as const, evidence } },
+  }) })
+  expect(reports[0]).toMatchObject({ branch: 'B', action: 'rollback', ok: true })
+})
+
+it('C1: branch-B rollback failure is reported with both causes', async () => {
+  const home = await homeWithJournal('target-written')
+  const io = nodeEvolutionIo()
+  const reports = await recoverCommitUnits({ io, home, now: () => 6, unit: fakeUnit({
+    async rollForward() { return { ok: false as const, code: 'unit-rollback-blocked' as const, message: 'forward blocked' } },
+    async rollback() { return { ok: false as const, code: 'unit-rollback-blocked' as const, message: 'rollback blocked' } },
+  }) })
+  expect(reports[0]).toMatchObject({ branch: 'B', action: 'blocked', ok: false })
+  expect(reports[0]?.message).toContain('rollback blocked')
+  expect(reports[0]?.message).toContain('forward blocked')
 })
 
 it('does not re-project a committed unit that already has an undo receipt', async () => {
