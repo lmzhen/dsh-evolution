@@ -121,6 +121,30 @@ it('refuses a multi-op plan until the unit phase is implemented', async () => {
   }
 })
 
+it('reports the on-disk patch bytes in the outcome (P1-1)', async () => {
+  const { root, lib } = await setup()
+  try {
+    expect((await lib.create('after-skill', body('after-skill', 'seed'), 'foreground')).ok).toBe(true)
+    expect((await lib.writeSupportFile('after-skill', 'references/a.md', 'line\n\n\n', 'foreground')).ok).toBe(true)
+    const before = await lib.readSupportFile('after-skill', 'references/a.md')
+    expect(before).not.toBeNull()
+    const patched = await lib.apply({
+      origin: 'foreground',
+      ops: [{ kind: 'patch', target: skillSupportTarget('after-skill', 'references/a.md'), oldString: 'line', newString: 'line2', replaceAll: false, expect: { kind: 'present', version: contentHash(before!) } }],
+    })
+    expect(patched.ok).toBe(true)
+    expect(patched.outcomes[0]?.after).toBe('line2\n')
+    expect(await lib.readSupportFile('after-skill', 'references/a.md')).toBe('line2\n')
+    const second = await lib.apply({
+      origin: 'foreground',
+      ops: [{ kind: 'patch', target: skillSupportTarget('after-skill', 'references/a.md'), oldString: 'line2', newString: 'line3', replaceAll: false, expect: { kind: 'present', version: contentHash(patched.outcomes[0]!.after!) } }],
+    })
+    expect(second.ok).toBe(true)
+  } finally {
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
+})
+
 it('SystemSkillWriter applies an explicit snapshot plan without session observation', async () => {
   const { root, lib } = await setup()
   try {

@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7f 独立复核 P1 修复：① `patchCore` 的 outcome `after` 从 `writeContent` 改为真正落盘的 `onDisk`，避免 patch 成功后同一 owner 立刻假 stale；新增 support 尾随换行回归。② approval plan replay 在 `apply` 前重跑执行点门禁（policy-protection、patch summary、descriptionStrict），并用真实 `approve()` 补“暂存后加入 protectedSkillNames → 拒绝”证据。`run-gates local` 复跑 pass=57/fail=0/cannotDecide=4/skipped=1。
+
 H7e 门禁第一轮：`run-gates local --concurrency 6` 结果 pass=56、fail=1（gate-46 check-taxonomy 陈旧，因新增 skill-write-plan.spec 未重新生成）、cannot-decide=4（gate-01 缺 overlay typescript、gate-29 缺 plane home、gate-81 空健康语料、gate-75 CI 路径）、skipped=1；已重生成 `packages/scripts/reports/check-taxonomy.json`（spec 总数 507→508）。其余 arch/doc-facts/test-lines/构建均绿。
 
 H7d 已获得跨进程 npm 包写证据：在 lab profile（file tarball 0.59.5）上用两个并发 headless 进程对同一 `race-h7` 做 skill read + sleep barrier + patch/update；history 每次只增加一个版本，另一个写入被 old_string/版本检查拒绝，未出现双写。`dsh web --profile h7lab --port 3083` 页面 200，证明 npm 包可在 web profile 装载；双 web session 的 create/patch 并发仍待补。

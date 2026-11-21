@@ -1706,6 +1706,30 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     },
   }))
 
+  /** The execution-point gates a stored plan must still pass at approve time. */
+  async function replayExecutionRefusal(args: SkillWriteArgs, origin: WriteOrigin): Promise<string | null> {
+    const refusal = await runWriteGates(skillWriteGateContext({
+      policy: ctx.get('evolutionPolicy'),
+      confirm: undefined,
+      readNames: undefined,
+      warn: warnWriteGateOnce,
+    }, { point: 'execution', args, origin }))
+    if (refusal !== null) return refusal
+    if (args.action === 'patch' && args.summary === undefined) {
+      return '插件升级后，动作「patch」必须提供 summary（一句变更原因）。\n这是升级前的暂存记录，之后的「patch」会带有 summary。'
+    }
+    if ((args.action === 'create' || args.action === 'update') && args.content !== undefined) {
+      const parsed = parseFrontmatter(args.content)
+      if (parsed !== null) {
+        const feedback = authoringFeedback(parsed.frontmatter)
+        if (settings().descriptionStrict && feedback.over60) {
+          return `作者检查：description 为 ${feedback.descriptionChars}/60 个字符，超过严格上限；请压到 60 以内，或设置 descriptionStrict=false。`
+        }
+      }
+    }
+    return null
+  }
+
   ctx.inject(['evolutionApproval'], (approvalCtx) => {
     const approval = (approvalCtx as unknown as { evolutionApproval: ApprovalLike }).evolutionApproval
     const preview: WritePreview = async args => await previewSkillWrite(library, args)
@@ -1718,11 +1742,17 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       }
       const replay = (gateView?: readonly SkillSummary[]): Promise<SkillActionResult> => replayPlan === undefined
         ? executeCore(operation, wrapped.libraryOrigin ?? wrapped.origin ?? 'background_review', gateView)
-        : (applyLimits(), skillWriteService.apply(replayPlan)).then(result => ({
-          ok: result.ok,
-          message: result.ok || result.code === undefined ? result.message : result.code + ': ' + result.message,
-          skills: [],
-        }))
+        : (async () => {
+          const refusal = await replayExecutionRefusal(operation, replayPlan.origin)
+          if (refusal !== null) return { ok: false, message: refusal, skills: [] }
+          applyLimits()
+          const result = await skillWriteService.apply(replayPlan)
+          return {
+            ok: result.ok,
+            message: result.ok || result.code === undefined ? result.message : result.code + ': ' + result.message,
+            skills: [],
+          }
+        })()
       // S1-B2: the replay re-runs the cross-source gate the tool path ran at
       // staging time — the catalog ranking may have changed while the write
       // sat pending. Same action exemptions as the tool path.

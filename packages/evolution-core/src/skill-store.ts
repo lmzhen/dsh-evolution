@@ -2383,7 +2383,7 @@ export class SkillLibrary {
       // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
       const onDisk = writeContent.trimEnd() + '\n'
       return {
-        result: { ok: true, message: `技能「${name}」已修补（${patchLabel}）。${patchNote}${capAdvisory}`, path: dir, after: writeContent, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
+        result: { ok: true, message: `技能「${name}」已修补（${patchLabel}）。${patchNote}${capAdvisory}`, path: dir, after: onDisk, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
         write: onDisk,
         audit: { skillName: name, action: 'patch', before: md, after: onDisk, summary: `patched ${patchLabel}` },
         event: { action: 'patch', name, skillDir: dir },

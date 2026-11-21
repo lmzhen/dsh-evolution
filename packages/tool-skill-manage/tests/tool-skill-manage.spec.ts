@@ -16,6 +16,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { tempHome } from '../../test-support/temp-home.ts'
+import { mountStateStack } from '../../test-support/state-stack.ts'
 
 const fakeSessions = new Map<string | undefined, { header: { origin?: string }; append: () => void }>()
 
@@ -922,6 +923,45 @@ it('v30 REV-02: a replayed write onto a policy-protected skill is refused (backg
   // The foreground channel stays open.
   const foreground = await replayRun(ctx, { action: 'update', name: 'guarded-skill', content: SKILL.replace('boundary-skill', 'guarded-skill').replace('lifecycle boundary test', 'operator body') }, 'foreground')
   expect(foreground.ok, foreground.message).toBe(true)
+  if (previousHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousHome
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+})
+
+it('P1-2: a plan replay re-checks policy-protection at approve time', async () => {
+  const root = await tempHome('dsh-p12-approve-')
+  const previousHome = process.env.DSH_HOME
+  process.env.DSH_HOME = root
+  const ctx = await mountStateStack(root, { evolution: true, approval: true })
+  await mountAgentLoopTestDependencies(ctx)
+  await ctx.plugin(SkillUsageRegistry, { root })
+  await ctx.plugin(ToolSkillManage)
+  await mkdir(join(root, 'skills', 'guarded-plan'), { recursive: true })
+  const initial = SKILL.replace('boundary-skill', 'guarded-plan')
+  await writeFile(join(root, 'skills', 'guarded-plan', 'SKILL.md'), initial)
+  const session = {
+    id: 'p12-approve',
+    header: { origin: 'subagent' },
+    readEvents: () => [
+      { type: 'tool/call', data: { callId: 'p12-read', name: 'skill', arguments: JSON.stringify({ name: 'guarded-plan' }) } },
+      { type: 'tool/result', data: { isError: false, message: { source: { callId: 'p12-read' }, content: [] } } },
+    ],
+  }
+  const staged = await executeOne(ctx, {
+    callId: ToolCallId('p12-stage'),
+    name: 'skill_manage',
+    arguments: { action: 'update', name: 'guarded-plan', content: initial.replace('lifecycle boundary test', 'review body') },
+    agent: { session } as unknown as Agent,
+    signal: new AbortController().signal,
+  })
+  expect((staged.value as { pending_id?: string } | undefined)?.pending_id).toBeTruthy()
+  const pending = await ctx.evolutionApproval.list('pending')
+  expect(pending.length).toBe(1)
+  ctx.provide('evolutionPolicy', { get: () => ({ protectedSkillNames: ['guarded-plan'] }) })
+  const approved = await ctx.evolutionApproval.approve(pending[0]!.id, { channel: 'command', principal: 'owner', deploymentAllowsRemote: false } as never)
+  expect(approved.ok).toBe(false)
+  expect(approved.message).toContain('protectedSkillNames')
+  expect(await readFile(join(root, 'skills', 'guarded-plan', 'SKILL.md'), 'utf8')).toBe(initial)
   if (previousHome === undefined) delete process.env.DSH_HOME
   else process.env.DSH_HOME = previousHome
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

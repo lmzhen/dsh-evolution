@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7f 独立复核 P1 修复
+
+- P1-1：patch outcome.after 改为 onDisk；support 尾随换行回归；
+- P1-2：plan replay 重跑 policy-protection/patch summary/descriptionStrict；真实 approve 测试；
+- run-gates local pass=57/fail=0/cannotDecide=4/skipped=1；
+- 定向 19 passed。
+
 ### 2026-11-21：Phase H7e 本地门禁第一轮
 
 - pass 56 / fail 1（taxonomy 陈旧）/ cannot-decide 4 / skipped 1；
