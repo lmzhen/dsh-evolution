@@ -34,6 +34,7 @@
 - A7：review aux 只对 scheduled debt 结账，见 [30](30-a7-review-debt.md)。
 - B1-2：delete/restructure/extract 绑定输入树与 plan，预览=回放；见 [31](31-b12-structural-anchor.md)。
 - E6：删除两个永久跳过的门禁仿真测试，见 [32](32-e6-remove-skips.md)。
+- E5：平台耦合账本改为 expected/both，strict 判 unknown/过期/tree 陈旧，见 [33](33-e5-test-lines.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
@@ -204,3 +205,4 @@
 | [30-a7-review-debt.md](30-a7-review-debt.md) | A7：review aux 调度成功才结账 |
 | [31-b12-structural-anchor.md](31-b12-structural-anchor.md) | B1-2 部分：结构写入输入树绑定 + delete 预览 |
 | [32-e6-remove-skips.md](32-e6-remove-skips.md) | E6：删除永久跳过测试 |
+| [33-e5-test-lines.md](33-e5-test-lines.md) | E5：平台耦合账本可判据化 |

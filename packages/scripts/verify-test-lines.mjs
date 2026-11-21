@@ -57,7 +57,36 @@ for (const [i, e] of (registry.testLines ?? []).entries()) {
   }
   if (typeof e?.status === "string" && !STATUSES.includes(e.status)) fieldViolations.push({ index: i, spec: e.spec, field: "status", why: "not-in-closed-set:" + e.status });
   if (typeof e?.expectLine === "string" && !EXPECT_LINES.includes(e.expectLine)) fieldViolations.push({ index: i, spec: e.spec, field: "expectLine", why: "not-in-closed-set:" + e.expectLine });
+  if (e?.expectLine === "unknown") fieldViolations.push({ index: i, spec: e.spec, field: "expectLine", why: "unassigned" });
+  if (e?.status === "pending") fieldViolations.push({ index: i, spec: e.spec, field: "status", why: "pending-not-enforcing" });
 }
+const versionOf = (raw) => {
+  const m = /^(\d+)\.(\d+)\.(\d+)/.exec(String(raw));
+  return m === null ? undefined : [Number(m[1]), Number(m[2]), Number(m[3])];
+};
+const familyVersion = (() => {
+  try { return versionOf(JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')).version) } catch { return undefined }
+})();
+const expiredEntries = (registry.testLines ?? []).filter((entry) => {
+  const expiry = versionOf(entry?.expiry);
+  if (expiry === undefined || familyVersion === undefined) return false;
+  for (let i = 0; i < 3; i += 1) {
+    if (familyVersion[i] > expiry[i]) return true;
+    if (familyVersion[i] < expiry[i]) return false;
+  }
+  return true;
+});
+const staleTree = (() => {
+  if (typeof registry.tree !== 'string' || registry.tree === '' || registry.tree === 'unknown') return ['registry has no measured tree'];
+  if (registry.tree === tree) return [];
+  try {
+    const changed = execFileSync('git', ['-C', ROOT, 'diff', '--name-only', registry.tree + '..' + tree, '--', 'packages'], { encoding: 'utf8' })
+      .split('\n').filter((line) => line.endsWith('.spec.ts'));
+    return changed.length === 0 ? [] : changed.slice(0, 5).map((file) => file + ': spec changed after the registry tree');
+  } catch (error) {
+    return ['cannot compare registry tree: ' + (error instanceof Error ? error.message : String(error))];
+  }
+})();
 const declared = new Set((registry.testLines ?? []).map((e) => e.spec + "::" + e.id));
 const seen = new Set(candidates.map((c) => c.file + "::" + c.id));
 const actualOnly = candidates.filter((c) => !declared.has(c.file + "::" + c.id));
@@ -75,10 +104,14 @@ console.log(JSON.stringify({
   actualOnly: actualOnly.length,
   declaredOnly: declaredOnly.length,
   fieldViolations: fieldViolations.length,
+  expired: expiredEntries.length,
+  sampleExpired: expiredEntries.slice(0, 5).map((e) => e.spec + '::' + e.id),
+  staleTree: staleTree.length,
+  sampleStaleTree: staleTree.slice(0, 5),
   sampleFieldViolations: fieldViolations.slice(0, 5),
   mode: STRICT ? "strict" : "report",
   fullCandidates: process.argv.includes("--full") ? candidates : undefined,
   sampleActualOnly: actualOnly.slice(0, 5),
   sampleDeclaredOnly: declaredOnly.slice(0, 5),
 }, null, 2));
-if (STRICT && (actualOnly.length > 0 || declaredOnly.length > 0 || fieldViolations.length > 0)) process.exit(1);
+if (STRICT && (actualOnly.length > 0 || declaredOnly.length > 0 || fieldViolations.length > 0 || expiredEntries.length > 0 || staleTree.length > 0)) process.exit(1);
