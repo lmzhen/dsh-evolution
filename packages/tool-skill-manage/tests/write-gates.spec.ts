@@ -34,7 +34,7 @@ function readFrames(name: string, failed = false): readonly unknown[] {
   const callId = `read-${name}`
   return [
     { type: 'tool/call', data: { callId, name: 'skill', arguments: JSON.stringify({ name }) } },
-    { type: 'tool/result', data: { isError: failed, message: { source: { callId }, content: [] } } },
+    { type: 'tool/result', data: { message: { source: { callId }, content: [], ...(failed ? { isError: true } : {}) } } },
   ]
 }
 
@@ -43,7 +43,15 @@ function fileReadFrames(path: string, failed = false): readonly unknown[] {
   const callId = 'read-' + Math.random().toString(36).slice(2)
   return [
     { type: 'tool/call', data: { callId, name: 'read', arguments: JSON.stringify({ file_path: path }) } },
-    { type: 'tool/result', data: { isError: failed, message: { source: { callId }, content: [] } } },
+    { type: 'tool/result', data: { message: { source: { callId }, content: [], ...(failed ? { isError: true } : {}) } } },
+  ]
+}
+
+function legacyReadFrames(name: string): readonly unknown[] {
+  const callId = `legacy-read-${name}`
+  return [
+    { type: 'tool/call', data: { callId, name: 'skill', arguments: JSON.stringify({ name }) } },
+    { type: 'tool/result', data: { isError: true, message: { source: { callId }, content: [] } } },
   ]
 }
 
@@ -141,6 +149,18 @@ describe('write gates: read-before-write (E-318)', () => {
       ctx,
       { action: 'patch', summary: 'test patch', name: 'gate-failed-read', old_string: 'Body.', new_string: 'Rewritten.' },
       sessionOf('subagent', readFrames('gate-failed-read', true)),
+    )
+    expect(valueOf(refused).ok).toBe(false)
+    expect(valueOf(refused).message).toContain('E-318')
+  })
+
+  it('still treats a legacy payload-level isError as a failed read', async () => {
+    const { ctx } = await setup()
+    await createTarget(ctx, 'gate-legacy-failed-read')
+    const refused = await callTool(
+      ctx,
+      { action: 'patch', summary: 'test patch', name: 'gate-legacy-failed-read', old_string: 'Body.', new_string: 'Rewritten.' },
+      sessionOf('subagent', legacyReadFrames('gate-legacy-failed-read')),
     )
     expect(valueOf(refused).ok).toBe(false)
     expect(valueOf(refused).message).toContain('E-318')

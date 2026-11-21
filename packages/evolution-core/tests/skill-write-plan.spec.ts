@@ -171,6 +171,26 @@ it('creates a foreground skill together with a support file in one multi-op unit
     expect(applied.ok, applied.message).toBe(true)
     expect(await lib.read('multi-create')).toContain('Body.')
     expect(await readFile(join(root, 'multi-create', 'references', 'a.md'), 'utf8')).toBe('a')
+    const created = (await lib.listMutations()).filter(entry => entry.skillName === 'multi-create' && entry.action === 'create')
+    expect(created).toHaveLength(1)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('does not write a create audit when a later op in the same plan is refused', async () => {
+  const { root, lib } = await setup()
+  try {
+    const refused = await lib.apply({
+      origin: 'foreground',
+      ops: [
+        { kind: 'createSkill', skill: 'multi-phantom', content: body('multi-phantom') },
+        { kind: 'write', target: skillSupportTarget('multi-phantom', 'references/a.md'), content: 'a', expect: { kind: 'present', version: contentHash('not-there') } },
+      ],
+    })
+    expect(refused.ok).toBe(false)
+    expect((await lib.listMutations()).filter(entry => entry.skillName === 'multi-phantom')).toHaveLength(0)
+    await expect(readFile(join(root, 'multi-phantom', 'SKILL.md'), 'utf8')).rejects.toThrow()
   } finally {
     await rm(root, { recursive: true, force: true })
   }

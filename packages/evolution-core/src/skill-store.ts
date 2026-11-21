@@ -2184,8 +2184,14 @@ export class SkillLibrary {
         return { ok: false, message: `创建过程中技能「${normalized}」被并发归档；残留标记已移除：等搬运完成后重试一次。` }
       }
     }
-    await this.audit(normalized, 'create', null, onDisk, 'created', undefined, result.unitId, options.unitHead, undefined, fenceHeld)
-    this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
+    // A multi-op plan prepares every op before the shared unit commits. Its
+    // collected unit is a no-write recorder, so a direct audit/event here would
+    // land during PREPARE: duplicated on success and phantom when a later op is
+    // refused. The final unit's committed hook audits each collected write.
+    if (PLAN_SINK.getStore() === undefined) {
+      await this.audit(normalized, 'create', null, onDisk, 'created', undefined, result.unitId, options.unitHead, undefined, fenceHeld)
+      this.notifyMutation({ action: 'create', name: normalized, skillDir: dir })
+    }
     // Both warnings ride the normal success path (audit/event included) — a
     // durability warning must never skip the accounting.
     const warnings = [

@@ -159,7 +159,7 @@ function readDispatchRecord(event: { type: string; data?: unknown }): DispatchRe
     arguments?: unknown
     isError?: unknown
     error?: unknown
-    message?: { source?: { callId?: unknown }; content?: unknown }
+    message?: { source?: { callId?: unknown }; content?: unknown; isError?: unknown }
   }
   if (event.type === NATIVE_RESULT_EVENT) {
     // The call identity lives INSIDE the message (`message.source.callId`, the
@@ -178,9 +178,12 @@ function readDispatchRecord(event: { type: string; data?: unknown }): DispatchRe
       rootCallId: callId,
       name: '',
       arguments: undefined,
-      // A failure is marked by the payload-level `error` OR a result block's own
-      // `isError` (both shapes exist in persisted pre-rc.2 logs).
-      outcome: { ok: data.isError !== true && data.error === undefined && block?.isError !== true },
+      // A failure is marked by the platform's `message.isError` (the live
+      // `createToolResultMessage` shape), by the payload-level `error` (HarnessError
+      // info), or by a result block's own `isError` (legacy/pre-rc.2 logs). The
+      // live result payload has no top-level `isError`; reading only that field
+      // counted a failed skill read as success and bypassed READ_BEFORE_WRITE.
+      outcome: { ok: data.isError !== true && data.message?.isError !== true && data.error === undefined && block?.isError !== true },
     }
   }
   const isPtc = event.type === PTC_DISPATCH_START_EVENT || event.type === PTC_DISPATCH_EVENT

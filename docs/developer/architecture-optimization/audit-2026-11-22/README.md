@@ -13,6 +13,12 @@
 - **发布影响**：0.59.6 已发布字节不变；这些是当前源码的审计结果。任何修复都需要新补丁版本，不能静默重发 0.59.6。
 - **发布证据风险**：现 `0.59.6` 的 rehearsal 仍携带 0.59.5 的 spike 数据，SPIKE 哈希无复算；这被列为 P1-E3，必须在下一版发布前修掉。
 
+## 执行状态（2026-11-22，未发布）
+
+- R0-1 / P0-1：已在 main 源码修复（平台真实 `message.isError` + 测试夹具），见 [12](12-r0-observation-plan-design.md)。
+- R0-2 / A1：已在 main 源码修复（prepare 期间跳过 create 直接 audit/notify），见 [12](12-r0-observation-plan-design.md)。
+- 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
+
 ## 方法
 
 - 8 个子智能体各自只读一个域，互不继承上下文；只允许写自己的报告文件。
