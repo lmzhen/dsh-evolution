@@ -111,6 +111,17 @@ describe('the staged skill write preview', () => {
     expect(missing.reason).toContain('会被拒绝')
   })
 
+  it('B1-2: a restructure preview projects the moved section and its support file', async () => {
+    const { preview, root } = await mount()
+    const body = BODY.replace('Body.\n', 'Body.\n\n## Extra\n\nDetail text.\n')
+    await writeFile(join(root, 'skills', 'preview-skill', 'SKILL.md'), body)
+    const answer = await preview({ operation: { action: 'restructure', name: 'preview-skill', restructure: [{ heading: 'Extra', to_file: 'references/extra.md' }] } }) as { available: boolean; after: string; files: Array<{ path: string; after: string }> }
+    expect(answer.available).toBe(true)
+    expect(answer.after).toContain('references/extra.md')
+    expect(answer.after).not.toContain('Detail text.')
+    expect(answer.files).toContainEqual({ path: 'preview-skill/references/extra.md', before: null, after: '## Extra\n\nDetail text.\n' })
+  })
+
   it('B1-2: a delete preview shows the current body and no after bytes', async () => {
     const { preview } = await mount()
     const answer = await preview({ operation: { action: 'delete', name: 'preview-skill', summary: 'delete it' } }) as { available: boolean; path: string; before: string; after: string | null }

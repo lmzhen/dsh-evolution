@@ -65,5 +65,6 @@ replay：
 
 - 新增 `stagedTreeDigest`；delete/restructure/extract 暂存写入 `staged_tree_sha256`，回放重算比对。
 - delete 预览返回 before body / after null。
-- approval-preview + tool-skill-manage：2 files / 53 tests passed；build 0。
-- B1-2 仍未 fully closed：restructure 字节预览、extract 完整 plan 待 PlanService 组。
+- 追加 restructure 预览：核心导出 `projectRestructureMarkdown`，预览给出 SKILL.md after 与每个 references 文件 before/after；与 store 共用同一 planner。
+- approval-preview + tool-skill-manage：10 files / 121 tests passed；build 0。
+- B1-2 仍未 fully closed：extract 仍缺完整 `ExtractPlanDraft` 落 pending，回放仍重新 build；待 PlanService 组。

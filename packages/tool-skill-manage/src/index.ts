@@ -29,7 +29,7 @@ import { defineTool } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { Agent } from '@deepseek-ai/dsh-evolution-platform-contract'
 import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { clampOnce, liveBool, unwrapLive, contentHash, evolutionIoAdapter, DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SKILL_VERSION_KEEP, DEFAULT_SUPPORT_FILE_CHAR_POLICY, paramRowId, policyStageLimits, userSetKeys, type PolicyStageFields, DSH_AUTHORING_STANDARDS, callingScope, isPresent, isUnknown, probePresent, probeUnknown, type Probe, SKILLS_GUIDANCE, SKILLS_GUIDANCE_SECTION_ORDER, computeDedupGroups, nearDuplicateSummaries, type SkillLimits } from '@deepseek-ai/dsh-evolution-core'
-import { DEFAULT_SKILL_WRITE_SUMMARY_CHARS, newSkillLibrary, normalizeChangeSummary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, type ChangeSummary, type SkillActionResult, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
+import { DEFAULT_SKILL_WRITE_SUMMARY_CHARS, newSkillLibrary, normalizeChangeSummary, resolveExecOrigins, sessionReadSkillNames, sessionReadSupportFiles, authoringFeedback, parseFrontmatter, projectRestructureMarkdown, type ChangeSummary, type SkillActionResult, type SkillRestructureMove, type WriteOrigin } from '@deepseek-ai/dsh-evolution-core/skills'
 import { installSkillObservationListener } from './skill-observations.ts'
 import { SkillObservationStore, SkillWriteService, skillBodyTarget, skillSupportTarget, type SkillWritePlan, type SkillWritePlanResult, type SkillWriteServiceResult } from '@deepseek-ai/dsh-evolution-core/skills'
 import { fuzzyPatch } from '@deepseek-ai/dsh-evolution-core'
@@ -403,6 +403,30 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
     return before === null
       ? { available: false, reason: '该支撑文件不存在，无法移除' }
       : { available: true, path, before, after: null }
+  }
+  if (action === 'restructure') {
+    if (before === null) return { available: false, reason: '该技能没有可重构的正文' }
+    const moves: SkillRestructureMove[] = (Array.isArray(operation.restructure) ? operation.restructure : []).map(item => ({
+      heading: typeof item?.heading === 'string' ? item.heading : '',
+      ...(typeof item?.start === 'string' ? { start: item.start } : {}),
+      ...(typeof item?.end === 'string' ? { end: item.end } : {}),
+      toFile: typeof item?.to_file === 'string' ? item.to_file : '',
+    }))
+    const projected = projectRestructureMarkdown(before, moves)
+    if (!projected.ok) return { available: false, reason: projected.message }
+    const files: Array<{ path: string; before: string | null; after: string | null }> = []
+    const byRel = new Map<string, string[]>()
+    for (const section of projected.sections) {
+      const texts = byRel.get(section.rel) ?? []
+      texts.push(section.text)
+      byRel.set(section.rel, texts)
+    }
+    for (const [rel, texts] of [...byRel.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      const current = await library.readSupportFile(name, rel)
+      const base = current?.trimEnd() ?? ''
+      files.push({ path: name + '/' + rel, before: current, after: base === '' ? texts.join('\n\n') : base + '\n\n' + texts.join('\n\n') })
+    }
+    return { available: true, path: 'SKILL.md', before, after: projected.body, files }
   }
   if (action === 'delete') {
     return before === null

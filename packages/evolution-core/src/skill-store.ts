@@ -757,6 +757,18 @@ function planRestructureSections(body: string, moves: SkillRestructureMove[]): R
   return { body: rebuilt.join('\n'), sections: spans.map(({ rel, heading, text }) => ({ rel, heading, text })) }
 }
 
+/** Project one restructure without writing: the operator preview and the store share the planner. */
+export function projectRestructureMarkdown(markdown: string, moves: SkillRestructureMove[]): { ok: true; body: string; sections: readonly PlannedRestructureSection[] } | { ok: false; message: string } {
+  const block = frontmatterBlock(markdown)
+  if (!block) return { ok: false, message: 'SKILL.md 没有有效的 frontmatter；拒绝重构。' }
+  const header = block.lines.slice(0, block.end + 1).join('\n')
+  const bodyRaw = markdown.slice(header.length)
+  const plan = planRestructureSections(bodyRaw.replace(/\r\n/g, '\n'), moves)
+  if ('error' in plan) return { ok: false, message: '重构被拒绝：' + plan.error }
+  const newMd = (header + plan.body).replace(/\r\n/g, '\n')
+  return { ok: true, body: block.nl === '\r\n' ? newMd.replace(/\n/g, '\r\n') : newMd, sections: plan.sections }
+}
+
 /** One low-level CAS result; no audit/event is emitted by this primitive. */
 export interface SkillFileCasResult {
   readonly ok: boolean
