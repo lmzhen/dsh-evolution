@@ -244,6 +244,16 @@ function injectKind(debt: ReviewDebt | null): ReviewKind | null {
   return debt.memory ? 'memory' : debt.skill ? 'skill' : null
 }
 
+/** Split one debt by which kinds actually scheduled; failed kinds are retried next boundary. */
+export function splitScheduledDebt(debt: ReviewDebt, result: { readonly memory: boolean; readonly skill: boolean }): { scheduled?: ReviewDebt; failed?: ReviewDebt } {
+  const scheduled = { memory: debt.memory && result.memory, skill: debt.skill && result.skill }
+  const failed = { memory: debt.memory && !result.memory, skill: debt.skill && !result.skill }
+  return {
+    ...scheduled.memory || scheduled.skill ? { scheduled } : {},
+    ...failed.memory || failed.skill ? { failed } : {},
+  }
+}
+
 function mergeDebt(a: ReviewDebt | null | undefined, b: ReviewDebt | null | undefined): ReviewDebt | undefined {
   if (a === null || a === undefined) return b ?? undefined
   if (b === null || b === undefined) return a
@@ -776,8 +786,12 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
         // decision: BOTH modes complete after the task — the old immediate
         // 'inject' contract is superseded, 0.3.39).
         if (params().reviewMode === 'aux') {
-          await consumeReviewDebt(session.id, pendingDebt)
-          await scheduleAuxDebt(session, agent, pendingDebt, signal, 'cadence')
+          const scheduled = await scheduleAuxDebt(session, agent, pendingDebt, signal, 'cadence')
+          // A7: only a debt whose review actually scheduled is consumed. A failed/blocked kind
+          // keeps its counters and is written back, so a transient lease/child failure retries at
+          // the next boundary instead of silently dropping this segment's review.
+          if (scheduled.scheduled !== undefined) await consumeReviewDebt(session.id, scheduled.scheduled)
+          if (scheduled.failed !== undefined) pendingCadenceReviews.set(session.id, scheduled.failed)
           return
         }
         const pendingKind = injectKind(pendingDebt)
@@ -1053,12 +1067,12 @@ function snapshotReviewParent(agent: Agent): Agent {
 }
 
 
-  async function scheduleAuxDebt(session: Session, agent: Agent, debt: ReviewDebt, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<void> {
-    const tasks: Promise<boolean>[] = []
-    if (debt.memory) tasks.push(tryAuxReview(session, agent, 'memory', signal, reason))
-    if (debt.skill) tasks.push(tryAuxReview(session, agent, 'skill', signal, reason))
-    await Promise.all(tasks)
+  async function scheduleAuxDebt(session: Session, agent: Agent, debt: ReviewDebt, signal: { toolCalls: number; userChars: number; assistantChars: number }, reason: 'cadence' | 'completion'): Promise<{ scheduled?: ReviewDebt; failed?: ReviewDebt }> {
+    const memory = debt.memory ? await tryAuxReview(session, agent, 'memory', signal, reason) : false
+    const skill = debt.skill ? await tryAuxReview(session, agent, 'skill', signal, reason) : false
+    return splitScheduledDebt(debt, { memory, skill })
   }
+
 
 
   async function consumeReviewDebt(sessionId: SessionId, debt: ReviewDebt): Promise<void> {
