@@ -227,7 +227,7 @@ export async function body(name: string, side: 'live' | 'archive', rowId?: strin
 export interface MergeDecisionOutcome { readonly ok: boolean; readonly message: string; readonly code?: string; readonly runId?: string }
 
 export async function decide(rowId: string, verb: 'approve' | 'reject', sessionId: string): Promise<MergeOutcome<MergeDecisionOutcome>> {
-  const path = HOST_ROUTES.body.replace(/body$/, 'decision')
+  const path = HOST_ROUTES.decision
   let response: Response
   try {
     response = await fetch(path, { method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify({ rowId, verb, sessionId }) })

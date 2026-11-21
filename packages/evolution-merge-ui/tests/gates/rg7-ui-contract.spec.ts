@@ -22,7 +22,7 @@ it('RG7 UI consumes wireVersion, ActionRef, and imports no write model', () => {
   const posts = all.match(/method:\s*['"]POST['"]/g) ?? []
   expect(posts).toHaveLength(1)
   const apiSource = readFileSync(join(clientRoot, 'api.ts'), 'utf8')
-  expect(apiSource).toContain("replace(/body$/, 'decision')")
+  expect(apiSource).toContain('HOST_ROUTES.decision')
   expect(apiSource).toContain('rowId, verb, sessionId')
   const deps = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).dependencies ?? {}
   expect(Object.keys(deps).some(name => name.includes('dsh-evolution-merge') || name.includes('dsh-evolution-core'))).toBe(false)

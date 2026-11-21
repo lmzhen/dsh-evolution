@@ -10,14 +10,13 @@ import type { QueueId } from './wire.ts'
 import type { MergeSnapshot, BodyRef } from './domain/merge-snapshot.ts'
 import { buildBodyView, buildFacts as buildSnapshotFacts, buildHistoryView, buildQueuePage } from './surface/merge-view.ts'
 
-const MERGE_PATHS = HOST_ROUTES.merge as { view: string; rows: string; body?: string; history?: string }
-const MERGE_BASE = MERGE_PATHS.view.slice(0, -'view'.length)
+const MERGE_PATHS = HOST_ROUTES.merge as { view: string; rows: string; body: string; history: string; decision: string }
 export const MERGE_ROUTES: { view: `/api/dsh-evolution/${string}`; rows: `/api/dsh-evolution/${string}`; body: `/api/dsh-evolution/${string}`; history: `/api/dsh-evolution/${string}`; decision: `/api/dsh-evolution/${string}` } = {
   view: MERGE_PATHS.view as `/api/dsh-evolution/${string}`,
   rows: MERGE_PATHS.rows as `/api/dsh-evolution/${string}`,
-  body: (MERGE_PATHS.body ?? MERGE_BASE + 'body') as `/api/dsh-evolution/${string}`,
-  history: (MERGE_PATHS.history ?? MERGE_BASE + 'history') as `/api/dsh-evolution/${string}`,
-  decision: (MERGE_BASE + 'decision') as `/api/dsh-evolution/${string}`,
+  body: MERGE_PATHS.body as `/api/dsh-evolution/${string}`,
+  history: MERGE_PATHS.history as `/api/dsh-evolution/${string}`,
+  decision: MERGE_PATHS.decision as `/api/dsh-evolution/${string}`,
 }
 
 export interface MergeDecisionRequest {

@@ -36,6 +36,7 @@ export const ROUTES = {
     runs: '/api/dsh-evolution/merge/runs',
     body: '/api/dsh-evolution/merge/body',
     history: '/api/dsh-evolution/merge/history',
+    decision: '/api/dsh-evolution/merge/decision',
   },
   diagnostics: {
     view: '/api/dsh-evolution/diagnostics',

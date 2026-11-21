@@ -219,3 +219,4 @@
 | [39-d2-contract-strict.md](39-d2-contract-strict.md) | D2：平台契约 strict 对准 rc.5 |
 | [40-p2-tool-register.md](40-p2-tool-register.md) | P2：工具注册缺失可见 |
 | [41-e7-falsifiability.md](41-e7-falsifiability.md) | E7：falsifiability-carrier 清零 |
+| [42-p2-merge-decision-route.md](42-p2-merge-decision-route.md) | P2：merge decision 路由单源 |
