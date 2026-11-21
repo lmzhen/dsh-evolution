@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7p 发布候选验收
+
+- 定向 32 files / 320 tests passed；
+- local gates pass=57/fail=0；
+- 22 tarball smoke/audit OK。
+
 ### 2026-11-21：Phase H7o 最终定向测试
 
 - 满载超时用例提升到 60s（仅测试）；
