@@ -113,3 +113,13 @@ export function apply(ctx) { ctx.effect(() => ctx.evolutionIo.registerProvider(p
   createIfAbsent→EEXIST、transact edit、transact create/delete）通过。
 - 本轮 `io-node` 仍是生产默认；新 provider 已可挂载但未替换组合行。
 - 未发布。
+
+## 6. 后续实现（2026-11-22，未发布）
+
+- 用真实平台 `LocalFileSystem` + 临时 DSH_HOME 做集成测试：write/read/size/transact/
+  createIfAbsent 冲突全部通过；平台 createIfAbsent 的冲突码是 `FS_NOT_OBSERVED`，adapter 已映射到
+  `EEXIST`（供 WriteKernel 识别为 cas-conflict）。
+- `evolution-all` / `evolution-host` / `evolution-preset` 的 IO 行已从 `evolution-io-node` 切到
+  `evolution-io-platform`；`HOST_ROW_IDS`/`HOST_ROW_NAMES` 同步。
+- host composition / bundle mutual-exclusion / dependency closure / contract：24 tests passed。
+- `io-node` 保留为测试/standalone legacy backend；下一步 UnitKernel 完成后再删除生产依赖。

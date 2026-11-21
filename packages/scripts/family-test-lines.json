@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-21T21:13:56.528Z",
-  "tree": "92d91d1d",
+  "measuredAt": "2026-11-21T21:16:39.622Z",
+  "tree": "3dcd0c77",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -182,6 +182,16 @@
       "reasonRef": "packages/evolution-commands/tests/platform-view.spec.ts:1",
       "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
       "owner": "evolution-commands"
+    },
+    {
+      "spec": "packages/evolution-core/tests/io-platform.integration.spec.ts",
+      "id": "@deepseek-ai/dsh-fs-local",
+      "kind": "platform",
+      "expectLine": "unknown",
+      "status": "pending",
+      "reasonRef": "packages/evolution-core/tests/io-platform.integration.spec.ts:1",
+      "expiry": "G2/M5: assign each spec its expected platform line (or drop the coupling) before the registry turns enforcing",
+      "owner": "evolution-core"
     },
     {
       "spec": "packages/evolution-core/tests/opt-in.spec.ts",

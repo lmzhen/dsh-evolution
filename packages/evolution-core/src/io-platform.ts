@@ -139,7 +139,7 @@ export function platformEvolutionIo(fs: PlatformFs): EvolutionIo {
       try {
         await fs.writeText(target, content, { kind: 'createIfAbsent' })
       } catch (error) {
-        if (codeOf(error) === 'FS_ALREADY_EXISTS' || codeOf(error) === 'FS_STALE_VERSION') {
+        if (codeOf(error) === 'FS_ALREADY_EXISTS' || codeOf(error) === 'FS_STALE_VERSION' || codeOf(error) === 'FS_NOT_OBSERVED') {
           throw eexist('target appeared before create: ' + path)
         }
         throw error
@@ -160,7 +160,7 @@ export function platformEvolutionIo(fs: PlatformFs): EvolutionIo {
         try {
           await fs.writeText(target, next, { kind: 'createIfAbsent' })
         } catch (error) {
-          if (codeOf(error) === 'FS_ALREADY_EXISTS' || codeOf(error) === 'FS_STALE_VERSION') {
+          if (codeOf(error) === 'FS_ALREADY_EXISTS' || codeOf(error) === 'FS_STALE_VERSION' || codeOf(error) === 'FS_NOT_OBSERVED') {
             throw eexist('target appeared before write: ' + path)
           }
           throw error

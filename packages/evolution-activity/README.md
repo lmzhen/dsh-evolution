@@ -15,7 +15,7 @@ There is no direct command or panel. `evolution-replay` reads plan records, whil
 
 Persistence starts after an `evolutionIo` provider mounts. Appends are best effort: a write failure is logged after the upstream operation has already completed. Before an append replaces unreadable or foreign-version bytes, the writer attempts to preserve them in a `.corrupt` copy and refuses the append if that rescue fails.
 
-The concurrency guarantee comes from the selected IO backend. The shipped Node backend is single-process; see [evolution-io-node](../evolution-io-node/README.md).
+The concurrency guarantee comes from the selected IO backend. The shipped composition uses the platform filesystem backend (`evolution-core/io-platform`) through the family IO seam; the legacy `io-node` backend remains available to tests and standalone consumers.
 
 ### Review schema v3
 

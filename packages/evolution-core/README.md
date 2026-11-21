@@ -4,7 +4,7 @@ Shared library for the evolution family: skill and memory stores, write kernels 
 
 The root entry is a library, not a user-facing command. The package also exposes `./composition`, `./subagent`, `./http-routes`, `./restrictor`, and `./runtime` subpaths.
 
-The `./io-platform` subpath adapts the platform filesystem service (`ctx.fs`) to the family's existing `EvolutionIoLike` seam. It is the Phase-B production backend; `./io-node` remains the current default until the composition rows are switched.
+The `./io-platform` subpath adapts the platform filesystem service (`ctx.fs`) to the family's existing `EvolutionIoLike` seam. It is the production backend used by the shipped composition rows; `./io-node` remains available for tests and standalone consumers as the legacy local backend.
 
 The former `./platform` compatibility barrel is removed: feature packages import port types from `@lmzhen/dsh-evolution-platform-contract`, port functions from `@lmzhen/dsh-evolution-adapter/ports`, and host runtime helpers from `@lmzhen/dsh-evolution-adapter/values`. `./runtime` no longer mounts `evolutionPlatform`; the bundle's `evolution-adapter` row owns it and mounts before core/runtime.
 
