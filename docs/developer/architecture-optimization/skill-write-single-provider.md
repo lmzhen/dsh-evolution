@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7i 双 web 客户端尝试（未通过）：两个 isolated Chromium 同时打开 lab host，未先各建独立会话，两个 composer 实际写入同一已选会话；结果只落一个 `references/web-race.txt` 内容 A，另一条消息排队，不能作为“双 session”证据。下一步必须在两个浏览器各自先点“新建会话”，再并发发送。
+
 H7h 真机 web 单会话证据：isolated Chromium 打开 lab host `http://127.0.0.1:3083`，新建会话后模型调用 `skill` 读取 `race-h7` 并成功 `skill_manage write_file` 写 `references/webrace.txt`（回复 DONE-WEB-A，无错误）。这证明 npm tarball 安装的 web profile 能完成真实 skill read→write 链路；**双 web session 并发**证据仍未拿到（单次会话 4 秒完成，第二次未及时并发）。
 
 H7g 验收矩阵补齐：新增 K2（两 owner 同 support patch 同一 observation，恰一成功、另一 SKILL_STALE_VERSION、磁盘只落一个改动）、K7（目录 junction alias 与真实路径共享 observation/lock，恰一成功且 target 文件只变一次）、K8（tool 级两 owner 并发 create 同名 skill，恰一成功、磁盘只有胜者内容）。K6 故障注入未做，但机制已无写后 re-read，create-tree-reads 读计数作为间接证据。

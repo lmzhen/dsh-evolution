@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7i 双 web 客户端尝试
+
+- 两个 isolated Chromium 未先各建会话，实际同一 conversation；
+- 只落一个 web-race.txt(A)，另一条排队；
+- 双 session 并发仍缺。
+
 ### 2026-11-21：Phase H7h web 单会话真机证据
 
 - isolated Chromium + lab host 3083；
