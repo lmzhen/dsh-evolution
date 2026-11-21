@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7e 本地门禁第一轮
+
+- pass 56 / fail 1（taxonomy 陈旧）/ cannot-decide 4 / skipped 1；
+- 重生成 check-taxonomy.json（spec 507→508）；
+- 其余静态门禁与构建绿。
+
 ### 2026-11-21：Phase H7d 跨进程 npm 包并发证据
 
 - lab profile h7headless，两个并发 headless 进程对同一 skill read+sleep+write；

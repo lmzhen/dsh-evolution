@@ -483,6 +483,7 @@
         "evolution-core::tests/skill-target-locks.spec.ts",
         "evolution-core::tests/skill-transaction.spec.ts",
         "evolution-core::tests/skill-write-intent.spec.ts",
+        "evolution-core::tests/skill-write-plan.spec.ts",
         "evolution-core::tests/skill-write-service.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
@@ -1146,6 +1147,7 @@
         "evolution-core::tests/skill-target-locks.spec.ts",
         "evolution-core::tests/skill-transaction.spec.ts",
         "evolution-core::tests/skill-write-intent.spec.ts",
+        "evolution-core::tests/skill-write-plan.spec.ts",
         "evolution-core::tests/skill-write-service.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
@@ -1743,6 +1745,7 @@
         "evolution-core::tests/skill-target-locks.spec.ts",
         "evolution-core::tests/skill-transaction.spec.ts",
         "evolution-core::tests/skill-write-intent.spec.ts",
+        "evolution-core::tests/skill-write-plan.spec.ts",
         "evolution-core::tests/skill-write-service.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
@@ -2166,7 +2169,7 @@
     },
     "pre-tag": {
       "gates": 62,
-      "specs": 435
+      "specs": 436
     },
     "ci-only": {
       "gates": 10,
@@ -2174,16 +2177,16 @@
     },
     "full(ci=off)": {
       "gates": 62,
-      "specs": 435
+      "specs": 436
     },
     "full(ci=on)": {
       "gates": 72,
-      "specs": 507
+      "specs": 508
     }
   },
   "specs": {
-    "total": 507,
-    "marked": 507,
+    "total": 508,
+    "marked": 508,
     "unmarked": 0
   }
 }
