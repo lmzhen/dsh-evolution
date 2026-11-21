@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7l 双 web host 尝试：启动第二个 lab web host（同 profile，端口 3084）与 3083 并行，两个 isolated Chromium 各自新建会话，分别写同一 `references/web-race5.txt` A/B。A(host1) 写入成功；B(host2) 在“加载技能”后停于“深度求索中 1 秒”，30 秒内无写入，手动停止。结论：模型/宿主请求在共享 home 下串行，双 web 模型会话无法制造并发窗口；provider 并发已由 headless 跨进程与 K2/K7/K8 覆盖，web 并发证据按 DEFERRED 记录。
+
 H7k 双 web 独立会话第三次尝试：两个 isolated Chromium 各自点“新建会话”成功，分别发送 write_file A/B 到同一 `references/web-race3.txt`。A 在 4 秒内完成并落盘 A；B 的会话进入“深度求索中 1 秒”后长时间未推进，60 秒内无写入，手动停止。观察到的是一次成功写入、无双写；但 B 的模型请求未在验收窗口内并发执行，无法证明双 web 写入竞态，归因为 host/模型请求排队而非 provider 双写。
 
 H7j 双 web 独立会话第二次尝试（未通过）：两个 isolated Chromium 各自点击“新建会话”后填 prompt，但 UI 仍停留在旧 conversation，发送后只看到旧 `web-race.txt` 记录，新 `web-race2.txt` 未产生。判断为新建会话点击未命中/两种客户端共享选中态，需改用 API 或每客户端独立 profile 后再验。

@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7l 双 web host 尝试
+
+- 3083/3084 双 host、双独立会话；
+- A 写入成功，B 模型请求 30s 未推进；
+- 共享 home 下模型请求串行，web 并发证据 DEFERRED；
+- provider 并发由 headless 跨进程 + K2/K7/K8 覆盖。
+
 ### 2026-11-21：Phase H7k 双 web 独立会话第三次尝试
 
 - 两 browser 独立新建会话成功；
