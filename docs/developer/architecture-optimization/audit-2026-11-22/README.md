@@ -174,3 +174,4 @@
 | [14-r0-ui-confirm-design.md](14-r0-ui-confirm-design.md) | R0-5/F1-F2 UI 确认 effective value 与 settings 订阅 |
 | [15-r0-release-evidence-design.md](15-r0-release-evidence-design.md) | R0-6/E3 evidence 绑定实际 dist tarball 与 release 门 |
 | [16-r0-meta-gate-design.md](16-r0-meta-gate-design.md) | R0-7/E7 argv-ci-parity 进 ledger、替换登记、mutation 签名刷新 |
+| [17-phase-b-platform-io.md](17-phase-b-platform-io.md) | Phase B 第一步：平台 fs 后端适配器（未切默认） |

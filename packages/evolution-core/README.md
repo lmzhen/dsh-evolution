@@ -4,6 +4,8 @@ Shared library for the evolution family: skill and memory stores, write kernels 
 
 The root entry is a library, not a user-facing command. The package also exposes `./composition`, `./subagent`, `./http-routes`, `./restrictor`, and `./runtime` subpaths.
 
+The `./io-platform` subpath adapts the platform filesystem service (`ctx.fs`) to the family's existing `EvolutionIoLike` seam. It is the Phase-B production backend; `./io-node` remains the current default until the composition rows are switched.
+
 The former `./platform` compatibility barrel is removed: feature packages import port types from `@lmzhen/dsh-evolution-platform-contract`, port functions from `@lmzhen/dsh-evolution-adapter/ports`, and host runtime helpers from `@lmzhen/dsh-evolution-adapter/values`. `./runtime` no longer mounts `evolutionPlatform`; the bundle's `evolution-adapter` row owns it and mounts before core/runtime.
 
 `./runtime` is a function plugin. It provides `evolutionProjections`, the single owner of the five host-only session units (`evolutionActivity`, `evolutionEvidence`, `evolutionReads`, `evolutionProjectionHistory`, `evolutionSignals`); readers ask that service and degrade to `undefined` when the platform registry is absent. It also provides `evolutionLlm`, the single route/purpose/transport owner for auxiliary model calls (curator, merge judge, domain generation). A granular composition that mounts feature rows without a family bundle must mount this row too. The runtime also installs the minimal-preset guard: while the active preset is `minimal`, family model tools are hidden per agent scope and AUX review is skipped; UI/commands remain profile-level.

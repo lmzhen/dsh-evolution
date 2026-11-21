@@ -75,6 +75,10 @@
       "types": "./lib/types/io-node.d.ts",
       "default": "./lib/io-node.js"
     },
+    "./io-platform": {
+      "types": "./lib/types/io-platform.d.ts",
+      "default": "./lib/io-platform.js"
+    },
     "./authority-plugin": {
       "types": "./lib/types/authority-plugin.d.ts",
       "default": "./lib/authority-plugin.js"
