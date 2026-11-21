@@ -11,7 +11,7 @@
  */
 import { contentHash } from './mutations.ts'
 import type { SkillLibrary, SkillSectionEdit, WriteAnchor, WriteOrigin } from './skill-store.ts'
-import type { SkillObservationStore } from './skill-observation.ts'
+import type { SkillObservationStore, SkillTarget } from './skill-observation.ts'
 import { skillBodyTarget, skillSupportTarget } from './skill-observation.ts'
 import type { SkillWritePlan } from './skill-write-plan.ts'
 
@@ -252,27 +252,15 @@ export class SkillWriteService {
    */
   async apply(plan: SkillWritePlan, owner?: SkillWriteOwner): Promise<SkillWriteServiceResult> {
     const result = await this.library.apply(plan)
-    if (result.ok && owner !== undefined) await this.observePlan(plan, owner)
+    if (result.ok && owner !== undefined) await this.observeOutcomes(result, owner)
     return actionResult(result)
   }
 
-  private async observePlan(plan: SkillWritePlan, owner: SkillWriteOwner): Promise<void> {
-    for (const op of plan.ops) {
-      try {
-        if (op.kind === 'remove') {
-          this.observations.record(owner, op.target, { kind: 'absent' })
-          continue
-        }
-        if (op.kind === 'createSkill') {
-          await this.readBody(owner, op.skill)
-          continue
-        }
-        if (op.target.relPath === '') await this.readBody(owner, op.target.skill)
-        else await this.readSupport(owner, op.target.skill, op.target.relPath)
-      } catch {
-        // H2 compatibility: a post-commit observation read must not change the
-        // write outcome. H5 records from SkillWriteOutcome instead.
-      }
+  private async observeOutcomes(result: { readonly outcomes: readonly { readonly target: SkillTarget; readonly version?: string }[] }, owner: SkillWriteOwner): Promise<void> {
+    for (const outcome of result.outcomes) {
+      if (outcome.version === undefined) continue
+      const target = outcome.target.identityKey === undefined ? await this.library.identify(outcome.target) : outcome.target
+      this.observations.record(owner, target, outcome.version === '' ? { kind: 'absent' } : { kind: 'present', version: outcome.version })
     }
   }
 

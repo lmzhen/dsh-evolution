@@ -157,7 +157,7 @@ describe('tool observed writes', () => {
       expect((unread.value as { message?: string }).message ?? '').toContain('read the skill target before writing it')
 
       const removed = await call(ctx, ownerA, { action: 'remove_file', name: 'remove-skill', file_path: 'references/a.md' }, 'remove-observed')
-      expect((removed.value as { ok?: boolean }).ok).toBe(true)
+      expect((removed.value as { ok?: boolean; message?: string }).ok, (removed.value as { message?: string }).message).toBe(true)
     } finally {
       await ctx.fiber.dispose()
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })

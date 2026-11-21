@@ -932,6 +932,14 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H5a write outcome observation
+
+- core mutator 成功返回 `after`；`SkillLibrary.apply` 生成 outcome（after/version）；
+- `SkillWriteService.apply` 用 outcome 记录 observation，不再 post-write re-read；
+- create-tree-reads 少一次写后读；
+- tool + core 定向 121 passed，build 0；
+- legacy 写前 seed 仍在，H5b 处理。
+
 ### 2026-11-21：Phase H3b approval replay plan + 旧记录拒绝
 
 - `WriteRunner(args, {replayed})`；approve 传 `replayed:true`；

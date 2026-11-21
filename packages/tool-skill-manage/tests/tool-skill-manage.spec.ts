@@ -808,7 +808,7 @@ Existing.
     // mutation event and bump patch_count (V4-27 discipline covers update/patch
     // only). The noop must keep the counter — the sum is real modification.
     const second = await execute({ action: 'write_file', name: 'wf-skill', file_path: 'references/notes.md', file_content: 'line one\n' })
-    expect((second.value as { ok?: boolean } | undefined)?.ok).toBe(true)
+    expect((second.value as { ok?: boolean } | undefined)?.ok, (second.value as { message?: string } | undefined)?.message).toBe(true)
     expect((second.value as { message?: string } | undefined)?.message ?? '').toContain('未变更')
     expect((await ctx.skillUsage.report()).get('wf-skill')?.patch_count).toBe(1)
     if (previousHome === undefined) delete process.env.DSH_HOME

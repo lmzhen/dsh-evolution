@@ -63,7 +63,7 @@ import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { decideSkillWrite, type SkillWriteIntent, type SkillWriteRefusalReason } from './skill-write-intent.ts'
 import type { SkillWriteOp, SkillWritePlan, SkillWriteResult } from './skill-write-plan.ts'
-import { skillNamespaceKey, type SkillTarget } from './skill-observation.ts'
+import { skillBodyTarget, skillNamespaceKey, type SkillTarget } from './skill-observation.ts'
 import { SkillTargetLocks } from './skill-target-locks.ts'
 import { SkillRootGate } from './skill-root-gate.ts'
 import { revisionFingerprint, revisionSupportDigest, type RevisionAnchor, type RevisionFile } from './skill-revision.ts'
@@ -286,6 +286,8 @@ export interface SkillActionResult {
   stale?: true
   /** The locked read's verdict for the caller's anchor. */
   anchor?: AnchorVerdict
+  /** Committed bytes of this write; null for a removal. */
+  after?: string | null
 }
 
 /**
@@ -954,14 +956,18 @@ export class SkillLibrary {
     const namespace = rel === '*'
     const body = rel === ''
     const path = namespace ? dir : body ? join(dir, 'SKILL.md') : join(dir, ...rel.replace(/\\/g, '/').split('/').filter(Boolean))
-    let identity = path
-    try {
-      identity = await realpathFs(path)
-    } catch {
+    let cursor = path
+    const suffix: string[] = []
+    let identity: string | undefined
+    while (true) {
       try {
-        identity = join(await realpathFs(dirname(path)), basename(path))
+        identity = join(await realpathFs(cursor), ...suffix.reverse())
+        break
       } catch {
-        return targetKey
+        const parent = dirname(cursor)
+        if (parent === cursor) return targetKey
+        suffix.push(basename(cursor))
+        cursor = parent
       }
     }
     const digest = createHash('sha256').update(identity.replace(/\\/g, '/')).digest('hex')
@@ -2116,6 +2122,7 @@ export class SkillLibrary {
       ok: true,
       message: `已创建技能「${normalized}」。${warnings.length === 0 ? '' : ` （警告：${warnings.join('；')}）`}`,
       path: dir,
+      after: onDisk,
       ...(norm.changed ? { normalizedFrontmatterFields: norm.fields } : {}),
     }
   }
@@ -2205,7 +2212,7 @@ export class SkillLibrary {
     }
     const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
     const retention = contentRetentionFeedback({ name, action: 'update', before: current, after: onDisk })
-    return { ok: true, message: `技能「${name}」已更新。${warning}${retention === null ? '' : '\n' + retention}`, path: dir, ...(prepared.norm.changed ? { normalizedFrontmatterFields: prepared.norm.fields } : {}) }
+    return { ok: true, message: `技能「${name}」已更新。${warning}${retention === null ? '' : '\n' + retention}`, path: dir, after: onDisk, ...(prepared.norm.changed ? { normalizedFrontmatterFields: prepared.norm.fields } : {}) }
   }
 
   async patch(rawName: string, oldString: string, newString: string, filePath = '', replaceAll = false, origin: WriteOrigin = this.authority.origin, anchor?: WriteAnchor): Promise<SkillActionResult> {
@@ -2270,10 +2277,10 @@ export class SkillLibrary {
     const nextBody = [...lines.slice(0, start), ...replacement, ...lines.slice(end)].join('\n')
     const next = `${header}${nextBody}`
     const finalMd = block.nl === '\r\n' ? next.replace(/\n/g, '\r\n') : next
-    if (finalMd.trimEnd() === md.trimEnd()) return { ok: true, message: `技能「${name}」未变更：章节内容一致，未写入。`, noop: true, path: dir }
+    if (finalMd.trimEnd() === md.trimEnd()) return { ok: true, message: `技能「${name}」未变更：章节内容一致，未写入。`, noop: true, path: dir, after: md }
     const result = await this.update(name, finalMd, origin, { sha256: contentHash(md) })
     if (!result.ok) return result
-    return { ok: true, message: `已更新「${name}」的「${edit.heading}」章节（正文 ${md.length} → ${finalMd.length} 字符）。`, path: dir }
+    return { ok: true, message: `已更新「${name}」的「${edit.heading}」章节（正文 ${md.length} → ${finalMd.length} 字符）。`, path: dir, ...(result.after === undefined ? {} : { after: result.after }) }
   }
 
   private async patchCore(
@@ -2376,7 +2383,7 @@ export class SkillLibrary {
       // trimEnd()+'\n'), so the audit afterHash is replay-identical to the file.
       const onDisk = writeContent.trimEnd() + '\n'
       return {
-        result: { ok: true, message: `技能「${name}」已修补（${patchLabel}）。${patchNote}${capAdvisory}`, path: dir, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
+        result: { ok: true, message: `技能「${name}」已修补（${patchLabel}）。${patchNote}${capAdvisory}`, path: dir, after: writeContent, ...(normalizedFields ? { normalizedFrontmatterFields: normalizedFields } : {}) },
         write: onDisk,
         audit: { skillName: name, action: 'patch', before: md, after: onDisk, summary: `patched ${patchLabel}` },
         event: { action: 'patch', name, skillDir: dir },
@@ -3962,10 +3969,14 @@ export class SkillLibrary {
       return { ok: false, message: 'multi-op skill write plans are not implemented in H1', outcomes: [] }
     }
     const result = await this.applyOne(op, plan.origin)
+    const target = op.kind === 'createSkill' ? skillBodyTarget(op.skill) : op.target
+    const outcomes = result.ok && result.after !== undefined
+      ? [{ op, target, after: result.after, version: result.after === null ? '' : contentHash(result.after) }]
+      : []
     return {
       ok: result.ok,
       message: result.message,
-      outcomes: [],
+      outcomes,
       ...(result.stale === true ? { stale: true as const } : {}),
       ...(result.noop === true ? { noop: true } : {}),
       ...(result.path === undefined ? {} : { path: result.path }),
@@ -4068,7 +4079,7 @@ export class SkillLibrary {
       return { ok: false, message: `支撑文件「${filePath}」的内容超过 ${this.limits.maxSkillContentChars} 个字符。${CONTENT_SPLIT_HINT}` }
     }
     if (current !== null && content.trimEnd() === current.trimEnd()) {
-      return { ok: true, message: `支撑文件「${filePath}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: target }
+      return { ok: true, message: `支撑文件「${filePath}」未变更：提供的内容与当前文件一致，未写入。`, noop: true, path: target, after: current }
     }
     const unit = this.commitUnit({
       limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
@@ -4098,7 +4109,7 @@ export class SkillLibrary {
     })
     if (!result.ok) return { ok: false, message: result.errors.map(error => error.message).join('；') }
     const warning = result.warnings === undefined || result.warnings.length === 0 ? '' : ` （警告：写入已落盘，但目录 fsync 失败 —— 持久性未确认：${result.warnings.join('；')})`
-    return { ok: true, message: `支撑文件「${filePath}」已写入「${name}」。${capAdvisory}${warning}`, path: target }
+    return { ok: true, message: `支撑文件「${filePath}」已写入「${name}」。${capAdvisory}${warning}`, path: target, after: content }
   }
 
   async removeSupportFile(
@@ -4160,7 +4171,7 @@ export class SkillLibrary {
     if (verdict !== 'match') return anchorRefusalFile(name, filePath, verdict)
     await this.audit(name, 'remove_file', lockedBefore, null, `removed ${filePath}`, filePath, unitId)
     this.notifyMutation({ action: 'remove_file', name, skillDir: dir, file: target })
-    return { ok: true, message: `支撑文件「${filePath}」已从「${name}」移除。`, path: target }
+    return { ok: true, message: `支撑文件「${filePath}」已从「${name}」移除。`, path: target, after: null }
   }
 
   /**
