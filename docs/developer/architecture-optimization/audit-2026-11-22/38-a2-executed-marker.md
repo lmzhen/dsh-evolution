@@ -35,11 +35,12 @@
 ## 4. 验证
 
 - 新增测试：成功 approve 后 marker 存在；
-- `evolution-approval` 全量：3 files / 55 tests passed；
+- 新增负例：预置 marker 后 approve 返回 false、runner 0 次调用；
+- `evolution-approval` 全量：3 files / 56 tests passed；
 - build 0；arch/doc/test-lines 0。
 
 ## 5. 实现结果（2026-11-22，未发布）
 
 - approval.approve 在 lease 前后各查一次 executed marker，成功 replay 后写 marker。
-- 新增成功路径 marker 测试；approval 3 files / 55 tests passed；build 0。
+- 新增成功路径 marker 测试与“预置 marker 时 runner 不执行”负例；approval 3 files / 56 tests passed；build 0。
 - A2 仍为部分收口：review/curator counter 跨进程更新未迁移 StateStore。

@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import EvolutionApproval from '../src/index.ts'
 import { effectiveSessionPolicy } from '../src/index.ts'
@@ -188,6 +189,28 @@ describe('evolution-approval', () => {
     expect(existsSync(markerPath)).toBe(true)
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
+  })
+
+  it('A2: an existing executed marker blocks the replay without calling the runner', async () => {
+    const home = await tempRoot('dsh-approval-blocked-')
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = await mountStateStack(home, { evolution: true, approval: true })
+      const runner = vi.fn(async () => ({ ok: true, message: 'ok' }))
+      ctx.evolutionApproval.registerRunner('memory', runner)
+      const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'blocked', args: {}, origin: 'background_review' })
+      const markerPath = join(home, 'evolution', 'approval', 'executed', encodeURIComponent(decision.pendingId!))
+      await mkdir(join(home, 'evolution', 'approval', 'executed'), { recursive: true })
+      await writeFile(markerPath, 'earlier-process\n')
+      const blocked = await ctx.evolutionApproval.approve(decision.pendingId!, AUDIT)
+      expect(blocked.ok).toBe(false)
+      expect(blocked.message).toContain('已执行过')
+      expect(runner).not.toHaveBeenCalled()
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+    }
   })
 
   it('keeps a pending record when the runner fails and retains rejection audit', async () => {
