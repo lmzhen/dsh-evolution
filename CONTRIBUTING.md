@@ -22,7 +22,7 @@ The canonical fact table is `packages/scripts/family-facts.json`. If you move a 
 
 ## Tests
 
-- Use the family Vitest config; pass `--testTimeout=30000`.
+- Use the family Vitest config: `-c packages/evolution/scripts/vitest.family.config.mjs` (the config supplies the spec timeout from the testing-policy fact).
 - Tiers: `fast` (no spawn/real wait/wall-clock assertions), `pre-tag` (no wall-clock assertions), `ci-only` (needs the platform line). Do not move a check to a faster tier to make it green.
 - Run a single spec by file; an entire directory can exceed the default timeout for reasons unrelated to the change.
 - A green process is not a pass by itself: the declared criterion must be evaluated. An unevaluated criterion is not a pass.
@@ -37,7 +37,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 |---|---|---|
 | 1 | `node packages/evolution/scripts/verify-family-types.mjs` | overlay |
 | 2 | `node node_modules/oxlint/bin/oxlint -c packages/evolution/oxlint.release.json packages/evolution --ignore-pattern '**/tests/**' --ignore-pattern '**/vendor/**' --ignore-pattern '**/scripts/**' -A style` | overlay |
-| 3 | `node node_modules/vitest/vitest.mjs run packages/evolution --maxWorkers=2 --testTimeout=30000` | overlay |
+| 3 | `node node_modules/vitest/vitest.mjs run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2` | overlay |
 | 4 | `node packages/evolution/scripts/build-lib.mjs` | overlay |
 | 5 | `node packages/evolution/scripts/smoke-built-entries.mjs packages/evolution` | overlay |
 | 6 | `node packages/scripts/verify-dependency-closure.mjs packages --strict` | mirror |

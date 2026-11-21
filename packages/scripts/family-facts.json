@@ -468,7 +468,7 @@
       "home": "repo:CONTRIBUTING.md",
       "must": [
         {
-          "text": "--testTimeout=30000"
+          "text": "-c packages/evolution/scripts/vitest.family.config.mjs"
         }
       ],
       "machine": {
@@ -613,7 +613,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "e69ae98d305bcac20ba58d9691be9ff66d4e54cab182da08761275e7d841085c",
+        "sha256": "960b1f53dc3ac03d9e345ed1aa0393e00901ad5bf0e3ec394e643f0e6886ad76",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",

@@ -28,6 +28,7 @@
 - B1/P1-4：模型 summary 经 plan 上下文进入 history/audit，见 [24](24-b1-summary.md)。
 - A3/A5：prepared 恢复失败现在 warn；rollback 不再首错停止，见 [25](25-a3-a5-recovery-compensation.md)。
 - A4：锁 repair 现在走 takeover claim + 重读，见 [26](26-a4-repair-takeover.md)。
+- E4：gate-03 命令已加载 family config，见 [27](27-e4-family-config.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
@@ -192,3 +193,4 @@
 | [24-b1-summary.md](24-b1-summary.md) | B1/P1-4：模型 summary 进入 history/audit |
 | [25-a3-a5-recovery-compensation.md](25-a3-a5-recovery-compensation.md) | A3/A5：恢复失败可见、补偿全量执行 |
 | [26-a4-repair-takeover.md](26-a4-repair-takeover.md) | A4：repair 复用平台 takeover claim |
+| [27-e4-family-config.md](27-e4-family-config.md) | E4：CI 单元套件加载 family config |
