@@ -32,6 +32,7 @@
 - E1：local gate overlay 改为当前构建线，adapter identity 不再硬编码，见 [28](28-e1-overlay-identity.md)。
 - F3/F4：刷新失败 strip + 延迟读失败重试，见 [29](29-f3-f4-retry.md)。
 - A7：review aux 只对 scheduled debt 结账，见 [30](30-a7-review-debt.md)。
+- B1-2 部分：结构动作绑定输入树 digest，delete 有预览，见 [31](31-b12-structural-anchor.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
@@ -200,3 +201,4 @@
 | [28-e1-overlay-identity.md](28-e1-overlay-identity.md) | E1：本地门禁解析当前构建线 |
 | [29-f3-f4-retry.md](29-f3-f4-retry.md) | F3/F4：刷新失败提示、延迟读失败可重试 |
 | [30-a7-review-debt.md](30-a7-review-debt.md) | A7：review aux 调度成功才结账 |
+| [31-b12-structural-anchor.md](31-b12-structural-anchor.md) | B1-2 部分：结构写入输入树绑定 + delete 预览 |

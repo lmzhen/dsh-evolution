@@ -322,6 +322,24 @@ function planFromStaged(operation: SkillWriteArgs, origin: WriteOrigin): SkillWr
   return undefined
 }
 
+async function stagedTreeDigest(library: PreviewLibrary, names: readonly string[]): Promise<string | undefined> {
+  const parts: string[] = []
+  for (const name of [...new Set(names)].sort()) {
+    let body: string | null
+    try { body = await library.read(name) } catch { return undefined }
+    parts.push('skill:' + name + ':' + (body === null ? 'absent' : contentHash(body)))
+    const support = await library.listSupportFiles(name)
+    if (isUnknown(support)) return undefined
+    if (!isPresent(support)) continue
+    for (const path of [...support.value].sort()) {
+      const content = await library.readSupportFileProbe(name, path)
+      if (isUnknown(content)) return undefined
+      parts.push('file:' + name + '/' + path + ':' + (isPresent(content) ? contentHash(content.value) : 'absent'))
+    }
+  }
+  return contentHash(parts.join('\n'))
+}
+
 async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promise<PreviewAnswer> {
   const wrapped = (args ?? {}) as { operation?: SkillWriteArgs }
   const operation = wrapped.operation ?? {}
@@ -384,6 +402,11 @@ async function previewSkillWrite(library: PreviewLibrary, args: unknown): Promis
   if (action === 'remove_file') {
     return before === null
       ? { available: false, reason: '该支撑文件不存在，无法移除' }
+      : { available: true, path, before, after: null }
+  }
+  if (action === 'delete') {
+    return before === null
+      ? { available: false, reason: '该技能没有可删除的正文' }
       : { available: true, path, before, after: null }
   }
   if (action === 'extract') {
@@ -451,6 +474,8 @@ interface SkillWriteArgs {
    * overwrite (memory carries old_text for the same purpose). Absent on
    * legacy records and on non-staging paths — the guard is opt-in. */
   staged_from_sha256?: string
+  /** B1-2: digest of the skill trees the structural action reads (delete/restructure/extract). */
+  staged_tree_sha256?: string
 }
 
 /**
@@ -1045,6 +1070,16 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       typeof args.staged_from_sha256 === 'string' && args.staged_from_sha256 !== ''
         ? args.staged_from_sha256 === 'absent' ? { absent: true } : { sha256: args.staged_from_sha256 }
         : undefined
+    if (typeof args.staged_tree_sha256 === 'string' && (action === 'delete' || action === 'restructure' || action === 'extract') && typeof args.name === 'string' && args.name !== '') {
+      const names = [args.name]
+      if (action === 'extract' && Array.isArray(args.extract)) {
+        for (const item of args.extract) if (typeof item?.to_skill === 'string' && item.to_skill !== '') names.push(item.to_skill)
+      }
+      const current = await stagedTreeDigest(library, names)
+      if (current !== args.staged_tree_sha256) {
+        return { ok: false, message: 'SKILL_STALE_VERSION: 结构写入的输入树在这次暂存之后发生了变化，批准会执行另一份字节；请重新预览并暂存。', skills: [] }
+      }
+    }
     if (owner !== undefined && stagedAnchor === undefined
       && (action === 'update' || action === 'patch' || action === 'write_file' || action === 'remove_file')) {
       const protection = await library.writeProtection(name, origin)
@@ -1675,6 +1710,15 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const stageFile: string | null = isPresent(supportProbe) ? supportProbe.value : null
           operation = { ...args, staged_from_sha256: stageFile === null ? 'absent' : contentHash(stageFile) }
+        }
+        if ((args.action === 'delete' || args.action === 'restructure' || args.action === 'extract') && typeof args.name === 'string' && args.name !== '') {
+          const names = [args.name]
+          if (args.action === 'extract' && Array.isArray(args.extract)) {
+            for (const item of args.extract) if (typeof item?.to_skill === 'string' && item.to_skill !== '') names.push(item.to_skill)
+          }
+          const digest = await stagedTreeDigest(library, names)
+          if (digest === undefined) return { ok: false, message: '目标当前读不到，无法绑定结构写入的暂存树 —— 先修好可读性再批准', skills: [] }
+          operation = { ...operation, staged_tree_sha256: digest }
         }
         const decision = await approval.request({
           kind: 'skill',

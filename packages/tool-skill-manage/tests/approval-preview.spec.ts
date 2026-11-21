@@ -111,6 +111,12 @@ describe('the staged skill write preview', () => {
     expect(missing.reason).toContain('会被拒绝')
   })
 
+  it('B1-2: a delete preview shows the current body and no after bytes', async () => {
+    const { preview } = await mount()
+    const answer = await preview({ operation: { action: 'delete', name: 'preview-skill', summary: 'delete it' } }) as { available: boolean; path: string; before: string; after: string | null }
+    expect(answer).toMatchObject({ available: true, path: 'SKILL.md', before: BODY, after: null })
+  })
+
   it('previews both roots of an extract without writing either', async () => {
     const { root, preview } = await mount()
     await mkdir(join(root, 'skills', 'preview-source'), { recursive: true })
