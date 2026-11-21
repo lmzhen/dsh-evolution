@@ -92,6 +92,20 @@ export class WriteKernel {
    * if no retry ever writes, the result is still a conflict.
    */
   async writeOne(target: WriteTarget, options: WriteOneOptions = {}): Promise<WriteKernelResult> {
+    // A missing target is published with the filesystem's no-replace primitive
+    // (hard link), so even a writer that ignores our locks cannot be silently
+    // overwritten. Expected-present writes still go through the CAS transaction.
+    if (target.expected === null && target.next !== null && this.io.createTextIfAbsent !== undefined) {
+      try {
+        await this.io.createTextIfAbsent(target.path, target.next)
+        return { ok: true, changed: [target.path], errors: [] }
+      } catch (error) {
+        if (isCommittedWarning(error)) return { ok: true, changed: [target.path], errors: [], warnings: [error instanceof Error ? error.message : String(error)] }
+        const code = (error as { code?: unknown } | undefined)?.code
+        if (code === 'EEXIST' || code === 'ENOTEMPTY') return { ok: false, changed: [], errors: [{ code: 'cas-conflict', message: 'target appeared before create: ' + target.path, target: target.path }] }
+        return { ok: false, changed: [], errors: [{ code: 'write-failed', message: error instanceof Error ? error.message : String(error), target: target.path }] }
+      }
+    }
     const guard = options.guardBaseline !== false
     let wrote = false
     let deferred = false

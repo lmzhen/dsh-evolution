@@ -258,6 +258,8 @@ describe('tool observed writes', () => {
       const okA = (a.value as { ok?: boolean }).ok === true
       const okB = (b.value as { ok?: boolean }).ok === true
       expect([okA, okB].filter(Boolean)).toHaveLength(1)
+      const loser = okA ? b : a
+      expect((loser.value as { message?: string }).message ?? '').toContain('SKILL_ALREADY_EXISTS')
       const content = await (await import('node:fs/promises')).readFile(join(root, 'skills', 'create-skill-race', 'SKILL.md'), 'utf8')
       expect(content).toContain(okA ? 'from A' : 'from B')
     } finally {

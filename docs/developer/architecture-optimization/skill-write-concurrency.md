@@ -932,6 +932,15 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-22：Phase H7u 纯插件侧收口
+
+- native identity；canonical root lock/gate；
+- hardlink createIfAbsent；
+- multi-op apply 单 MutationUnit；
+- create 竞争 code；
+- 相关测试 190+ passed；
+- 未发布。
+
 ### 2026-11-22：Phase H7t 上游锁对照
 
 - 复核 fs-local withLock/withLocks、writeTarget、atomic create；

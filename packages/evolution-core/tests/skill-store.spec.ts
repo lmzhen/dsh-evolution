@@ -1,6 +1,6 @@
 // @tier pre-tag
 import { expect, it } from 'vitest'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { contentHash, SKILL_NAME_RE, loadSuppressedNames, loadUsage, nodeEvolutionIo, saveSuppressedNames, saveUsage } from '@deepseek-ai/dsh-evolution-core'
@@ -1023,6 +1023,12 @@ it('A1-15 (v18): a post-commit dir-fsync failure still audits and reports a dura
       await base.writeText(path, content)
       throw Object.assign(new Error('simulated dir-fsync failure'), { committed: true })
     },
+    ...(base.createTextIfAbsent === undefined ? {} : {
+      createTextIfAbsent: async (path: string, content: string) => {
+        await base.createTextIfAbsent!(path, content)
+        throw Object.assign(new Error('simulated dir-fsync failure'), { committed: true })
+      },
+    }),
   }
   const lib = new SkillLibrary(root, io)
   const updated = await lib.update('durable-skill', SKILL.replace('python-testing', 'durable-skill').replace('Run tests with pytest.', 'Updated after the fsync failure.'), 'foreground')
@@ -1044,6 +1050,12 @@ it('P2-2 (v19): create and setPinned tolerate a post-commit fsync failure too', 
       await base.writeText(path, content)
       throw Object.assign(new Error('simulated dir-fsync failure'), { committed: true })
     },
+    ...(base.createTextIfAbsent === undefined ? {} : {
+      createTextIfAbsent: async (path: string, content: string) => {
+        await base.createTextIfAbsent!(path, content)
+        throw Object.assign(new Error('simulated dir-fsync failure'), { committed: true })
+      },
+    }),
   }
   const lib = new SkillLibrary(root, io)
   const created = await lib.create('durable-create', SKILL.replace('python-testing', 'durable-create'), 'foreground')
@@ -1281,4 +1293,20 @@ it.runIf(process.platform === 'win32')('canonical lock identity expands 8.3 root
   const short = await shortRoot.identify(target)
   const long = await longRoot.identify(target)
   expect(short.identityKey).toBe(long.identityKey)
+})
+
+it('shares the in-process structural gate across two spellings of one root', async () => {
+  const root = await tempRoot('dsh-root-gate-')
+  const alias = root + '-alias'
+  await symlink(root, alias, process.platform === 'win32' ? 'junction' : 'dir')
+  try {
+    const a = new SkillLibrary(root)
+    const b = new SkillLibrary(alias)
+    const gateA = (a as unknown as { rootGate: object }).rootGate
+    const gateB = (b as unknown as { rootGate: object }).rootGate
+    expect(gateA).toBe(gateB)
+  } finally {
+    await unlink(alias).catch(() => {})
+    await rm(root, { recursive: true, force: true })
+  }
 })

@@ -36,6 +36,7 @@
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { realpathSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { authorityFrom, type WriteAuthority } from './write-authority.ts'
 import { resolveCitations } from './citations.ts'
 import { scanContentThreats, type ScanOptions } from './threats.ts'
@@ -62,7 +63,7 @@ import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { decideSkillWrite, type SkillWriteIntent, type SkillWriteRefusalReason } from './skill-write-intent.ts'
-import type { SkillWriteOp, SkillWritePlan, SkillWriteResult } from './skill-write-plan.ts'
+import type { SkillWriteOp, SkillWriteOutcome, SkillWritePlan, SkillWriteResult } from './skill-write-plan.ts'
 import { skillBodyTarget, skillNamespaceKey, type SkillTarget } from './skill-observation.ts'
 import { SkillTargetLocks } from './skill-target-locks.ts'
 import { SkillRootGate } from './skill-root-gate.ts'
@@ -792,8 +793,16 @@ const ROOT_SERIAL = new Map<string, ReturnType<typeof makeSerialQueue>>()
  * @param root - the resolved skill root; the key, so two spellings of one directory share a queue.
  * @returns the queue every instance over this root serializes through.
  */
+function canonicalRootKey(root: string): string {
+  try {
+    return realpathSync.native(resolve(root))
+  } catch {
+    return resolve(root)
+  }
+}
+
 function serialForRoot(root: string): ReturnType<typeof makeSerialQueue> {
-  const key = resolve(root)
+  const key = canonicalRootKey(root)
   const existing = ROOT_SERIAL.get(key)
   if (existing !== undefined) return existing
   const created = makeSerialQueue()
@@ -809,14 +818,46 @@ function sameRevisionAnchor(expected: RevisionAnchor, live: RevisionAnchor): boo
 /** One target-lock registry per skill ROOT, shared by every library instance in this process. */
 const TARGET_LOCKS_BY_ROOT = new Map<string, SkillTargetLocks>()
 
+/** One structural gate per canonical root, shared by every library instance. */
+const ROOT_GATES = new Map<string, SkillRootGate>()
+
+function rootGateFor(root: string): SkillRootGate {
+  const key = canonicalRootKey(root)
+  let gate = ROOT_GATES.get(key)
+  if (gate === undefined) {
+    gate = new SkillRootGate()
+    ROOT_GATES.set(key, gate)
+  }
+  return gate
+}
+
 function targetLocksFor(root: string): SkillTargetLocks {
-  let locks = TARGET_LOCKS_BY_ROOT.get(root)
+  const key = canonicalRootKey(root)
+  let locks = TARGET_LOCKS_BY_ROOT.get(key)
   if (locks === undefined) {
     locks = new SkillTargetLocks()
-    TARGET_LOCKS_BY_ROOT.set(root, locks)
+    TARGET_LOCKS_BY_ROOT.set(key, locks)
   }
   return locks
 }
+
+/** One op collected by a multi-op plan; written only after every op prepared. */
+interface PlanSinkWrite {
+  readonly target: string
+  readonly expected: string | null
+  readonly content: string | null
+  readonly skill: string
+  readonly path: string | undefined
+  readonly auditAction: string
+  readonly auditSummary: string
+}
+
+interface PlanSink {
+  readonly writes: PlanSinkWrite[]
+}
+
+/** Async-local collector: a normal single-op write never sees another plan's sink. */
+const PLAN_SINK = new AsyncLocalStorage<PlanSink>()
 
 export class SkillLibrary {
   readonly root: string
@@ -837,8 +878,8 @@ export class SkillLibrary {
   private readonly serial: <T>(task: () => Promise<T>) => Promise<T>
   /** Transitional target locks (same key as SkillWriteService). */
   private readonly targetLocks: SkillTargetLocks
-  /** Root structural gate; simple writes still use the serial until D.5d. */
-  private readonly rootGate = new SkillRootGate()
+  /** Root structural gate; shared per canonical root across library instances. */
+  private readonly rootGate: SkillRootGate
   /** V10-03 (P2-18): see the constructor's threatExemptLabels. Empty by
    * default — the strict ANY-hit-blocks policy is unchanged. */
   private readonly threatExemptLabels: readonly string[]
@@ -865,6 +906,7 @@ export class SkillLibrary {
   ) {
     this.root = root
     this.targetLocks = targetLocksFor(root)
+    this.rootGate = rootGateFor(root)
     this.io = io
     this.limits = limits
     this.onMutation = onMutation
@@ -997,6 +1039,31 @@ export class SkillLibrary {
 
   /** The one MutationUnit constructor: storage ports are fixed here, callers pass the rest. */
   private commitUnit(options: Omit<MutationUnitOptions, 'io' | 'journal' | 'snapshots'>): MutationUnit {
+    const plan = PLAN_SINK.getStore()
+    if (plan !== undefined) {
+      // Multi-op plan collection: the core mutators still perform every read,
+      // validation and CAS anchor check, but their write unit only records the
+      // final op. The plan then commits the collected ops through one real unit.
+      return {
+        apply: async (request: Parameters<MutationUnit['apply']>[0]) => {
+          for (const op of request.ops) {
+            const skill = op.skill ?? request.name
+            const dir = this.dirOf(skill)
+            const rel = relative(dir, op.target).split(String.fromCharCode(92)).join('/')
+            plan.writes.push({
+              target: op.target,
+              expected: op.expected ?? null,
+              content: op.kind === 'delete' ? null : op.content,
+              skill,
+              path: rel === 'SKILL.md' ? undefined : rel,
+              auditAction: request.auditAction,
+              auditSummary: request.auditSummary,
+            })
+          }
+          return { ok: true, unitId: request.unitId ?? 'plan-item-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8), dryRun: false, changed: request.ops.map(op => op.target), errors: [] }
+        },
+      } as unknown as MutationUnit
+    }
     return new MutationUnit({
       io: this.io,
       journal: unitJournalPort(this.io, dirname(this.root)),
@@ -3972,9 +4039,7 @@ export class SkillLibrary {
   async apply(plan: SkillWritePlan): Promise<SkillWriteResult> {
     const op = plan.ops[0]
     if (op === undefined) return { ok: false, message: 'skill write plan is empty', outcomes: [] }
-    if (plan.ops.length > 1) {
-      return { ok: false, message: 'multi-op skill write plans are not implemented in H1', outcomes: [] }
-    }
+    if (plan.ops.length > 1) return await this.applyMulti(plan)
     const result = await this.applyOne(op, plan.origin)
     const target = op.kind === 'createSkill' ? skillBodyTarget(op.skill) : op.target
     const outcomes = result.ok && result.after !== undefined
@@ -3988,6 +4053,119 @@ export class SkillLibrary {
       ...(result.noop === true ? { noop: true } : {}),
       ...(result.path === undefined ? {} : { path: result.path }),
       ...(result.normalizedFrontmatterFields === undefined ? {} : { normalizedFrontmatterFields: result.normalizedFrontmatterFields }),
+    }
+  }
+
+  /**
+   * Commit a multi-op plan as one atomic unit. Each op is first prepared by the
+   * existing single-op mutator in a collector context (so its validation and
+   * anchor/CAS checks stay the source of truth), then all collected writes are
+   * handed to ONE MutationUnit. Any preparation failure or stale anchor leaves
+   * every target untouched.
+   */
+  private async applyMulti(plan: SkillWritePlan): Promise<SkillWriteResult> {
+    const creating = plan.ops.find(op =>
+      op.kind === 'createSkill'
+      || (op.kind === 'write' && op.target.relPath === '' && op.expect.kind === 'absent' && op.create !== false))
+    // A non-foreground create writes the hermes-managed marker directly after its
+    // body; that side effect cannot be deferred into the shared unit. Foreground
+    // creates have no marker and can join a multi-op unit.
+    if (creating !== undefined && (plan.origin !== 'foreground' || (creating.kind === 'createSkill' && creating.managed === true))) {
+      return { ok: false, message: 'multi-op plans cannot create a managed/non-foreground skill; create it in its own plan first', outcomes: [] }
+    }
+    const sink: PlanSink = { writes: [] }
+    const results: SkillActionResult[] = []
+    const writeCounts: number[] = []
+    const refusal = await PLAN_SINK.run(sink, async () => {
+      for (const op of plan.ops) {
+        const start = sink.writes.length
+        const result = await this.applyOne(op, plan.origin)
+        results.push(result)
+        writeCounts.push(sink.writes.length - start)
+        if (!result.ok) return result
+      }
+      return undefined
+    })
+    if (refusal !== undefined) return { ok: false, message: refusal.message, outcomes: [], ...(refusal.stale === true ? { stale: true as const } : {}) }
+    if (new Set(sink.writes.map(write => write.target)).size !== sink.writes.length) {
+      return { ok: false, message: 'multi-op plan targets the same path more than once', outcomes: [] }
+    }
+    if (sink.writes.length === 0) {
+      return {
+        ok: true,
+        message: '没有写入变更。',
+        outcomes: plan.ops.map((op, index) => ({
+          op,
+          target: op.kind === 'createSkill' ? skillBodyTarget(op.skill) : op.target,
+          ...(results[index]?.after === undefined ? {} : { after: results[index]!.after }),
+          noop: true,
+        })),
+      }
+    }
+    const skills = [...new Set(sink.writes.map(write => write.skill))]
+    const roots = skills.map(name => ({ name, protection: 'write' as const }))
+    const rootDirs = Object.fromEntries(skills.map(name => [name, this.dirOf(name)]))
+    const targetKeys = [...new Set(sink.writes.flatMap(write => [
+      write.path === undefined ? 'skill::' + write.skill : 'skill::' + write.skill + '::' + write.path,
+      skillNamespaceKey(write.skill),
+    ]))]
+    const unit = this.commitUnit({
+      limits: { maxSkillFileBytes: Number.MAX_SAFE_INTEGER, maxSkillContentChars: Number.MAX_SAFE_INTEGER },
+      serial: this.serial,
+      lock: this.lockPort(),
+      targetKeys,
+      ...(this.transact === undefined ? {} : { transact: this.transact }),
+      hooks: {
+        committed: async event => {
+          for (const write of sink.writes) {
+            const before = write.expected
+            const after = write.content
+            await this.audit(write.skill, write.auditAction, before, after, write.auditSummary, write.path, event.unitId, { sources: [{ skill: write.skill }] }, plan.origin, true)
+            this.notifyMutation({ action: write.auditAction as EvolutionSkillMutatedEvent['action'], name: write.skill, skillDir: this.dirOf(write.skill), ...(write.path === undefined ? {} : { file: write.target }) })
+          }
+        },
+      },
+      validateWrite: op => op.kind === 'write' ? this.contentThreatBlock(op.content) : null,
+    })
+    const applied = await unit.apply({
+      name: skills[0] ?? '',
+      origin: plan.origin,
+      roots,
+      rootDirs,
+      ops: sink.writes.map(write => write.content === null
+        ? { kind: 'delete' as const, target: write.target, expected: write.expected, skill: write.skill }
+        : { kind: 'write' as const, target: write.target, content: write.content, expected: write.expected, skill: write.skill }),
+      auditAction: 'update',
+      auditSummary: plan.summary ?? 'applied write plan',
+      eventAction: 'update',
+    })
+    if (!applied.ok) return { ok: false, message: applied.errors.map(error => error.message).join('；'), outcomes: [], ...(applied.warnings === undefined ? {} : { warnings: applied.warnings }) }
+    let cursor = 0
+    const outcomes: SkillWriteOutcome[] = plan.ops.map((op, index) => {
+      if ((writeCounts[index] ?? 0) === 0) {
+        const after = results[index]?.after
+        return {
+          op,
+          target: op.kind === 'createSkill' ? skillBodyTarget(op.skill) : op.target,
+          ...(after === undefined ? {} : { after }),
+          ...(typeof after === 'string' ? { version: contentHash(after) } : {}),
+          noop: true,
+        }
+      }
+      const write = sink.writes[cursor++]!
+      return {
+        op,
+        target: op.kind === 'createSkill' ? skillBodyTarget(op.skill) : op.target,
+        before: write.expected,
+        after: write.content,
+        version: write.content === null ? '' : contentHash(write.content),
+      }
+    })
+    return {
+      ok: true,
+      message: '已原子应用 ' + String(outcomes.length) + ' 个写入。',
+      outcomes,
+      ...(applied.warnings === undefined || applied.warnings.length === 0 ? {} : { warnings: applied.warnings }),
     }
   }
 
@@ -4063,7 +4241,8 @@ export class SkillLibrary {
     const badName = this.badName(name)
     if (badName) return { ok: false, message: badName }
     const dir = this.dirOf(name)
-    if (!await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `技能「${name}」不存在。` }
+    const pendingCreate = PLAN_SINK.getStore()?.writes.some(write => write.skill === name && write.path === undefined && write.expected === null) === true
+    if (!pendingCreate && !await this.io.exists(join(dir, 'SKILL.md'))) return { ok: false, message: `技能「${name}」不存在。` }
     const protection = await this.writeProtection(name, origin)
     if (protection) return { ok: false, message: `技能「${name}」受保护（${protection}）。` }
     const validation = validateSupportPath(filePath)
@@ -4159,6 +4338,19 @@ export class SkillLibrary {
     const before = beforeProbe.value
     let verdict = anchorVerdict(anchor, before)
     let lockedBefore = before
+    const planSink = PLAN_SINK.getStore()
+    if (planSink !== undefined && verdict === 'match') {
+      planSink.writes.push({
+        target,
+        expected: before,
+        content: null,
+        skill: name,
+        path: filePath.replace(/\\/g, '/'),
+        auditAction: 'remove_file',
+        auditSummary: 'removed ' + filePath,
+      })
+      return { ok: true, message: '支撑文件「' + filePath + '」已从「' + name + '」移除。', path: target, after: null }
+    }
     if (verdict === 'match' && this.transact) {
       const ran = { done: false }
       try {

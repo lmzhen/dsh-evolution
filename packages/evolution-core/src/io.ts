@@ -6,7 +6,7 @@
  */
 
 import { copyFileSync, existsSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { cp, lstat, mkdir, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
+import { cp, link, lstat, mkdir, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 // v43 S1-4: the family's ONE definition of "this read failure means it is not
@@ -50,6 +50,13 @@ export interface EvolutionIoLike {
    * no await in the task need no Promise residue).
    */
   transact?(this: void, path: string, task: (current: string | null) => string | null | Promise<string | null>): Promise<void>
+  /**
+   * Publish a new file only when the target does not exist. `link(tmp, path)`
+   * is the filesystem no-replace primitive (upstream fs-local uses the same
+   * publication rule): a concurrent creator wins and this call rejects with
+   * EEXIST, even when that creator does not participate in our locks.
+   */
+  createTextIfAbsent?: ((this: void, path: string, content: string) => Promise<void>) | undefined
   /**
    * Optional symlink probe (G7). `true` = the path is a symlink, `false` = a
    * real entry, `null` = guard not applicable (backend without the probe or
@@ -153,6 +160,11 @@ export function evolutionIoAdapter(provider: () => EvolutionIoLike): EvolutionIo
     get processScope() { return provider().processScope },
     readText: path => provider().readText(path),
     writeText: (path, content) => provider().writeText(path, content),
+    get createTextIfAbsent(): ((path: string, content: string) => Promise<void>) | undefined {
+      const io = provider()
+      const fn = io.createTextIfAbsent
+      return fn === undefined ? undefined : (path, content) => fn(path, content)
+    },
     remove: path => provider().remove(path),
     list: path => provider().list(path),
     exists: path => provider().exists(path),
@@ -471,6 +483,26 @@ export function nodeEvolutionIo(): EvolutionIoLike {
         // mistakes an unreadable store for an empty one and overwrites it.
         if (isMissing(error)) return null
         throw error
+      }
+    },
+    async createTextIfAbsent(path, content) {
+      await mkdir(dirname(path), { recursive: true })
+      await sweepStaleTmps(path)
+      const tmp = await writeDurableTmp(path, content)
+      try {
+        await link(tmp, path)
+      } catch (error) {
+        await rm(tmp, { force: true }).catch(() => {})
+        throw error
+      }
+      await rm(tmp, { force: true }).catch(() => {})
+      try {
+        await fsyncDirectory(dirname(path))
+      } catch (error) {
+        throw Object.assign(
+          new Error(`createTextIfAbsent: ${path} was linked but the directory fsync failed: ${error instanceof Error ? error.message : String(error)}`),
+          { committed: true, cause: error },
+        )
       }
     },
     async writeText(path, content) {

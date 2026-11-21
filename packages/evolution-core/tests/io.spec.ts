@@ -45,6 +45,16 @@ it('nodeEvolutionIo.writeText commits one complete payload per concurrent writer
   expect(content).toMatch(/^writer-\d$/m)
 })
 
+it('createTextIfAbsent publishes once and rejects a second creator without replacing bytes', async () => {
+  const root = await tempRoot('dsh-io-create-absent-')
+  const io = nodeEvolutionIo()
+  const target = join(root, 'created.txt')
+  if (io.createTextIfAbsent === undefined) throw new Error('node IO must implement createTextIfAbsent')
+  await io.createTextIfAbsent(target, 'winner')
+  await expect(io.createTextIfAbsent(target, 'loser')).rejects.toMatchObject({ code: 'EEXIST' })
+  expect(await readFile(target, 'utf8')).toBe('winner')
+})
+
 it('nodeEvolutionIo.remove is serialized with an in-flight transact on the same path', async () => {
   const root = await tempRoot('dsh-io-remove-queue-')
   const io = nodeEvolutionIo()

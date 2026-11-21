@@ -260,7 +260,7 @@ export class SkillWriteService {
         // turn a landed write into a tool failure (K6).
       }
     }
-    return actionResult(result)
+    return actionResult(result, plan)
   }
 
   private async observeOutcomes(result: { readonly outcomes: readonly { readonly target: SkillTarget; readonly version?: string }[] }, owner: SkillWriteOwner): Promise<void> {
@@ -398,8 +398,13 @@ function notObserved(): SkillWritePlanResult {
 
 function anchorOf(version: string): WriteAnchor { return { sha256: version } }
 
-function actionResult(result: { ok: boolean; message: string; noop?: boolean; stale?: true; anchor?: 'match' | 'drift' | 'missing'; path?: string; normalizedFrontmatterFields?: readonly string[] }): SkillWriteServiceResult {
+function actionResult(result: { ok: boolean; message: string; noop?: boolean; stale?: true; anchor?: 'match' | 'drift' | 'missing'; path?: string; normalizedFrontmatterFields?: readonly string[] }, plan?: SkillWritePlan): SkillWriteServiceResult {
   if (result.ok) return { ok: true, message: result.message, ...(result.noop === true ? { noop: true } : {}), ...(result.path === undefined ? {} : { path: result.path }), ...(result.normalizedFrontmatterFields === undefined ? {} : { normalizedFrontmatterFields: result.normalizedFrontmatterFields }) }
+  const only = plan?.ops.length === 1 ? plan.ops[0] : undefined
+  const absentCreate = only !== undefined
+    && (only.kind === 'createSkill' || (only.kind === 'write' && only.target.relPath === '' && only.expect.kind === 'absent' && only.create !== false))
+    && (result.stale === true || /已存在|target appeared|changed after plan|concurrent modification/i.test(result.message))
+  if (absentCreate) return { ok: false, code: 'SKILL_ALREADY_EXISTS', message: result.message }
   if (result.stale === true) return { ok: false, code: 'SKILL_STALE_VERSION', message: result.message }
   return { ok: false, code: 'SKILL_INVALID', message: result.message }
 }

@@ -103,19 +103,114 @@ it('creates a skill only through the explicit createSkill op', async () => {
   }
 })
 
-it('refuses a multi-op plan until the unit phase is implemented', async () => {
+it('applies a multi-op plan through one atomic unit and leaves all targets untouched on one stale anchor', async () => {
   const { root, lib } = await setup()
   try {
-    const target = skillBodyTarget('missing')
-    const result = await lib.apply({
+    expect((await lib.create('multi-plan', body('multi-plan'), 'foreground')).ok).toBe(true)
+    const a = skillSupportTarget('multi-plan', 'references/a.md')
+    const b = skillSupportTarget('multi-plan', 'references/b.md')
+    const applied = await lib.apply({
       origin: 'foreground',
       ops: [
-        { kind: 'write', target, content: body('missing'), expect: { kind: 'absent' } },
-        { kind: 'write', target, content: body('missing', 'second'), expect: { kind: 'absent' } },
+        { kind: 'write', target: a, content: 'A', expect: { kind: 'absent' } },
+        { kind: 'write', target: b, content: 'B', expect: { kind: 'absent' } },
       ],
     })
-    expect(result.ok).toBe(false)
-    expect(result.message).toContain('multi-op')
+    expect(applied.ok, applied.message).toBe(true)
+    expect(applied.outcomes).toHaveLength(2)
+    expect(await readFile(join(root, 'multi-plan', 'references', 'a.md'), 'utf8')).toBe('A')
+    expect(await readFile(join(root, 'multi-plan', 'references', 'b.md'), 'utf8')).toBe('B')
+    const stale = await lib.apply({
+      origin: 'foreground',
+      ops: [
+        { kind: 'write', target: skillSupportTarget('multi-plan', 'references/c.md'), content: 'C', expect: { kind: 'absent' } },
+        { kind: 'write', target: skillSupportTarget('multi-plan', 'references/d.md'), content: 'D', expect: { kind: 'present', version: contentHash('not-the-bytes') } },
+      ],
+    })
+    expect(stale.ok).toBe(false)
+    await expect(readFile(join(root, 'multi-plan', 'references', 'c.md'), 'utf8')).rejects.toThrow()
+    await expect(readFile(join(root, 'multi-plan', 'references', 'd.md'), 'utf8')).rejects.toThrow()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('applies a body write and a support write in one multi-op unit, including remove', async () => {
+  const { root, lib } = await setup()
+  try {
+    expect((await lib.create('multi-body', body('multi-body', 'old'), 'foreground')).ok).toBe(true)
+    expect((await lib.writeSupportFile('multi-body', 'references/gone.md', 'gone', 'foreground')).ok).toBe(true)
+    const old = body('multi-body', 'old')
+    const applied = await lib.apply({
+      origin: 'foreground',
+      ops: [
+        { kind: 'write', target: skillBodyTarget('multi-body'), content: body('multi-body', 'new'), expect: { kind: 'present', version: contentHash(old) } },
+        { kind: 'write', target: skillSupportTarget('multi-body', 'references/added.md'), content: 'added', expect: { kind: 'absent' } },
+        { kind: 'remove', target: skillSupportTarget('multi-body', 'references/gone.md'), expect: { kind: 'present', version: contentHash('gone') } },
+      ],
+    })
+    expect(applied.ok, applied.message).toBe(true)
+    expect(await lib.read('multi-body')).toContain('new')
+    expect(await readFile(join(root, 'multi-body', 'references', 'added.md'), 'utf8')).toBe('added')
+    await expect(readFile(join(root, 'multi-body', 'references', 'gone.md'), 'utf8')).rejects.toThrow()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('creates a foreground skill together with a support file in one multi-op unit', async () => {
+  const { root, lib } = await setup()
+  try {
+    const applied = await lib.apply({
+      origin: 'foreground',
+      ops: [
+        { kind: 'createSkill', skill: 'multi-create', content: body('multi-create') },
+        { kind: 'write', target: skillSupportTarget('multi-create', 'references/a.md'), content: 'a', expect: { kind: 'absent' } },
+      ],
+    })
+    expect(applied.ok, applied.message).toBe(true)
+    expect(await lib.read('multi-create')).toContain('Body.')
+    expect(await readFile(join(root, 'multi-create', 'references', 'a.md'), 'utf8')).toBe('a')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('applies a section patch and a support write in one multi-op unit', async () => {
+  const { root, lib } = await setup()
+  try {
+    const original = '---\nname: multi-section\ndescription: section fixture\n---\n\n# multi-section\n\n## Details\nold\n'
+    expect((await lib.create('multi-section', original, 'foreground')).ok).toBe(true)
+    const applied = await lib.apply({
+      origin: 'foreground',
+      ops: [
+        { kind: 'patchSection', target: skillBodyTarget('multi-section'), section: { heading: 'Details', content: 'new' }, expect: { kind: 'present', version: contentHash(original) } },
+        { kind: 'write', target: skillSupportTarget('multi-section', 'references/a.md'), content: 'a', expect: { kind: 'absent' } },
+      ],
+    })
+    expect(applied.ok, applied.message).toBe(true)
+    expect(await lib.read('multi-section')).toContain('new')
+    expect(await readFile(join(root, 'multi-section', 'references', 'a.md'), 'utf8')).toBe('a')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('keeps a no-op op in a multi-op plan while committing the changed one', async () => {
+  const { root, lib } = await setup()
+  try {
+    const current = body('multi-noop')
+    expect((await lib.create('multi-noop', current, 'foreground')).ok).toBe(true)
+    const applied = await lib.apply({
+      origin: 'foreground',
+      ops: [
+        { kind: 'write', target: skillBodyTarget('multi-noop'), content: current, expect: { kind: 'present', version: contentHash(current) } },
+        { kind: 'write', target: skillSupportTarget('multi-noop', 'references/a.md'), content: 'a', expect: { kind: 'absent' } },
+      ],
+    })
+    expect(applied.ok, applied.message).toBe(true)
+    expect(applied.outcomes[0]?.noop).toBe(true)
+    expect(await readFile(join(root, 'multi-noop', 'references', 'a.md'), 'utf8')).toBe('a')
   } finally {
     await rm(root, { recursive: true, force: true })
   }
