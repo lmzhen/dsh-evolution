@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7k 双 web 独立会话第三次尝试
+
+- 两 browser 独立新建会话成功；
+- A 完成并写 A；B 模型请求 60s 未推进，手动停止；
+- 一次写入、无双写；双 web 竞态仍缺证据。
+
 ### 2026-11-21：Phase H7j 双 web 独立会话第二次尝试
 
 - 两个 isolated Chromium 点“新建会话”后仍停留旧 conversation；
