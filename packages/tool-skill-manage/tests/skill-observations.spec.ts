@@ -108,6 +108,27 @@ describe('skill fs observation listener', () => {
 
     expect(store.requirePresent(owner.agent.session, observedTarget(root, 'my-skill'))).toEqual({ kind: 'unobserved' })
   })
+  it('bridges a skill tool result into a read-time observation (H5b)', async () => {
+    const ctx = new Context()
+    const root = await makeRoot()
+    const store = installSkillObservationListener(ctx, root)
+    const path = await writeSkillFile(root, 'bridged-skill/SKILL.md', '---\nname: bridged-skill\ndescription: bridge probe\n---\n\nBody text.\n')
+    const owner = { agent: { session: {} } }
+    const session = owner.agent.session
+    ctx.emit('session/event', session, { type: 'tool/call', data: { callId: 'skill-call-1', name: 'skill', arguments: '{}' } })
+    ctx.emit('session/event', session, {
+      type: 'tool/result',
+      data: {
+        isError: false,
+        message: {
+          source: { callId: 'skill-call-1' },
+          content: [{ type: 'text', text: `<skill_content name="bridged-skill">\n<skill_resources>\nBase directory for this skill: ${join(root, 'bridged-skill')}\n</skill_resources>\n\n<skill_instructions>\nBody text.\n</skill_instructions>\n</skill_content>` }],
+        },
+      },
+    })
+    expect(store.requirePresent(session, observedTarget(root, 'bridged-skill'))).toEqual({ version: contentHash('---\nname: bridged-skill\ndescription: bridge probe\n---\n\nBody text.\n') })
+  })
+
   it('clears every observation when the plugin context disposes (HMR)', async () => {
     const ctx = new Context()
     const root = await makeRoot()

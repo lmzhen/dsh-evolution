@@ -19,6 +19,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { clearReviewChannel, markReviewChannel, withReviewContext } from '@deepseek-ai/dsh-evolution-core'
+import { skillPlatformVersion } from '../src/skill-observations.ts'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -40,20 +41,36 @@ async function setup() {
   await ctx.plugin(NodeIo)
   await ctx.plugin(SkillUsageRegistry, { root })
   await ctx.plugin(ToolSkillManage)
+  const sessions = new Map<string, object>()
+  const sessionFor = (sessionId: string): object => {
+    let session = sessions.get(sessionId)
+    if (session === undefined) {
+      session = { id: sessionId, header: {} }
+      sessions.set(sessionId, session)
+    }
+    return session
+  }
   const run = (sessionId: string, args: Record<string, unknown>) => executeOne(ctx, {
     callId: ToolCallId(`s22-${sessionId}-${Math.random()}`),
     name: 'skill_manage',
     arguments: args,
-    agent: { session: { id: sessionId, header: {} } } as unknown as Agent,
+    agent: { session: sessionFor(sessionId) } as unknown as Agent,
     signal: new AbortController().signal,
   })
   const messageOf = (result: { value?: unknown }): string => (result.value as { message?: string } | undefined)?.message ?? ''
   // A library-level refusal rides the structured payload: `ok: false` with the
   // reason in `message` (`isError` stays false — only a schema reject sets it).
   const okOf = (result: { value?: unknown }): boolean => (result.value as { ok?: boolean } | undefined)?.ok === true
+  const observe = (sessionId: string, name: string): void => {
+    const path = join(root, 'skills', name, 'SKILL.md')
+    const version = skillPlatformVersion(path)
+    expect(version).toBeDefined()
+    ctx.emit('fs/observed', { targetKey: path, displayPath: path } as never, { kind: 'present', version: version! }, { agent: { session: sessionFor(sessionId) } })
+  }
   return {
     root,
     run,
+    observe,
     messageOf,
     okOf,
     cleanup: async () => {
@@ -97,7 +114,7 @@ describe('review-channel origin (S2.2, v37 P1-2)', () => {
   })
 
   it('a review-run skill read counts as write evidence', async () => {
-    const { run, messageOf, okOf, cleanup } = await setup()
+    const { run, observe, messageOf, okOf, cleanup } = await setup()
     try {
       markReviewChannel(MARKED_SESSION)
       const created = await run(PLAIN_SESSION, { action: 'create', name: 'run-read-skill', content: skill('run-read-skill', 'Body v1.') })
@@ -105,6 +122,7 @@ describe('review-channel origin (S2.2, v37 P1-2)', () => {
       const blocked = await withReviewContext({ reviewId: 'read-proof', runId: 'read-proof', reads: new Set<string>() }, async () =>
         await run(MARKED_SESSION, { action: 'update', name: 'run-read-skill', content: skill('run-read-skill', 'Body v2.') }))
       expect(okOf(blocked)).toBe(false)
+      observe(MARKED_SESSION, 'run-read-skill')
       const allowed = await withReviewContext({ reviewId: 'read-proof', runId: 'read-proof', reads: new Set(['run-read-skill']) }, async () =>
         await run(MARKED_SESSION, { action: 'update', name: 'run-read-skill', content: skill('run-read-skill', 'Body v3.') }))
       expect(okOf(allowed), messageOf(allowed)).toBe(true)
@@ -152,7 +170,7 @@ describe('review-channel origin (S2.2, v37 P1-2)', () => {
   })
 
   it('a real user message ends the window: the same session writes as foreground again', async () => {
-    const { run, messageOf, okOf, cleanup } = await setup()
+    const { run, observe, messageOf, okOf, cleanup } = await setup()
     try {
       await run(PLAIN_SESSION, { action: 'create', name: 'window-skill', content: skill('window-skill', 'Body v1.') })
       await run(PLAIN_SESSION, { action: 'pin', name: 'window-skill' })
@@ -162,6 +180,7 @@ describe('review-channel origin (S2.2, v37 P1-2)', () => {
       expect(messageOf(review)).toContain('受保护（pinned）')
       // The review plugin clears the mark on the next `{ kind: 'user' }` message.
       clearReviewChannel(MARKED_SESSION)
+      observe(MARKED_SESSION, 'window-skill')
       const afterUser = await run(MARKED_SESSION, { action: 'update', name: 'window-skill', content: skill('window-skill', 'Body v3.') })
       expect(okOf(afterUser), messageOf(afterUser)).toBe(true)
       expect(messageOf(afterUser)).not.toContain('受保护')

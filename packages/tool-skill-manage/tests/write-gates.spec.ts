@@ -17,6 +17,7 @@ import EvolutionApproval from '@deepseek-ai/dsh-evolution-approval'
 import * as ToolSkillManage from '../src/index.ts'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { readFile } from 'node:fs/promises'
+import { skillPlatformVersion } from '../src/skill-observations.ts'
 import { join } from 'node:path'
 import { tempHome } from '../../test-support/temp-home.ts'
 
@@ -44,6 +45,12 @@ function fileReadFrames(path: string, failed = false): readonly unknown[] {
     { type: 'tool/call', data: { callId, name: 'read', arguments: JSON.stringify({ file_path: path }) } },
     { type: 'tool/result', data: { isError: failed, message: { source: { callId }, content: [] } } },
   ]
+}
+
+function observe(ctx: Context, path: string, session: object): void {
+  const version = skillPlatformVersion(path)
+  expect(version).toBeDefined()
+  ctx.emit('fs/observed', { targetKey: path, displayPath: path } as never, { kind: 'present', version: version! }, { agent: { session } })
 }
 
 function skillBody(name: string, body = 'Body.'): string {
@@ -116,10 +123,12 @@ describe('write gates: read-before-write (E-318)', () => {
   it('accepts the same write once the session read the skill, and writes it', async () => {
     const { ctx, root } = await setup()
     await createTarget(ctx, 'gate-read')
+    const session = sessionOf('subagent', readFrames('gate-read'))
+    observe(ctx, skillPath(root, 'gate-read'), session)
     const accepted = await callTool(
       ctx,
       { action: 'patch', summary: 'test patch', name: 'gate-read', old_string: 'Body.', new_string: 'Rewritten.' },
-      sessionOf('subagent', readFrames('gate-read')),
+      session,
     )
     expect(valueOf(accepted).ok, valueOf(accepted).message).toBe(true)
     expect(await readFile(skillPath(root, 'gate-read'), 'utf8')).toContain('Rewritten.')
@@ -140,10 +149,12 @@ describe('write gates: read-before-write (E-318)', () => {
   it('accepts a foreground operator that read the skill', async () => {
     const { ctx, root } = await setup()
     await createTarget(ctx, 'gate-foreground')
+    const session = sessionOf(undefined, readFrames('gate-foreground'))
+    observe(ctx, skillPath(root, 'gate-foreground'), session)
     const accepted = await callTool(
       ctx,
       { action: 'patch', summary: 'test patch', name: 'gate-foreground', old_string: 'Body.', new_string: 'Operator edit.' },
-      sessionOf(undefined, readFrames('gate-foreground')),
+      session,
     )
     expect(valueOf(accepted).ok, valueOf(accepted).message).toBe(true)
     expect(await readFile(skillPath(root, 'gate-foreground'), 'utf8')).toContain('Operator edit.')
@@ -186,7 +197,9 @@ describe('write gates: support-file read (P2-27)', () => {
     expect(valueOf(refused).message).toContain('E-326')
     expect(valueOf(refused).message).toContain('references/x.md')
     expect(await readFile(path, 'utf8')).toBe('original')
-    const allowed = await callTool(ctx, { action: 'write_file', name: 'support-gate', file_path: 'references/x.md', file_content: 'seen' }, sessionOf('subagent', fileReadFrames(path)))
+    const allowedSession = sessionOf('subagent', fileReadFrames(path))
+    observe(ctx, path, allowedSession)
+    const allowed = await callTool(ctx, { action: 'write_file', name: 'support-gate', file_path: 'references/x.md', file_content: 'seen' }, allowedSession)
     expect(valueOf(allowed).ok, valueOf(allowed).message).toBe(true)
     expect(await readFile(path, 'utf8')).toBe('seen')
   })

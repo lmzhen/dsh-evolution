@@ -10,10 +10,11 @@
  * @module @deepseek-ai/dsh-tool-skill-manage/skill-observations
  */
 import { readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-fs'
-import { contentHash } from '@deepseek-ai/dsh-evolution-core'
-import { SkillObservationStore, skillHostIdentity, skillTargetFromHostPath } from '@deepseek-ai/dsh-evolution-core/skills'
+import { contentHash, sessionAudited, ToolDispatchNormalizer } from '@deepseek-ai/dsh-evolution-core'
+import { parseFrontmatter, SkillObservationStore, skillHostIdentity, skillTargetFromHostPath } from '@deepseek-ai/dsh-evolution-core/skills'
 
 /** Actor shape the platform carries on `fs/observed`. */
 type ObservationActor = { agent?: { session?: object } } | undefined
@@ -24,8 +25,58 @@ type ObservationActor = { agent?: { session?: object } } | undefined
  * @param root - absolute skills root captured at apply time.
  * @returns the store the future SkillWriteService reads; also cleared on dispose.
  */
+interface SkillResultEventData {
+  readonly isError?: unknown
+  readonly message?: { readonly source?: { readonly callId?: unknown }; readonly content?: unknown }
+}
+
+function resultText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  const parts: string[] = []
+  for (const block of content) {
+    if (typeof block === 'string') parts.push(block)
+    else if (typeof block === 'object' && block !== null && typeof (block as { text?: unknown }).text === 'string') parts.push((block as { text: string }).text)
+  }
+  return parts.join('\n')
+}
+
+function recordSkillToolRead(store: SkillObservationStore, root: string, session: object, text: string): void {
+  const base = /Base directory for this skill: ([^\n]+)/.exec(text)?.[1]?.trim()
+  const instructions = /<skill_instructions>\n([\s\S]*?)\n<\/skill_instructions>/.exec(text)?.[1]
+  if (base === undefined || instructions === undefined) return
+  const path = join(base, 'SKILL.md')
+  let markdown: string
+  try {
+    markdown = readFileSync(path, 'utf8')
+  } catch {
+    return
+  }
+  const parsed = parseFrontmatter(markdown)
+  if (parsed === null || parsed.body.trim() !== instructions.trim()) return
+  const target = skillTargetFromHostPath(root, path)
+  const identityKey = skillHostIdentity(path)
+  if (target === undefined || identityKey === undefined) return
+  store.record(session, { ...target, identityKey }, { kind: 'present', version: contentHash(markdown) })
+}
+
 export function installSkillObservationListener(ctx: Context, root: string, store: SkillObservationStore = new SkillObservationStore()): SkillObservationStore {
   ctx.effect(() => () => store.clear(), 'tool-skill-manage.skill-observations')
+  const dispatchBySession = new WeakMap<object, ToolDispatchNormalizer>()
+  ctx.on('session/event', (session, event) => {
+    if (!sessionAudited(ctx, String((session as { id?: unknown }).id ?? ''), false)) return
+    let dispatches = dispatchBySession.get(session)
+    if (dispatches === undefined) {
+      dispatches = new ToolDispatchNormalizer()
+      dispatchBySession.set(session, dispatches)
+    }
+    const scope = String((session as { id?: unknown }).id ?? '')
+    dispatches.advance(event, scope)
+    const signal = dispatches.settledSignalOf(event, scope)
+    if (signal === null || signal.name !== 'skill' || signal.ok !== true) return
+    const data = event.data as SkillResultEventData | undefined
+    recordSkillToolRead(store, root, session, resultText(data?.message?.content))
+  })
   ctx.on('fs/observed', (fsTarget, observation, actor) => {
     if (observation.kind !== 'present') return
     const owner = (actor as ObservationActor)?.agent?.session

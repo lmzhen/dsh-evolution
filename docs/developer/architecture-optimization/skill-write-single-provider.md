@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H5b 已完成：删除写前 legacy seed；`installSkillObservationListener` 增加 `session/event` 桥：记录 `skill` 工具的 tool/call，在 tool/result 文本中解析 skill 内容与 base dir，读取 SKILL.md 并校验渲染 instructions 等于当前 body 后，以 `skillHostIdentity` 记录 read-time observation。非 directory provider、stale body 不记录。剩余缺口：平台 `skill` 工具仍不发 fs/observed，桥依赖渲染文本格式，列为 DEFERRED 上游推动项。
+
 H5a 已完成：`SkillActionResult.after` 由 core mutator 在成功提交时返回（create/update/patch/patchSection/write_file/remove_file）；`SkillLibrary.apply` 用 after 生成 `SkillWriteOutcome.version`；`SkillWriteService.apply` 直接从 outcome 记录 observation，不再为 plan 写后 re-read；`create-tree-reads` 的 post-write read 计数下降为 1。legacy `skill` 读的写前 seed 仍在，H5b 再隔离/移除。
 
 H3b 已完成：approval replay 优先用 `args.plan`；`WriteRunner` 增加 `context.replayed`，approve 路径对无 plan 的旧内容写入明确拒绝；plan replay 前重新 `applyLimits()`，避免绕过收紧后的 cap；update 目标缺失用 `write` + `expect absent` + `create:false` 保留 update-only 语义。per-action anchor staging 分支尚未删除（H3c）。

@@ -914,10 +914,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     crossSourceView?: readonly SkillSummary[],
     /** Exact reading session for observation-based writes; undefined on approval replay. */
     owner?: object,
-    /** Read history the admission gate accepted, used to seed legacy skill-tool reads. */
-    readNames?: ReadonlySet<string>,
-    /** Support-file read history the admission gate accepted. */
-    readSupportFiles?: ReadonlyMap<string, ReadonlySet<string>>,
   ): Promise<{ ok: boolean; message: string; skills: string[]; proposal?: string }> {
     // T2-09/A24: re-materialize the write caps HERE, not only at the tool entry. The approve path
     // (registerRunner) calls this function directly, so a deployment that TIGHTENED skillContentChars /
@@ -1017,22 +1013,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       typeof args.staged_from_sha256 === 'string' && args.staged_from_sha256 !== ''
         ? args.staged_from_sha256 === 'absent' ? { absent: true } : { sha256: args.staged_from_sha256 }
         : undefined
-    // Legacy `skill` tool reads are session history, not fs/observed events. If the
-    // admission gate accepted such a read, seed the body observation from the bytes
-    // under the service lock before the first write; newer read tools still produce
-    // the stronger fs/observed observation and take precedence.
     if (owner !== undefined && stagedAnchor === undefined
       && (action === 'update' || action === 'patch' || action === 'write_file' || action === 'remove_file')) {
       const protection = await library.writeProtection(name, origin)
       if (protection !== null) return { ok: false, message: `技能「${name}」受保护（${protection}）。`, skills: [] }
-      if (action === 'update' || action === 'patch') {
-        const operator = origin === 'foreground' && typeof (owner as { id?: unknown }).id === 'string'
-        if (readNames?.has(name) === true || operator) await skillWriteService.readBody(owner, name).catch(() => null)
-      } else if (typeof args.file_path === 'string' && args.file_path !== ''
-        && readSupportFiles?.get(name)?.has(args.file_path)) {
-        await skillWriteService.readSupport(owner, name, args.file_path).catch(() => null)
-      }
     }
+    // H5b: legacy `skill` tool reads are bridged into observations at READ time
+    // by installSkillObservationListener's session/event listener. No write-time
+    // seed remains here; an unobserved write is refused by the service.
     // P0 authoring feedback: every create/update reports the description
     // against the 60-char authoring bar; the strict mode refuses a violation
     // up front (default off — advisory only, matching the platform limit).
@@ -1687,7 +1675,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           ? { ok: true, message: '提取提议（未写入；确认后按 extract items 提交）。', skills: [], proposal: proposed.proposal }
           : { ok: false, message: proposed.message, skills: [] }
       }
-      return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined, exec.agent?.session, writeReadNames, writeReadSupportFiles)
+      return await executeCore(operation, libraryOrigin, crossSourceView ?? undefined, exec.agent?.session)
     },
   }))
 

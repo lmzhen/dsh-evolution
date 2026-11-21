@@ -932,6 +932,15 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H5b skill read bridge，删除写前 seed
+
+- 删除 `executeCore` 的 legacy 写前 read/seed；
+- `installSkillObservationListener` 监听 `session/event`，从 `skill` tool/result 解析内容并校验 body 后记录；
+- 保护检查保留在 observation 之前，pinned 仍先拒绝；
+- 更新 write-gates/review-channel/create-tree 测试为 read-time observation；
+- tool + core 定向 122 passed，build 0；
+- 平台 skill 工具无 fs/observed 的缺口 DEFERRED。
+
 ### 2026-11-21：Phase H5a write outcome observation
 
 - core mutator 成功返回 `after`；`SkillLibrary.apply` 生成 outcome（after/version）；
