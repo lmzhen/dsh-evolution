@@ -573,6 +573,8 @@ apply(plan, owner?): Promise<SkillWriteServiceResult>
 - tool 全部 plan 路径仍经 `SkillLibrary` 的 target lock；
 - tool 全包 115 passed，overlay build 0。
 
+H7j 双 web 独立会话第二次尝试（未通过）：两个 isolated Chromium 各自点击“新建会话”后填 prompt，但 UI 仍停留在旧 conversation，发送后只看到旧 `web-race.txt` 记录，新 `web-race2.txt` 未产生。判断为新建会话点击未命中/两种客户端共享选中态，需改用 API 或每客户端独立 profile 后再验。
+
 H7i 双 web 客户端尝试（未通过）：两个 isolated Chromium 同时打开 lab host，未先各建独立会话，两个 composer 实际写入同一已选会话；结果只落一个 `references/web-race.txt` 内容 A，另一条消息排队，不能作为“双 session”证据。下一步必须在两个浏览器各自先点“新建会话”，再并发发送。
 
 H7h 真机 web 单会话证据：isolated Chromium 打开 lab host `http://127.0.0.1:3083`，新建会话后模型调用 `skill` 读取 `race-h7` 并成功 `skill_manage write_file` 写 `references/webrace.txt`（回复 DONE-WEB-A，无错误）。这证明 npm tarball 安装的 web profile 能完成真实 skill read→write 链路；**双 web session 并发**证据仍未拿到（单次会话 4 秒完成，第二次未及时并发）。

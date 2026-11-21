@@ -932,6 +932,12 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H7j 双 web 独立会话第二次尝试
+
+- 两个 isolated Chromium 点“新建会话”后仍停留旧 conversation；
+- 新 web-race2.txt 未产生；
+- 双 web session 证据仍缺，改 API/独立 profile 再验。
+
 ### 2026-11-21：Phase H7i 双 web 客户端尝试
 
 - 两个 isolated Chromium 未先各建会话，实际同一 conversation；
