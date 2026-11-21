@@ -419,12 +419,24 @@
       }
     },
     {
-      "id": "evolution-io-node",
+      "id": "evolution-io-platform",
       "group": "evolution-io",
       "forms": [
         "all",
         "host",
-        "preset",
+        "preset"
+      ],
+      "lead": [],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-core/io-platform'"
+      ],
+      "bodies": {},
+      "leads": {}
+    },
+    {
+      "id": "evolution-io-node",
+      "group": "evolution-io",
+      "forms": [
         "standalone"
       ],
       "lead": [],

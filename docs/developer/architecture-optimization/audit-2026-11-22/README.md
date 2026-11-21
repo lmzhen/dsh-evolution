@@ -38,6 +38,7 @@
 - P2：删除 `SKIP_MANIFEST_FRESHNESS` 死开关，见 [34](34-p2-dead-switch.md)。
 - A2：approval reload+marker、review/curator lease+reload、home sidecar 平台文件锁；见 [38](38-a2-executed-marker.md)。
 - D2：契约检测过滤 family 路径并对 rc.5 strict 通过；见 [39](39-d2-contract-strict.md)。
+- Phase B/P2：bundle roster 生产 forms 改 io-platform；本地 61/0/3；见 [44](44-bundle-roster-platform.md)。
 - E7 剩余：4 条 ci-only 行补 noDrillReason，falsifiability-carrier live=0；见 [41](41-e7-falsifiability.md)。
 - E2：gate-13/14/15 改为真实检查，gate-75 改为 action step，见 [35](35-e2-real-gates.md)。
 - R0-7 / E7：已在 main 源码修复（argv-ci-parity 进入 check registry；2 条 substitution 登记；mutation ledger 刷新），见 [16](16-r0-meta-gate-design.md)。
@@ -221,3 +222,4 @@
 | [41-e7-falsifiability.md](41-e7-falsifiability.md) | E7：falsifiability-carrier 清零 |
 | [42-p2-merge-decision-route.md](42-p2-merge-decision-route.md) | P2：merge decision 路由单源 |
 | [43-p2-ledger-orphans.md](43-p2-ledger-orphans.md) | P2：mutation ledger 拒绝孤儿 |
+| [44-bundle-roster-platform.md](44-bundle-roster-platform.md) | Phase B/P2：生产 bundle 用 io-platform + 本地门禁 61 pass |

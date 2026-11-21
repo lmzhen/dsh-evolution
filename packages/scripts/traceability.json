@@ -830,7 +830,7 @@
     "newProfileRows": 0,
     "newSlots": 0,
     "newPersistence": 0,
-    "newSubpaths": 13,
+    "newSubpaths": 14,
     "newErrorCodes": [
       "E-323",
       "E-324",
@@ -850,4 +850,3 @@
     ]
   }
 }
-
