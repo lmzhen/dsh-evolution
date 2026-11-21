@@ -159,3 +159,4 @@
 | [07-ui-client.md](07-ui-client.md) | UI/client/host 接缝、settings、workbench、merge UI |
 | [08-tests-debt.md](08-tests-debt.md) | 测试/门禁/发布证据、永久 skip、假绿 |
 | [10-system-framework.md](10-system-framework.md) | 第一性原理/系统科学/系统工程整合框架：八不变量、七平面、六失效模式、V 模型与目标内核 |
+| [11-target-architecture.md](11-target-architecture.md) | 综合目标架构：HomeFS/UnitKernel/PlanService/StateStore/Projection/Assurance、旧组件去留、迁移与验收 |

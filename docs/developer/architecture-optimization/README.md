@@ -76,4 +76,5 @@
 - 方法：8 个上下文隔离的只读子智能体分域审计，根代理去重与抽检；未修改源码。
 - 当前读数：P0=1、P1=28、P2/技术债约 117 条。
 - 系统框架：[10-system-framework.md](audit-2026-11-22/10-system-framework.md)（八不变量、七平面、六失效模式、V 模型）。
+- 目标架构：[11-target-architecture.md](audit-2026-11-22/11-target-architecture.md)（HomeFS/UnitKernel/PlanService/StateStore/Projection/Assurance）。
 - 修复顺序见 [09-remediation-plan.md](audit-2026-11-22/09-remediation-plan.md)。
