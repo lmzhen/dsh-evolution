@@ -859,6 +859,9 @@ interface PlanSink {
 /** Async-local collector: a normal single-op write never sees another plan's sink. */
 const PLAN_SINK = new AsyncLocalStorage<PlanSink>()
 
+/** The model-supplied plan summary that must reach history/audit, not just command output. */
+const PLAN_SUMMARY = new AsyncLocalStorage<string>()
+
 export class SkillLibrary {
   readonly root: string
   /** The ONE read face owner/health/panel consume; a thin adapter, not a store. */
@@ -1801,12 +1804,18 @@ export class SkillLibrary {
     // Keep per-file transactions, but do not queue behind our own lease.
     const fence = fenceHeld ? undefined : this.fence
     const at = new Date().toISOString()
-    const finalSummary = change === undefined
-      ? this.hostChangeSummary(action, before, after, path, summary)
-      : (() => {
-        const normalized = normalizeChangeSummary(change.text, DEFAULT_SKILL_WRITE_SUMMARY_CHARS)
-        return normalized.ok ? { text: normalized.text, source: change.source } : this.hostChangeSummary(action, before, after, path, summary)
+    const planSummary = PLAN_SUMMARY.getStore()
+    const finalSummary = planSummary !== undefined
+      ? (() => {
+        const normalized = normalizeChangeSummary(planSummary, DEFAULT_SKILL_WRITE_SUMMARY_CHARS)
+        return normalized.ok ? { text: normalized.text, source: 'model' as const } : this.hostChangeSummary(action, before, after, path, summary)
       })()
+      : change === undefined
+        ? this.hostChangeSummary(action, before, after, path, summary)
+        : (() => {
+          const normalized = normalizeChangeSummary(change.text, DEFAULT_SKILL_WRITE_SUMMARY_CHARS)
+          return normalized.ok ? { text: normalized.text, source: change.source } : this.hostChangeSummary(action, before, after, path, summary)
+        })()
     let versions: RecordedVersions | null = null
     try {
       const keep = this.limits.versionKeep ?? DEFAULT_SKILL_VERSION_KEEP
@@ -4045,8 +4054,14 @@ export class SkillLibrary {
   async apply(plan: SkillWritePlan): Promise<SkillWriteResult> {
     const op = plan.ops[0]
     if (op === undefined) return { ok: false, message: 'skill write plan is empty', outcomes: [] }
-    if (plan.ops.length > 1) return await this.applyMulti(plan)
-    const result = await this.applyOne(op, plan.origin)
+    if (plan.ops.length > 1) {
+      return plan.summary === undefined || plan.summary === ''
+        ? await this.applyMulti(plan)
+        : await PLAN_SUMMARY.run(plan.summary, () => this.applyMulti(plan))
+    }
+    const result = plan.summary === undefined || plan.summary === ''
+      ? await this.applyOne(op, plan.origin)
+      : await PLAN_SUMMARY.run(plan.summary, () => this.applyOne(op, plan.origin))
     const target = op.kind === 'createSkill' ? skillBodyTarget(op.skill) : op.target
     const outcomes = result.ok && result.after !== undefined
       ? [{ op, target, after: result.after, version: result.after === null ? '' : contentHash(result.after) }]

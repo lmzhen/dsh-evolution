@@ -8,8 +8,8 @@ import { expect, it } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { contentHash } from '@deepseek-ai/dsh-evolution-core'
-import { SkillLibrary, SystemSkillWriter, skillBodyTarget, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
+import { contentHash, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
+import { SkillLibrary, SystemSkillWriter, loadVersions, skillBodyTarget, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 
 const body = (name: string, text = 'Body.'): string => `---\nname: ${name}\ndescription: plan seam fixture\n---\n${text}\n`
 
@@ -191,6 +191,24 @@ it('does not write a create audit when a later op in the same plan is refused', 
     expect(refused.ok).toBe(false)
     expect((await lib.listMutations()).filter(entry => entry.skillName === 'multi-phantom')).toHaveLength(0)
     await expect(readFile(join(root, 'multi-phantom', 'SKILL.md'), 'utf8')).rejects.toThrow()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('B1-4: a plan summary becomes the model-sourced history summary', async () => {
+  const { root, lib } = await setup()
+  try {
+    expect((await lib.create('summary-skill', body('summary-skill', 'seed'), 'foreground')).ok).toBe(true)
+    const initial = body('summary-skill', 'seed')
+    const applied = await lib.apply({
+      origin: 'foreground',
+      summary: 'model says why',
+      ops: [{ kind: 'write', target: skillBodyTarget('summary-skill'), content: body('summary-skill', 'changed'), expect: { kind: 'present', version: contentHash(initial) } }],
+    })
+    expect(applied.ok, applied.message).toBe(true)
+    const versions = await loadVersions(root, nodeEvolutionIo(), 'summary-skill')
+    expect(versions.at(-1)).toMatchObject({ summary: 'model says why', summarySource: 'model' })
   } finally {
     await rm(root, { recursive: true, force: true })
   }
