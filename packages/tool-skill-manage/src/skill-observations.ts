@@ -13,7 +13,7 @@ import { readFileSync, statSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-fs'
 import { contentHash } from '@deepseek-ai/dsh-evolution-core'
-import { SkillObservationStore, recordFsSkillObservation, skillHostIdentity } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillObservationStore, skillHostIdentity, skillTargetFromHostPath } from '@deepseek-ai/dsh-evolution-core/skills'
 
 /** Actor shape the platform carries on `fs/observed`. */
 type ObservationActor = { agent?: { session?: object } } | undefined
@@ -45,12 +45,11 @@ export function installSkillObservationListener(ctx: Context, root: string, stor
       return
     }
     if (skillPlatformVersion(hostPath) !== version) return
-    const recorded = recordFsSkillObservation(store, owner, root, {
-      hostPath,
-      version: contentHash(content),
-    })
-    const identityKey = recorded === undefined ? undefined : skillHostIdentity(hostPath)
-    if (recorded !== undefined && identityKey !== undefined) store.record(owner, { ...recorded, identityKey }, { kind: 'present', version: contentHash(content) })
+    const recorded = skillTargetFromHostPath(root, hostPath)
+    if (recorded === undefined) return
+    const identityKey = skillHostIdentity(hostPath)
+    if (identityKey === undefined) return
+    store.record(owner, { ...recorded, identityKey }, { kind: 'present', version: contentHash(content) })
   })
   return store
 }

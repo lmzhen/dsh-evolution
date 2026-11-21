@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { contentHash } from '@deepseek-ai/dsh-evolution-core'
 import type { FsTarget } from '@deepseek-ai/dsh-fs'
-import { skillBodyTarget, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
+import { skillBodyTarget, skillHostIdentity, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { installSkillObservationListener, skillPlatformVersion } from '../src/skill-observations.ts'
 
 const roots: string[] = []
@@ -25,6 +25,15 @@ async function writeSkillFile(root: string, rel: string, content: string): Promi
   await mkdir(join(path, '..'), { recursive: true })
   await writeFile(path, content, 'utf8')
   return path
+}
+
+function observedTarget(root: string, skill: string, rel = '') {
+  const path = join(root, skill, rel === '' ? 'SKILL.md' : rel)
+  const identityKey = skillHostIdentity(path)
+  expect(identityKey).toBeDefined()
+  return rel === ''
+    ? { ...skillBodyTarget(skill), identityKey: identityKey! }
+    : { ...skillSupportTarget(skill, rel), identityKey: identityKey! }
 }
 
 function fsTarget(path: string): FsTarget {
@@ -49,10 +58,10 @@ describe('skill fs observation listener', () => {
     emitRead(ctx, bodyPath, owner)
     emitRead(ctx, supportPath, owner)
 
-    expect(store.requirePresent(owner.agent.session, skillBodyTarget('my-skill'))).toEqual({
+    expect(store.requirePresent(owner.agent.session, observedTarget(root, 'my-skill'))).toEqual({
       version: contentHash('body'),
     })
-    expect(store.requirePresent(owner.agent.session, skillSupportTarget('my-skill', 'references/a.md'))).toEqual({
+    expect(store.requirePresent(owner.agent.session, observedTarget(root, 'my-skill', 'references/a.md'))).toEqual({
       version: contentHash('support'),
     })
   })
@@ -67,8 +76,8 @@ describe('skill fs observation listener', () => {
 
     emitRead(ctx, path, ownerA)
 
-    expect(store.requirePresent(ownerA.agent.session, skillBodyTarget('my-skill'))).toBeDefined()
-    expect(store.requirePresent(ownerB.agent.session, skillBodyTarget('my-skill'))).toEqual({ kind: 'unobserved' })
+    expect(store.requirePresent(ownerA.agent.session, observedTarget(root, 'my-skill'))).toBeDefined()
+    expect(store.requirePresent(ownerB.agent.session, observedTarget(root, 'my-skill'))).toEqual({ kind: 'unobserved' })
   })
 
   it('ignores non-skill paths, absent observations, and actor-less events', async () => {
@@ -83,7 +92,7 @@ describe('skill fs observation listener', () => {
     ctx.emit('fs/observed', fsTarget(bodyPath), { kind: 'absent' }, owner)
     emitRead(ctx, bodyPath, undefined)
 
-    expect(store.requirePresent(owner.agent.session, skillBodyTarget('my-skill'))).toEqual({ kind: 'unobserved' })
+    expect(store.requirePresent(owner.agent.session, observedTarget(root, 'my-skill'))).toEqual({ kind: 'unobserved' })
   })
 
   it('does not record when the platform version is stale for the current bytes', async () => {
@@ -97,7 +106,7 @@ describe('skill fs observation listener', () => {
     await writeFile(path, 'new', 'utf8')
     ctx.emit('fs/observed', fsTarget(path), { kind: 'present', version: oldVersion! }, owner)
 
-    expect(store.requirePresent(owner.agent.session, skillBodyTarget('my-skill'))).toEqual({ kind: 'unobserved' })
+    expect(store.requirePresent(owner.agent.session, observedTarget(root, 'my-skill'))).toEqual({ kind: 'unobserved' })
   })
   it('clears every observation when the plugin context disposes (HMR)', async () => {
     const ctx = new Context()
@@ -106,11 +115,11 @@ describe('skill fs observation listener', () => {
     const path = await writeSkillFile(root, 'my-skill/SKILL.md', 'body')
     const owner = { agent: { session: {} } }
     emitRead(ctx, path, owner)
-    expect(store.requirePresent(owner.agent.session, skillBodyTarget('my-skill'))).toBeDefined()
+    expect(store.requirePresent(owner.agent.session, observedTarget(root, 'my-skill'))).toBeDefined()
 
     await ctx.fiber.dispose()
 
-    expect(store.requirePresent(owner.agent.session, skillBodyTarget('my-skill'))).toEqual({ kind: 'unobserved' })
+    expect(store.requirePresent(owner.agent.session, observedTarget(root, 'my-skill'))).toEqual({ kind: 'unobserved' })
   })
 
 })

@@ -124,7 +124,7 @@ function observationKey(target: SkillTarget): string {
 /** Canonical realpath identity for an existing host path, matching SkillLibrary's lock key. */
 export function skillHostIdentity(hostPath: string): string | undefined {
   try {
-    const real = realpathSync(hostPath).replaceAll('\\', '/')
+    const real = realpathSync.native(hostPath).replaceAll('\\', '/')
     return 'skillpath:' + createHash('sha256').update(real).digest('hex')
   } catch {
     return undefined
@@ -154,9 +154,7 @@ export class SkillObservationStore {
    * @returns the observation, or `undefined` when this owner never read it.
    */
   get(owner: SkillObservationOwner, target: SkillTarget): SkillObservation | undefined {
-    const reads = this.byOwner.get(owner)
-    if (reads === undefined) return undefined
-    return reads.get(observationKey(target)) ?? reads.get(target.targetKey)
+    return this.byOwner.get(owner)?.get(observationKey(target))
   }
 
   /**

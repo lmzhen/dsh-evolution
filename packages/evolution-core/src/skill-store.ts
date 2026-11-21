@@ -947,7 +947,8 @@ export class SkillLibrary {
     const rel = tail.join('::')
     const dir = this.dirOf(name)
     const namespace = rel === '*'
-    const path = namespace ? dir : join(dir, ...rel.replace(/\\/g, '/').split('/').filter(Boolean))
+    const body = rel === ''
+    const path = namespace ? dir : body ? join(dir, 'SKILL.md') : join(dir, ...rel.replace(/\\/g, '/').split('/').filter(Boolean))
     let identity = path
     try {
       identity = await realpathFs(path)

@@ -932,6 +932,14 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-21：Phase H4b3 observation 单 identity
+
+- observation store 不再记录逻辑键，只认 `identityKey`；
+- `skillHostIdentity` 改用 `realpathSync.native`，与异步 `realpath` 的 Windows 长路径一致；
+- 更新 listener/observation 测试；
+- tool + core 定向 137 passed，build 0；
+- unit targetKeys 仍逻辑键，H4b4。
+
 ### 2026-11-21：Phase H4b2 observation/plan identity
 
 - `SkillTarget.identityKey` + `SkillLibrary.identify`；
