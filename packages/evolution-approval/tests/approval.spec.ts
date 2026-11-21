@@ -2,6 +2,8 @@
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import EvolutionApproval from '../src/index.ts'
 import { effectiveSessionPolicy } from '../src/index.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
@@ -171,6 +173,21 @@ describe('evolution-approval', () => {
     const direct = await ctx.evolutionApproval.run('skill', { operation: { action: 'update', name: 'x' } }, { interface: 'background_review' })
     expect(direct.ok).toBe(true)
     expect(contexts[1]).toBeUndefined()
+  })
+
+  it('A2: writes a durable executed marker after a successful replay', async () => {
+    const home = await tempRoot('dsh-approval-executed-')
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    ctx.evolutionApproval.registerRunner('memory', async () => ({ ok: true, message: 'ok' }))
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'mark', args: {}, origin: 'background_review' })
+    const approved = await ctx.evolutionApproval.approve(decision.pendingId!, AUDIT)
+    expect(approved.ok).toBe(true)
+    const markerPath = join(home, 'evolution', 'approval', 'executed', encodeURIComponent(decision.pendingId!))
+    expect(existsSync(markerPath)).toBe(true)
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
   })
 
   it('keeps a pending record when the runner fails and retains rejection audit', async () => {

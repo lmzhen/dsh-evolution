@@ -22,10 +22,11 @@ import { settingsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
 // v43 FLOW2-1: the orphan criterion needs ONE liveness rule. G2 S4 retired the io write-lock
 // protocol this grammar was borrowed from, so the claim-id grammar and its pid probe live HERE —
 // the only remaining user — instead of keeping a lock parser alive in core for a non-lock caller.
-import { clampOnce, unwrapLive } from '@deepseek-ai/dsh-evolution-core'
+import { clampOnce, evolutionHome, unwrapLive, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import z from '@deepseek-ai/schemastery'
 import type { PendingKind, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-state'
 import type { EvolutionState } from '@deepseek-ai/dsh-evolution-state'
@@ -302,6 +303,30 @@ export class EvolutionApproval extends Service {
     return this.ctx.evolutionState
   }
 
+  /** A2: a durable executed marker is the cross-process idempotency barrier for one pending id. */
+  private approvalIo(): EvolutionIoLike | undefined {
+    const registry = this.ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
+    if (registry === undefined) return undefined
+    try { return registry.provider() } catch { return undefined }
+  }
+
+  private executedPath(id: string): string {
+    return join(evolutionHome(), 'approval', 'executed', encodeURIComponent(id))
+  }
+
+  private async alreadyExecuted(id: string): Promise<boolean> {
+    const io = this.approvalIo()
+    if (io === undefined) return false
+    try { return await io.exists(this.executedPath(id)) } catch { return false }
+  }
+
+  private async markExecuted(id: string): Promise<void> {
+    const io = this.approvalIo()
+    if (io === undefined) return
+    try { await io.writeText(this.executedPath(id), new Date().toISOString() + '\n') }
+    catch (error) { this.ctx.logger.warn('evolution-approval: executed marker write failed; a second process may replay ' + id + ': ' + (error instanceof Error ? error.message : String(error))) }
+  }
+
   /** Serialize one approval's claim with the family run lease when the authority service is mounted. */
   private async withApprovalLease<T>(id: string, task: () => Promise<T>): Promise<T | undefined> {
     const authority = this.ctx.get('evolutionMutationAuthority') as MutationAuthority | undefined
@@ -511,7 +536,13 @@ export class EvolutionApproval extends Service {
     // P2-22: the TTL is a gate on EVERY decision, not only on list(). A caller
     // holding an id must not execute a record the window already closed.
     await this.expireStale()
-    const result = await this.withApprovalLease(id, () => this.dedupe(`approve:${id}`, () => this.doApprove(id, audit)))
+    if (await this.alreadyExecuted(id)) return { ok: false, message: '待批准写入「' + id + '」已执行过（跨进程记录），不会重复回放。' }
+    const result = await this.withApprovalLease(id, async () => {
+      if (await this.alreadyExecuted(id)) return { ok: false, message: '待批准写入「' + id + '」已执行过（跨进程记录），不会重复回放。' }
+      const resolved = await this.dedupe(`approve:${id}`, () => this.doApprove(id, audit))
+      if (resolved.ok) await this.markExecuted(id)
+      return resolved
+    })
     return result ?? { ok: false, message: '待批准写入「' + id + '」正在被另一个批准/过期进程处理：lease 被占用。' }
   }
 
