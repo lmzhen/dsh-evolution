@@ -932,6 +932,13 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
+### 2026-11-22：Phase H7r 0.59.6 发布完成
+
+- 修复 virtual-root lock key 回退；
+- tag v0.59.6 @ 67255012；
+- release run 44926000840 success；
+- npm all/tool-skill 0.59.6 可查。
+
 ### 2026-11-22：Phase H7q 最终发布确认
 
 - 用户确认 0.59.6 补丁版、现在发布；
