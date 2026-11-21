@@ -579,10 +579,14 @@ export class MutationUnit {
   }
 
   private async rollback(snapshots: ReadonlyArray<{ target: string; before: string | null; after: string | null }>): Promise<void> {
+    // A5: one blocked target must not stop compensation of the others. A later target whose bytes
+    // still match this unit is restorable; only the blocked one is left for the prepared snapshot.
+    const errors: string[] = []
     for (const snapshot of [...snapshots].reverse()) {
       const result = await this.kernel.restore({ path: snapshot.target, before: snapshot.before, after: snapshot.after })
-      if (!result.ok) throw new Error(result.errors[0]?.message ?? 'rollback failed: ' + snapshot.target)
+      if (!result.ok) errors.push(snapshot.target + ': ' + (result.errors[0]?.message ?? 'rollback failed'))
     }
+    if (errors.length > 0) throw new Error('rollback incomplete: ' + errors.join('; '))
   }
 }
 

@@ -238,6 +238,32 @@ describe('MutationUnit executor', () => {
     expect(order.indexOf('journal:committed')).toBeGreaterThan(order.indexOf('snapshot:committed'))
   })
 
+class BumpAfterWriteIo extends MemoryIo {
+  override async writeText(path: string, content: string): Promise<void> {
+    await super.writeText(path, content)
+    if (path.endsWith('b.md')) this.files.set(path, 'external')
+  }
+}
+
+  it('A5: continues compensation past a blocked target', async () => {
+    const io = new BumpAfterWriteIo()
+    io.files.set('source/a.md', 'oldA')
+    io.files.set('source/b.md', 'oldB')
+    io.files.set('source/c.md', 'oldC')
+    io.failWrite = 'c.md'
+    const result = await unit(io).apply(request({
+      ops: [
+        { kind: 'write', target: 'source/a.md', content: 'newA', expected: 'oldA', skill: 'source' },
+        { kind: 'write', target: 'source/b.md', content: 'newB', expected: 'oldB', skill: 'source' },
+        { kind: 'write', target: 'source/c.md', content: 'newC', expected: 'oldC', skill: 'source' },
+      ],
+    }))
+    expect(result.ok).toBe(false)
+    expect(io.files.get('source/a.md')).toBe('oldA')
+    expect(io.files.get('source/b.md')).toBe('external')
+    expect(result.errors[0]?.message).toContain('rollback incomplete')
+  })
+
   it('rolls back a later write failure', async () => {
     const io = new MemoryIo()
     io.files.set('source/SKILL.md', 'old-a')

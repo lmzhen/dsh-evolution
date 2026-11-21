@@ -2,7 +2,7 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { MutationUnit, fileMutationLock, unitJournalPort, unitSnapshotPort } from '@deepseek-ai/dsh-evolution-core/write'
@@ -134,6 +134,32 @@ it('runs recovery before the first create writes a new skill', async () => {
     const created = await lib.create('other', '---\nname: other\ndescription: other\n---\n\nBody.\n', 'foreground', { managed: true })
     expect(created.ok, created.message).toBe(true)
     expect(await readFile(target, 'utf8')).toBe('before')
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
+it('A3: warns when a prepared unit cannot be recovered', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dsh-evo-recover-drift-'))
+  const root = join(home, 'skills')
+  const io = nodeEvolutionIo()
+  try {
+    await mkdir(join(root, 'demo'), { recursive: true })
+    const target = join(root, 'demo', 'SKILL.md')
+    await writeFile(target, 'third')
+    await unitSnapshotPort(io, home).write({
+      unitId: 'boot-recover-drift',
+      state: 'prepared',
+      createdAt: 1,
+      ops: [{ target, before: 'before', after: 'after', skill: 'demo' }],
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const lib = new SkillLibrary(root, io)
+    await lib.recoverOnBoot()
+    const text = warn.mock.calls.flat().join('\n')
+    expect(text).toContain('boot-recover-drift')
+    expect(text).toContain('recover-drift')
+    warn.mockRestore()
   } finally {
     await rm(home, { recursive: true, force: true })
   }

@@ -1130,7 +1130,15 @@ export class SkillLibrary {
 
   /** Run the boot recovery once per library instance, before the first write. */
   private async ensureRecovered(): Promise<void> {
-    this.recovery ??= this.recoverPreparedUnits().then(() => undefined).catch(error => {
+    this.recovery ??= this.recoverPreparedUnits().then(results => {
+      const unresolved = results.filter(result => !result.ok)
+      if (unresolved.length > 0) {
+        // A3: a drifted prepared unit is a structured recover refusal, not a throw. Ignoring the
+        // results made it invisible while undo kept refusing with undo-needs-recovery.
+        console.warn('skill-store: prepared-unit recovery left ' + String(unresolved.length) + ' unit(s) unresolved; first: '
+          + unresolved.slice(0, 5).map(result => result.unitId + '=' + (result.errors[0]?.code ?? 'unknown') + ':' + (result.errors[0]?.message ?? '')).join('; '))
+      }
+    }).catch(error => {
       console.warn('skill-store: prepared-unit recovery failed; writes continue: ' + (error instanceof Error ? error.message : String(error)))
     })
     await this.recovery
