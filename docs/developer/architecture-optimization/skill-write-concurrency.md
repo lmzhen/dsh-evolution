@@ -3,6 +3,7 @@
 > 状态：**设计提案（未实施）**
 > 范围：`skill_manage` 的 create / update / write_file / patch / remove_file，以及所有直接调用 `SkillLibrary` 的写路径（AUX、curator、merge、learning graph、extract）。
 > 目标：后台多 session/agent 并发修改或创建 skill 时，结果可解释、无静默丢更新、无静默语义合并；长期只保留一个写入权威层。
+> 后续目标方案：[skill-write-single-provider.md](skill-write-single-provider.md)（plan/intent、单 target 锁、审批 plan 与 Phase H 分步落地）。
 
 ## 1. 结论
 
@@ -931,7 +932,28 @@ overlay build:          0
 - review child 的真实执行仍待宿主验收；
 - 未 bump 版本，未发布。
 
-### 2026-11-21：Phase P1.14 section patch anchor（0.59.5）
+### 2026-11-21：Phase H1 plan 层类型与单 op apply
+
+读完 `skill-write-intent.ts`、`write-kernel.ts`、`mutation-unit.ts` 后修正了单 Provider 方案的第一版类型：**不新增第二套底层 intent/CAS 内核**，plan 层只表达“领域动作 + 期望版本”，provider 再映射到现有 `SkillWriteIntent` / `decideSkillWrite` / `MutationUnit`。
+
+已完成：
+
+- 新增 `packages/evolution-core/src/skill-write-plan.ts`
+  - `SkillWriteExpect`、`SkillWriteOp`（createSkill/write/patch/patchSection/remove）、`SkillWritePlan`、`SkillWriteOutcome`、`SkillWriteResult`；
+  - 从 `evolution-core/skills` 导出。
+- `SkillLibrary.apply(plan)` 先支持单 op，转发现有的 `create/update/patch/patchSection/writeSupportFile/removeSupportFile`；
+- `createSkill` 与普通 `write` 分开，保留 create 的 managed/保护/审计语义；
+- 多 op 明确返回未实现，不部分提交；
+- 新增 `skill-write-plan.spec.ts`：write/patch/section、support createIfAbsent 重复拒绝、createSkill、multi-op 拒绝，4 passed；
+- overlay build 0。
+
+边界：
+
+- tool 路径未改变，仍走旧 service/library 分支；
+- 尚无 observation→intent 的 service.plan，也未触碰 approval；
+- H2 才把 tool 全部写动作切到 plan；H3 才改 approval；H4 才收敛锁。
+
+
 
 独立复核 0.59.4 发现 P1：`patch.section` 的 approval replay 未校验 staged anchor，staging 后并发改写 body 仍可能覆盖新 section。
 

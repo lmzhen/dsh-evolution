@@ -1,0 +1,520 @@
+# Skill 写入单 Provider 收敛方案
+
+> 状态：**设计提案（未实施）**
+> 范围：`skill_manage` 全部写动作、审批 replay、curator / merge / undo / learning-graph 等直接调用 `SkillLibrary` 的写路径。
+> 上游基线：`harness-rc3` 的 `fs-local`、`fs-observation-policy`、`tool-fs`、`tool-str-replace-editor`。
+> 问题台账与历史决策：见同目录 [skill-write-concurrency.md](skill-write-concurrency.md)。
+
+## 1. 结论
+
+当前实现已经借用了上游最关键的三个原语：
+
+- per-target promise lock；
+- owner 隔离的 observation；
+- `createIfAbsent` / `replaceIfVersion` + stale-before-match。
+
+但**没有借到上游的“单 provider 权威”结构**。结果是：
+
+- body update/patch 有 observation；
+- support patch、section patch 仍绕过 observation；
+- `write_file` 的 absent 分支没有 `createIfAbsent` intent；
+- 同一个 target 同时存在多套锁；
+- approval 的 anchor 按 action 分别手写，天然容易漏。
+
+本方案不再逐条补漏。目标是把 `SkillLibrary` 改造成类似 `LocalFileSystem` 的唯一写入 provider，把 `SkillWriteService` 改造成类似的 intent 层，tool 只做参数、审批和展示。
+
+一句话：
+
+> **所有 skill 写入都变成一个带显式 intent 的 `SkillWritePlan`，由唯一的 provider 在同一把 target lock 下校验并提交。**
+
+## 2. 设计原则
+
+1. **一个写入口**：`SkillLibrary.apply(plan)`。tool 不直接调用任何内容 mutator。
+2. **一个 target 身份**：realpath / nearest-ancestor 解析一次，observation、锁、unit、审批共用。
+3. **一个锁表**：in-process per-target 锁只放在 provider；service 不持锁。
+4. **intent 必填**：不存在“无 anchor 的 update/patch/support write”公共 API。
+5. **观察只由读和写结果产生**：写前不再把“读过名字”重新读成当前版本。
+6. **审批存计划**：pending 记录保存完整 `SkillWritePlan`，replay 不再按 action 拼 anchor。
+7. **unit 是唯一提交单位**：单文件写也是一个 op 的 plan；多文件写是多个 op 的 plan。
+8. **结构操作单独 gate**：restructure / merge / extract 继续走 RootGate；普通文件写不再叠加 root 串行。
+
+## 3. 目标架构
+
+```text
+tool-skill-manage（adapter）
+  参数校验 / 审批 staging / 展示 / read gate
+  不直接调用 SkillLibrary 的内容 mutator
+        │
+        │ SkillWritePlan
+        ▼
+SkillWriteService（authorization）
+  readBody / readSupport
+  observation → intent
+  plan(action, args, owner)
+  apply(plan)
+        │
+        │ SkillWritePlan（ops + intents）
+        ▼
+SkillLibrary（provider / kernel）
+  唯一的 target lock table
+  apply(plan)
+  UnitTransaction / audit / history / CAS
+        │
+        ▼
+IO + MutationUnit + transact + HomeFence
+  durable temp + fsync + rename
+  跨进程 file lock
+```
+
+角色对应：
+
+| 本家族 | 上游 |
+|---|---|
+| `SkillLibrary` + `MutationUnit` | `LocalFileSystem` + `fsio.writeFileAtomic` |
+| `SkillWriteService` + `SkillObservationStore` | `fs-observation-policy` + `tool-fs` 的 intent 组装 |
+| `tool-skill-manage` | `tool-fs` 的参数层 |
+| `SkillWritePlan` | `FsWriteIntent` / `FsEditRequest` 的上层组合 |
+
+不直接用平台 `ctx.fs` 替换 skill provider：平台 fs 有 target lock 和 observation，但没有 skill history、audit、多文件 unit、merge undo；换过去会把两套事务混在一起。这里只借鉴语义，不复制对象。
+
+## 4. 核心类型
+
+### 4.1 复用已有原语（读完代码后的修正）
+
+本方案最初草案把 `SkillWriteIntent` 当成新类型引入；阅读现有实现后修正：仓库已经有三个可复用的底层原语，不能重复造。
+
+- `packages/evolution-core/src/skill-write-intent.ts`
+  - `SkillWriteIntent`：`createIfAbsent` / `replaceIfVersion` / `editIfVersion`；
+  - `decideSkillWrite()`：锁内对 current 做版本判断，`editIfVersion` 先比版本再匹配 old_string；
+  - `decideLiteralEdit()`：唯一的 literal patch 语义。
+- `packages/evolution-core/src/write-kernel.ts`
+  - `WriteKernel.writeOne/commit/restore`：CAS、单 target 写、多 target 预检、只补偿本 unit 已写目标。
+- `packages/evolution-core/src/mutation-unit.ts`
+  - 已使用 `WriteKernel`，并提供 UnitTransaction、audit、history、跨进程 target lock、journal、恢复。
+
+因此，本方案**不再新增底层 intent / CAS / 写内核**：
+
+- plan 层只负责“领域动作 + 期望版本”；
+- provider 在锁内把 plan op 转成现有 `SkillWriteIntent`，交给 `decideSkillWrite()`；
+- 提交继续走 `MutationUnit` → `WriteKernel`；
+- 不复制 `decideSkillWrite` 的 stale-before-match 逻辑，也不复制 `WriteKernel` 的补偿逻辑。
+
+这是一次设计修正，不改变“单 provider”的结论；它避免计划文档与实际代码出现两套 intent。
+
+### 4.2 plan 层类型
+
+```ts
+type SkillWriteExpect =
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'present'; readonly version: string }
+
+type SkillWriteOp =
+  | { readonly kind: 'createSkill'; readonly skill: string; readonly content: string; readonly managed?: boolean }
+  | { readonly kind: 'write'; readonly target: SkillTarget; readonly content: string; readonly expect: SkillWriteExpect }
+  | { readonly kind: 'patch'; readonly target: SkillTarget; readonly oldString: string; readonly newString: string; readonly replaceAll: boolean; readonly expect: { readonly kind: 'present'; readonly version: string } }
+  | { readonly kind: 'patchSection'; readonly target: SkillTarget; readonly section: SkillSectionEdit; readonly expect: { readonly kind: 'present'; readonly version: string } }
+  | { readonly kind: 'remove'; readonly target: SkillTarget; readonly expect: { readonly kind: 'present'; readonly version: string } }
+
+interface SkillWritePlan {
+  readonly origin: WriteOrigin
+  readonly ops: readonly SkillWriteOp[]
+  readonly summary?: string
+  readonly stagedAt?: string
+}
+
+interface SkillWriteOutcome {
+  readonly op: SkillWriteOp
+  readonly target: SkillTarget
+  /** H1 wrapper leaves these empty; H5 fills them from the provider outcome. */
+  readonly before?: string | null
+  readonly after?: string | null
+  readonly version?: string
+  readonly noop?: boolean
+}
+
+interface SkillWriteResult {
+  readonly ok: boolean
+  readonly message: string
+  readonly outcomes: readonly SkillWriteOutcome[]
+  readonly warnings?: readonly string[]
+}
+```
+
+plan op 到现有 intent 的映射固定：
+
+| plan op | 现有 intent |
+|---|---|
+| `write` + expect absent | `createIfAbsent(next)` |
+| `write` + expect present | `replaceIfVersion(expected, next)` |
+| `patch` | `editIfVersion(expected, oldString, newString, replaceAll)` |
+| `remove` | `deleteIfVersion(expected)`（扩展现有 intent；或 provider 内同一套版本判断） |
+| `patchSection` | 锁内读 body → 版本判断 → `selectSections` → `replaceIfVersion(expected, next)` |
+| `createSkill` | 走现有 `create` 路径，语义是 createIfAbsent + managed marker |
+
+要点：
+
+- plan 层不再出现 content 之外的 intent 分支；
+- `createSkill` 与普通 `write` 分开，因为 create 需要 `.hermes-managed`、保护、审计等现有语义；
+- patch 的 section/support 是显式 op，不再由 tool 分流；
+- approval 保存 plan，而不是保存一堆 `staged_from_sha256` 特判字段；
+- 旧 `SkillWriteIntent` 保持为底层决策原语，不把一个类型同时当“领域动作”和“锁内决策结果”。
+
+
+## 5. Provider 执行算法
+
+`SkillLibrary.apply(plan)` 是唯一写入口，顺序固定：
+
+1. 校验 name / path / protection / caps；
+2. 由 `SkillTargetResolver` 为每个 op 解析 target identity；
+3. 收集全部 target keys，去重、字典序排序；
+4. 一次性获取 per-target lock（多 op 只获取一次，不嵌套）；
+5. 锁内读取每个 target 的当前 bytes；
+6. 逐 op 校验 `expect`，并构造现有 `SkillWriteIntent` 交给 `decideSkillWrite()`：
+   - absent：current 必须 absent；
+   - present：current 必须 present 且 content hash 匹配；
+   - patch 先比版本，再匹配 old_string；
+   - section 先比版本，再做 `selectSections`；
+7. 计算所有 next bytes，完成结构/内容校验；
+8. 交给 UnitTransaction 一次提交；
+9. 提交 audit、history、mutation event；
+10. 返回每个 target 的 `before`、`after`、`version`。
+
+任何一步失败：
+
+- 整个 plan 不写；
+- 不自动 rebase；
+- 不部分提交；
+- 补偿只针对本 unit 已写入的目标。
+
+单文件更新只是 `ops.length === 1` 的 plan；不再有独立的简单写路径。
+
+## 6. 锁与 target 身份
+
+### 6.1 一个锁表
+
+- 删除 `SkillWriteService.locks`；
+- `SkillTargetLocks` 移到 provider 的 root 级 owner；
+- 每个 root 只允许一个 lock table；
+- `MutationUnit` 的跨进程 `TargetLockSet` 仍在 unit 内部，用同一组 target keys；
+- RootGate 只保护结构操作，不再为普通写叠加 per-root 串行。
+
+锁顺序：
+
+```text
+RootGate（仅结构操作）
+  → SkillTargetLocks（provider，按 key 排序）
+  → MutationUnit TargetLockSet（跨进程，按 key 排序）
+  → transact / HomeFence
+```
+
+释放顺序与上游一致：内层先释放，外层后释放。
+
+### 6.2 target identity
+
+target identity 不能是 `name::relPath` 文本拼接。采用上游 `resolveLocalTarget` 的最近存在祖先 realpath 算法：
+
+- 已存在文件：realpath(file)；
+- 不存在文件：realpath(最近存在祖先) + 缺失后缀；
+- 非 Node / fake IO：fallback 到规范化逻辑路径，并在 observation 中标记 weaker identity。
+
+所有地方只允许 `SkillTargetResolver` 产生 target identity：
+
+- `SkillObservationStore`；
+- `SkillTargetLocks`；
+- `MutationUnit` 的 targetKeys；
+- approval 的 expected version；
+- audit / history snapshot。
+
+这样 symlink、大小写 alias、相对路径别名不会各自拿一把锁。
+
+## 7. observation 与 intent
+
+### 7.1 observation 的两个来源
+
+1. **读**：
+   - 平台 `fs/observed`；
+   - `SkillWriteService.readBody/readSupport`；
+   - 只记录实际读到的 bytes 的 content hash。
+
+2. **写结果**：
+   - `apply(plan)` 返回 `after`；
+   - service 直接用 `after` 的 content hash 记录 present；
+   - 不再在写后重新读文件。
+
+写前禁止：
+
+- 用 `readNames` / foreground 在 `executeCore` 里 `readBody` 制造 observation；
+- 把“读过名字”当成“读过版本”。
+
+### 7.2 legacy `skill` 读缺口
+
+平台 `skill` 工具目前不产生 `fs/observed`，这是已知平台缺口。
+
+本方案的处置：
+
+- 不在 tool 写路径里局部兼容；
+- 该兼容收敛到一个独立 `LegacySkillReadAdapter`，只在读发生的位置记录 observation，并标记 `source: 'legacy'`；
+- 长期最优是上游让 `skill` read 也发出 `fs/observed`；插件侧无法凭空恢复读时版本；
+- 在该缺口关闭前，文档明确写“legacy skill 读的 CAS 为 best-effort”，不把弱保证伪装成强保证。
+
+### 7.3 写成功后的 observation
+
+`SkillWriteService`：
+
+```ts
+const result = await library.apply(plan)
+if (result.ok) {
+  for (const outcome of result.outcomes) {
+    observations.record(owner, outcome.target, {
+      kind: 'present',
+      version: outcome.version,
+    })
+  }
+}
+```
+
+不再 `await readBody(...)`。observation 刷新失败不能把已提交的写变成失败；最多返回 warning。
+
+## 8. 审批
+
+### 8.1 存 plan，不存 action 特判
+
+staging：
+
+```ts
+const plan = await service.plan(owner, action, args)
+const staged = await approval.request({ kind: 'skill', plan, ... })
+```
+
+pending 记录保存 `plan`，每个 op 自带 intent。
+
+replay：
+
+```ts
+const result = await service.apply(storedPlan)
+```
+
+任一 op stale 则整个 plan 拒绝；不自动重放旧 patch。
+
+### 8.2 旧 pending 记录
+
+没有 `plan` / 没有 intent 的旧记录：
+
+- 明确拒绝；
+- 提示重新发起写入；
+- 不做无 anchor 回放。
+
+这是安全方向的有意破坏性变更，发布说明必须写明。
+
+## 9. 内部 system writer
+
+curator、merge、undo、learning-graph 不是 session 读路径，不应强行走 observation 服务。
+
+它们使用同一 provider，但用显式 intent：
+
+```ts
+interface SystemSkillWriter {
+  apply(plan: SkillWritePlan): Promise<SkillWriteResult>
+}
+```
+
+- 版本来自它们自己的 snapshot / anchor；
+- 不构造伪 session observation；
+- 仍经过同一锁、同一 unit、同一 audit/history。
+
+这样“所有写只经 provider”成立，但不会把系统写强行塞进用户读模型。
+
+## 10. tool 层
+
+`tool-skill-manage` 的写动作收敛成表驱动：
+
+```ts
+interface SkillWriteAction {
+  plan(args, owner): Promise<SkillWritePlan>
+  present?(result): ...
+}
+```
+
+流程：
+
+1. 参数校验；
+2. `service.plan(owner, action, args)`；
+3. 审批开启 → `stage(plan)`；
+4. 否则 → `service.apply(plan)`；
+5. 展示结果。
+
+删除：
+
+- `patch` 按 `file_path` / `section` 的 library 分流；
+- 每个 action 手写的 `staged_from_sha256`；
+- 写前 `readBody/readSupport` seed；
+- tool 对 `SkillLibrary` 内容 mutator 的直接调用。
+
+## 11. 问题到方案
+
+| 问题 | 方案 |
+|---|---|
+| support patch 绕过 observation | `patchSupport` op，必须 `editIfVersion` |
+| section patch 无 read 要求 | `patchSection` op，必须 body observation |
+| `write_file` absent 并发覆盖 | `createIfAbsent` intent，provider 锁内拒绝已存在 |
+| legacy 读写前制造 observation | observation 只在读/写结果产生 |
+| 写后 re-read 失败反向报错 | provider 返回 `after`/`version`，service 直接记录 |
+| 多套 per-target 锁 | 只保留 provider 一套 |
+| targetKey 非 realpath | `SkillTargetResolver` 统一 realpath |
+| approval anchor 分支多 | approval 存 plan |
+| 简单写与多文件 unit 两套路径 | 全部变成 plan，UnitTransaction 唯一提交 |
+| 内部 system 写绕过 | `SystemSkillWriter.apply(plan)` |
+
+## 12. 文件级改造
+
+### `packages/evolution-core`
+
+- `skill-store.ts`
+  - 新增 `SkillWriteIntent` / `SkillWriteOp` / `SkillWritePlan` / `SkillWriteResult`；
+  - 新增 `apply(plan)` 作为唯一内容写入口；
+  - 现有 `update/patch/patchSection/writeSupportFile/removeSupportFile` 改为 private / `apply` 内部实现；
+  - target lock table 放到 root 级 owner；
+  - 删除重复的简单写包装。
+- `skill-write-service.ts`
+  - 删除 `locks`；
+  - 新增 `plan()` / `apply(plan)`；
+  - 新增 `patchSupport` / `patchSection`；
+  - `writeSupport` absent 分支使用 `createIfAbsent`；
+  - 写后 observation 使用 outcome。
+- `skill-observation.ts`
+  - target identity 改为 realpath/nearest-ancestor；
+  - observation 增加 source：`fs/observed`、`read`、`write`、`legacy`。
+- `mutation-unit.ts`
+  - 只接收 plan 产生的 ops/targetKeys；
+  - 多 target 排序与逆序释放保持。
+- `io.ts`
+  - 可选 realpath / identity 解析；
+  - fake 后端 fallback。
+
+### `packages/tool-skill-manage`
+
+- `index.ts`
+  - 写动作表驱动；
+  - 删除 library 写分流；
+  - 删除写前 observation seed；
+  - 删除 per-action staged anchor 分支。
+- `skill-actions.ts` / `write.ts`
+  - 只保留参数与展示语义。
+
+### 其他包
+
+- `evolution-curator`
+- `evolution-merge`
+- `evolution-activity`
+- `evolution-merge-ui`
+
+改用 `SystemSkillWriter.apply(plan)`；保留各自的 snapshot/anchor 来源。
+
+### 文档
+
+- 本文作为目标方案；
+- [skill-write-concurrency.md](skill-write-concurrency.md) 保留问题台账与历史 Phase；
+- 落地后在主文档追加 Phase H 记录与 supersede 说明；
+- 新增文档登记到 [README.md](README.md) 文档索引。
+
+## 13. 分步落地
+
+| 阶段 | 内容 | 工作量 | 完成判定 |
+|---|---|---|---|
+| H1 | 新增 `skill-write-plan.ts`（plan 层类型，复用 `skill-write-intent.ts`）；`SkillLibrary.apply(plan)` 先支持单 op 转发现有 mutator，多 op 明确返回未实现；tool 路径不变 | M | 编译、定向测试通过；行为不变 |
+| H2 | tool 全部写动作走 plan；补 support patch/section patch/write_file create | M | P0/P1 回归消失 |
+| H3 | approval 存 plan；删除 per-action anchor 分支 | M | 旧 pending 明确拒绝 |
+| H4 | 删除 service 锁，收敛到 provider target lock；target identity realpath | M–L | 锁表只剩一份 |
+| H5 | observation 只由读/写结果产生；legacy 适配隔离 | M | 写后观察失败不改写结果 |
+| H6 | curator/merge/undo/learning-graph 迁移到 SystemSkillWriter | L | 内部写走同一 apply |
+| H7 | 门禁、文档、真机验收、发布 | M | P0=0/P1=0 |
+
+依赖：不新增第三方依赖；包边界不变；先做 H1–H3 即可消灭当前 P0/P1，不等待 target identity 大改。
+
+风险：
+
+- approval pending 记录兼容：旧记录拒绝，需要发布说明；
+- target identity realpath 增加一次 IO：对一次写可接受；
+- 内部调用者迁移量大：按 H1–H6 分步，不一次性推。
+
+## 14. 验收矩阵
+
+必须新增或保持：
+
+1. 两 session 同时 `write_file` 同一 absent support：
+   - 一个成功，另一个 `SKILL_ALREADY_EXISTS` / `SKILL_NOT_OBSERVED`；
+   - 文件只写入一次。
+2. 两 session 同时 patch 同一 support 不同区域：
+   - 未重读的第二个 `SKILL_STALE_VERSION`；
+   - 重读后可成功。
+3. 无读直接 `patch.section`：
+   - `SKILL_NOT_OBSERVED`。
+4. approval stage 后目标被改：
+   - approve 返回 `SKILL_STALE_VERSION`，不落盘。
+5. 多文件 unit 任一 target stale：
+   - 整个 unit 不写；undo 只回滚本 unit。
+6. 写成功但 observation 刷新失败：
+   - tool 仍返回成功 + warning。
+7. symlink/alias 指向同一文件：
+   - 同一 target lock、同一 observation。
+8. 两个 session 并发 create 同名 skill：
+   - 一个成功，另一个 `SKILL_ALREADY_EXISTS`。
+
+## 15. 静态门禁
+
+新增 arch guard：
+
+- `tool-skill-manage` 不得调用 `SkillLibrary` 的 `update/patch/patchSection/writeSupportFile/removeSupportFile`；
+- 全仓只允许 provider 构造 `SkillTargetLocks`；
+- 所有 `SkillWriteOp` 必须有 `intent`；
+- target identity 只能由 `SkillTargetResolver` 产生；
+- approval pending 记录必须带 plan。
+
+## 16. 明确不做
+
+- 不新增第三套锁；
+- 不把 mtime 当 version；
+- 不自动 rebase / 不静默合并 / 不 last-writer-wins；
+- 不复制平台 `fs-local` 的锁对象进插件；
+- 不强制内部 system writer 使用 session observation；
+- 不为旧 pending 记录保留无 anchor 回放；
+- 不在 tool 层为单个 action 增加特判。
+
+## 17. 为什么这是整体最优
+
+短期看，plan/intent 类型和 provider 迁移会增加代码；长期看，它删除的是：
+
+- support/section/body 三套 patch 分叉；
+- 多套 per-target 锁；
+- per-action approval anchor；
+- 写前 seed、写后 re-read 的两段特判；
+- tool 与 library 双重写入口。
+
+最终只留下：
+
+- 一个 `apply(plan)`；
+- 一个 target lock table；
+- 一个 observation store；
+- 一个 approval plan。
+
+这比继续在现有分支上补 P0/P1 更少补丁、更少未来的同类 bug。
+
+## 18. H1 落地记录（2026-11-21）
+
+已按本节设计完成 H1：
+
+- 新增 `packages/evolution-core/src/skill-write-plan.ts`，导出 `SkillWriteExpect` / `SkillWriteOp` / `SkillWritePlan` / `SkillWriteOutcome` / `SkillWriteResult`；
+- 从 `evolution-core/skills` 导出；
+- `SkillLibrary.apply(plan)` 支持单 op，转发现有 `create/update/patch/patchSection/writeSupportFile/removeSupportFile`；
+- `createSkill` 与普通 `write` 分开，保留 create 的 managed/保护/审计语义；
+- 多 op 明确返回未实现，不部分提交；
+- 新增 `packages/evolution-core/tests/skill-write-plan.spec.ts`，4 项通过：write/patch/section、support createIfAbsent 重复拒绝、createSkill、multi-op 拒绝；
+- overlay build 0。
+
+H1 边界：
+
+- tool 路径未改变，仍走旧 service/library 分支；
+- `SkillWriteService.plan()`、observation→expect、approval plan、锁收敛都未开始；
+- H2 才把 tool 全部写动作切到 plan；H3 approval；H4 单锁与 target identity；H5 observation。
+
+

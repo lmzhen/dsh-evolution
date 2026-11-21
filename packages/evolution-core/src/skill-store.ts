@@ -60,6 +60,7 @@ import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
 import { diffFindings } from './skill-lint.ts'
 import { contentHash, loadMutations, recordMutation, type MutationRecord } from './mutations.ts'
 import { decideSkillWrite, type SkillWriteIntent, type SkillWriteRefusalReason } from './skill-write-intent.ts'
+import type { SkillWriteOp, SkillWritePlan, SkillWriteResult } from './skill-write-plan.ts'
 import { skillNamespaceKey } from './skill-observation.ts'
 import { SkillTargetLocks } from './skill-target-locks.ts'
 import { SkillRootGate } from './skill-root-gate.ts'
@@ -3888,6 +3889,74 @@ export class SkillLibrary {
       if (refusal !== undefined) return { ok: false, message: refusal.message, reason: refusal.reason }
       return { ok: true, message: 'skill file written', path: target }
     }))
+  }
+
+  /**
+   * Execute one plan-level write through the existing mutators.
+   *
+   * H1 deliberately supports one op only: it is the stable seam the tool and
+   * approval will move onto, while the multi-op UnitTransaction path is the
+   * next phase. Refusing a partial plan is safer than committing half of it.
+   * @param plan - origin plus the single operation to apply.
+   * @returns the action result; `outcomes` stays empty until the provider
+   * returns before/after/version in the next phase.
+   */
+  async apply(plan: SkillWritePlan): Promise<SkillWriteResult> {
+    const op = plan.ops[0]
+    if (op === undefined) return { ok: false, message: 'skill write plan is empty', outcomes: [] }
+    if (plan.ops.length > 1) {
+      return { ok: false, message: 'multi-op skill write plans are not implemented in H1', outcomes: [] }
+    }
+    const result = await this.applyOne(op, plan.origin)
+    return { ok: result.ok, message: result.message, outcomes: [] }
+  }
+
+  private async applyOne(op: SkillWriteOp, origin: WriteOrigin): Promise<SkillActionResult> {
+    switch (op.kind) {
+      case 'createSkill':
+        return await this.create(op.skill, op.content, origin, op.managed === true ? { managed: true } : {})
+      case 'write': {
+        if (op.target.relPath === '') {
+          if (op.expect.kind === 'absent') {
+            return await this.create(op.target.skill, op.content, origin)
+          }
+          return await this.update(op.target.skill, op.content, origin, { sha256: op.expect.version })
+        }
+        const anchor: WriteAnchor = op.expect.kind === 'absent'
+          ? { absent: true }
+          : { sha256: op.expect.version }
+        return await this.writeSupportFile(op.target.skill, op.target.relPath, op.content, origin, anchor)
+      }
+      case 'patch': {
+        const anchor: WriteAnchor = { sha256: op.expect.version }
+        return await this.patch(
+          op.target.skill,
+          op.oldString,
+          op.newString,
+          op.target.relPath,
+          op.replaceAll,
+          origin,
+          anchor,
+        )
+      }
+      case 'patchSection':
+        return await this.patchSection(
+          op.target.skill,
+          op.section,
+          origin,
+          { sha256: op.expect.version },
+        )
+      case 'remove':
+        if (op.target.relPath === '') {
+          return { ok: false, message: 'removing SKILL.md must use the structural archive path, not a plan remove' }
+        }
+        return await this.removeSupportFile(
+          op.target.skill,
+          op.target.relPath,
+          origin,
+          { sha256: op.expect.version },
+        )
+    }
   }
 
   async writeSupportFile(
