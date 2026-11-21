@@ -45,18 +45,36 @@ export function llmPort(ctx: Context): LlmPort | undefined {
     ...(llm.stream === undefined ? {} : { streamRaw: (options: GenerateOptions) => llm.stream!(options) }),
     async completeText(request) {
       let text = ''
+      let finished = false
       for await (const chunk of port.stream(request)) {
         const frame = chunk as { type?: unknown; text?: unknown; reason?: { kind?: unknown; failure?: { message?: unknown; code?: unknown } } }
-        if (frame.type === 'text-delta' || frame.type === 'text') text += typeof frame.text === 'string' ? frame.text : ''
-        if (frame.type === 'finish' && frame.reason?.kind === 'error') {
-          const failure = frame.reason.failure
-          const message = failure?.message
+        if (frame.type === 'text-delta') text += typeof frame.text === 'string' ? frame.text : ''
+        if (frame.type !== 'finish') continue
+        finished = true
+        const reason = frame.reason
+        if (reason?.kind === 'stop' || reason?.kind === 'tool-calls' || reason?.kind === 'max-tokens') break
+        if (reason?.kind === 'aborted') {
+          const failure = reason.failure
+          throw new EvolutionLlmError('cancelled', 'model call aborted', failure)
+        }
+        if (reason?.kind === 'error') {
+          const failure = reason.failure
+          const message = typeof failure?.message === 'string' ? failure.message : 'unknown'
+          const code = typeof failure?.code === 'string' ? failure.code : ''
           // rc5 delivers a refusal as an in-band finish(error) chunk, not as a thrown LlmError.
           // Preserve the decided code at the seam so callers do not retry it as transport.
-          const kind = failure?.code === 'CONTENT_REFUSED' ? 'content-refused' : 'transport'
-          throw new EvolutionLlmError(kind, 'model call failed: ' + (typeof message === 'string' ? message : 'unknown'))
+          if (code === 'CONTENT_REFUSED') throw new EvolutionLlmError('content-refused', 'model call failed: ' + message, failure)
+          if (code === 'TIMEOUT') throw new EvolutionLlmError('timeout', 'model call timed out: ' + message, failure)
+          if (/^(NO_ADAPTER|NO_DISCOVERY|MISSING_CREDENTIAL|INVALID_CREDENTIAL|AUTH|UNKNOWN_MODEL)$/.test(code)) {
+            throw new EvolutionLlmError('no-route', 'model route unavailable: ' + message, failure)
+          }
+          if (/^(ACCOUNT_|QUOTA|RATE_LIMIT)/.test(code)) throw new EvolutionLlmError('model-unavailable', 'model unavailable: ' + message, failure)
+          throw new EvolutionLlmError('transport', 'model call failed: ' + message, failure)
         }
+        // FinishReasonMap is merge-extensible; an unknown terminal kind is not a success.
+        throw new EvolutionLlmError('transport', 'model call ended with an unknown finish reason')
       }
+      if (!finished) throw new EvolutionLlmError('transport', 'model stream ended without a finish frame')
       return text
     },
   }

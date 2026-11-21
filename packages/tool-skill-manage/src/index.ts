@@ -804,9 +804,9 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // that moment (this row, user layer included) — the deployment's allocation, as long
   // as no widening write ever landed. The fiber guard keeps a child fiber's candidate
   // out of this row's decision (precedent: packages/llm/llm-pi-ai/src/index.ts:172-181).
-  ctx.on('internal/config', function (this: Fiber, _previous: unknown, next: () => unknown) {
+  ctx.on('internal/config', (fiber: Fiber, next: () => unknown) => {
     const value = next()
-    if (this !== ctx.fiber) return value
+    if (fiber !== ctx.fiber) return value
     const ceilings = rowSettings()
     validateSkillSettings(value as Partial<Pick<SkillSettings, (typeof SKILL_SETTINGS_CAPS)[number]>>, {
       skillContentChars: ceilings.skillContentChars,

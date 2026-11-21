@@ -64,6 +64,19 @@ function stampedBody(name: string): string {
   return lines.join('\n') + '\n'
 }
 
+  it('G1: the cross-field rule rides the platform 4.1 internal/config waterfall', async () => {
+    await tempHome('dsh-curator-settings-waterfall-')
+    const ctx = new Context()
+    await ctx.plugin(EvolutionIoRegistry)
+    await ctx.plugin(NodeIo)
+    const curator = new EvolutionCurator(ctx, { enabled: true, autoStart: false })
+    const candidate = (value: unknown): unknown => ctx.waterfall('internal/config', ctx.fiber, () => value)
+    expect(() => candidate({ staleAfterDays: 30, archiveAfterDays: 10 }))
+      .toThrow(/archiveAfterDays \(10\) must be >= staleAfterDays \(30\)/)
+    expect(() => candidate({ staleAfterDays: 10, archiveAfterDays: 10 })).not.toThrow()
+    curator.stop()
+  })
+
 describe('curator parameter surface (G1: row config, precedence and the cross-field rule)', () => {
   it('refuses a pair whose archive window sits below the stale window', () => {
     expect(() => { validateCuratorSettings({ staleAfterDays: 30, archiveAfterDays: 10 }) })

@@ -17,6 +17,7 @@
 
 - R0-1 / P0-1：已在 main 源码修复（平台真实 `message.isError` + 测试夹具），见 [12](12-r0-observation-plan-design.md)。
 - R0-2 / A1：已在 main 源码修复（prepare 期间跳过 create 直接 audit/notify），见 [12](12-r0-observation-plan-design.md)。
+- R0-3 / B5 与 R0-4 / D1：已在 main 源码修复（platform 4.1 调用约定、LLM aborted 终态），见 [13](13-r0-platform-contract-design.md)。
 - 其余 P0/P1 仍按 [09-remediation-plan.md](09-remediation-plan.md) 处理；本 goal 不发布中间版本。
 
 ## 方法
@@ -166,3 +167,4 @@
 | [08-tests-debt.md](08-tests-debt.md) | 测试/门禁/发布证据、永久 skip、假绿 |
 | [10-system-framework.md](10-system-framework.md) | 第一性原理/系统科学/系统工程整合框架：八不变量、七平面、六失效模式、V 模型与目标内核 |
 | [11-target-architecture.md](11-target-architecture.md) | 综合目标架构：HomeFS/UnitKernel/PlanService/StateStore/Projection/Assurance、旧组件去留、迁移与验收 |
+| [13-r0-platform-contract-design.md](13-r0-platform-contract-design.md) | R0-3/B5 + R0-4/D1 平台调用约定与 LLM 终态设计与实现 |

@@ -477,9 +477,9 @@ export class EvolutionCurator extends Service {
     // BEFORE the write instead of being stored (precedent:
     // packages/llm/llm-pi-ai/src/index.ts:172-181 — the fiber guard keeps a child
     // fiber's candidate out of this row's decision).
-    ctx.on('internal/config', function (this: Fiber, _previous: unknown, next: () => unknown) {
+    ctx.on('internal/config', (fiber: Fiber, next: () => unknown) => {
       const value = next()
-      if (this !== ctx.fiber) return value
+      if (fiber !== ctx.fiber) return value
       // A volatile row's schema cannot re-parse its own resolved config (the input
       // side is plain numbers, the output side wraps them), so the candidate is judged
       // as written: the shape this rule targets is a write carrying BOTH thresholds.

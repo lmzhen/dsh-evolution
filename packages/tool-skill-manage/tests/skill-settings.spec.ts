@@ -119,7 +119,7 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
   it('G1: the tighten-only rule rides the config waterfall', async () => {
     const cap = mutableVol<number | undefined>(1_000)
     const { ctx, cleanup } = await setup({ skillContentChars: cap.ref })
-    const candidate = (value: unknown): unknown => ctx.waterfall(ctx.fiber, 'internal/config', value, () => value)
+    const candidate = (value: unknown): unknown => ctx.waterfall('internal/config', ctx.fiber, () => value)
     expect(() => candidate({ skillContentChars: 2_000 }))
       .toThrow(/skillContentChars may only be tightened: 2000 exceeds the deployment value 1000/)
     expect(() => candidate({ skillContentChars: 500 })).not.toThrow()
