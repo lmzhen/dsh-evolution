@@ -27,7 +27,7 @@ The canonical fact table is `packages/scripts/family-facts.json`. If you move a 
 - Run a single spec by file; an entire directory can exceed the default timeout for reasons unrelated to the change.
 - A green process is not a pass by itself: the declared criterion must be evaluated. An unevaluated criterion is not a pass.
 
-## The gate: all 84 steps
+## The gate: 84 numbered steps + 8 CI-only manifest rows
 
 The local profile runs the family gate runner (see [docs/developer/development.md](docs/developer/development.md)); `pre-tag` and `ci` add the release checks. The table below is generated from the gate registry (`packages/scripts/gates/registry.mjs`); do not hand-edit it. If a row moves tier or command, change the registry and regenerate the views.
 

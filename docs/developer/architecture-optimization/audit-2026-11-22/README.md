@@ -223,3 +223,4 @@
 | [42-p2-merge-decision-route.md](42-p2-merge-decision-route.md) | P2：merge decision 路由单源 |
 | [43-p2-ledger-orphans.md](43-p2-ledger-orphans.md) | P2：mutation ledger 拒绝孤儿 |
 | [44-bundle-roster-platform.md](44-bundle-roster-platform.md) | Phase B/P2：生产 bundle 用 io-platform + 本地门禁 61 pass |
+| [45-p2-docs-truth.md](45-p2-docs-truth.md) | P2：文档声明与当前门禁对齐 |

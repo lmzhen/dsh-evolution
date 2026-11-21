@@ -303,7 +303,7 @@
           "text": "| # | Command | Working tree |"
         },
         {
-          "text": "all 84 steps",
+          "text": "84 numbered steps + 8 CI-only manifest rows",
           "unique": true
         }
       ],

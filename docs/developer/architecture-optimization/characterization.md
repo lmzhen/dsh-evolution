@@ -1,3 +1,5 @@
+> **历史快照**：merge 全量基线是当时读数；当前验证状态见 [audit-2026-11-22/README.md](audit-2026-11-22/README.md)。
+
 # 行为基线与 characterization（Phase 0）
 
 > 目的：在改架构前，把“今天成立的行为”固定为可重复的基线；后续每个 Phase 用同一组夹具证明等价，除已记录 bug 修复。

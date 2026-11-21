@@ -1,5 +1,7 @@
 # 架构优化：执行入口
 
+> **历史快照（0.49-0.50）**：本文件保留当时的执行阶段记录；当前全量审计、P0-P2 状态与发布门以 [audit-2026-11-22/README.md](audit-2026-11-22/README.md) 为准。
+
 > Goal id：`goal-11516794-1c0c-490f-9382-c0b94bc0d4c4`
 > 长期目标与文档索引：[27-architecture-goal-and-document-index.md](D:/dsh/_research/plugin-code-audit-2026-11-09/audit-2026-11-12/reports/27-architecture-goal-and-document-index.md)
 > 目标架构：[26-architecture-optimization-plan.md](D:/dsh/_research/plugin-code-audit-2026-11-09/audit-2026-11-12/reports/26-architecture-optimization-plan.md)
@@ -8,7 +10,7 @@
 >
 > **多版本重构（2026-11-19）**：以 [multi-version-support.md](multi-version-support.md) 为唯一设计源，goal `goal-0eb89255-0cd9-46dd-8940-4d5524c2c6ed`；全部优化完成并通过全量验收/独立复核后才发布，过程中不发布中间版本。
 >
-> **当前进度（2026-11-19）**：P0/P0b/P0c 完成；P1 envelope/cohort、rc.3/rc.5 双线矩阵、cohort smoke、release evidence cohort 读数完成；P2 的 bundle 平台 row 覆盖清理、doctor cohort 显示完成。发布包 22、源码包 23；cohort 为 `0.2.2-rc.5`（rc.5 已实测）；剩余发布门禁全量执行、独立复核与唯一一次正式发布。
+> **当前状态（2026-11-22）**：0.59.6 已发布基线之后的全量审计与源码修复在 [audit-2026-11-22/README.md](audit-2026-11-22/README.md)；本文件以下阶段/读数均为历史快照，不再作为当前证据。
 
 ## 1. 这个目录是什么
 
