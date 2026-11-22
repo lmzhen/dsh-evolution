@@ -9,7 +9,7 @@
  *
  * @module @deepseek-ai/dsh-evolution-review/review-tool-channel
  */
-import type { ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { ToolSchema } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import type { ReviewParent, ReviewReport, ReviewToolOutcome, ReviewToolPort } from './review-executor.ts'
 
 /** One executable tool transport for a review task. */

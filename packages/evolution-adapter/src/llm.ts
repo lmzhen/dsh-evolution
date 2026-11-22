@@ -3,17 +3,17 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { EvolutionLlmError } from '@deepseek-ai/dsh-evolution-platform-contract'
-import type { EvolutionLlmRequest, LlmPort, ModelRoute } from '@deepseek-ai/dsh-evolution-platform-contract'
+import { EvolutionLlmError } from './contract/index.ts'
+import type { EvolutionLlmRequest, LlmPort, ModelRoute } from './contract/index.ts'
 
-export { EvolutionLlmError } from '@deepseek-ai/dsh-evolution-platform-contract'
+export { EvolutionLlmError } from './contract/index.ts'
 export type {
   EvolutionLlmFailureKind,
   EvolutionLlmPurpose,
   EvolutionLlmRequest,
   LlmPort,
   ModelRoute,
-} from '@deepseek-ai/dsh-evolution-platform-contract'
+} from './contract/index.ts'
 
 interface LlmRuntimeLike {
   stream?(options: GenerateOptions): AsyncIterable<StreamChunk>

@@ -1,6 +1,0 @@
-{
-  "meta": {
-    "title": "Platform contract",
-    "description": "Pure types, capability names and ports shared by family plugins; no host runtime import."
-  }
-}

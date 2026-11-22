@@ -2,9 +2,9 @@
  * The profile-context implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { ProfileContextPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { ProfileContextPort } from './contract/index.ts'
 
-export type { ProfileContextPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { ProfileContextPort } from './contract/index.ts'
 
 interface ProfileContextServiceLike {
   readonly name?: string

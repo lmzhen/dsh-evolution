@@ -54,7 +54,7 @@ Install only `@lmzhen/dsh-evolution-all`, never the family's implementation pack
 
 For the desktop GUI, replace `--profile web` with `--profile desktop`. After installation, ask the agent to remember a project fact and open a new session to verify that it is injected. `doctor` checks the installation form and service state; it does not replace an actual read/write check.
 
-The full source layout reports<!-- gen:install-counts --> 21 packages installed (the published list is 21; the agent preset is separate)<!-- /gen:install-counts -->.
+The full source layout reports<!-- gen:install-counts --> 20 packages installed (the published list is 20; the agent preset is separate)<!-- /gen:install-counts -->.
 
 ## Installation forms
 

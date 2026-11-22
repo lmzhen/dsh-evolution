@@ -1,6 +1,6 @@
 // The ONE subagent execution path: capability probe -> restricted preset -> activation -> settle.
 import type { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { SessionId } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import type { EvolutionPlatform } from '../runtime/platform.ts'
 import { ensureRestrictedPreset } from '../composition/ensure.ts'
 import { probeChannelState } from './readiness.ts'

@@ -1,6 +1,0 @@
-{
-  "meta": {
-    "title": "Contrato da plataforma",
-    "description": "Tipos puros, nomes de capacidades e portas compartilhados pelos plugins da família; sem importar o runtime do host."
-  }
-}

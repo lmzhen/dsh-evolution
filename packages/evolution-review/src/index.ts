@@ -8,7 +8,7 @@ import type { Context, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
-import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { AUX_COMPLETION_INSTRUCTION, ReviewPartialFailure, runReview } from './review-executor.ts'
 import { nativeReviewToolChannel, type ReviewToolChannel } from './review-tool-channel.ts'
 import { PtcReviewToolHost } from './review-ptc-channel.ts'
@@ -24,7 +24,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import { SessionId } from '@deepseek-ai/dsh-evolution-adapter/values'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { advanceReview, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, withReviewContext, type EvolutionReviewScheduledEvent, type ReviewDebt, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import { assertSkillsRootAliasRetired } from '@deepseek-ai/dsh-evolution-core/skills'
 import type {} from '@deepseek-ai/dsh-evolution-core/state'

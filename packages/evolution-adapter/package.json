@@ -34,7 +34,15 @@
       "types": "./lib/types/review-child.d.ts",
       "default": "./lib/review-child.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./contract": {
+      "types": "./lib/types/contract/index.d.ts",
+      "default": "./lib/contract/index.js"
+    },
+    "./contract/result": {
+      "types": "./lib/types/contract/result.d.ts",
+      "default": "./lib/contract/result.js"
+    }
   },
   "files": [
     "lib/**/*.js",
@@ -43,8 +51,8 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/dsh-evolution-platform-contract": "workspace:^",
-    "@deepseek-ai/dsh-atomic-write": "workspace:^"
+    "@deepseek-ai/dsh-atomic-write": "workspace:^",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",

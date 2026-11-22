@@ -2,9 +2,9 @@
  * The agents implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { AgentIdentity, AgentsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { AgentIdentity, AgentsPort } from './contract/index.ts'
 
-export type { AgentIdentity, AgentsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { AgentIdentity, AgentsPort } from './contract/index.ts'
 
 interface AgentsServiceLike {
   get(id: string): unknown

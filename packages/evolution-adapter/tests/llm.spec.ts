@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { EvolutionLlmError, llmPort } from '../src/llm.ts'
-import type { EvolutionLlmRequest } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { EvolutionLlmRequest } from '@deepseek-ai/dsh-evolution-adapter/contract'
 
 function contextWith(chunks: readonly StreamChunk[]): Context {
   const ctx = new Context()

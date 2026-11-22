@@ -3,9 +3,9 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolDefinition, ToolRuntime } from '@deepseek-ai/dsh-tools'
-import type { ToolsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { ToolsPort } from './contract/index.ts'
 
-export type { ToolsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { ToolsPort } from './contract/index.ts'
 
 /**
  * Resolve the tools port from a context; undefined means the host has no tools service.

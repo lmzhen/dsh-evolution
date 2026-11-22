@@ -1,6 +1,6 @@
 # 架构：36 个包如何叠起来
 
-> 2026-11-16：这里的“36 个包”是历史包组/逻辑行口径（含子路径与发布行）；当前 `packages/*` 物理源码包是 21 个（21 个发布包；preset 已删，evolution-state 已吸收进 core）。目标架构与包边界调整见 [架构优化执行入口](architecture-optimization/README.md)。Phase 7 完成后本页统一为物理包口径。
+> 2026-11-16：这里的“36 个包”是历史包组/逻辑行口径（含子路径与发布行）；当前 `packages/*` 物理源码包是 20 个（20 个发布包；preset/state 已吸收，platform-contract 已并入 adapter）。目标架构与包边界调整见 [架构优化执行入口](architecture-optimization/README.md)。Phase 7 完成后本页统一为物理包口径。
 
 ## 1. 一张图
 

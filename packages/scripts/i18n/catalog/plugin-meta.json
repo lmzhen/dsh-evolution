@@ -661,26 +661,6 @@
       "de": "Verbindet die Familien-Plugins mit der Host-Plattform; das einzige Paket, das Host-Interna importiert.",
       "ru": "Связывает плагины семейства с хост-платформой; единственный пакет, импортирующий внутренности хоста.",
       "pt": "Conecta os plugins da família à plataforma host; o único pacote que importa os internos do host."
-    },
-    "evolution-platform-contract.title": {
-      "zh": "平台契约",
-      "en": "Platform contract",
-      "ja": "プラットフォーム契約",
-      "es": "Contrato de plataforma",
-      "fr": "Contrat de plateforme",
-      "de": "Plattformvertrag",
-      "ru": "Контракт платформы",
-      "pt": "Contrato da plataforma"
-    },
-    "evolution-platform-contract.description": {
-      "zh": "家族插件共享的纯类型、能力名和端口；不导入宿主 runtime。",
-      "en": "Pure types, capability names and ports shared by family plugins; no host runtime import.",
-      "ja": "ファミリープラグインが共有する純粋な型・能力名・ポート。ホスト runtime はインポートしない。",
-      "es": "Tipos puros, nombres de capacidades y puertos compartidos por los plugins de la familia; sin importar el runtime host.",
-      "fr": "Types purs, noms de capacités et ports partagés par les plugins de la famille ; aucun import du runtime hôte.",
-      "de": "Reine Typen, Fähigkeitsnamen und Ports der Familien-Plugins; kein Host-Runtime-Import.",
-      "ru": "Чистые типы, имена возможностей и порты плагинов семейства; без импорта хост-runtime.",
-      "pt": "Tipos puros, nomes de capacidades e portas compartilhados pelos plugins da família; sem importar o runtime do host."
     }
   }
 }

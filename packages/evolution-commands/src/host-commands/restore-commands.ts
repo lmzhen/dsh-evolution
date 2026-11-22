@@ -1,6 +1,6 @@
 /** The two whole/single-tree restore commands, both behind the same replayability refusal. */
 import type { EvolutionErrorId, HostLocale } from '@deepseek-ai/dsh-evolution-core'
-import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { CommandResult } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { hostErrorText } from '../host-locale.ts'
 
 /** What the restore handlers need. */

@@ -3,9 +3,9 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
-import type { SystemPromptPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { SystemPromptPort } from './contract/index.ts'
 
-export type { SystemPromptPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { SystemPromptPort } from './contract/index.ts'
 
 interface SystemPromptServiceLike {
   section(section: PromptSection): () => void

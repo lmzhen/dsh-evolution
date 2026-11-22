@@ -6,13 +6,13 @@ import type {
   SubagentActivationPort,
   SubagentSendOptions,
   SubagentsPort,
-} from '@deepseek-ai/dsh-evolution-platform-contract'
+} from './contract/index.ts'
 
 export type {
   SubagentActivationPort,
   SubagentSendOptions,
   SubagentsPort,
-} from '@deepseek-ai/dsh-evolution-platform-contract'
+} from './contract/index.ts'
 
 interface SubagentsServiceLike {
   getProvider(name: string): unknown

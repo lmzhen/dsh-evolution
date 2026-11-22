@@ -10,7 +10,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
-import type { Domain } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { Domain } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { storageDomainPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 import { defineDomain, domainTable, DomainError } from '@deepseek-ai/dsh-evolution-adapter/values'
 import {

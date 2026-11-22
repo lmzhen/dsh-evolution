@@ -11,7 +11,7 @@ import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
-import type { ContextFormed } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { ContextFormed } from '@deepseek-ai/dsh-evolution-adapter/contract'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).
@@ -73,7 +73,7 @@ import { blobPath } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthAssessment, SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-core/state'
-import type { Session } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { Session } from '@deepseek-ai/dsh-evolution-adapter/contract'
 
 
 /** The runtime service surface the curator's advisory pass consumes. */

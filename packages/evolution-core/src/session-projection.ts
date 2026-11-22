@@ -21,7 +21,7 @@
  */
 import { z } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
-import type { EvolutionProjectionDefinition, Session } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { EvolutionProjectionDefinition, Session } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { isBookkeepingFrame, type EvidenceIndex } from './evidence.ts'
 import { dispatchPathOf, dispatchStepOf, isSkillReadToolName, skillReadNameOf } from './tool-dispatch.ts'
 import { foldTurnEvent, initialTurnFold, type TurnFoldState, type TurnSignals } from './signals.ts'

@@ -4,7 +4,7 @@
  * @module evolution-commands/src/host-commands/curator-command
  */
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
-import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { CommandResult } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { hostCommandText, hostErrorText } from '../host-locale.ts'
 
 /** What the curator handler needs from the command body. */

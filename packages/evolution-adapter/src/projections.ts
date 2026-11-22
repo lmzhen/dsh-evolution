@@ -8,14 +8,14 @@ import type {
   ProjectionHandleLike,
   ProjectionPort,
   ProjectionPortShape,
-} from '@deepseek-ai/dsh-evolution-platform-contract'
+} from './contract/index.ts'
 
 export type {
   EvolutionProjectionDefinition,
   ProjectionHandleLike,
   ProjectionPort,
   ProjectionPortShape,
-} from '@deepseek-ai/dsh-evolution-platform-contract'
+} from './contract/index.ts'
 
 interface ProjectionRegistry {
   register(definition: unknown): unknown

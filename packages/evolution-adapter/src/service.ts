@@ -4,8 +4,8 @@
  */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import { CONTRACT } from '@deepseek-ai/dsh-evolution-platform-contract'
-import type { AgentIdentity, HostPlatformPorts } from '@deepseek-ai/dsh-evolution-platform-contract'
+import { CONTRACT } from './contract/index.ts'
+import type { AgentIdentity, HostPlatformPorts } from './contract/index.ts'
 import { agentsPort } from './agents.ts'
 import { commandsPort } from './commands.ts'
 import { settingsPort } from './settings.ts'
@@ -23,7 +23,7 @@ import { projectionPort } from './projections.ts'
 import { toolsPort } from './tools.ts'
 import { llmPort } from './llm.ts'
 
-export type { HostPlatformPorts } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { HostPlatformPorts } from './contract/index.ts'
 
 /** Domain service owning the host port table. */
 export class EvolutionPlatform extends Service {

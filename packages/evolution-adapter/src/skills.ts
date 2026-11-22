@@ -3,9 +3,9 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SkillSummary } from '@deepseek-ai/dsh-skill'
-import type { SkillsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { SkillsPort } from './contract/index.ts'
 
-export type { SkillsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { SkillsPort } from './contract/index.ts'
 
 interface SkillsServiceLike {
   list(options?: { scope?: unknown }): Promise<readonly SkillSummary[]>

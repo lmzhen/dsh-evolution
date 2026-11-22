@@ -2,9 +2,9 @@
  * The agent-preset implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { PresetDefinitionLike, PresetDocument, PresetsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { PresetDefinitionLike, PresetDocument, PresetsPort } from './contract/index.ts'
 
-export type { PresetDefinitionLike, PresetDocument, PresetsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { PresetDefinitionLike, PresetDocument, PresetsPort } from './contract/index.ts'
 
 interface RegistryLike {
   readDocument?(agentPreset: string): Promise<PresetDocument>

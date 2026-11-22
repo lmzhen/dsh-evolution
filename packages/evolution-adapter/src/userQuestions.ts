@@ -2,9 +2,9 @@
  * The human-question implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { AskedQuestions, UserQuestionsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { AskedQuestions, UserQuestionsPort } from './contract/index.ts'
 
-export type { AskedQuestions, UserQuestion, UserQuestionOption, UserQuestionsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { AskedQuestions, UserQuestion, UserQuestionOption, UserQuestionsPort } from './contract/index.ts'
 
 interface UserQuestionsServiceLike {
   ask(request: unknown): Promise<AskedQuestions>

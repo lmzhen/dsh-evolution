@@ -23,7 +23,7 @@
 
 ## 1. 当前基线
 
-- 发布包：重构前 20 个；P0 拆出 `evolution-platform-contract` 与 `evolution-adapter` 后 22 个（`packages/evolution-*`、`memory`、`tool-skill-manage`）；源码包 21 个（preset 已删，evolution-state 已吸收进 core）。
+- 发布包：重构前 20 个；P0 拆出 `evolution-platform-contract` 与 `evolution-adapter` 后 22 个（`packages/evolution-*`、`memory`、`tool-skill-manage`）；源码包 20 个（preset/state 已吸收，platform-contract 已并入 adapter）。
 - 版本事实源：`platform-line.json`（保留文件名，内部已升级为 envelope 语义），当前 `version=0.2.2-rc.5`、`floor=0.2.2-rc.5`、`cohort=[0.2.2-rc.5]`。
 - 生成结果：每个发布 manifest 的 `@deepseek-ai/dsh-*` peers 与 `engines.dsh` 都等于同一精确并集 `0.2.2-rc.5`；`all` bundle 只带 engines，row 包同时带 peers/engines。
 - 平台耦合：`evolution-core` 直接 import 14 个平台包；其余 16 个包只 import Cordis/Schemastery 与家族服务。`ctx.get()` 的家族服务访问遍布各包，但平台包导入集中在 core。

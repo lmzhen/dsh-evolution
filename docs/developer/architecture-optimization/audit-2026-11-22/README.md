@@ -248,3 +248,4 @@
 | [67-state-p2-cleanup.md](67-state-p2-cleanup.md) | state 吸收后的 P2 死引用清理 |
 | [68-npm-scope.md](68-npm-scope.md) | 发布 scope：@lmzhen |
 | [69-review-p2-a2-e3.md](69-review-p2-a2-e3.md) | 复核残余 P2：A2 双 reload、E3 结构化 traceability |
+| [70-contract-merged.md](70-contract-merged.md) | Phase F：platform-contract 并入 adapter |

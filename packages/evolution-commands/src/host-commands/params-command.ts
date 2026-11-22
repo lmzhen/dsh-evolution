@@ -1,7 +1,7 @@
 /** The read-only `params` surface: provider rows filtered by group, text or JSON. */
 import type { HostLocale, SettingsProviderLike } from '@deepseek-ai/dsh-evolution-core'
 import { PARAM_EXPOSURE } from '@deepseek-ai/dsh-evolution-core'
-import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { CommandResult } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { hostErrorText } from '../host-locale.ts'
 import {
   paramGroups,

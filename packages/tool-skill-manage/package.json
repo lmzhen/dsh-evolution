@@ -32,7 +32,6 @@
     "@deepseek-ai/dsh-evolution-core": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
-    "@deepseek-ai/dsh-evolution-platform-contract": "workspace:^",
     "@deepseek-ai/dsh-evolution-adapter": "workspace:^"
   },
   "peerDependencies": {

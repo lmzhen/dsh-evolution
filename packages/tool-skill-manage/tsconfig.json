@@ -26,9 +26,6 @@
       "path": "../../test-support/agent-loop-testkit"
     },
     {
-      "path": "../evolution-platform-contract"
-    },
-    {
       "path": "../evolution-adapter"
     }
   ]

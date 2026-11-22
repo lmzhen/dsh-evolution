@@ -24,7 +24,7 @@
  * @module @deepseek-ai/dsh-evolution-core
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { Session } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { Session } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { collectReadSkillNames, collectReadSupportFiles, DEFAULT_SUPPORT_READ_TOOL_NAMES, supportFileReadFromPath } from './tool-dispatch.ts'
 import { isProjectableSession, sessionReadNames, type EvolutionReadsState } from './session-projection.ts'
 

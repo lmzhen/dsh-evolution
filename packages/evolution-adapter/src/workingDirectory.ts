@@ -3,9 +3,9 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { WorkingDirectoryPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { WorkingDirectoryPort } from './contract/index.ts'
 
-export type { WorkingDirectoryPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { WorkingDirectoryPort } from './contract/index.ts'
 
 interface WorkingDirectoryServiceLike {
   ensure(agent: Agent, signal?: AbortSignal): Promise<string>

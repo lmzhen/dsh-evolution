@@ -3,9 +3,9 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
-import type { CommandsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { CommandsPort } from './contract/index.ts'
 
-export type { CommandsPort } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { CommandsPort } from './contract/index.ts'
 
 interface CommandsServiceLike {
   register(definition: CommandDefinition): () => void

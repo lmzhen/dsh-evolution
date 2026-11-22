@@ -2,10 +2,10 @@
  * The connection implementation half of the family's platform boundary.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { err, ok } from '@deepseek-ai/dsh-evolution-platform-contract/result'
-import type { ConnectionPort, ConnectionRoute } from '@deepseek-ai/dsh-evolution-platform-contract'
+import { err, ok } from './contract/result.ts'
+import type { ConnectionPort, ConnectionRoute } from './contract/index.ts'
 
-export type { ConnectionPort, ConnectionRegisterResult, ConnectionRoute } from '@deepseek-ai/dsh-evolution-platform-contract'
+export type { ConnectionPort, ConnectionRegisterResult, ConnectionRoute } from './contract/index.ts'
 
 interface ConnectionFetchLike {
   register(route: ConnectionRoute): () => Promise<void>

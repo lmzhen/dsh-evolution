@@ -9,8 +9,8 @@
  */
 import { BlockAssembler, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
 import { recordReviewRead } from '@deepseek-ai/dsh-evolution-core'
-import type { ContentBlock, ContextFormed, GenerateOptions, Message, RequestMessage, StreamChunk, ToolCallBlock, ToolCallId, ToolHistory, ToolSchema } from '@deepseek-ai/dsh-evolution-platform-contract'
-import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { ContentBlock, ContextFormed, GenerateOptions, Message, RequestMessage, StreamChunk, ToolCallBlock, ToolCallId, ToolHistory, ToolSchema } from '@deepseek-ai/dsh-evolution-adapter/contract'
+import type { EpochHeader, SessionId } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import type { ReviewToolChannel } from './review-tool-channel.ts'
 import type { ReviewWriteLocks } from './review-write-locks.ts'
 

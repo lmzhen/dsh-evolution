@@ -1,5 +1,5 @@
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
-import type { UserMessage } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { UserMessage } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { escapeText } from '@deepseek-ai/dsh-evolution-adapter/values'
 import type { CatalogEntry } from './projection.ts'
 

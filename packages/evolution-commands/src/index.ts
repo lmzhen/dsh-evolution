@@ -15,11 +15,11 @@ import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
 import { makeDiagnosticsRoutes } from './diagnostics-route.ts'
 import z from '@deepseek-ai/schemastery'
-import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-evolution-adapter/contract'
 import { effectiveSessionPolicy, type ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
 import { commandsPort, toolsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
 import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
-import type { ContextFormed } from '@deepseek-ai/dsh-evolution-platform-contract'
+import type { ContextFormed } from '@deepseek-ai/dsh-evolution-adapter/contract'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
 // map: each producer declares its own kind in its own module, and there is no shared
 // catch-all plugin kind (llm/src/message.ts:103-115).
