@@ -130,9 +130,9 @@
 | `internal/config` waterfall | **不兼容**：cordis 4.1 用首参 fiber/this=null；当前 4.0 `this` 约定，钩子静默失效 | B5；`fiber.ts:678`、`events.ts:162-171` |
 | LLM finish 终态 | **漏判**：`aborted` 是终态，当前只处理 `error`；返回半截文本 | D1；`llm/types.ts:163-172,488-495` |
 | `session/event` / `fs/observed` 签名 | 形状正确；observation 解释平台 `FsVersion` 的 token、owner 不派生 | 01/02 P2；`fs/types.ts:28-34` |
-| `configForms` 快照 | **重述过头**：家族声明 `save/refresh/reason/stale/readback`，平台只有 6 字段/5 方法 | 07-P2-3；`config-form-types.ts:8-74` |
-| `workspace` 服务 | **读不存在的形状**：`UiWorkspace` 没有 `workspaceId`，排序恒 local | 07-P2-4；`ui-workspace/.../navigation.ts:39-146` |
-| `HOST_ROUTES.merge` | **路由派生**：`decision` 不在 `HOST_ROUTES`，客户端用 `body.replace(/body$/, 'decision')` | 07-P2-1、04；`api.ts:230`、`merge-routes.ts:20` |
+| `configForms` 快照 | 已对齐：家族只保留平台 6 字段/5 方法 | 07-P2-3；见 [49](49-p2-configforms-shape.md) |
+| `workspace` 服务 | 已对齐：由 sessions 主 session + workspaces.items 取 workspace id | 07-P2-4；见 [50](50-p2-workspace-id.md) |
+| `HOST_ROUTES.merge` | 已收口：`decision` 进入 `HOST_ROUTES`，host/client 单源 | 07-P2-1、04；见 [42](42-p2-merge-decision-route.md) |
 | `sendMessage` options | 契约可选，平台必填 `{signal}`；当前调用方总带，但类型洞 | 05-P2-5；`subagent/src/index.ts:368-375` |
 | `configEditor.configuration` | 契约 `Promise<unknown>`，平台同步数组；返回值类型说谎 | 05-P2-1；`platformView.ts:14` vs `config-editor/index.ts:49-70` |
 | `dsh.resolverDependencies` | 四份清单仍声明，rc.3/rc.5 无平台读者 | 05-P2-8；`profile.ts:313` |
@@ -235,3 +235,4 @@
 | [54-p2-dead-ui-contract.md](54-p2-dead-ui-contract.md) | P2：删除 client-kit/history 死契约与假 face |
 | [55-p2-local-require.md](55-p2-local-require.md) | P2：client require 改 bundle 局部绑定 |
 | [56-p2-merge-view-ledger.md](56-p2-merge-view-ledger.md) | P2：merge tab 响应式 + 计数共享解析 |
+| [57-p2-status.md](57-p2-status.md) | P2：07 域处置状态总表 |
