@@ -241,3 +241,4 @@
 | [60-d12-test-reachin.md](60-d12-test-reachin.md) | D12：测试跨包 reach-in 改走包导出 |
 | [61-final-suite-align.md](61-final-suite-align.md) | S4 用例归位 + U5 适配 P2-3 |
 | [62-independent-review-1.md](62-independent-review-1.md) | 独立复核第一轮：A2/E4/E3 三条 P1 |
+| [63-review-closure.md](63-review-closure.md) | 独立复核第二轮：P1 关闭 + 残余 P2 |
