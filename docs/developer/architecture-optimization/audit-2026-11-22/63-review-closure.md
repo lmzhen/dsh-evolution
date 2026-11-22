@@ -20,7 +20,7 @@
 | A2 list/expire 每条记录 reload，TTL>0 时 pending 轮询有抖动/O(n) | approval | 下一 minor | GET 走 listReadonly 或轻量 freshness；expire 负例覆盖 reload/marker |
 | E3 traceability 的 source fallback 可能把其他 40-hex 当 commit | release | 下一 minor | release 只接受结构化 `traceability.measuredCommit`，并补 parser 误判测试 |
 | E3 artifacts 只与证据自比，不校验应发布 22 包集合 | release | 下一 minor | 与发布包清单对账 |
-| E4 40min CI 预算是按本地 986s 推断，缺一次真实 `full(ci=on)` 计时 | gates | 下一个发布候选 | CI 实跑一次并落盘 |
+| ~~E4 40min CI 预算~~ **已关闭** | gates | — | `full(ci=on)` 实跑 513 files / 3080 tests / 1118.44s，见 [65](65-ci-lane.md) |
 | A3 `prepared-unit recovery left N unresolved` 仍是 warn | core-write | 下一 minor | 区分测试夹具污染与真实残留，并给清理/拒绝判据 |
 
 `release-evidence-rehearsal.json` 仍是旧数据：spikes `67eb0c3a`、traceability source `567020ea`；

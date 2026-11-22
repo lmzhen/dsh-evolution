@@ -243,3 +243,4 @@
 | [62-independent-review-1.md](62-independent-review-1.md) | 独立复核第一轮：A2/E4/E3 三条 P1 |
 | [63-review-closure.md](63-review-closure.md) | 独立复核第二轮：P1 关闭 + 残余 P2 |
 | [64-preset-retired.md](64-preset-retired.md) | Phase F：退役 evolution-preset 活表面 |
+| [65-ci-lane.md](65-ci-lane.md) | E4：真实 CI 形态全量套件计时 |
