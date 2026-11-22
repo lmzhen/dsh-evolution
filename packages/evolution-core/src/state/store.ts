@@ -39,7 +39,7 @@ import {
 
 const STORE_VERSION = 1
 
-type StoredReviewState = ReviewStateRecord & { updatedAt?: number }
+export type StoredReviewState = ReviewStateRecord & { updatedAt?: number }
 
 interface StoreFile {
   version: typeof STORE_VERSION
@@ -57,6 +57,30 @@ export interface StateStoreOptions {
 }
 
 const emptyStore = (): StoreFile => ({ version: STORE_VERSION, review: {}, curator: null, pending: {} })
+
+/** A complete store image, built by migration or by the provider itself. */
+export interface StateStoreSnapshot {
+  readonly review: Record<string, StoredReviewState>
+  readonly curator: CuratorStateRecord | null
+  readonly pending: Record<string, PendingRecord>
+}
+
+/** Validate and publish a complete store image. The write is create-if-absent:
+ * an existing store is never overwritten by a migration. */
+export async function writeStateStoreSnapshot(io: EvolutionIoLike, path: string, snapshot: StateStoreSnapshot): Promise<void> {
+  const store: StoreFile = { ...emptyStore(), ...snapshot }
+  const text = serialize(store)
+  // Parsing our own image catches a migration source that produced a bad record
+  // before the first byte reaches the medium.
+  parseStore(text)
+  if (io.exists !== undefined && await io.exists(path)) throw new Error('evolution-state-store: refusing to overwrite an existing store: ' + path)
+  if (io.createTextIfAbsent !== undefined) {
+    await io.createTextIfAbsent(path, text)
+    return
+  }
+  if (io.exists !== undefined && await io.exists(path)) throw new Error('evolution-state-store: refusing to overwrite an existing store: ' + path)
+  await io.writeText(path, text)
+}
 
 function invalid(message: string): never {
   throw new Error('evolution-state-store: ' + message)
@@ -151,6 +175,13 @@ export function createStateStoreProvider(options: StateStoreOptions): EvolutionS
 
   return {
     name: PROVIDER_STORE,
+
+    async listReviewStates() {
+      return Object.entries((await read()).review).map(([sessionId, record]) => {
+        const { updatedAt, ...consumer } = record
+        return { sessionId, record: structuredClone(consumer), ...(updatedAt === undefined ? {} : { updatedAt }) }
+      })
+    },
 
     async loadReviewState(sessionId) {
       const stored = (await read()).review[sessionId]

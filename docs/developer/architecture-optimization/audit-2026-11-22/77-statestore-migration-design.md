@@ -55,3 +55,24 @@
 - 本步只迁 pending/review/curator；activity/usage 仍是文件侧车，D1c 另议；
 - approval 的完整 SkillPlan 属于 Phase D 审批面，本步不改 plan 形状；
 - UI/提示词/aux 前缀无变化。
+
+## 实现进度（D1b-1）
+
+已完成核心迁移函数，未接命令、未切换 row：
+
+- `packages/evolution-core/src/state/migrate.ts`：`migrateDomainToStore(ctx, { io, home?, dryRun? })`；
+- 优先读已挂载的 domain provider（避免同一 KV domain 二次 open 的 `already-open`）；新增可选 seam `listReviewStates()` 供迁移/诊断读全部 review 行；
+- 完整 snapshot 通过 `writeStateStoreSnapshot` 的 create-if-absent 发布；不覆盖已有 store；
+- 成功后写 `.migrated-from-domain.json`；domain 数据不改；
+- `dry-run` 只计数、不写；
+- 失败路径：已有 store / domain 打不开 / 非法记录 ⇒ 不写 store。
+
+验证：
+
+```text
+core state: 8 files / 49 tests passed
+build-lib: 0
+run-gates local: 61 pass / 0 fail / 3 cannot-decide
+```
+
+仍未做：`/evolution migrate state` 命令接入、bundle provider 切换、domain provider 删除与回滚演练。

@@ -148,6 +148,7 @@
         "evolution-core::tests/skill-write-intent.spec.ts",
         "evolution-core::tests/skill-write-service.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
+        "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
         "evolution-core::tests/text-budgets.spec.ts",
         "evolution-core::tests/text-metrics.spec.ts",
@@ -504,6 +505,7 @@
         "evolution-core::tests/state-store.spec.ts",
         "evolution-core::tests/state/domain/compatibility.spec.ts",
         "evolution-core::tests/state/state.spec.ts",
+        "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
@@ -1178,6 +1180,7 @@
         "evolution-core::tests/state-store.spec.ts",
         "evolution-core::tests/state/domain/compatibility.spec.ts",
         "evolution-core::tests/state/state.spec.ts",
+        "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
@@ -1790,6 +1793,7 @@
         "evolution-core::tests/state/domain/domain.spec.ts",
         "evolution-core::tests/state/domain/provider-consistency.spec.ts",
         "evolution-core::tests/state/state.spec.ts",
+        "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
@@ -2207,11 +2211,11 @@
   "counts": {
     "fast": {
       "gates": 64,
-      "specs": 135
+      "specs": 136
     },
     "pre-tag": {
       "gates": 64,
-      "specs": 443
+      "specs": 444
     },
     "ci-only": {
       "gates": 10,
@@ -2219,16 +2223,16 @@
     },
     "full(ci=off)": {
       "gates": 64,
-      "specs": 443
+      "specs": 444
     },
     "full(ci=on)": {
       "gates": 74,
-      "specs": 514
+      "specs": 515
     }
   },
   "specs": {
-    "total": 514,
-    "marked": 514,
+    "total": 515,
+    "marked": 515,
     "unmarked": 0
   }
 }

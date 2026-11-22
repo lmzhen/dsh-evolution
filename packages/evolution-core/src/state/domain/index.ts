@@ -205,6 +205,14 @@ export function apply(ctx: Context): void {
     name: PROVIDER_DOMAIN,
     reload,
 
+    async listReviewStates() {
+      const table = (await ensure()).table(REVIEW_STATE_TABLE)
+      return [...table.entries()].map(([sessionId, record]) => {
+        const { updatedAt, ...consumer } = record as ReviewStateRecord & { updatedAt?: number }
+        return { sessionId, record: structuredClone(consumer), ...(updatedAt === undefined ? {} : { updatedAt }) }
+      })
+    },
+
     async loadReviewState(sessionId) {
       // C-2 (v18): return a DEEP copy — the caller (advanceReview) mutates the
       // record before save, and `args`-carrying records share nested objects
