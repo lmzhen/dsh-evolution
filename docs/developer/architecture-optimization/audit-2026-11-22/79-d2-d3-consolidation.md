@@ -20,7 +20,7 @@ mutation-context/crash/recovery/unit-engine: 9 tests
 build-lib: 0
 approval.spec: 37 tests passed
 run-gates local: 61 pass / 0 fail / 3 cannot-decide
-全量 family suite: 447 files / 2450 tests passed（1134.94s）
+全量 family suite: 447 files / 2451 tests passed（1147.45s）
 ```
 
 ### 已补：真正的 prepare/commit 两阶段

@@ -20,6 +20,6 @@ for (const c of reading.fullCandidates ?? []) {
   const expectLine = c.kind === "platform" || c.kind === "testkit" ? "both" : "local";
   rows.push({ spec: c.file, id: c.id, kind: c.kind, expectLine, status: "expected", reasonRef: c.file + ":1", expiry: "0.60.0", owner });
 }
-const payload = { generatedBy: "gen-test-lines.mjs", measuredAt: reading.measuredAt, tree: reading.tree, testLines: rows };
+const payload = { generatedBy: "gen-test-lines.mjs", measuredAt: reading.measuredAt, tree: reading.tree, specDigest: reading.specDigest, testLines: rows };
 writeFileSync(join(ROOT, "packages", "scripts", "family-test-lines.json"), JSON.stringify(payload, null, 2) + "\n", "utf8");
 console.log(JSON.stringify({ wrote: "packages/scripts/family-test-lines.json", candidates: reading.candidates, entries: rows.length, tree: reading.tree }));

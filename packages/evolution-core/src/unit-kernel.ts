@@ -490,9 +490,11 @@ export class UnitKernel {
         ? { ok: true, unitId, dryRun: true, changed: [], errors: [] }
         : { ok: false, unitId, dryRun: true, changed: [], errors: validation.errors }
     }
-    const prepared = await this.prepare(request)
-    if ((prepared as PreparedMutation).kind !== 'prepared') return prepared as MutationResult
-    return await this.commit(prepared as PreparedMutation)
+    return await this.serial(async () => {
+      const prepared = await this.prepare(request)
+      if ((prepared as PreparedMutation).kind !== 'prepared') return prepared as MutationResult
+      return await this.commit(prepared as PreparedMutation)
+    })
   }
 
   /** Recover every prepared snapshot known to the port; safe to call at boot. */

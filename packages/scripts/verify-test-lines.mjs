@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { REPO_ROOT } from "./lib-env.mjs";
 
 const ROOT = process.argv[2] ?? REPO_ROOT;
@@ -30,6 +31,7 @@ const familyLayout = existsSync(join(ROOT, "evolution-core", "package.json"));
 const scanRoot = familyLayout ? ROOT : join(ROOT, "packages");
 walk(scanRoot);
 
+const specDigest = createHash("sha256").update(specFiles.map((f) => readFileSync(f, "utf8")).sort().join("\u0000")).digest("hex");
 const candidates = [];
 for (const f of specFiles) {
   const text = readFileSync(f, "utf8");
@@ -77,6 +79,11 @@ const expiredEntries = (registry.testLines ?? []).filter((entry) => {
   return true;
 });
 const staleTree = (() => {
+  if (typeof registry.specDigest === 'string' && registry.specDigest !== '') {
+    // Layout-neutral: the mirror and the CI overlay have different relative paths,
+    // but identical spec bytes. The digest is the authority; the commit is only a label.
+    return registry.specDigest === specDigest ? [] : ['spec digest changed after the registry tree'];
+  }
   if (typeof registry.tree !== 'string' || registry.tree === '' || registry.tree === 'unknown') return ['registry has no measured tree'];
   if (registry.tree === tree) return [];
   try {
@@ -96,6 +103,7 @@ const byKind = candidates.reduce((a, c) => ({ ...a, [c.kind]: (a[c.kind] ?? 0) +
 console.log(JSON.stringify({
   measuredAt: new Date().toISOString(),
   tree,
+  specDigest,
   command: "node packages/scripts/verify-test-lines.mjs " + ROOT + (STRICT ? " --strict" : ""),
   specsScanned: specFiles.length,
   candidates: candidates.length,

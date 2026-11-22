@@ -39,7 +39,7 @@ function request(overrides: Partial<MutationRequest> = {}): MutationRequest {
   }
 }
 
-function unit(io: MemoryIo, overrides: { lock?: MutationLockPort; targetKeys?: readonly string[]; journal?: { write(record: MutationJournalRecord): Promise<void> }; snapshots?: MutationSnapshotPort; hooks?: UnitKernelHooks; context?: { owner: 'foreground' | 'background_review'; runId: string; leaseId: string } } = {}) {
+function unit(io: MemoryIo, overrides: { lock?: MutationLockPort; serial?: <T>(task: () => Promise<T>) => Promise<T>; targetKeys?: readonly string[]; journal?: { write(record: MutationJournalRecord): Promise<void> }; snapshots?: MutationSnapshotPort; hooks?: UnitKernelHooks; context?: { owner: 'foreground' | 'background_review'; runId: string; leaseId: string } } = {}) {
   return new UnitKernel({ io, limits: LIMITS, ...(overrides.lock === undefined ? { nested: true } : {}), ...overrides })
 }
 
@@ -75,6 +75,21 @@ describe('UnitKernel executor', () => {
     expect(result.ok).toBe(false)
     expect(io.files.get('source/A.md')).toBe('oldA')
     expect(io.files.get('source/B.md')).toBe('changedB')
+  })
+
+  it('apply goes through the serial ordering gate', async () => {
+    const io = new MemoryIo()
+    io.files.set('source/SKILL.md', 'old')
+    const order: string[] = []
+    const serial = async <T>(task: () => Promise<T>): Promise<T> => {
+      order.push('enter')
+      const result = await task()
+      order.push('exit')
+      return result
+    }
+    const result = await unit(io, { serial }).apply(request())
+    expect(result.ok).toBe(true)
+    expect(order).toEqual(['enter', 'exit'])
   })
 
   it('prepare is side-effect free and commit is the only writer', async () => {

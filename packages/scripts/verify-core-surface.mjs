@@ -14,7 +14,7 @@ const packageRoot = existsSync(join(root, 'packages/evolution-core'))
     : scriptSibling
 const index = readFileSync(join(packageRoot, 'src/index.ts'), 'utf8')
 const stars = [...index.matchAll(/^export \* from '([^']+)'/gm)].map(match => match[1])
-const writeOwned = ['./write-kernel.ts', './mutation-unit.ts', './mutation-storage-adapter.ts', './unit-claim.ts', './unit-journal.ts', './unit-storage.ts']
+const writeOwned = ['./unit-kernel.ts', './mutation-storage-adapter.ts', './unit-claim.ts', './unit-journal.ts', './unit-storage.ts', './unit-undo.ts', './unit-undo-plan.ts', './unit-members.ts']
 const leaked = stars.filter(path => writeOwned.includes(path))
 if (leaked.length > 0) {
   console.error('verify-core-surface: write modules leaked back into the root barrel: ' + leaked.join(', '))

@@ -1,0 +1,39 @@
+# 发布前 P2 台账与阻断项
+
+基线：0.59.6；当前树未发布。P0=0、P1=0（第 80 轮独立复核后修复了 3 个 P1，见下）。
+
+## 本轮修复的 P1
+
+| ID | 问题 | 修复 | 证据 |
+|---|---|---|---|
+| P1-CI-20 | `verify-core-surface` 仍按已删除的 `write-kernel.ts`/`mutation-unit.ts` 校验 | `writeOwned` 改为当前 `write.ts` 导出面 | `run-gates ci --lane ci-static` 通过 |
+| P1-CI-26 | `family-test-lines` 用 family commit 做 git diff，CI overlay 无此历史 | 注册表增加 `specDigest`（spec 字节摘要），校验不再依赖 git 历史 | mirror + overlay 两边 digest 一致，`ci-only-26` 通过 |
+| P1-SERIAL | `UnitKernel.apply` 丢了旧 `MutationUnit.apply` 的 `serial` 包裹 | `apply` 恢复 `this.serial` 包裹，并加 serial 顺序测试 | unit-kernel 30 tests；全量套件 |
+
+## P2 台账（DEFERRED）
+
+| ID | P2 | 文件 | owner | reason | expiry | 判据 |
+|---|---|---|---|---|---|---|
+| D1-MARKER-FAIL | marker 写失败后 store 已存在、marker 缺失，重试被拒绝 | `state/migrate.ts` | D1 | 失败恢复需要显式人工核对 | 0.61.0 | 注入 marker 写失败测试，并给恢复指引 |
+| D1-ROLLBACK | 删 marker 回退 domain 会丢 store-era 新写 | `tests/state/store-migration.spec.ts` | D1 | 单向回退未覆盖 store-era 写 | 0.61.0 | 增加 store 新写后回退测试/警告 |
+| D1-STORE-PIN | 显式 pin `store` 时不校验 marker，缺失 store 按空读 | `state/index.ts` | D1 | 显式 pin 属高级配置，auto 已 fail-closed | 0.61.0 | 显式 pin 同样要求有效 store |
+| D1-MARKER-DEPTH | marker 只验顶层 image，record/curator 损坏延迟到首次读 | `state/index.ts` | D1 | 顶层合法后坏记录会由 provider 读时报错 | 0.61.0 | 完整 parse/record 负例 |
+| D1-HOME | `EvolutionState.home` 与 store-plugin/命令 home 可能不一致 | `state/index.ts`、`state/store-plugin.ts` | D1 | 生产只用 `evolutionHome()`；仅自定义配置有风险 | 0.61.0 | 单一 home 来源 + 自定义 home 测试 |
+| D1-HMR | provider Map 缓存首次 IO，HMR 替换 IO 后仍用旧 IO | `state/store-plugin.ts` | D1 | HMR 罕见，注册幂等已修 | 0.61.0 | 换 IO 测试/按 ctx 清理 |
+| D1-LOCK-READ | 每次 state 读也持锁；只读 home/长迁移可能阻塞 | `state/index.ts` | D1 | 读一致性优先，性能待基准 | 0.61.0 | 只读策略或基准 + 长迁移测试 |
+| D1-OLD-PIN | 旧 profile pin domain 时迁移不切换，命令不提示 | `evolution-commands/src/host-commands/migrate-state.ts` | D1 | 旧 profile 覆盖 pin 的人为配置 | 0.61.0 | 命令检测 pin 并提示下一步 |
+| D2-JOURNAL-FAIL | snapshot committed 先于 journal committed；journal 失败时 target 回滚而 snapshot 仍 committed | `unit-kernel.ts` | D2 | 崩溃恢复窗口已由 snapshot 优先保护；失败分支待硬化 | 0.61.0 | 注入 journal committed 失败并核对恢复 |
+| D2-HANDLE | `PreparedMutation` 可重复 commit/release，忘记 release 会占锁 | `unit-kernel.ts` | D2 | 当前所有调用方都在 finally/commit 释放 | 0.61.0 | handle 状态机 + double commit/release 测试 |
+| D2-JOURNAL-ERR | commit catch 内 journal failed 写失败会抛出而非结构化结果 | `unit-kernel.ts` | D2 | 二次失败路径，未观测 | 0.61.0 | 失败注入测试 |
+| D3-SETTINGS | SettingsPort 仍手写（Fiber/unknown 不兼容） | `contract/settings.ts`、`docs/79` | D3 | 平台 `configure` owner 是 Fiber，family 端口是 unknown | Phase E | 统一 owner 类型后 Pick/生成 |
+| D3-OTHER-PORTS | 其余 family-facing ports 仍手写 | `docs/79` | D3 | 只有 3 个端口可机械派生 | Phase E | 逐个判定可生成性 |
+| D2-TARGET-WRITER | 低层 `TargetWriter` 不在 `write.ts` 公共导出 | `write.ts`、`verify-core-surface.mjs` | D2 | 公共面收窄，内部实现 | next minor | 更新 gate/文档，决定是否公共导出 |
+
+## 发布阻断项（不是 P2）
+
+1. **release evidence 仍是旧数据**：`packages/scripts/release-evidence-rehearsal.json` 的 `measuredCommit`、traceability source 都是 0.59.6 旧值；发布前必须重新 build、pack、复算 dist sha256，并重测 S1–S4。
+2. **dev pack 是旧构建**：`D:\dsh\harness-rc3\packages\evolution\dist` 早于 D1/D2，不能作为发布证据；必须重新 `build-lib` + `prepare-release --dev-build`/正式 pack。
+3. **真实 web 验收未做**：安装/启动不算整体通过；发布前后必须做真实 web 操作与截图/E2E。
+4. **D1c domain fallback**：本版保留 domain provider/row 作为迁移窗口；发布说明必须写“先 `/evolution migrate state`、重启后用 store、domain 留一版回退”，且 DCR-4 用户确认前不能声称 domain authority 删除完成。
+5. **trusted publisher 未 OTP 复核**：`npm trust list` 本会话被 EOTP 挡住；正式 tag 前必须核对 repo/file/environment。
+6. **全量套件需在最终 HEAD 复跑**：当前记录 447 files / 2451 tests；serial/digest 修复后需更新 reading。
