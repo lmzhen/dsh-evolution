@@ -39,7 +39,7 @@ if (/export function injectToolSkillCap/.test(installer)) {
 // profile patch/yml may carry the restricted preset ids (a second delivery source would
 // double-register). The old RESTRICTED_PRESET_DELIVERY string switch was dead (W11 E2b).
 const restrictedIds = ['evolution-reviewer-readonly', 'evolution-maintainer-readonly', 'evolution-restricted-tools']
-for (const bundle of ['evolution-all', 'evolution-host', 'evolution-preset', 'evolution-agent']) {
+for (const bundle of ['evolution-all', 'evolution-host', 'evolution-agent']) {
   const manifestPath = join(root, bundle, 'package.json')
   if (!existsSync(manifestPath)) { problems.push('missing bundle manifest ' + manifestPath); continue }
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))

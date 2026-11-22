@@ -25,7 +25,6 @@ interface Subject {
 const SUBJECTS: Subject[] = [
   { id: 'evolution-all', manifestUrl: new URL('../../evolution-all/package.json', import.meta.url), patchUrl: new URL('../../evolution-all/cordis.patch.yml', import.meta.url), rows: 'inserted', bundlePatch: './cordis.patch.yml', closure: true },
   { id: 'evolution-host', manifestUrl: new URL('../package.json', import.meta.url), patchUrl: new URL('../cordis.patch.yml', import.meta.url), rows: 'inserted', bundlePatch: './cordis.patch.yml' },
-  { id: 'evolution-preset', manifestUrl: new URL('../../evolution-preset/package.json', import.meta.url), patchUrl: new URL('../../evolution-preset/cordis.patch.yml', import.meta.url), rows: 'inserted', bundlePatch: './cordis.patch.yml' },
   { id: 'evolution-agent', manifestUrl: new URL('../../evolution-agent/package.json', import.meta.url), patchUrl: new URL('../../evolution-agent/agent.cordis.yml', import.meta.url), rows: 'all', toolVector: AGENT_EVOLUTION_ROW_NAMES },
 ]
 

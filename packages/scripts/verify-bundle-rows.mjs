@@ -30,7 +30,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 /** Bundle layers whose patch files come out of the roster. */
-const FORMS = ['all', 'host', 'preset']
+const FORMS = ['all', 'host']
 
 const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')

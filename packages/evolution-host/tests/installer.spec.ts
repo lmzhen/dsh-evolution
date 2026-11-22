@@ -194,7 +194,7 @@ describe('layered installer', () => {
     const profileDir = join(home, 'profiles', 'evo-test')
     await mkdir(profileDir, { recursive: true })
     await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@lmzhen/dsh-evolution-preset'] } } }), 'utf8')
-    await expect(runInstaller(home, 'all', 'evo-test')).rejects.toThrow(/one-click preset bundle/)
+    await expect(runInstaller(home, 'all', 'evo-test')).rejects.toThrow(/mutually exclusive/)
   }, 30_000)
 
   it('P1-3: --mode host refuses an evolution-all profile; --mode oneclick is removed', async () => {
@@ -269,17 +269,7 @@ describe('layered installer', () => {
     await expect(runInstaller(home, 'oneclick', 'evo-test', ['--dry-run'])).rejects.toThrow(/removed in 0\.48/)
   }, 30_000)
 
-  it('D-2 (v18): uninstalling host from a one-click profile keeps the packages (no phantom row)', async () => {
-    const home = await tempRoot('dsh-installer-d2-')
-    const profileDir = join(home, 'profiles', 'evo-test')
-    await mkdir(profileDir, { recursive: true })
-    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: ['@deepseek-ai/dsh-evolution-preset'] } } }), 'utf8')
-    const { stdout } = await runInstaller(home, 'host', 'evo-test', ['--uninstall', '--dry-run'])
-    expect(stdout).toMatch(/packages:\s+0/)
-    expect(stdout).toContain('kept:')
-  }, 30_000)
-
-  it('D-3/D-4 (v18): a fresh profile is seeded with the platform bundles and the mounted bundle is pinned', async () => {
+    it('D-3/D-4 (v18): a fresh profile is seeded with the platform bundles and the mounted bundle is pinned', async () => {
     const home = await tempRoot('dsh-installer-d34-')
     // D-4 parity: a name WITH a shipped template seeds that template
     // (`PROFILE_TEMPLATES.web = base + web-app`), matching upstream initProfile.

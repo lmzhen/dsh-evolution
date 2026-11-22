@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-22T02:28:57.370Z",
-  "tree": "ad4db1e1",
+  "measuredAt": "2026-11-22T03:06:28.149Z",
+  "tree": "ec0dcf05",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -782,16 +782,6 @@
       "reasonRef": "packages/evolution-maintenance/tests/orchestrate.spec.ts:1",
       "expiry": "0.60.0",
       "owner": "evolution-maintenance"
-    },
-    {
-      "spec": "packages/evolution-preset/tests/preset.spec.ts",
-      "id": "@deepseek-ai/dsh-app-boot",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-preset/tests/preset.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-preset"
     },
     {
       "spec": "packages/evolution-review/tests/review-executor-real-tools.spec.ts",

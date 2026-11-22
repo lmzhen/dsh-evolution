@@ -19,7 +19,7 @@ This file is the canonical statement of the product install surface. The root [I
 
 ## Internal composition (not product choices)
 
-`dsh-evolution-preset` is a migration-only compatibility bundle and is no longer published. Its **install** path was removed in 0.48; `--uninstall --mode oneclick` remains for one version so existing profiles can be cleaned up. The legacy `agent` and `layered` install paths were removed in the same release; only `--uninstall --mode agent|layered|oneclick` remains, for one version, so a 0.46/0.47 profile can be cleaned up.
+The one-click `dsh-evolution-preset` bundle was retired: the package and its bundle patch are gone. Existing 0.46/0.47 profiles can still be cleaned up with `--uninstall --mode oneclick`; it cannot be installed. The legacy `agent` and `layered` install paths were removed in the same release; only `--uninstall --mode agent|layered|oneclick` remains, for one version, so a 0.46/0.47 profile can be cleaned up.
 
 The historical bundles share infrastructure rows; mounting two double-registers services and the loader fails loud. Shrinking a product install means disabling rows or uninstalling `all`; a leftover legacy preset row or one-click bundle is exclusive with `all` because its model rows would double-mount.
 

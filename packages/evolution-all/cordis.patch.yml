@@ -15,9 +15,9 @@
 #   - every infra row block below must stay byte-identical to
 #     evolution-host/cordis.patch.yml (same id/name/config/disabled);
 #   - the three model rows must stay byte-identical to
-#     evolution-preset/cordis.patch.yml's model rows;
+#     the layered agent preset's model rows;
 #   - the row names must all resolve inside this package's dependency closure.
-# MUTUAL EXCLUSION: all / host / one-click preset are ALTERNATIVE install
+# MUTUAL EXCLUSION: all / host are ALTERNATIVE install
 # targets — mounting two of them triple-mounts the infra rows and fails loud
 # at startup (invariants: already registered). `all` is likewise exclusive
 # with the layered Evolution agent preset (the preset scope's model rows would
@@ -80,7 +80,7 @@
     # "the nearest layer's entry wins a duplicate name outright, and the rank
     # order decides duplicates only within one layer"). So `includeSkillNames` /
     # `excludeSkillNames` set HERE have no effect on a preset session: set them on
-    # the preset's row (evolution-preset/cordis.yml) for those sessions, and
+    # the layered agent-preset row for those sessions, and
     # install ONE form (doctor flags all + layered preset as a double-mount).
     # tests/rank-contract.spec.ts pins both halves mechanically.
     - id: evolution-skill-catalog

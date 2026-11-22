@@ -692,7 +692,7 @@ const CORE_ALLOWED_FAMILY = new Set([
   '@deepseek-ai/dsh-memory',
 ])
 // N6 (v39): composition-only packages (see docblock).
-const BUNDLE_PKGS = new Set(['evolution-host', 'evolution-all', 'evolution-preset', 'evolution-agent'])
+const BUNDLE_PKGS = new Set(['evolution-host', 'evolution-all', 'evolution-agent'])
 // N7 (v39, S3.1; converged 0.3.75, v41 P2-26): direct construction sites.
 // The list is EMPTY on purpose — every site routes through core's
 // newSkillLibrary(), so a new entry means someone re-opened the divergence.

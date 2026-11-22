@@ -1,5 +1,5 @@
 {
-  "pin": "ecd2fea5",
+  "pin": "ec0dcf05",
   "bed": {
     "mono": "overlay"
   },
@@ -73,11 +73,6 @@
       "id": "@deepseek-ai/dsh-evolution-platform-contract",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-platform-contract"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-preset",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-preset"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-review",

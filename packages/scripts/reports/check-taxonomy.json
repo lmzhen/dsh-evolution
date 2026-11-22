@@ -904,7 +904,6 @@
         "evolution-host::tests/profile-override.spec.ts",
         "evolution-host::tests/row-contract.spec.ts",
         "evolution-maintenance::tests/orchestrate.spec.ts",
-        "evolution-preset::tests/preset.spec.ts",
         "evolution-review::tests/review.spec.ts",
         "evolution-skill-discovery::tests/awareness.spec.ts",
         "evolution-skill-discovery::tests/catalog/catalog-path-consistency.spec.ts",
@@ -2025,7 +2024,6 @@
         "evolution-merge::tests/undo-resume.spec.ts",
         "evolution-merge::tests/unit-claim.spec.ts",
         "evolution-merge::tests/wire.spec.ts",
-        "evolution-preset::tests/preset.spec.ts",
         "evolution-review::tests/redact.spec.ts",
         "evolution-review::tests/review-debt.spec.ts",
         "evolution-review::tests/review-executor-real-tools.spec.ts",
@@ -2213,7 +2211,7 @@
     },
     "ci-only": {
       "gates": 10,
-      "specs": 72
+      "specs": 71
     },
     "full(ci=off)": {
       "gates": 64,
@@ -2221,12 +2219,12 @@
     },
     "full(ci=on)": {
       "gates": 74,
-      "specs": 514
+      "specs": 513
     }
   },
   "specs": {
-    "total": 514,
-    "marked": 514,
+    "total": 513,
+    "marked": 513,
     "unmarked": 0
   }
 }

@@ -35,7 +35,6 @@ export const EVOLUTION_PREFIXES = [
 export const EVOLUTION_BUNDLE_TAILS = [
   'dsh-evolution-all',
   'dsh-evolution-host',
-  'dsh-evolution-preset',
 ]
 
 /** Directories under packages/ that are not publishable packages, by NAME.
@@ -45,10 +44,10 @@ export const EVOLUTION_BUNDLE_TAILS = [
  * package.json, so a leftover carrying one (a staging copy does) would have been published by the
  * second rule while the first said it was excluded. */
 /** Product-retired packages still present in the workspace for migration/source installs. */
-export const RETIRED_PACKAGE_DIRS = new Set(['evolution-preset'])
+export const RETIRED_PACKAGE_DIRS = new Set()
 
 /** Package names the source installer must not copy (the mirrored form of the retired dirs). */
-export const RETIRED_PACKAGE_NAMES = new Set(['dsh-evolution-preset'])
+export const RETIRED_PACKAGE_NAMES = new Set()
 
 export const NON_PACKAGE_DIRS = new Set([
   'scripts', 'docs', 'node_modules', 'dist', 'dist.next',

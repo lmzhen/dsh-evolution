@@ -4,24 +4,12 @@ import { loadOverlayPatches, composeEntries } from '@deepseek-ai/dsh-app-boot'
 import { fileURLToPath } from 'node:url'
 import { cordisRows, rowId, type CordisRow } from '../../test-support/cordis-rows.ts'
 
-// S7.2 / E-33: `dsh-evolution-host` and `dsh-evolution-preset` are two INDEPENDENT
-// bundle patches that overlap on the shared infra rows (policy/io/state/memory/
-// review/curator/...) but are ALTERNATIVE install layouts — host-only
-// (infrastructure, no model tools) vs one-click preset (infrastructure + model
-// tools). Installing both would double-mount the infra rows and, if the shared
-// configs ever diverge, produce an ambiguous composition. This spec pins the
-// mutual exclusion: every row id present in BOTH bundles must carry a
-// byte-identical (id/name/config/disabled) definition, and the preset bundle
-// keeps the model-facing rows the host must never grow (their distinguishing
-// identities). The 60-char catalog cap is now applied only by the family preset
-// composer; no bundle patch overrides a platform row, so distinctness is pinned
-// via the model tools, not via a host-only row.
-// V10-14→0.3.54 (route B): `dsh-evolution-all` joins the matrix as the FULL
-// bundle — infra ∪ the three model rows. The guards below pin all.patch's row
-// bodies to host.patch (infra) and preset.patch (model rows), and the
-// composition check proves that mounting all + host (or all + preset) composes
-// DUPLICATE infra rows — the precondition for the startup fail-loud (upstream
-// invariants globals: a second instance throws already registered).
+// V10-14 -> 0.3.54 (route B): `dsh-evolution-all` is the FULL bundle
+// (infra + the three model rows). The one-click `dsh-evolution-preset` bundle was
+// retired; this spec now pins the remaining all/host relationship:
+// - every all.patch infra row is byte-identical to host.patch;
+// - all row set = host infra + the model rows + the all-only rows;
+// - mounting all + host composes DUPLICATE infra rows (startup fail-loud precondition).
 function rowMap(value: unknown): Map<string, CordisRow> {
   const map = new Map<string, CordisRow>()
   for (const entry of cordisRows(value)) {
@@ -41,51 +29,19 @@ function rowMap(value: unknown): Map<string, CordisRow> {
 const normalize = (row: CordisRow | undefined) => ({ name: row?.name, config: row?.config, disabled: row?.disabled })
 
 const hostPatch = rowMap(loadOverlayPatches('test', fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))))
-const presetPatch = rowMap(
-  loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-preset/cordis.patch.yml', import.meta.url))),
-)
 const allPatch = rowMap(
   loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-all/cordis.patch.yml', import.meta.url))),
 )
 
-const sharedIds = [...hostPatch.keys()].filter(id => presetPatch.has(id))
 const MODEL_TOOLS = ['tool-memory', 'tool-skill-manage', 'evolution-skill-catalog']
 
 /** Rows that are neither host infra nor model-facing: the UI umbrella makes its
- * own host registration but stays out of the host-only and preset bundles; the
- * merge view is a client-only package row for the workbench slot; the health
- * panel ships disabled. Listed by name so a new row of any class still fails the
- * count below until it is decided here. */
+ * own host registration but stays out of the host-only bundle; the merge view is
+ * a client-only package row for the workbench slot; the health panel ships disabled. */
 const ALL_ONLY_ROWS = ['evolution-skill-health', 'evolution-ui', 'evolution-merge-ui']
 
-/** 0.28.0: the merge host row is all-only — it is infra for the full bundle but
- * deliberately stays out of the host-only and preset bundles. */
+/** 0.28.0: the merge host row is all-only. */
 const ALL_EXTRA_INFRA: string[] = ['evolution-skill-discovery']
-
-describe('host/preset dual-bundle mutual exclusion (S7.2, E-33)', () => {
-  it('overlaps only on shared infra rows, not the full composition', () => {
-    // Both bundles own the infrastructure plane; sharedIds is the overlap.
-    expect(sharedIds.length).toBeGreaterThan(0)
-  })
-
-  it('defines every shared row identically across the two bundles', () => {
-    for (const id of sharedIds) {
-      expect(normalize(presetPatch.get(id)), `shared row ${id}`).toEqual(normalize(hostPatch.get(id)))
-    }
-  })
-
-  it('keeps the preset the only bundle exposing model-facing tools (V10-14: host rows are a subset)', () => {
-    const presetOnly = [...presetPatch.keys()].filter(id => !hostPatch.has(id))
-    // The preset bundle is the one that exposes the model-facing tools.
-    for (const tool of ['tool-memory', 'tool-skill-manage']) {
-      expect(presetOnly).toContain(tool)
-    }
-    // No platform row override survives in either bundle, so the host plane is
-    // a strict subset of the preset's — pin that subset relationship.
-    expect(hostPatch.size).toBeGreaterThan(0)
-    for (const id of hostPatch.keys()) expect(presetPatch.has(id)).toBe(true)
-  })
-})
 
 describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
   it('G-A: every all.patch infra row is byte-identical to host.patch', () => {
@@ -94,13 +50,7 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
     }
   })
 
-  it('G-B: the three all.patch model rows are byte-identical to preset.patch', () => {
-    for (const id of MODEL_TOOLS) {
-      expect(normalize(allPatch.get(id)), `all model row ${id}`).toEqual(normalize(presetPatch.get(id)))
-    }
-  })
-
-  it('all row set = host infra ∪ 3 model rows ∪ the all-only UI rows', () => {
+  it('all row set = host infra ∪ 3 model rows ∪ the all-only rows', () => {
     expect(allPatch.size).toBe(hostPatch.size + MODEL_TOOLS.length + ALL_ONLY_ROWS.length + ALL_EXTRA_INFRA.length)
     for (const id of ALL_EXTRA_INFRA) expect(hostPatch.has(id), `${id} must stay all-only`).toBe(false)
     for (const id of MODEL_TOOLS) expect(hostPatch.has(id)).toBe(false)
@@ -114,28 +64,10 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
       loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-all/cordis.patch.yml', import.meta.url))),
     ]))
     const ids = merged.map(rowId).filter(id => id !== '')
-    // INSERT rows only; there is no root-level platform-row patch to exclude.
     const infraInsertIds = [...hostPatch.keys()]
     for (const id of infraInsertIds) {
       expect(ids.filter(match => match === id), `infra row ${id} must mount TWICE`).toHaveLength(2)
     }
-    // The model rows all added mount exactly once.
     expect(ids.filter(id => id === 'tool-memory')).toHaveLength(1)
-  })
-
-  it('T2: mounting all + one-click preset composes DUPLICATE infra rows AND model rows', () => {
-    const merged = cordisRows(composeEntries([
-      loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-preset/cordis.patch.yml', import.meta.url))),
-      loadOverlayPatches('test', fileURLToPath(new URL('../../evolution-all/cordis.patch.yml', import.meta.url))),
-    ]))
-    const ids = merged.map(rowId).filter(id => id !== '')
-    const infraInsertIds = [...hostPatch.keys()]
-    for (const id of infraInsertIds) {
-      expect(ids.filter(match => match === id), `infra row ${id} must mount TWICE`).toHaveLength(2)
-    }
-    // The preset row set already exposes the model tools — all adds a second
-    // copy of each, hence the cross-bundle exclusion.
-    expect(ids.filter(id => id === 'tool-memory')).toHaveLength(2)
-    expect(ids.filter(id => id === 'tool-skill-manage')).toHaveLength(2)
   })
 })

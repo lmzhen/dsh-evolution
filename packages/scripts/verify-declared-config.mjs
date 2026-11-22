@@ -64,7 +64,7 @@ if (upstreamArg >= 0 && (!argv[upstreamArg + 1] || (argv[upstreamArg + 1] ?? '')
 }
 
 /** The three bundle patch layers that declare deployment config. */
-const BUNDLE_PATCHES = ['evolution-all', 'evolution-host', 'evolution-preset']
+const BUNDLE_PATCHES = ['evolution-all', 'evolution-host']
 
 /**
  * Target profiles, as their ordered plane list. `web` is what `dsh web` boots

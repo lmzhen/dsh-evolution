@@ -1367,8 +1367,8 @@
           "gate-21": [
             {
               "mutate": {
-                "file": "packages/evolution-preset/cordis.yml",
-                "find": "  name: '@deepseek-ai/dsh-storage-json'\n",
+                "file": "packages/evolution-host/cordis.patch.yml",
+                "find": "  name: '@deepseek-ai/dsh-evolution-core/runtime'\n",
                 "replace": ""
               },
               "expect": "red",

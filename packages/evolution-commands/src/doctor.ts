@@ -36,7 +36,8 @@ const tailOf = (name: string): string => name.slice(name.lastIndexOf('/') + 1)
  * side (install-layered.mjs, verify-profile-bundles.mjs) imports the list
  * from packages/scripts/lib-family-packages.mjs; guard-scripts.spec.ts pins
  * the two sides to each other. */
-export const EVOLUTION_BUNDLE_TAILS = new Set(['dsh-evolution-all', 'dsh-evolution-host', 'dsh-evolution-preset'])
+export const EVOLUTION_BUNDLE_TAILS = new Set(['dsh-evolution-all', 'dsh-evolution-host'])
+const LEGACY_PRESET_TAIL = 'dsh-evolution-preset'
 
 /** G3-② (B2): one delivered preset variant compared against a fresh generation.
  * "absent" is the user simply not using that base (never an action); "unknown"
@@ -86,7 +87,7 @@ function familyForms(bundles: readonly string[]): { full: boolean; host: boolean
   return {
     full: bundles.some(name => tailOf(name) === 'dsh-evolution-all'),
     host: bundles.some(name => tailOf(name) === 'dsh-evolution-host'),
-    preset: bundles.some(name => tailOf(name) === 'dsh-evolution-preset'),
+    preset: bundles.some(name => tailOf(name) === LEGACY_PRESET_TAIL),
   }
 }
 
@@ -344,7 +345,7 @@ export function collectEvolutionBundles(home: string, onReadError?: (error: unkn
         dsh?: { profile?: { bundles?: string[] } }
       }
       for (const name of manifest.dsh?.profile?.bundles ?? []) {
-        if (EVOLUTION_BUNDLE_TAILS.has(tailOf(name))) bundles.push(name)
+        if (EVOLUTION_BUNDLE_TAILS.has(tailOf(name)) || tailOf(name) === LEGACY_PRESET_TAIL) bundles.push(name)
       }
     } catch (error) {
       onReadError?.(error, 'profile-manifest')
