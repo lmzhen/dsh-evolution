@@ -14,7 +14,7 @@ import { HistoryItemRow } from './HistoryItemRow.ts'
 import { FALLBACK_COMMANDS } from './fallbacks.ts'
 
 export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
-export interface MergeFace { store: MergeStore; t: Translate; doctorCommand?: string; settings?: SettingsFace; workspaceId?: string; decide?: (rowId: string, verb: 'approve' | 'reject') => Promise<{ ok: boolean; message: string; code?: string }> }
+export interface MergeFace { store: MergeStore; t: Translate; doctorCommand?: string; settings?: SettingsFace; workspaceId?: string | (() => string | undefined); decide?: (rowId: string, verb: 'approve' | 'reject') => Promise<{ ok: boolean; message: string; code?: string }> }
 const QUEUES: MergeQueue[] = ['verify', 'pending', 'fuse', 'skipped']
 const DOCTOR_COMMAND = '/evolution doctor'
 
@@ -184,7 +184,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const openBoth = (a: { name: string; side: 'live' | 'archive' }, b: { name: string; side: 'live' | 'archive' }, rowId: string | undefined): void => { captureFocus(); void store.openPair(a, b, rowId) }
   const openHistory = (): void => { captureFocus(); void store.openHistory() }
   const closeOverlay = (): void => { store.closeOverlay(); requestAnimationFrame(() => { returnFocus.current?.focus() }) }
-  const workspaceId = resolveWorkspaceId(face.workspaceId)
+  const workspaceId = resolveWorkspaceId(typeof face.workspaceId === 'function' ? face.workspaceId() : face.workspaceId)
   const orderStore = useMemo(() => createRowOrderStore(), [])
   const decideRow = (rowId: string, verb: 'approve' | 'reject'): void => {
     if (face.decide === undefined) return

@@ -41,7 +41,7 @@ beforeEach(() => { localStorage.clear(); host = document.createElement('div'); d
 afterEach(() => { root.unmount(); host.remove(); localStorage.clear() })
 const order = (): string[] => [...host.querySelectorAll('[data-role="row"]')].map(el => el.getAttribute('data-row-id') ?? '')
 async function mount(): Promise<void> {
-  await act(async () => { root.render(createElement(MergePanel, { store: new MergeStore(source(), { view: view(), rows }), t, workspaceId: 'ws-A' })) })
+  await act(async () => { root.render(createElement(MergePanel, { store: new MergeStore(source(), { view: view(), rows }), t, workspaceId: () => 'ws-A' })) })
   await act(async () => {})
 }
 

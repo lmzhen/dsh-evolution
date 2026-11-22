@@ -51,9 +51,12 @@ describe('client kit panel lifecycle', () => {
     expect(row.label()).toBe('Demo')
   })
 
-  it('reads a workspace id from either service shape and falls back to local scope', () => {
-    expect(panelWorkspaceId({ get: (name: string) => name === 'workspace' ? { workspaceId: 'w1' } : undefined } as never)).toBe('w1')
-    expect(panelWorkspaceId({ get: () => ({ currentWorkspaceId: 'w2' }) } as never)).toBe('w2')
-    expect(panelWorkspaceId({ get: () => ({}) } as never)).toBeUndefined()
+  it('resolves the current workspace through sessions + workspaces, and falls back to local scope', () => {
+    const sessions = { list: { getSnapshot: () => ({ byId: { s1: { retainedBy: { mainView: 1 } }, s2: { retainedBy: { mainView: 0 } } } }) } }
+    const workspaces = { list: { getSnapshot: () => ({ items: [{ workspaceId: 'w1', sessionIds: ['s1'] }, { workspaceId: 'w2', sessionIds: ['s2'] }] }) } }
+    const ctx = { get: (name: string) => name === 'sessions' ? sessions : name === 'workspaces' ? workspaces : undefined }
+    expect(panelWorkspaceId(ctx as never)).toBe('w1')
+    expect(panelWorkspaceId({ get: () => undefined } as never)).toBeUndefined()
+    expect(panelWorkspaceId({ get: (name: string) => name === 'sessions' ? sessions : undefined } as never)).toBeUndefined()
   })
 })

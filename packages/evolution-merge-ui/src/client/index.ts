@@ -36,7 +36,6 @@ export function apply(ctx: ClientContext): void {
     styles: { css: CSS, tagId: CSS_TAG_ID },
     component: MergeView as unknown as (props: never) => ReactNode,
     face: (t: (key: string, values?: Readonly<Record<string, string | number>>) => string) => {
-      const workspaceId = panelWorkspaceId(ctx)
       return {
         store,
         t,
@@ -50,7 +49,7 @@ export function apply(ctx: ClientContext): void {
           const failure = result.failure
           return { ok: false, message: 'message' in failure && typeof failure.message === 'string' ? failure.message : t('decide.failed'), ...(failure.kind === 'problem' && failure.code !== undefined ? { code: failure.code } : {}) }
         },
-        ...(workspaceId === undefined ? {} : { workspaceId }),
+        workspaceId: () => panelWorkspaceId(ctx),
       }
     },
   })

@@ -228,3 +228,4 @@
 | [47-p2-client-tokens.md](47-p2-client-tokens.md) | P2：客户端 token 补齐、去掉写死 fallback |
 | [48-p2-client-seats.md](48-p2-client-seats.md) | P2：client-seat 几何门禁跟随真实注册 |
 | [49-p2-configforms-shape.md](49-p2-configforms-shape.md) | P2：configForms 删手抄字段 |
+| [50-p2-workspace-id.md](50-p2-workspace-id.md) | P2：panel workspace id 走平台真服务 |
