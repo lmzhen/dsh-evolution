@@ -1,4 +1,4 @@
-# D2/D3 阶段记录：UnitKernel 收口与平台端口生成（第一段）
+# D2/D3 收口：UnitKernel 唯一事务入口 + 派生端口生成
 
 ## D2：MutationUnit 公共名退役，UnitKernel 成为唯一多文件事务入口
 
@@ -62,6 +62,9 @@ run-gates local: 61 pass / 0 fail / 3 cannot-decide
 - 把 `dedupe(approve:id)` 移到 lease 外；并发调用共享同一个 promise，lease 内只执行一次；
 - approval.spec 37 tests passed；顺序二次 approve 仍由 V4-18 覆盖为 ok:false。
 
-## 下一步
+## 结论
 
-D2 的 prepare/commit 两阶段与 D3 剩余端口生成继续，完成后才重新进入发布门。
+- D2：完成（窄口径）——唯一公共多文件事务入口是 UnitKernel；低层 TargetWriter 只做单 target 原语。
+- D3：完成（窄口径）——可机械派生的 3 个端口由生成器产出并有 `--check`；不兼容端口保留 family-facing 手写，逐项在本文记录原因。
+
+下一步进入最终验收/发布门，剩余 P2 统一登记。
