@@ -1303,7 +1303,7 @@
             {
               "mutate": {
                 "file": "packages/README.md",
-                "find": "| `evolution-state` | domain provider (subpath `./domain`);  State facade and provider pinning |\n",
+                "find": "| `memory` | registry, `MEMORY.md`/`USER.md` provider and model tools (subpaths `./files`, `./tools`);  `ctx.memory` provider registry |\n",
                 "replace": ""
               },
               "expect": "red",

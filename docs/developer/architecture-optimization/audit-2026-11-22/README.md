@@ -245,3 +245,4 @@
 | [64-preset-retired.md](64-preset-retired.md) | Phase F：退役 evolution-preset 活表面 |
 | [65-ci-lane.md](65-ci-lane.md) | E4：真实 CI 形态全量套件计时 |
 | [66-state-absorbed.md](66-state-absorbed.md) | Phase F：进化状态包吸收进 core |
+| [67-state-p2-cleanup.md](67-state-p2-cleanup.md) | state 吸收后的 P2 死引用清理 |

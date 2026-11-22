@@ -1,6 +1,6 @@
 # Evolution plugin family — package reference
 
-This directory holds the 22 packages of the dsh-evolution family. For the user guide, start at [README.md](../README.md) or [docs/](../docs/README.md); this file is the package map and maintainer reference.
+This directory holds the 21 packages of the dsh-evolution family. For the user guide, start at [README.md](../README.md) or [docs/](../docs/README.md); this file is the package map and maintainer reference.
 
 ## Package map
 
@@ -62,7 +62,7 @@ Summary: `/evolution` (27 table entries), `/graph`, and `/skill-domain` (mode:on
 
 ## State and IO
 
-The shipped state provider is `evolution-state-domain`, which registers a KV domain on the platform storage stack (base bundle: `storage` + `storage-json` + `storage-domain`). `evolution-state` is a facade, not a medium. IO is a local `node:fs` provider; the honest process scope is **single-process**.
+The shipped state provider is `@deepseek-ai/dsh-evolution-core/state/domain`, which registers a KV domain on the platform storage stack (base bundle: `storage` + `storage-json` + `storage-domain`). `@deepseek-ai/dsh-evolution-core/state` is a facade, not a medium. IO is a local `node:fs` provider; the honest process scope is **single-process**.
 
 ## Generated surfaces
 

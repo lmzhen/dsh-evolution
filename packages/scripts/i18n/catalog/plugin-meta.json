@@ -502,66 +502,6 @@
       "ru": "Проверка навыков",
       "pt": "Saúde das skills"
     },
-    "evolution-state-domain.description": {
-      "zh": "内部机制，无需设置。",
-      "en": "Internal component. Nothing to configure.",
-      "ja": "内部用で、設定する項目はありません。",
-      "es": "Es de uso interno y no hay nada que configurar.",
-      "fr": "Élément interne : rien à régler.",
-      "de": "Nur intern; hier gibt es nichts einzustellen.",
-      "ru": "Внутренняя часть, настраивать нечего.",
-      "pt": "De uso interno; não há nada para configurar."
-    },
-    "evolution-state-domain.title": {
-      "zh": "平台存储",
-      "en": "Platform storage",
-      "ja": "保存先の接続",
-      "es": "Almacén de la plataforma",
-      "fr": "Stockage de la plateforme",
-      "de": "Speicher der Plattform",
-      "ru": "Хранилище платформы",
-      "pt": "Armazenamento do sistema"
-    },
-    "evolution-state-json.description": {
-      "zh": "把各功能的进度存在一个文件里，你可以自己备份。",
-      "en": "Keeps the features' progress in a file you can back up.",
-      "ja": "各機能の状態を、バックアップできるファイルに残す。",
-      "es": "Guarda el progreso de las funciones en un archivo que puedes respaldar.",
-      "fr": "Garde la progression des fonctions dans un fichier que vous pouvez sauvegarder.",
-      "de": "Hält den Fortschritt der Funktionen in einer Datei, die du sichern kannst.",
-      "ru": "Хранит прогресс функций в файле, который легко скопировать для резервной копии.",
-      "pt": "Guarda o progresso dos recursos em um arquivo do qual você pode fazer backup."
-    },
-    "evolution-state-json.title": {
-      "zh": "进度文件",
-      "en": "Progress file",
-      "ja": "状態ファイル",
-      "es": "Archivo de progreso",
-      "fr": "Fichier de progression",
-      "de": "Fortschrittsdatei",
-      "ru": "Файл прогресса",
-      "pt": "Arquivo de progresso"
-    },
-    "evolution-state-storage.description": {
-      "zh": "内部机制，无需设置。",
-      "en": "Internal component. Nothing to configure.",
-      "ja": "内部用で、設定する項目はありません。",
-      "es": "Es de uso interno y no hay nada que configurar.",
-      "fr": "Élément interne : rien à régler.",
-      "de": "Nur intern; hier gibt es nichts einzustellen.",
-      "ru": "Внутренняя часть, настраивать нечего.",
-      "pt": "De uso interno; não há nada para configurar."
-    },
-    "evolution-state-storage.title": {
-      "zh": "存储支持",
-      "en": "Storage support",
-      "ja": "保存の共通処理",
-      "es": "Soporte de guardado",
-      "fr": "Socle de stockage",
-      "de": "Speicher-Anbindung",
-      "ru": "Поддержка хранения",
-      "pt": "Suporte ao armazenamento"
-    },
     "evolution-threat.description": {
       "zh": "改记忆、改技能时，先查一遍有没有不安全的内容。",
       "en": "Checks the agent's memory and skill changes for unsafe content.",
