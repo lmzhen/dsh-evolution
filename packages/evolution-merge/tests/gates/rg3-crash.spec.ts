@@ -18,6 +18,20 @@ async function waitFor(path: string, timeoutMs: number): Promise<string> {
   throw new Error('timeout waiting for ' + path)
 }
 
+async function waitForPid(path: string, timeoutMs: number): Promise<number> {
+  const end = Date.now() + timeoutMs
+  while (Date.now() < end) {
+    try {
+      const pid = Number(await readFile(path, 'utf8'))
+      // The child creates pidPath before its bytes are flushed; an empty read is Number('') === 0,
+      // and taskkill /PID 0 must never be attempted.
+      if (Number.isInteger(pid) && pid > 0) return pid
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 25))
+  }
+  throw new Error('timeout waiting for a positive child pid at ' + path)
+}
+
 async function crashAt(point: (typeof POINTS)[number]): Promise<void> {
     const home = await tempRoot('dsh-rg3-crash-')
     const core = new URL('../../src/unit-protocol.ts', import.meta.url).href
@@ -43,7 +57,7 @@ await tx.commit(p.prepared)
     await writeFile(join(home, 'tree', 'alpha'), 'old')
     await writeFile(join(home, 'tree', 'beta'), 'beta')
     const child = spawnTsx(scriptPath)
-    const pid = Number(await waitFor(pidPath, 20_000))
+    const pid = await waitForPid(pidPath, 20_000)
     const killed = process.platform === 'win32'
       ? spawnSync('taskkill', ['/F', '/PID', String(pid)], { encoding: 'utf8' })
       : spawnSync('kill', ['-9', String(pid)], { encoding: 'utf8' })

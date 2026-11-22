@@ -26,7 +26,7 @@
 - `build-lib`: 0；
 - adapter + 受影响 core/tool-skill-manage：6 files / 26 tests passed；
 - `run-gates local`: 61 pass / 0 fail / 3 cannot-decide；
-- 全量 suite 待跑。
+- 全量 family 套件：442 files / 2429 tests passed（1073.99s）；首跑 rg3-crash 的 pid 读取竞态已改为等待正 pid（taskkill /PID 0 不再可能）。
 
 ## 回退
 
