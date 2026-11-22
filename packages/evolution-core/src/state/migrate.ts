@@ -56,7 +56,7 @@ async function migrateDomainToStoreUnlocked(ctx: Context, options: StateMigratio
   const storePath = join(home, 'state', 'store.json')
   const markerPath = join(home, 'state', STATE_MIGRATION_MARKER)
   const io = options.io
-  if (!options.dryRun && await io.exists(storePath)) {
+  if (await io.exists(storePath)) {
     throw new Error('evolution-state-migrate: store already exists; refusing to overwrite it: ' + storePath)
   }
   // Prefer the provider that is already mounted: the host normally has the

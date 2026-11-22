@@ -96,6 +96,12 @@ describe('domain → StateStore migration', () => {
     await stateWrite
   })
 
+  it('dry-run refuses an existing store instead of reporting a false dry success', async () => {
+    const { ctx, home, io } = await seeded()
+    await io.writeText(join(home, 'state', 'store.json'), '{}\n')
+    await expect(migrateDomainToStore(ctx, { io, home, dryRun: true })).rejects.toThrow(/refusing to overwrite/)
+  })
+
   it('dry-run counts without writing store or marker', async () => {
     const { ctx, home, io } = await seeded()
     const result = await migrateDomainToStore(ctx, { io, home, dryRun: true })

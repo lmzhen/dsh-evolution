@@ -335,6 +335,11 @@ const RAW_WRITE_REGISTER = new Set([
   // failed release. Both are lock protocol, not the durable state medium (the platform
   // withFileLock owns the lock file it creates), so routing them through the IO seam would put the
   // seam inside the lock it exists to take.
+  // W9-state-lock: the migration/state lock lives under the evolution home and the
+  // platform withFileLock requires its parent; creating that directory is lock protocol,
+  // not a second state medium (the bytes still go through transactIo / createTextIfAbsent).
+  'evolution-core/src/state/index.ts',
+  'evolution-core/src/state/migrate.ts',
   'evolution-core/src/authority.ts',
   'evolution-commands/src/index.ts',
   'evolution-merge/src/domain/state-v3.ts',
@@ -766,6 +771,7 @@ const MUTABLE_STATE_RE = /^const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*new\s+(?:
 // scope ("dedup across instances and roots keyed by file NAME only"), and the module function that
 // needed them now takes the memory as an argument.
 const MUTABLE_STATE = new Map([
+  ['evolution-core/src/state/store-plugin.ts :: providers', 'WHY MODULE SCOPE: the provider is a stable registrant per evolution home; Cordis HMR re-applies the row and the storage registry only treats the SAME object as idempotent. Lifecycle: lazy get-or-create per home, bounded to the process lifetime, no dispose needed because the row owns the registration effect; evidence evolution-core/tests/state/state-auto.spec.ts and evolution-host/tests/host-composition.spec.ts; validity single-process (the file medium is cross-process via createTextIfAbsent/transact).'],
   ['evolution-core/src/composition/composer.ts :: overridesCache', 'WHY MODULE SCOPE (S4.4): the cache is an immutable-data memo keyed by the manifest PATH, shared by every composition caller; process scope changes no behaviour and threading it through callers would buy nothing (same rationale as the former preset-composition.ts entry this refactor replaced). Lifecycle: lazy get-or-set on first read, replaced when its source manifest is re-read; evidence evolution-core/tests/real-preset-composition.spec.ts; validity single-process cache over on-disk data.'],
   ['evolution-core/src/composition/ensure.ts :: SLOTS', 'WHY MODULE SCOPE (S4.4): the single-flight registration table is keyed by Context through a WeakMap, so a disposed fiber\'s slots die with it; lazy ensureRestrictedPreset calls for the same context must share it (a per-instance table would register the same preset twice), and the WeakMap key is exactly the lifecycle owner. Lifecycle: get-or-create per kind, release via ctx.effect on dispose; evidence evolution-core/tests/subagent-channel.spec.ts and evolution-host/tests/subagent-restrictor.spec.ts; validity single-process.'],
   // The "validity single-process" tail of every row is the assumption N20 makes

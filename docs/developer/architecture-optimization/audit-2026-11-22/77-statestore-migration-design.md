@@ -101,7 +101,9 @@ store-migration: 4 tests passed（含迁移后 auto 读 store、删 marker 回�
 验证：
 
 ```text
-core state: 9 files / 53 tests passed
+core state: 9 files / 54 tests passed
+全量 family 套件: 446 files / 2446 tests passed（1188.86s）
+`run-gates local`: 61 pass / 0 fail / 3 cannot-decide
 ```
 
 剩余 P2：marker 写失败后 store 已存在会阻止重试、dry-run 不检查已有 store、HMR 二次注册、旧 pin domain 命令不切换提示、README row 计数/tsconfig 子路径。
