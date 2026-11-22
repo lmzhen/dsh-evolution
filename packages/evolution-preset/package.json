@@ -24,10 +24,7 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    },
-    "resolverDependencies": [
-      "@deepseek-ai/dsh-evolution-core"
-    ]
+    }
   },
   "dependencies": {
     "@deepseek-ai/dsh-evolution-state": "workspace:^",

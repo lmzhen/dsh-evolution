@@ -195,9 +195,8 @@ for (const dir of readdirSync(root)) {
     }
   }
   const haystack = referenceText.join('\n')
-  // Resolver dependencies (G2-S6): a bundle can carry a package ONLY so the runtime can resolve a
-  // preset row (the restrictor subpath mounted from the agent preset). There is no source import to
-  // reference, so the manifest names them explicitly under dsh.resolverDependencies.
+  // A bundle can carry a package only so its preset row resolves; the agent preset names the
+  // restrictor row's core package explicitly. This is a live composition edge, not a dead field.
   const resolverDeps = new Set(Array.isArray(manifest.dsh?.resolverDependencies) ? manifest.dsh.resolverDependencies : [])
   for (const section of ['dependencies', 'peerDependencies', 'optionalDependencies', 'devDependencies']) {
     for (const name of Object.keys(manifest[section] ?? {})) {

@@ -236,3 +236,4 @@
 | [55-p2-local-require.md](55-p2-local-require.md) | P2：client require 改 bundle 局部绑定 |
 | [56-p2-merge-view-ledger.md](56-p2-merge-view-ledger.md) | P2：merge tab 响应式 + 计数共享解析 |
 | [57-p2-status.md](57-p2-status.md) | P2：07 域处置状态总表 |
+| [58-p2-resolver-deps.md](58-p2-resolver-deps.md) | P2：删除 dsh.resolverDependencies |
