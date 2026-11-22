@@ -176,6 +176,7 @@
         "evolution-merge::tests/authoring-manifest.spec.ts",
         "evolution-merge::tests/run-meta-merge.spec.ts",
         "evolution-merge::tests/runtime-busy-target.spec.ts",
+        "evolution-merge::tests/state-migrate-v4.spec.ts",
         "evolution-merge::tests/undo-fence.spec.ts",
         "evolution-merge::tests/undo-journal-protocol.spec.ts",
         "evolution-merge::tests/undo-resume-skip.spec.ts",
@@ -726,6 +727,7 @@
         "evolution-merge::tests/staging-files.spec.ts",
         "evolution-merge::tests/staging-index.spec.ts",
         "evolution-merge::tests/staging.spec.ts",
+        "evolution-merge::tests/state-migrate-v4.spec.ts",
         "evolution-merge::tests/state-v3.spec.ts",
         "evolution-merge::tests/state.spec.ts",
         "evolution-merge::tests/status-wire.spec.ts",
@@ -1404,6 +1406,7 @@
         "evolution-merge::tests/staging-files.spec.ts",
         "evolution-merge::tests/staging-index.spec.ts",
         "evolution-merge::tests/staging.spec.ts",
+        "evolution-merge::tests/state-migrate-v4.spec.ts",
         "evolution-merge::tests/state-v3.spec.ts",
         "evolution-merge::tests/state.spec.ts",
         "evolution-merge::tests/status-wire.spec.ts",
@@ -2030,6 +2033,7 @@
         "evolution-merge::tests/staging-files.spec.ts",
         "evolution-merge::tests/staging-index.spec.ts",
         "evolution-merge::tests/staging.spec.ts",
+        "evolution-merge::tests/state-migrate-v4.spec.ts",
         "evolution-merge::tests/state-v3.spec.ts",
         "evolution-merge::tests/state.spec.ts",
         "evolution-merge::tests/status-wire.spec.ts",
@@ -2223,11 +2227,11 @@
   "counts": {
     "fast": {
       "gates": 64,
-      "specs": 139
+      "specs": 140
     },
     "pre-tag": {
       "gates": 64,
-      "specs": 447
+      "specs": 448
     },
     "ci-only": {
       "gates": 10,
@@ -2235,16 +2239,16 @@
     },
     "full(ci=off)": {
       "gates": 64,
-      "specs": 447
+      "specs": 448
     },
     "full(ci=on)": {
       "gates": 74,
-      "specs": 518
+      "specs": 519
     }
   },
   "specs": {
-    "total": 518,
-    "marked": 518,
+    "total": 519,
+    "marked": 519,
     "unmarked": 0
   }
 }

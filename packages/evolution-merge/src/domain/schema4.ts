@@ -4,7 +4,7 @@ import { transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-cor
 import { isV4Row, applyV4Write, v3ToV4, type CommitUnitRef, type V4Event, type V4Row, type V4Write, type V4WriteResult } from './row-v4.ts'
 import type { V3Row } from './row-v3.ts'
 import { readPre1bManifest } from './pre-1b-backup.ts'
-import { readTextOrNull } from './read-probe.ts'
+import { probeText } from '@deepseek-ai/dsh-evolution-core'
 
 export interface MergeStateV4 {
   readonly schemaVersion: 4
@@ -49,7 +49,9 @@ async function inspect(io: EvolutionIoLike, home: string, body: Record<string, u
 
 /** Pure read-only v4 readiness. Does not normalize, repair, or write. */
 export async function readV4Readiness(io: EvolutionIoLike, home: string): Promise<V4Readiness> {
-  const raw = await readTextOrNull(io, schema4StatePath(home))
+  const probe = await probeText(io, schema4StatePath(home))
+  if (probe.kind === 'unknown') return blocked('merge-state-needs-repair', 'merge state is unreadable: ' + probe.reason)
+  const raw = probe.kind === 'present' ? probe.value : null
   if (raw === null) return blocked('merge-state-v4-required', 'schema4 state is missing')
   let value: unknown
   try { value = JSON.parse(raw) } catch { return blocked('merge-state-needs-repair', 'merge state is not JSON') }

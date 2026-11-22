@@ -22,7 +22,7 @@
 | 重启 | 迁移后重启宿主无 activation 失败，auto 选 store，页面继续可用 |
 | 截图 | `D:\dsh\_after_store_1440.png`、`D:\dsh\_lab60_1024.png`、`D:\dsh\_lab60_390.png` |
 
-全量 family 套件（最终 HEAD）：447 files / 2454 tests passed（1181.28s）。
+全量 family 套件（最终 HEAD）：448 files / 2456 tests passed（1182.81s）。
 
 合并 scan 在无模型 key 的隔离宿主上启动后进入 `failed`（screening 阶段），不是 state bootstrap 失败；合并页 200 已证明状态可读。真实模型合并需另配 key 的宿主，不在本候选的 UI 验收范围。
 
@@ -44,3 +44,8 @@
 - S1–S4/traceability release evidence 需在最终 dist 上重测；
 - 独立复核需在最终 HEAD 再跑一次 P0/P1；
 - D1c domain fallback、P2 台账中的 defer 项按 `80-p2-ledger.md`。
+
+## 复核后修复（P1）
+
+- legacy v2/v1 → v4 迁移重新经过 v3 gate，再 normalize；新增 `state-migrate-v4.spec` 验证 v2 迁移；
+- readiness 使用 `probeText` 三态：unreadable 返回 `merge-state-needs-repair`，不再把未知读成空状态；目录/不可读测试覆盖。

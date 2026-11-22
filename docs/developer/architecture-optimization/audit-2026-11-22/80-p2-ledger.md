@@ -33,7 +33,7 @@
 
 1. **release evidence 仍是旧数据**：`packages/scripts/release-evidence-rehearsal.json` 的 `measuredCommit`、traceability source 都是 0.59.6 旧值；发布前必须重新 build、pack、复算 dist sha256，并重测 S1–S4。
 2. **dev pack 是旧构建**：`D:\dsh\harness-rc3\packages\evolution\dist` 早于 D1/D2，不能作为发布证据；必须重新 `build-lib` + `prepare-release --dev-build`/正式 pack。
-3. **真实 web 验收未做**：安装/启动不算整体通过；发布前后必须做真实 web 操作与截图/E2E。
+3. **候选 web 验收已做，最终 dist 验收未做**：lab60 已记录 0.60.0 候选（见 81）；正式 tarball 打包后必须用同一 dist 再验或证明字节一致。
 4. **D1c domain fallback**：本版保留 domain provider/row 作为迁移窗口；发布说明必须写“先 `/evolution migrate state`、重启后用 store、domain 留一版回退”，且 DCR-4 用户确认前不能声称 domain authority 删除完成。
 5. **trusted publisher 未 OTP 复核**：`npm trust list` 本会话被 EOTP 挡住；正式 tag 前必须核对 repo/file/environment。
-6. **全量套件需在最终 HEAD 复跑**：当前记录 447 files / 2454 tests；serial/digest 修复后需更新 reading。
+6. **全量套件需在最终 HEAD 复跑**：当前记录 448 files / 2456 tests；serial/digest 修复后需更新 reading。

@@ -4,6 +4,7 @@
  */
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { normalizePairLedger } from './pair-ledger.ts'
+import { ensureMergeStateReady } from './state-bootstrap.ts'
 import { readV4Readiness } from './schema4.ts'
 
 /** Outcome of the one-time migration. */
@@ -22,12 +23,18 @@ export type MigrateToV4Result =
 export async function migrateMergeStateToV4(
   io: EvolutionIoLike,
   home: string,
-  _fence?: { run<T>(body: () => Promise<T>): Promise<T> },
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> },
 ): Promise<MigrateToV4Result> {
   const v4 = await readV4Readiness(io, home)
   if (v4.ok) return { ok: true, migrated: false }
   if (v4.code === 'merge-state-forward-only' || v4.code === 'merge-state-needs-repair') {
     return { ok: false, code: v4.code, message: v4.message }
+  }
+  // Legacy v1/v2 and a pending v3 journal must pass the v3 gate before v4
+  // normalize; only protocol-v4/absent states can skip it.
+  if (v4.code !== 'merge-state-v4-required' && v4.code !== 'merge-state-normalize-required') {
+    const v3 = await ensureMergeStateReady(io, home, fence)
+    if (!v3.ok) return { ok: false, code: v3.code, message: v3.message }
   }
   const normalized = await normalizePairLedger(io, home)
   if (!normalized.ok) return { ok: false, code: 'merge-state-needs-repair', message: normalized.message ?? 'v3->v4 normalize failed' }

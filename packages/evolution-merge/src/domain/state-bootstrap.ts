@@ -3,7 +3,7 @@ import { readTextOrNull } from './read-probe.ts'
 import { createHash } from 'node:crypto'
 import { chmod, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { probeText, transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { migrateV2ToV3, type QuarantinedRow, type V3State } from './migrate-v3.ts'
 import { isV3Row, type V3Row } from './row-v3.ts'
 import { stagingIndexPath, writeStagingIndex } from './staging-index.ts'
@@ -141,7 +141,9 @@ async function completeJournal(io: EvolutionIoLike, home: string, journal: Migra
 
 /** Read-only readiness probe. Never migrates, never writes. */
 export async function readStateReadiness(io: EvolutionIoLike, home: string): Promise<StateReadiness> {
-  const raw = await readTextOrNull(io, mergeStatePath(home))
+  const probe = await probeText(io, mergeStatePath(home))
+  if (probe.kind === 'unknown') return blocked('merge-state-needs-repair', 'state file is unreadable: ' + probe.reason)
+  const raw = probe.kind === 'present' ? probe.value : null
   if (raw === null) return { ok: true, schema: 3, migrated: false, state: { schemaVersion: 3, rows: [] }, quarantine: [], report: await readReport(io, home) }
   const body = parseBody(raw)
   if (body === null) return blocked('merge-state-needs-repair', 'state file is not a JSON object')
