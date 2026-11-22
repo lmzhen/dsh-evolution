@@ -17,7 +17,7 @@
 
 - `gen-param-docs` / `gen-i18n` / `gen-gate-manifest` / `gen-checks-fact` / `gen-test-lines` / `gen-check-taxonomy` / `gen-line-manifest` 全部重生成；
 - `run-gates local`: 61 pass / 0 fail / 3 cannot-decide；
-- 全量套件待最终复跑。
+- 全量 family 套件：442 files / 2426 tests passed（1076.71s）。
 
 ## 回退
 
