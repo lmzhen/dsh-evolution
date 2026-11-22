@@ -42,7 +42,7 @@ export async function mountStateStack(
   await ctx.plugin(NodeIo)
   if (options.authority === true) ctx.provide('evolutionMutationAuthority', new MutationAuthority({ io: ctx.evolutionIo.provider(), home: root }))
   await ctx.plugin(DomainState)
-  if (options.evolution) await ctx.plugin(EvolutionState, { provider: 'domain' })
+  if (options.evolution) await ctx.plugin(EvolutionState, { provider: 'domain', home: root })
   if (options.approval) await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
   return ctx
 }

@@ -9,8 +9,10 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
+import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values'
 import { evolutionHome } from '../state-store.ts'
 import type Schema from '@deepseek-ai/schemastery'
 import type {
@@ -46,19 +48,24 @@ declare module '@deepseek-ai/cordis' {
 export interface Config {
   /** Pin a provider by name; `auto` picks store after the migration marker, else domain. */
   provider?: string
+  /** Evolution home override (tests/migration); defaults to `evolutionHome()`. */
+  home?: string
 }
 
 export class EvolutionState extends Service {
   static inject = ['evolutionStateStorage']
   static Config: Schema<Config> = z.object({
     provider: z.string().default(''),
+    home: z.string().default(''),
   })
 
   private readonly providerName: string
+  private readonly home: string
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionState')
     this.providerName = config.provider ?? ''
+    this.home = config.home !== undefined && config.home !== '' ? config.home : evolutionHome()
     // S-07: a PINNED provider name is verified at mount when any
     // provider is already registered — a config typo used to explode only at
     // the first state access, far away from the mistake (the registry's
@@ -82,8 +89,12 @@ export class EvolutionState extends Service {
   private assertProviderChoice(): void {
     if (this.providerName === 'auto') {
       const names = this.ctx.evolutionStateStorage.providerNames()
-      if (existsSync(join(evolutionHome(), 'state', STATE_MIGRATION_MARKER)) && !names.includes(PROVIDER_STORE)) {
-        throw new Error('evolution-state: the migration marker exists but no "' + PROVIDER_STORE + '" provider is registered')
+      if (existsSync(join(this.home, 'state', STATE_MIGRATION_MARKER))) {
+        if (!names.includes(PROVIDER_STORE)) throw new Error('evolution-state: the migration marker exists but no "' + PROVIDER_STORE + '" provider is registered')
+        const storePath = join(this.home, 'state', 'store.json')
+        if (!existsSync(storePath) || statSync(storePath).size === 0) {
+          throw new Error('evolution-state: the migration marker exists but the store is missing/empty: ' + storePath)
+        }
       }
       return
     }
@@ -100,9 +111,40 @@ export class EvolutionState extends Service {
   /** `auto` is the migration switch: the marker is the explicit one-way signal. */
   private autoProviderName(): string {
     const names = this.ctx.evolutionStateStorage.providerNames()
-    if (existsSync(join(evolutionHome(), 'state', STATE_MIGRATION_MARKER))) return PROVIDER_STORE
+    const marker = join(this.home, 'state', STATE_MIGRATION_MARKER)
+    if (existsSync(marker)) {
+      const storePath = join(this.home, 'state', 'store.json')
+      // A marker without a non-empty store is a half-migration; failing loud is
+      // safer than silently serving an empty state authority.
+      if (!existsSync(storePath) || statSync(storePath).size === 0) {
+        throw new Error('evolution-state: the migration marker exists but the store is missing/empty: ' + storePath + ' (restore the store or remove the marker to keep using domain)')
+      }
+      return PROVIDER_STORE
+    }
     if (names.includes(PROVIDER_DOMAIN)) return PROVIDER_DOMAIN
-    return names[0] ?? ''
+    throw new Error('evolution-state: auto has no migration marker and no "' + PROVIDER_DOMAIN + '" provider; refusing to guess a state authority')
+  }
+
+  /** Validate synchronously (legacy callers rely on a throw, not a rejected promise). */
+  private assertResolvable(): void {
+    this.assertProviderChoice()
+    if (this.providerName !== '' && this.providerName !== 'auto') {
+      // Throws synchronously for an unknown/absent pinned provider; the mount-time
+      // check stays lazy only while the registry is empty.
+      this.ctx.evolutionStateStorage.provider(this.providerName)
+    }
+  }
+
+  /** Validate, then serialize against migration across processes. */
+  private run<T>(task: () => Promise<T>): Promise<T> {
+    this.assertResolvable()
+    return this.withStateLock(task)
+  }
+
+  /** Serialize state operations against the migration command across processes. */
+  private async withStateLock<T>(task: () => Promise<T>): Promise<T> {
+    await mkdir(this.home, { recursive: true })
+    return withFileLock(join(this.home, 'state.lock'), task)
   }
 
   private storage(): EvolutionStateStorage {
@@ -113,50 +155,50 @@ export class EvolutionState extends Service {
 
   /** A2: refresh the mounted provider before a decision reads pending state. */
   reload(): Promise<void> {
-    return this.storage().reload?.() ?? Promise.resolve()
+    return this.run(async () => this.storage().reload?.() ?? Promise.resolve())
   }
 
   loadReviewState(sessionId: string): Promise<ReviewStateRecord | null> {
-    return this.storage().loadReviewState(sessionId)
+    return this.run(async () => this.storage().loadReviewState(sessionId))
   }
 
   saveReviewState(sessionId: string, record: ReviewStateRecord): Promise<void> {
-    return this.storage().saveReviewState(sessionId, record)
+    return this.run(async () => this.storage().saveReviewState(sessionId, record))
   }
 
   loadCuratorState(): Promise<CuratorStateRecord | null> {
-    return this.storage().loadCuratorState()
+    return this.run(async () => this.storage().loadCuratorState())
   }
 
   saveCuratorState(record: CuratorStateRecord): Promise<void> {
-    return this.storage().saveCuratorState(record)
+    return this.run(async () => this.storage().saveCuratorState(record))
   }
 
   /** Atomic read-modify-write the curator-state record (S5.5): `task` returns
    * the next record; returning null keeps the current record unchanged (the
    * seam has no delete semantic). */
   transactCuratorState(task: (current: CuratorStateRecord | null) => CuratorStateRecord | null): Promise<void> {
-    return this.storage().transactCuratorState(task)
+    return this.run(async () => this.storage().transactCuratorState(task))
   }
 
   listPending(status: PendingStatus = 'pending'): Promise<PendingRecord[]> {
-    return this.storage().listPending(status)
+    return this.run(async () => this.storage().listPending(status))
   }
 
   savePending(record: PendingRecord): Promise<void> {
-    return this.storage().savePending(record)
+    return this.run(async () => this.storage().savePending(record))
   }
 
   tryResolvePending(id: string, status: 'approved' | 'rejected', expectedClaimId?: string) {
-    return this.storage().tryResolvePending(id, status, expectedClaimId)
+    return this.run(async () => this.storage().tryResolvePending(id, status, expectedClaimId))
   }
 
   claimPending(id: string, claimId: string) {
-    return this.storage().claimPending(id, claimId)
+    return this.run(async () => this.storage().claimPending(id, claimId))
   }
 
   releasePendingClaim(id: string, claimId: string) {
-    return this.storage().releasePendingClaim(id, claimId)
+    return this.run(async () => this.storage().releasePendingClaim(id, claimId))
   }
 }
 

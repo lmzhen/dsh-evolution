@@ -90,3 +90,18 @@ store-migration: 4 tests passed（含迁移后 auto 读 store、删 marker 回�
 - `run-gates local`: 61 pass / 0 fail / 3 cannot-decide。
 
 仍待：删除 domain provider/row、更新 `evolution-state-domain` 的运行时描述、真实升级/回滚演练。
+
+## D1b-3 独立复核修复
+
+复核指出两个 P1，已修：
+
+1. **运行中迁移无锁**：`EvolutionState` 的每个状态操作与 `migrateDomainToStore` 共用同一把跨进程 `state.lock`（`withFileLock`）；迁移持有锁跨“读 domain → 写 store → 写 marker”，状态写不能插入。新增阻塞测试证明迁移期间的状态读必须等锁。
+2. **marker 存在但 store 缺失/为空时静默读空**：`auto` 现在要求 marker + 非空 store 文件；缺失/0 字节直接 fail loud，测试覆盖两者的抛错。
+
+验证：
+
+```text
+core state: 9 files / 53 tests passed
+```
+
+剩余 P2：marker 写失败后 store 已存在会阻止重试、dry-run 不检查已有 store、HMR 二次注册、旧 pin domain 命令不切换提示、README row 计数/tsconfig 子路径。

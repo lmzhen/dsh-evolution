@@ -8,9 +8,11 @@
  */
 
 import { join } from 'node:path'
+import { mkdir } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Domain } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { storageDomainPort } from '@deepseek-ai/dsh-evolution-platform/ports'
+import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values'
 import { evolutionHome } from '../state-store.ts'
 import type { EvolutionIoLike } from '../io.ts'
 import { writeStateStoreSnapshot, type StoredReviewState } from './store.ts'
@@ -49,7 +51,7 @@ export { STATE_MIGRATION_MARKER }
  * Migrate the three state tables. The store file is published with
  * create-if-absent, so a stale rerun cannot overwrite a newer store.
  */
-export async function migrateDomainToStore(ctx: Context, options: StateMigrationOptions): Promise<StateMigrationResult> {
+async function migrateDomainToStoreUnlocked(ctx: Context, options: StateMigrationOptions): Promise<StateMigrationResult> {
   const home = options.home ?? evolutionHome()
   const storePath = join(home, 'state', 'store.json')
   const markerPath = join(home, 'state', STATE_MIGRATION_MARKER)
@@ -108,4 +110,16 @@ export async function migrateDomainToStore(ctx: Context, options: StateMigration
     curator: result.curator,
   }, null, 2) + '\n')
   return result
+}
+
+
+/**
+ * Public entry: hold the same cross-process state.lock every EvolutionState
+ * operation holds, so no state write can interleave between the snapshot read
+ * and the marker publish.
+ */
+export async function migrateDomainToStore(ctx: Context, options: StateMigrationOptions): Promise<StateMigrationResult> {
+  const home = options.home ?? evolutionHome()
+  await mkdir(home, { recursive: true })
+  return withFileLock(join(home, 'state.lock'), () => migrateDomainToStoreUnlocked(ctx, { ...options, home }))
 }
