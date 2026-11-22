@@ -145,7 +145,7 @@
 2. **`evolution-core` 事实上帝包**：28,044 行 src（全仓 35%），112 个文件平铺 `src/`，21 个 exports，13 个包依赖；barrel 70/75 star 只剩 5 条预算。`SkillLibrary` 4,145 行/102 方法；`tool-skill-manage` 单 `apply` 1,205 行；`commands` 1,081；`review` 958；全仓 ≥100 行函数 83 个（见 06-D1/D2）。
 3. **写路径五层锁/两套 CAS**：`ROOT_SERIAL`、`SkillTargetLocks`、`SkillRootGate`、`HomeAuthority`、`TargetLockSet` 并存；`WriteKernel` 用原始字节，`SkillWriteService` 用 contentHash，平台 `FsVersion` 未直接用；死 API `WriteKernel.commit/run/compensate`、`writeFileCas`、`atomicWriteFiles` 无调用方（01-P2）。
 4. **重复状态机/契约**：merge 的 scan/round2 两套 pair 状态机、三套行结果表示；approval 与 UI 各写一份 PendingRow；`platform-contract` 与 `adapter` 19 个 port 三处枚举；HOST_ROUTES 与客户端路由各拼一份。
-5. **退役/死面**：`evolution-preset` 已排除发布仍有 bundle patch/cordis.yml/peers；`dsh.resolverDependencies` 死字段；`evolution-agent/agent.cordis.yml` 自述 legacy 仍打包；`verify-architecture-baseline.mjs` 无调用；arch 注册表 5 个死键（06-D9/D11）。
+5. **退役/死面**：`evolution-preset` 已排除发布仍有 bundle patch/cordis.yml/peers；`dsh.resolverDependencies` 死字段；`evolution-agent/agent.cordis.yml` 自述 legacy 仍打包；`verify-architecture-baseline.mjs`/基线 JSON 已删除（06-D11）；arch 注册表 5 个死键（06-D9）。
 6. **UI host/client 混装**：`evolution-ui` 一个包同时 host 行与浏览器入口，客户端组件散在 `panels/*.ts`；`build-client` 只认 `src/client/index.ts`，放错目录静默不进构建（06-D8）。
 7. **文档漂移**：`architecture.md` 仍写 36 包/0.49 基线；`architecture-optimization/README` 仍写“剩余发布门禁”，实际已发布 0.59.6；本次审计文档用于校正当前事实（见 08-P2-13、06-D14）。
 
@@ -237,3 +237,4 @@
 | [56-p2-merge-view-ledger.md](56-p2-merge-view-ledger.md) | P2：merge tab 响应式 + 计数共享解析 |
 | [57-p2-status.md](57-p2-status.md) | P2：07 域处置状态总表 |
 | [58-p2-resolver-deps.md](58-p2-resolver-deps.md) | P2：删除 dsh.resolverDependencies |
+| [59-d11-dead-validator.md](59-d11-dead-validator.md) | D11：删除无调用 baseline 验证器 |

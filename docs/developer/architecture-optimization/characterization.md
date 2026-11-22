@@ -7,14 +7,9 @@
 > Phase 0 的 merge 全量执行位置见 27 的 **DCR-1**：148 个 pre-tag spec 保留在 pre-tag lane，不在开发机裸跑。
 > **DCR-2** 后 0.50 只验收 rc.3；下面 rc.1 的行只作 0.49 历史基线，不再作为发布门。
 
-## 0. 一键基线验证
+## 0. 历史一键基线验证（已删除）
 
-```bash
-node packages/scripts/verify-architecture-baseline.mjs \
-  --overlay D:\line-b6 --json
-```
-
-检查三件事：`v0.49.0` tag/commit、7 个必需文档、3 个 spec 的逐文件计数（9/30/37）。2026-11-16 实测 exit 0；日志 `D:\dsh\_phase0-baseline-verify4.log`。
+D11：`verify-architecture-baseline.mjs` 与 `architecture-baseline.json` 记录的是 v0.49.0 的旧树，且没有 caller；已删除。当前验证以 `run-gates local` 与 [audit-2026-11-22/README.md](audit-2026-11-22/README.md) 为准。
 
 
 ## 0.1 双版本编译矩阵
