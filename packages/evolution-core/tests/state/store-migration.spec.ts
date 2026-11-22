@@ -1,11 +1,13 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { mountStateStack } from '../../../test-support/state-stack.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { migrateDomainToStore, STATE_MIGRATION_MARKER } from '../../src/state/migrate.ts'
 import { createStateStoreProvider } from '../../src/state/store.ts'
+import EvolutionState from '../../src/state/index.ts'
+import * as StorePlugin from '../../src/state/store-plugin.ts'
 
 async function seeded(): Promise<{ ctx: Awaited<ReturnType<typeof mountStateStack>>; home: string; io: ReturnType<typeof import('../../src/io.ts').nodeEvolutionIo> }> {
   const home = await tempRoot('dsh-state-migrate-')
@@ -37,6 +39,30 @@ describe('domain → StateStore migration', () => {
     await io.writeText(join(home, 'state', 'store.json'), '{}\n')
     await expect(migrateDomainToStore(ctx, { io, home })).rejects.toThrow(/refusing to overwrite/)
     expect((await ctx.evolutionStateStorage.provider('domain').loadCuratorState())?.lastSummary).toBe('seed')
+  })
+
+  it('after migration, auto reads store; deleting the marker rolls back to domain', async () => {
+    const { ctx, home, io } = await seeded()
+    await migrateDomainToStore(ctx, { io, home })
+    // The `store` provider always registers; `auto` switches only on the marker.
+    const root = dirname(home)
+    const evolution = home
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = root
+    try {
+      const restarted = await mountStateStack(evolution)
+      await restarted.plugin(StorePlugin)
+      await restarted.plugin(EvolutionState, { provider: 'auto' })
+      expect(await restarted.evolutionState.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
+      expect((await restarted.evolutionState.listPending('pending')).map(row => row.id)).toEqual(['p1'])
+      // Rollback is removing the marker: the domain data was never touched.
+      await io.remove(join(evolution, 'state', STATE_MIGRATION_MARKER))
+      expect(await restarted.evolutionState.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
+      expect(await createStateStoreProvider({ io, home: evolution }).loadReviewState('s1')).toMatchObject({ turnsSinceMemory: 1 })
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+    }
   })
 
   it('dry-run counts without writing store or marker', async () => {

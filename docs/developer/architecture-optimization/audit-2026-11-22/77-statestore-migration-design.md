@@ -74,6 +74,7 @@ core state: 8 files / 49 tests passed
 build-lib: 0
 run-gates local: 61 pass / 0 fail / 3 cannot-decide
 全量 family 套件: 444 files / 2438 tests passed（1173.32s）
+store-migration: 4 tests passed（含迁移后 auto 读 store、删 marker 回退 domain）
 ```
 
 已接 `/evolution migrate state [--dry-run]`（commands 3 tests，commands 全套 52 tests）；仍待 bundle provider 切换、domain provider 删除与回滚演练。
