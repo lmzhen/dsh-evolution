@@ -134,7 +134,8 @@ export class MergeStore {
     const token = (this.tokens.get(key) ?? 0) + 1
     this.tokens.set(key, token)
     const previous = this.cache.get(key)
-    const keepRows = cursor === undefined && (previous?.rows.length ?? 0) > 0
+    const hasRows = (previous?.rows.length ?? 0) > 0
+    const keepRows = hasRows
     const next: QueueState = cursor === undefined
       ? keepRows
         ? { status: 'ready', refreshing: true, rows: previous!.rows, ...(previous!.nextCursor === undefined ? {} : { nextCursor: previous!.nextCursor }) }
@@ -151,8 +152,8 @@ export class MergeStore {
         this.set({ ...this.snapshot, viewState: 'blocked', viewFailure: outcome.failure, current: { status: 'idle', rows: [] } })
         return
       }
-      const failed: QueueState = keepRows
-        ? { status: 'ready', refreshing: false, rows: previous!.rows, failure: outcome.failure }
+      const failed: QueueState = hasRows
+        ? { status: 'ready', refreshing: false, rows: previous!.rows, failure: outcome.failure, ...(previous!.nextCursor === undefined ? {} : { nextCursor: previous!.nextCursor }) }
         : { status: 'error', rows: [], failure: outcome.failure }
       this.cache.set(key, failed)
       if (this.isCurrent(queue, expiredOnly)) this.set({ ...this.snapshot, current: failed })

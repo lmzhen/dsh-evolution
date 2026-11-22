@@ -109,6 +109,29 @@ describe('MergeStore', () => {
     expect(rows).toHaveBeenCalledWith('pending', 'cursor-2', false)
   })
 
+  it('keeps already loaded rows and the cursor when a later page fails', async () => {
+    let call = 0
+    const rows = vi.fn(async (_queue, cursor): Promise<MergeOutcome<QueuePage>> => {
+      call += 1
+      if (call === 1) return { ok: true, payload: { queue: 'pending', expiredOnly: false, items: [row('p1')], counts: view().counts, nextCursor: 'cursor-2' } }
+      return { ok: false, failure: problem('server') }
+    })
+    const store = new MergeStore(source({ rows }))
+    await store.loadQueue('pending', false)
+    const before = store.read().current
+    expect(before.rows.map(item => item.id)).toEqual(['p1'])
+    expect(before.nextCursor).toBe('cursor-2')
+    store.loadMore()
+    await Promise.resolve()
+    await Promise.resolve()
+    const after = store.read().current
+    expect(after.status).toBe('ready')
+    expect(after.rows.map(item => item.id)).toEqual(['p1'])
+    expect(after.nextCursor).toBe('cursor-2')
+    expect(after.failure?.kind).toBe('problem')
+    expect(rows).toHaveBeenCalledWith('pending', 'cursor-2', false)
+  })
+
   it('switches to empty and ready without overlap', async () => {
     const store = new MergeStore(source({ rows: vi.fn(async () => ({ ok: true, payload: { queue: 'pending', expiredOnly: false, items: [], counts: view().counts } } as MergeOutcome<QueuePage>)) }))
     await store.loadQueue('pending', false)

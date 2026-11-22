@@ -230,3 +230,4 @@
 | [49-p2-configforms-shape.md](49-p2-configforms-shape.md) | P2：configForms 删手抄字段 |
 | [50-p2-workspace-id.md](50-p2-workspace-id.md) | P2：panel workspace id 走平台真服务 |
 | [51-p2-hidden-merge.md](51-p2-hidden-merge.md) | P2：非活动 merge 视图不启动 + 不挂 focus |
+| [52-p2-loadmore.md](52-p2-loadmore.md) | P2：load-more 失败保留行/游标 |

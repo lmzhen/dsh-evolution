@@ -298,7 +298,7 @@ export function MergePanel(face: MergeFace): ReactNode {
   const list = uiState === 'ready' && queue.status === 'ready' ? createElement('div', { 'data-role': 'rows', id: 'merge-rows', role: 'tabpanel' }, visibleRows.map(row => createElement(MergeRow, { row, t, copy, sort: sortHandlers, openBoth, onDecide: face.decide === undefined ? undefined : decideRow, busy: deciding === row.id }))) : null
   const empty = uiState === 'empty' ? createElement('div', null, createElement('p', { 'data-role': 'note' }, t('empty.' + snapshot.queue)), createElement('p', { 'data-role': 'empty-scope' }, t('empty.scope'))) : null
   const staleViewFailure = snapshot.viewState === 'ready' ? snapshot.viewFailure : undefined
-  const activeFailure = viewFailure !== undefined ? viewFailure : staleViewFailure !== undefined ? staleViewFailure : queue.status === 'error' ? queue.failure : undefined
+  const activeFailure = viewFailure !== undefined ? viewFailure : staleViewFailure !== undefined ? staleViewFailure : queue.failure
   const overlay = snapshot.overlay
   const menuStyle = menu === undefined ? undefined : {
     position: 'fixed', zIndex: 70, minWidth: '160px', maxWidth: 'min(320px, calc(100vw - 16px))',
