@@ -127,6 +127,18 @@ describe('evolution-approval', () => {
     expect(await ctx.evolutionApproval.list('pending').then(rows => rows.length)).toBe(0)
   })
 
+  it('reject refuses an executing record whose claim holder is a live foreign process', async () => {
+    const home = await tempRoot('dsh-approval-live-holder-')
+    const ctx = await mountStateStack(home, { evolution: true, approval: true })
+    const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'live', args: {}, origin: 'background_review' })
+    const pid = spawnLivePid()
+    await ctx.evolutionState.claimPending(decision.pendingId!, pid + ':' + 'a'.repeat(32))
+    const rejected = await ctx.evolutionApproval.reject(decision.pendingId!, AUDIT)
+    expect(rejected.ok).toBe(false)
+    expect(rejected.message).toContain('pid ' + String(pid))
+    expect(rejected.message).toContain('不要拒绝它')
+  })
+
   it('stages background writes, keeps audit records and replays through a registered runner', async () => {
     const home = await tempRoot('dsh-approval-')
     const ctx = await mountStateStack(home, { evolution: true, approval: true })

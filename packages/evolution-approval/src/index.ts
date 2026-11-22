@@ -659,6 +659,13 @@ export class EvolutionApproval extends Service {
         // write effect standing as-is.
         const stuck = (await this.state().listPending('executing')).find(item => item.id === id)
         if (stuck) {
+          // Never overwrite an approve that may still be running. The rescue is only for a dead
+          // holder or an unverifiable legacy claim; a live foreign pid is not ours to close.
+          const holder = typeof (stuck as { claimedBy?: unknown }).claimedBy === 'string' ? (stuck as { claimedBy: string }).claimedBy : ''
+          const holderPid = holder === '' ? null : claimHolderPid(holder)
+          if (holderPid !== null && holderPid > 0 && holderPid !== process.pid && isProcessAlive(holderPid)) {
+            return { ok: false, message: `待批准写入「${id}」被 pid ${holderPid} 占用且该进程仍存活：可能有另一个进程正在执行这次批准。不要拒绝它：改为核验写入效果，并让那次运行跑完。` }
+          }
           const resolution = await this.state().tryResolvePending(id, 'rejected')
           return resolution.applied
             ? { ok: true, message: `已拒绝执行中的写入「${id}」（未持有占用声明：这可能与在途的批准运行器抢跑；如果写入已落地，其效果按现状保留。请手动核验写入状态）。` }

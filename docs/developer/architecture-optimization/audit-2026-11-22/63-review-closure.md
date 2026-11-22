@@ -16,7 +16,7 @@
 
 | 项 | owner | expiry | 判据 |
 |---|---|---|---|
-| A2 executing-rescue 仍无 claim，在途 approve 可能被 reject 覆盖为 rejected | approval | 下一 minor | 只允许“pid 已死”的 rescue，并补双进程负例 |
+| ~~A2 executing-rescue 无 claim~~ **已关闭** | approval | — | reject 的 rescue 先看 `claimedBy` 的 pid；live foreign pid 拒绝，补了负例 |
 | ~~A2 list/expire 双 reload~~ **已关闭** | approval | — | TTL>0 只由 expireStale reload；TTL=0 list 自己 reload 一次 |
 | ~~E3 traceability source fallback~~ **已关闭** | release | — | release 只接受结构化 `traceability.measuredCommit`；缺字段/不一致均红 |
 | E3 artifacts 只与证据自比，不校验应发布 22 包集合 | release | 下一 minor | 与发布包清单对账 |
