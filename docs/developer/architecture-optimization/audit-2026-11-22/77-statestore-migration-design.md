@@ -76,4 +76,4 @@ run-gates local: 61 pass / 0 fail / 3 cannot-decide
 全量 family 套件: 444 files / 2438 tests passed（1173.32s）
 ```
 
-仍未做：`/evolution migrate state` 命令接入、bundle provider 切换、domain provider 删除与回滚演练。
+已接 `/evolution migrate state [--dry-run]`（commands 3 tests，commands 全套 52 tests）；仍待 bundle provider 切换、domain provider 删除与回滚演练。

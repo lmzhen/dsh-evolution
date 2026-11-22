@@ -682,6 +682,56 @@ export const HOST_COMMANDS = {
       "de": "/evolution Unterbefehle ({count}):",
       "ru": "/evolution подкоманды ({count}):",
       "pt": "/evolution subcomandos ({count}):"
+    },
+    "summary.migrate state": {
+      "zh": "把旧 domain 的 pending/review/curator 状态迁到文件 StateStore（显式、不覆盖已有 store）",
+      "en": "Move pending/review/curator state from the old domain to the file StateStore (explicit; never overwrites an existing store)",
+      "ja": "旧 domain の pending/review/curator 状態をファイル StateStore へ移行します（明示的、既存 store は上書きしません）",
+      "es": "Mueve el estado pending/review/curator del domain anterior al StateStore de archivo (explícito; no sobrescribe un store existente)",
+      "fr": "Déplace l’état pending/review/curator de l’ancien domain vers le StateStore fichier (explicite ; n’écrase jamais un store existant)",
+      "de": "Verschiebt pending/review/curator-Zustand vom alten Domain in den Datei-StateStore (explizit; überschreibt keinen vorhandenen Store)",
+      "ru": "Переносит состояние pending/review/curator из старого domain в файловый StateStore (явно; не перезаписывает существующий store)",
+      "pt": "Move o estado pending/review/curator do domain antigo para o StateStore em arquivo (explícito; nunca sobrescreve um store existente)"
+    },
+    "help.migrate state": {
+      "zh": "用法：migrate state [--dry-run]\n只迁移 pending/review/curator；不删除旧 domain 数据；已有 store 时拒绝覆盖。",
+      "en": "Usage: migrate state [--dry-run]\nMigrates pending/review/curator only; the old domain data is kept; an existing store is never overwritten.",
+      "ja": "使い方：migrate state [--dry-run]\npending/review/curator のみ移行します。旧 domain のデータは削除しません。既存の store は上書きしません。",
+      "es": "Uso: migrate state [--dry-run]\nSolo migra pending/review/curator; los datos del domain anterior se conservan; un store existente nunca se sobrescribe.",
+      "fr": "Utilisation : migrate state [--dry-run]\nMigre uniquement pending/review/curator ; les données de l’ancien domain sont conservées ; un store existant n’est jamais écrasé.",
+      "de": "Verwendung: migrate state [--dry-run]\nMigriert nur pending/review/curator; die alten domain-Daten bleiben erhalten; ein vorhandener Store wird nie überschrieben.",
+      "ru": "Использование: migrate state [--dry-run]\nПереносит только pending/review/curator; данные старого domain сохраняются; существующий store никогда не перезаписывается.",
+      "pt": "Uso: migrate state [--dry-run]\nMigra apenas pending/review/curator; os dados do domain antigo são mantidos; um store existente nunca é sobrescrito."
+    },
+    "command.migrate state.done": {
+      "zh": "已迁移：review={review} 个会话，pending={pending} 条，curator={curator}；store={path}",
+      "en": "Migrated: review={review} sessions, pending={pending}, curator={curator}; store={path}",
+      "ja": "移行しました：review={review} セッション、pending={pending}、curator={curator}；store={path}",
+      "es": "Migrado: review={review} sesiones, pending={pending}, curator={curator}; store={path}",
+      "fr": "Migré : review={review} sessions, pending={pending}, curator={curator} ; store={path}",
+      "de": "Migriert: review={review} Sitzungen, pending={pending}, curator={curator}; store={path}",
+      "ru": "Перенесено: review={review} сессий, pending={pending}, curator={curator}; store={path}",
+      "pt": "Migrado: review={review} sessões, pending={pending}, curator={curator}; store={path}"
+    },
+    "command.migrate state.dry": {
+      "zh": "dry-run：review={review} 个会话，pending={pending} 条，curator={curator}；未写 store",
+      "en": "dry-run: review={review} sessions, pending={pending}, curator={curator}; nothing written",
+      "ja": "dry-run：review={review} セッション、pending={pending}、curator={curator}；何も書き込みません",
+      "es": "dry-run: review={review} sesiones, pending={pending}, curator={curator}; no se escribió nada",
+      "fr": "dry-run : review={review} sessions, pending={pending}, curator={curator} ; rien n’a été écrit",
+      "de": "dry-run: review={review} Sitzungen, pending={pending}, curator={curator}; nichts geschrieben",
+      "ru": "dry-run: review={review} сессий, pending={pending}, curator={curator}; ничего не записано",
+      "pt": "dry-run: review={review} sessões, pending={pending}, curator={curator}; nada foi gravado"
+    },
+    "command.migrate state.error": {
+      "zh": "迁移失败：{message}",
+      "en": "Migration failed: {message}",
+      "ja": "移行に失敗しました：{message}",
+      "es": "La migración falló: {message}",
+      "fr": "La migration a échoué : {message}",
+      "de": "Migration fehlgeschlagen: {message}",
+      "ru": "Миграция не удалась: {message}",
+      "pt": "A migração falhou: {message}"
     }
   } as const
 

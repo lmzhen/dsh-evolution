@@ -449,6 +449,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           case 'params':
           case 'curator':
           case 'mutations':
+          case 'migrate.state':
           case 'doctor':
           case 'restore':
           case 'skill.restore':

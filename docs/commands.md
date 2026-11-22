@@ -27,6 +27,7 @@
 | `/evolution skills health` | 查看技能库结构健康 |
 | `/evolution skills refresh` | 手动改目录后丢弃缓存并重新读取 |
 | `/evolution mutations` | 查看最近的技能变更记录 |
+| `/evolution migrate state [--dry-run]` | 把旧 domain 的 pending/review/curator 显式迁到文件 StateStore；不删旧数据，已有 store 时拒绝覆盖 |
 | `/evolution restore` | 把技能树恢复到最近一次快照，不能选择其它快照 |
 | `/evolution propose` | 为正文过大的技能生成 keep 提议，不自动拆分 |
 

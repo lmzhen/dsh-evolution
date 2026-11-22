@@ -1036,7 +1036,7 @@ describe('evolution-commands', () => {
     const help = await handler!.handler({ rawInput: '' })
     expect(help.text).not.toContain('preset install')
     expect(help.text).not.toContain('policy set')
-    expect(help.text).not.toContain('migrate')
+    expect(help.text).toContain('migrate state')
   })
 
   it('T4-03: an unknown subcommand (or a known one missing its argument) answers ERROR, not a successful help dump', async () => {

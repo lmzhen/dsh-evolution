@@ -7,6 +7,7 @@ import { runCuratorCommand, runMutationsCommand } from './curator-command.ts'
 import { runDoctorCommand, type DoctorCommandContext } from './doctor-command.ts'
 import { runRestoreCommand, runSkillRestoreCommand } from './restore-commands.ts'
 import { runSkillHistoryCommand, runSkillUndoCommand } from './skill-history-commands.ts'
+import { runMigrateStateCommand } from './migrate-state.ts'
 import {
   runDecisionCommand,
   runPendingCommand,
@@ -49,6 +50,9 @@ export const HOST_COMMAND_HANDLERS: Readonly<Record<string, CommandHandler>> = {
   mutations: context => context.ctx === undefined
     ? undefined
     : runMutationsCommand({ input: context.input, ctx: context.ctx, locale: context.locale }),
+  'migrate.state': context => context.ctx === undefined
+    ? undefined
+    : runMigrateStateCommand({ input: context.input, command: context.command, ctx: context.ctx, locale: context.locale }),
   doctor: context => context.ctx === undefined || context.runs === undefined
     ? undefined
     : runDoctorCommand({
