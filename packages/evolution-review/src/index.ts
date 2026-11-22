@@ -3,16 +3,16 @@
  * @module @deepseek-ai/dsh-evolution-review
  */
 
-import { llmPort, settingsPort, toolsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import { llmPort, settingsPort, toolsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { randomUUID } from 'node:crypto'
-import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
-import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-adapter/contract'
+import { createUserMessage } from '@deepseek-ai/dsh-evolution-platform/values'
+import type { Agent, ContextFormed } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { AUX_COMPLETION_INSTRUCTION, ReviewPartialFailure, runReview } from './review-executor.ts'
 import { nativeReviewToolChannel, type ReviewToolChannel } from './review-tool-channel.ts'
 import { PtcReviewToolHost } from './review-ptc-channel.ts'
-import { createReviewChildAgent } from '@deepseek-ai/dsh-evolution-adapter/review-child'
+import { createReviewChildAgent } from '@deepseek-ai/dsh-evolution-platform/review-child'
 import { ReviewWriteLocks } from './review-write-locks.ts'
 import { ReviewLimiter } from './review-limiter.ts'
 // 0.2.x replaced the shared `{ kind: 'plugin', plugin }` source with a merge-extensible
@@ -23,8 +23,8 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-review': { kind: 'evolution-review' } & ContextFormed
   }
 }
-import { SessionId } from '@deepseek-ai/dsh-evolution-adapter/values'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-evolution-adapter/contract'
+import { SessionId } from '@deepseek-ai/dsh-evolution-platform/values'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { advanceReview, clearReviewChannel, markReviewChannel, sweepReviewChannelSessions, withReviewContext, type EvolutionReviewScheduledEvent, type ReviewDebt, type ReviewKind, type ReviewState } from '@deepseek-ai/dsh-evolution-core'
 import { assertSkillsRootAliasRetired } from '@deepseek-ai/dsh-evolution-core/skills'
 import type {} from '@deepseek-ai/dsh-evolution-core/state'

@@ -14,7 +14,7 @@
       "path": "../../core/session"
     },
     {
-      "path": "../evolution-adapter"
+      "path": "../evolution-platform"
     }
   ]
 }

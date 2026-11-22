@@ -4,7 +4,7 @@
  * @module evolution-commands/src/host-commands/approval-commands
  */
 import type { ApprovalLike } from '@deepseek-ai/dsh-evolution-approval'
-import type { CommandResult } from '@deepseek-ai/dsh-evolution-adapter/contract'
+import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform/contract'
 import type { EvolutionErrorId, HostLocale } from '@deepseek-ai/dsh-evolution-core'
 import { elapsedSince } from '@deepseek-ai/dsh-evolution-core/skills'
 import { hostCommandText, hostErrorText } from '../host-locale.ts'

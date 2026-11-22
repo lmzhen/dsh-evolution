@@ -1,7 +1,7 @@
 /** Host human-output locale: one resolver, output boundaries only. */
 import type { Context } from '@deepseek-ai/cordis'
 import { errorTextIn, HOST_LOCALES, type EvolutionErrorId, type HostLocale } from '@deepseek-ai/dsh-evolution-core'
-import { settingsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import { settingsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 import { HOST_COMMANDS, type HostCommandKey } from './generated/host-commands.ts'
 
 /**

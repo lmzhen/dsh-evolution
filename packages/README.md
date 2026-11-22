@@ -8,7 +8,7 @@ This directory holds the 20 packages of the dsh-evolution family. For the user g
 
 | Package | Role |
 |---|---|
-| `evolution-adapter` | The only host-facing adapter: platform ports, `evolutionPlatform` service, runtime helper values |
+| `evolution-platform` | The only host-facing adapter: platform ports, `evolutionPlatform` service, runtime helper values |
 | `evolution-core` | SkillLibrary, MemoryStore, write kernel/unit transactions, prompts, projections, events, presets, `./restrictor` plugin; `./io-registry` + `./io-node` (IO seam), `./authority-plugin` (the `evolutionMutationAuthority` home lock service), `./policy`, `./contract` |
 
 ### Domain services

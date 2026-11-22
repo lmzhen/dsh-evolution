@@ -6,7 +6,7 @@
  * accumulated until a configured interval fires.
  */
 
-import type { SessionEvent } from '@deepseek-ai/dsh-evolution-adapter/contract'
+import type { SessionEvent } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { dispatchStepOf, isSkillToolName } from './tool-dispatch.ts'
 import { graphemeCount } from './text-metrics.ts'
 

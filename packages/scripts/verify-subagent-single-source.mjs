@@ -16,7 +16,7 @@ const argv = process.argv.slice(2)
 const root = resolve(argv.find((arg) => !arg.startsWith('--')) ?? 'packages')
 const JSON_OUT = argv.includes('--json')
 const OWNER = 'evolution-core/src/subagent/channel.ts'
-const PORT_ADAPTER = 'evolution-adapter/src/subagents.ts'
+const PORT_ADAPTER = 'evolution-platform/src/subagents.ts'
 const KERNEL = 'evolution-core/src/subagent/kernel.ts'
 const FORBIDDEN = [
   [/\.start\('spawn'/, 'legacy subagents.start(spawn) call'],

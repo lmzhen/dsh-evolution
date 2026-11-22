@@ -52,6 +52,6 @@
     "@deepseek-ai/dsh-evolution-commands": "workspace:^",
     "@deepseek-ai/dsh-evolution-maintenance": "workspace:^",
     "@deepseek-ai/dsh-evolution-skill-health": "workspace:^",
-    "@deepseek-ai/dsh-evolution-adapter": "workspace:^"
+    "@deepseek-ai/dsh-evolution-platform": "workspace:^"
   }
 }

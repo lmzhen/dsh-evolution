@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-evolution-adapter",
-  "description": "The only host-facing platform adapter for the dsh-evolution family",
+  "name": "@deepseek-ai/dsh-evolution-platform",
+  "description": "The platform adapter and generated-contract surface for the dsh-evolution family",
   "version": "0.59.6",
   "publishConfig": {
     "access": "public"
@@ -8,7 +8,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
-    "directory": "packages/evolution-adapter"
+    "directory": "packages/evolution-platform"
   },
   "type": "module",
   "main": "lib/index.js",

@@ -8,7 +8,7 @@
       "path": "../evolution-core"
     },
     {
-      "path": "../evolution-adapter"
+      "path": "../evolution-platform"
     }
   ]
 }

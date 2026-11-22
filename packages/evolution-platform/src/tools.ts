@@ -37,7 +37,7 @@ export function registerEvolutionTool(
 ): () => void {
   const port = toolsPort(ctx)
   if (port === undefined) {
-    ctx.logger.warn('evolution-adapter: tools service is not mounted; family tool "' + definition.name + '" was not registered')
+    ctx.logger.warn('evolution-platform: tools service is not mounted; family tool "' + definition.name + '" was not registered')
     return () => {}
   }
   return port.register(definition)

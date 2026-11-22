@@ -4,8 +4,8 @@
  */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { EvolutionLlmFailureKind, EvolutionLlmRequest, LlmPort, ModelRoute, StreamChunk } from '@deepseek-ai/dsh-evolution-adapter/contract'
-import { EvolutionLlmError, modelRoute } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import type { EvolutionLlmFailureKind, EvolutionLlmRequest, LlmPort, ModelRoute, StreamChunk } from '@deepseek-ai/dsh-evolution-platform/contract'
+import { EvolutionLlmError, modelRoute } from '@deepseek-ai/dsh-evolution-platform/ports'
 import type { EvolutionPlatform } from './platform.ts'
 
 export interface EvolutionLlmInput {

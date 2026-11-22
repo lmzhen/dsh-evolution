@@ -10,8 +10,8 @@
 # `maintenance_probe` row below (its only model-facing surface).
 - insert:
     # ── runtime services: one projection owner per composition ───────────────
-    - id: evolution-adapter
-      name: '@deepseek-ai/dsh-evolution-adapter'
+    - id: evolution-platform
+      name: '@deepseek-ai/dsh-evolution-platform'
     - id: evolution-core-runtime
       name: '@deepseek-ai/dsh-evolution-core/runtime'
 

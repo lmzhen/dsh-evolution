@@ -3,7 +3,7 @@
  *
  * PTC runs tools through `run_code`; its nested dispatch appends to
  * `exec.agent.session`. The review executor therefore passes a detached child
- * agent created by `@deepseek-ai/dsh-evolution-adapter/review-child`.
+ * agent created by `@deepseek-ai/dsh-evolution-platform/review-child`.
  *
  * The review completion tools (`review_done`, `review_wait`) are registered
  * ONCE per plugin instance by {@link PtcReviewToolHost}. Their `when` guard only
@@ -13,8 +13,8 @@
  *
  * @module @deepseek-ai/dsh-evolution-review/review-ptc-channel
  */
-import { defineTool } from '@deepseek-ai/dsh-evolution-adapter/values'
-import type { ToolDefinition } from '@deepseek-ai/dsh-evolution-adapter/values'
+import { defineTool } from '@deepseek-ai/dsh-evolution-platform/values'
+import type { ToolDefinition } from '@deepseek-ai/dsh-evolution-platform/values'
 import { currentReviewContext } from '@deepseek-ai/dsh-evolution-core'
 import type { ReviewReport, ReviewToolOutcome } from './review-executor.ts'
 import { REVIEW_DONE_TOOL_NAME, REVIEW_WAIT_TOOL_NAME, parseReviewReport } from './review-executor.ts'

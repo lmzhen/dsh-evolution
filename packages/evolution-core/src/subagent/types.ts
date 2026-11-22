@@ -1,8 +1,8 @@
 // Subagent channel contract types (frozen in W1; implementation in channel.ts/readiness.ts).
-import type { Agent, AgentIdentity, AgentOptions } from '@deepseek-ai/dsh-evolution-adapter/contract'
-import type { SessionId } from '@deepseek-ai/dsh-evolution-adapter/contract'
-import type { SubagentStopReason } from '@deepseek-ai/dsh-evolution-adapter/contract'
-import type { ObjectJsonSchema } from '@deepseek-ai/dsh-evolution-adapter/contract'
+import type { Agent, AgentIdentity, AgentOptions } from '@deepseek-ai/dsh-evolution-platform/contract'
+import type { SessionId } from '@deepseek-ai/dsh-evolution-platform/contract'
+import type { SubagentStopReason } from '@deepseek-ai/dsh-evolution-platform/contract'
+import type { ObjectJsonSchema } from '@deepseek-ai/dsh-evolution-platform/contract'
 
 export type ChannelCode = 'E-323' | 'E-324'
 export type ChannelKind = 'reviewer' | 'maintainer' | 'governance'

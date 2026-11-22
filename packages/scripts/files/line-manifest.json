@@ -1,5 +1,5 @@
 {
-  "pin": "79982a91",
+  "pin": "15e4c1c5",
   "bed": {
     "mono": "overlay"
   },
@@ -8,11 +8,6 @@
       "id": "@deepseek-ai/dsh-evolution-activity",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-activity"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-adapter",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-adapter"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-agent-preset",
@@ -68,6 +63,11 @@
       "id": "@deepseek-ai/dsh-evolution-merge-ui",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-merge-ui"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-platform",
+      "kind": "evo-src",
+      "relPath": "packages/evolution/evolution-platform"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-review",

@@ -10,7 +10,7 @@ import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
-import { toolsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import { toolsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 import {

@@ -4,7 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { apply as mountRuntime } from '@deepseek-ai/dsh-evolution-core/runtime'
-import { EvolutionPlatform } from '@deepseek-ai/dsh-evolution-adapter/service'
+import { EvolutionPlatform } from '@deepseek-ai/dsh-evolution-platform/service'
 import * as Review from '../src/index.ts'
 
 describe('evolution-review', () => {

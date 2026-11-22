@@ -3,4 +3,4 @@
  *
  * @module @deepseek-ai/dsh-evolution-core/result
  */
-export * from '@deepseek-ai/dsh-evolution-adapter/contract/result'
+export * from '@deepseek-ai/dsh-evolution-platform/contract/result'

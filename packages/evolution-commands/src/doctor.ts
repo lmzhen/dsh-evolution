@@ -10,7 +10,7 @@
  */
 import { hostCommandText } from './host-locale.ts'
 import type { Context } from '@deepseek-ai/cordis'
-import { settingsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import { settingsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
 import { readFileSync } from 'node:fs'
 import { scopedPackageName, asRecord } from '@deepseek-ai/dsh-evolution-core'

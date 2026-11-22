@@ -17,7 +17,7 @@
 
 ## 边界
 
-- 本轮是包合并，不是最终 `evolution-platform` 改名；
+- **后续 `evolution-adapter` 已改名为 `evolution-platform`（第 68 轮）**，本轮只记录 contract 合并；
 - 契约仍是手工维护文件，`ports.generated.ts` 生成化尚未做；
 - 无运行时行为变化，无 UI/提示词变化。
 

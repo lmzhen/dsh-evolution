@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-22T07:13:42.971Z",
-  "tree": "f1c1f65f",
+  "measuredAt": "2026-11-22T07:42:30.925Z",
+  "tree": "15e4c1c5",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -42,26 +42,6 @@
       "reasonRef": "packages/evolution-activity/tests/threat/threat-guard.spec.ts:1",
       "expiry": "0.60.0",
       "owner": "evolution-activity"
-    },
-    {
-      "spec": "packages/evolution-adapter/tests/llm.spec.ts",
-      "id": "@deepseek-ai/dsh-llm",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-adapter/tests/llm.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-adapter"
-    },
-    {
-      "spec": "packages/evolution-adapter/tests/review-child.spec.ts",
-      "id": "@deepseek-ai/dsh-session",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-adapter/tests/review-child.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-adapter"
     },
     {
       "spec": "packages/evolution-agent/tests/agent-composition.spec.ts",
@@ -872,6 +852,26 @@
       "reasonRef": "packages/evolution-maintenance/tests/orchestrate.spec.ts:1",
       "expiry": "0.60.0",
       "owner": "evolution-maintenance"
+    },
+    {
+      "spec": "packages/evolution-platform/tests/llm.spec.ts",
+      "id": "@deepseek-ai/dsh-llm",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-platform/tests/llm.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-platform"
+    },
+    {
+      "spec": "packages/evolution-platform/tests/review-child.spec.ts",
+      "id": "@deepseek-ai/dsh-session",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-platform/tests/review-child.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-platform"
     },
     {
       "spec": "packages/evolution-review/tests/review-executor-real-tools.spec.ts",

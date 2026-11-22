@@ -642,7 +642,7 @@
       "ru": "Правка навыков",
       "pt": "Edição de skills"
     },
-    "evolution-adapter.title": {
+    "evolution-platform.title": {
       "zh": "宿主平台适配器",
       "en": "Host platform adapter",
       "ja": "ホストプラットフォームアダプター",
@@ -652,7 +652,7 @@
       "ru": "Адаптер хост-платформы",
       "pt": "Adaptador da plataforma host"
     },
-    "evolution-adapter.description": {
+    "evolution-platform.description": {
       "zh": "把家族插件接到宿主平台；唯一导入宿主内部实现的包。",
       "en": "Connects family plugins to the host platform; the only package that imports host internals.",
       "ja": "ファミリープラグインをホストプラットフォームに接続する。ホスト内部をインポートする唯一のパッケージ。",

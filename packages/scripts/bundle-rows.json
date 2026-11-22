@@ -173,7 +173,7 @@
   ],
   "rows": [
     {
-      "id": "evolution-adapter",
+      "id": "evolution-platform",
       "group": "evolution-core-runtime",
       "forms": [
         "all",
@@ -181,7 +181,7 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-adapter'"
+        "      name: '@deepseek-ai/dsh-evolution-platform'"
       ]
     },
     {

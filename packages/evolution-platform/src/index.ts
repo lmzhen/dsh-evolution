@@ -15,7 +15,7 @@ export * from './ports.ts'
 export * from './values.ts'
 export * from './service.ts'
 
-export const name = 'evolution-adapter'
+export const name = 'evolution-platform'
 
 /** Mount the one host platform service; bundle row order places this before core/runtime. */
 export async function apply(ctx: Context): Promise<void> {

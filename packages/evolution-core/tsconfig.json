@@ -2,7 +2,7 @@
   "extends": "../tsconfig.pkg.json",
   "references": [
     {
-      "path": "../evolution-adapter"
+      "path": "../evolution-platform"
     },
     {
       "path": "../../../vendor/cordis"

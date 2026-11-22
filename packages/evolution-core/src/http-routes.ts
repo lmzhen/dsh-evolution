@@ -14,7 +14,7 @@
 import { isRecord } from './guards.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { EvolutionPlatform } from './runtime/platform.ts'
-import { connectionPort, type ConnectionPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import { connectionPort, type ConnectionPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 
 /** Largest request body a family route accepts; a bigger one reads as "no body" (400 from the handler). */
 export const MAX_REQUEST_BODY_BYTES = 64 * 1024

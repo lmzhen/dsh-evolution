@@ -23,7 +23,7 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../evolution-adapter"
+      "path": "../evolution-platform"
     }
   ]
 }

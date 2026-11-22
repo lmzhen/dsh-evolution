@@ -3,7 +3,7 @@
  * runner(prompt, cfg) and expects raw model text; the runtime owns provider
  * selection, purpose, transport and timeout.
  */
-import { createUserMessage } from '@deepseek-ai/dsh-evolution-adapter/values'
+import { createUserMessage } from '@deepseek-ai/dsh-evolution-platform/values'
 import { normalizeProviderKey } from '../domain/provider-key.ts'
 
 export interface ModelRoute {

@@ -184,7 +184,21 @@ export function resolveEntries(env = process.env) {
       const pkgPath = join(p.evo, dir.name, 'package.json')
       const src = join(p.evo, dir.name, 'src/index.ts')
       if (!existsSync(pkgPath) || !existsSync(src)) continue
-      add(readName(pkgPath), 'evo-src', src, 'overlay src')
+      const id = readName(pkgPath)
+      add(id, 'evo-src', src, 'overlay src')
+      // Family subpaths must resolve to SOURCE too. Without these, the platform-package scan below
+      // registers the built lib/*.js subpaths first and the test bed externalizes them, so their
+      // bare peer imports (@deepseek-ai/dsh-tools, ...) fail to resolve. Source subpaths also keep
+      // package-subpath changes in the same transform graph as the test.
+      let pkg
+      try { pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) } catch { continue }
+      for (const [key, value] of Object.entries(pkg?.exports ?? {})) {
+        if (!key.startsWith('./') || key === './package.json') continue
+        const target = typeof value === 'string' ? value : value?.default
+        if (typeof target !== 'string' || !target.startsWith('./lib/') || !target.endsWith('.js')) continue
+        const source = join(p.evo, dir.name, 'src', target.slice('./lib/'.length).replace(/\.js$/, '.ts'))
+        if (existsSync(source)) add(id + key.slice(1), 'evo-src-subpath', source, 'overlay src subpath')
+      }
     }
   }
   // 3. profile-hoisted platform packages — ONLY the ones the policy declares (MACHINE STATE).

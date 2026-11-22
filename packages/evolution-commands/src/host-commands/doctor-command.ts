@@ -1,7 +1,7 @@
 /** The read-only doctor surface: the CLI view and its --json form. */
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
 import { evolutionRoot } from '@deepseek-ai/dsh-evolution-core'
-import type { CommandResult } from '@deepseek-ai/dsh-evolution-adapter/contract'
+import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { diagnose, renderDoctorText } from '../doctor.ts'
 import { presetProfileTarget } from '../preset-source.ts'
 

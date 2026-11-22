@@ -11,7 +11,7 @@ type Context = CordisContext & HostContext
 import z from '@deepseek-ai/schemastery'
 import { DEFAULT_THREAT_MAX_SCAN_CHARS, EVOLUTION_WRITE_TOOLS, PATTERN_OVERLAP, scanContentThreats, scanMemoryThreats, clampedNumber } from '@deepseek-ai/dsh-evolution-core'
 import type { ScanOptions } from '@deepseek-ai/dsh-evolution-core'
-import { toolsPort } from '@deepseek-ai/dsh-evolution-adapter/ports'
+import { toolsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 
 export const name = 'evolution-threat'
 // T3-13 (A41): NO module-level `inject` export. The `tools` dependency is

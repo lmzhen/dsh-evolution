@@ -16,7 +16,7 @@
  * peer, so one family artifact can remain valid across the declared cohort while
  * a host without PTC mode fails with an explicit unavailable error.
  *
- * @module @deepseek-ai/dsh-evolution-adapter/review-child
+ * @module @deepseek-ai/dsh-evolution-platform/review-child
  */
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { createScope, type Scope } from '@deepseek-ai/dsh-scope'

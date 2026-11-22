@@ -1,7 +1,7 @@
 // @tier fast
 import { expect, it } from 'vitest'
 import { withReviewContext } from '@deepseek-ai/dsh-evolution-core'
-import type { ToolDefinition } from '@deepseek-ai/dsh-evolution-adapter/values'
+import type { ToolDefinition } from '@deepseek-ai/dsh-evolution-platform/values'
 import { PtcReviewToolHost } from '../src/review-ptc-channel.ts'
 import { ReviewWriteLocks } from '../src/review-write-locks.ts'
 

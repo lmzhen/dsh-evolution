@@ -8,7 +8,7 @@ import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
 // the platform's base bundle mounts (a real host always has it).
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { apply as mountRuntime } from '@deepseek-ai/dsh-evolution-core/runtime'
-import { EvolutionPlatform } from '@deepseek-ai/dsh-evolution-adapter/service'
+import { EvolutionPlatform } from '@deepseek-ai/dsh-evolution-platform/service'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import EvolutionCurator from '../src/index.ts'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
