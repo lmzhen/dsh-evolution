@@ -14,7 +14,7 @@
 ## 边界
 
 - 这是命名/包边界收口，不是行为变更；
-- 契约仍是 adapter/contract 下的手写文件，`ports.generated.ts` 生成化未做；
+- 契约仍是 platform/contract 下的手写文件，`ports.generated.ts` 生成化未做；
 - 包数保持 20；
 - 无 UI、提示词、aux 前缀缓存变化。
 

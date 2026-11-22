@@ -252,3 +252,4 @@
 | [71-platform-renamed.md](71-platform-renamed.md) | Phase F：adapter 改名 evolution-platform |
 | [72-npm-platform-placeholder.md](72-npm-platform-placeholder.md) | 新 npm 包 @lmzhen/dsh-evolution-platform 的 0.0.0 占位与 Trusted Publisher |
 | [73-release-dryrun.md](73-release-dryrun.md) | 改名后的发布链 dev 打包/publish dry-run |
+| [74-line-subpath.md](74-line-subpath.md) | family source 子路径进入 line manifest |

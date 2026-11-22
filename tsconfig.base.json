@@ -41,6 +41,7 @@
     "@deepseek-ai/dsh-evolution-platform": ["./packages/evolution-platform/src/index.ts"],
     "@deepseek-ai/dsh-evolution-platform/contract": ["./packages/evolution-platform/src/contract/index.ts"],
     "@deepseek-ai/dsh-evolution-platform/contract/result": ["./packages/evolution-platform/src/contract/result.ts"],
+    "@deepseek-ai/dsh-evolution-platform/review-child": ["./packages/evolution-platform/src/review-child.ts"],
     "@deepseek-ai/dsh-evolution-platform/service": ["./packages/evolution-platform/src/service.ts"],
     "@deepseek-ai/dsh-evolution-platform/ports": ["./packages/evolution-platform/src/ports.ts"],
     "@deepseek-ai/dsh-evolution-platform/values": ["./packages/evolution-platform/src/values.ts"],

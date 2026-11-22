@@ -47,6 +47,18 @@ const familyPairs = readdirSync(join(ROOT, 'packages'))
 const entries = []
 for (const { dir: shortDir, id } of familyPairs) {
   entries.push({ id, kind: 'evo-src', relPath: 'packages/evolution/' + shortDir })
+  // Source subpaths are real resolution entries too (line-adapter registers them as
+  // evo-src-subpath). Record them so the line-identity artifact covers the same face.
+  let pkg
+  try { pkg = JSON.parse(readFileSync(join(ROOT, 'packages', shortDir, 'package.json'), 'utf8')) } catch { continue }
+  for (const [key, value] of Object.entries(pkg?.exports ?? {})) {
+    if (!key.startsWith('./') || key === './package.json') continue
+    const target = typeof value === 'string' ? value : value?.default
+    if (typeof target !== 'string' || !target.startsWith('./lib/') || !target.endsWith('.js')) continue
+    const sourceRel = target.slice('./lib/'.length).replace(/\.js$/, '.ts')
+    if (!existsSync(join(ROOT, 'packages', shortDir, 'src', sourceRel))) continue
+    entries.push({ id: id + key.slice(1), kind: 'evo-src-subpath', relPath: 'packages/evolution/' + shortDir + '/src/' + sourceRel })
+  }
 }
 // profile hoist：政策声明过的机器态包，从 profile 的 node_modules 记实。
 const hoists = Object.keys(policy.profileHoist ?? {}).sort()

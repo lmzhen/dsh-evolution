@@ -1,5 +1,5 @@
 {
-  "pin": "15e4c1c5",
+  "pin": "d42371ee",
   "bed": {
     "mono": "overlay"
   },
@@ -8,6 +8,26 @@
       "id": "@deepseek-ai/dsh-evolution-activity",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-activity"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-activity/feedback",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-activity/src/feedback/index.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-activity/replay",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-activity/src/replay/index.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-activity/learning-graph",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-activity/src/learning-graph/index.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-activity/threat",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-activity/src/threat/index.ts"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-agent-preset",
@@ -35,6 +55,101 @@
       "relPath": "packages/evolution/evolution-core"
     },
     {
+      "id": "@deepseek-ai/dsh-evolution-core/composition",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/composition/index.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/subagent",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/subagent/index.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/http-routes",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/http-routes.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/runtime",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/runtime/plugin.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/restrictor",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/restrictor.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/write",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/write.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/skills",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/skills.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/contract",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/contract.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/result",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/result.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/errors",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/errors.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/extract",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/extract.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/io-registry",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/io-registry.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/io-node",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/io-node.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/io-platform",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/io-platform.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/authority-plugin",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/authority-plugin.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/policy",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/policy.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/state",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/state/index.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/state/storage",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/state/storage.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/state/domain",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/state/domain/index.ts"
+    },
+    {
       "id": "@deepseek-ai/dsh-evolution-curator",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-curator"
@@ -48,6 +163,11 @@
       "id": "@deepseek-ai/dsh-evolution-maintenance",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-maintenance"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-maintenance/tools",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-maintenance/src/tools.ts"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-merge",
@@ -70,6 +190,36 @@
       "relPath": "packages/evolution/evolution-platform"
     },
     {
+      "id": "@deepseek-ai/dsh-evolution-platform/service",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-platform/src/service.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-platform/ports",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-platform/src/ports.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-platform/values",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-platform/src/values.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-platform/review-child",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-platform/src/review-child.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-platform/contract",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-platform/src/contract/index.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-platform/contract/result",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-platform/src/contract/result.ts"
+    },
+    {
       "id": "@deepseek-ai/dsh-evolution-review",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-review"
@@ -78,6 +228,16 @@
       "id": "@deepseek-ai/dsh-evolution-skill-discovery",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-skill-discovery"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-skill-discovery/catalog",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-skill-discovery/src/catalog/index.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-skill-discovery/usage",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-skill-discovery/src/usage/index.ts"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-skill-health",
@@ -93,6 +253,61 @@
       "id": "@lmzhen/dsh-evolution-client-kit",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-client-kit"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/contracts",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/contracts.generated.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/fallbacks",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/fallbacks.generated.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/route-client",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/route-client.generated.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/routes",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/routes.generated.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/states",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/states.generated.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/tokens",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/tokens.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/i18n",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/i18n.generated.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/i18n/evolution-settings",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/i18n/evolution-settings.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/i18n/evolution-skill-history",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/i18n/evolution-skill-history.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/i18n/evolution-merge",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/i18n/evolution-merge.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/i18n/evolution-skill-health",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/i18n/evolution-skill-health.ts"
     },
     {
       "id": "@deepseek-ai/schemastery",
