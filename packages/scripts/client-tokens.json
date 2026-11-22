@@ -155,17 +155,17 @@
     },
     "accent": {
       "base": {
-        "value": "var(--dsw-alias-brand-primary)",
+        "value": "color-mix(in srgb, var(--dsw-alias-state-success-primary) 65%, var(--dsw-alias-label-primary))",
         "why": "the one state/accent colour both panels already used"
       },
       "weak": {
-        "value": "color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent)",
+        "value": "color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent)",
         "why": "the tinted active surface; replaces a literal fallback"
       }
     },
     "warn": {
       "base": {
-        "value": "var(--dsw-alias-state-warn-primary)",
+        "value": "color-mix(in srgb, var(--dsw-alias-state-warn-primary) 65%, var(--dsw-alias-label-primary))",
         "why": "needs-attention/warning text"
       }
     }

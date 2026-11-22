@@ -7,9 +7,9 @@
 ## 设计
 
 - `client-tokens.json` 新增：
-  - `accent.base = var(--dsw-alias-brand-primary)`；
-  - `accent.weak = color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent)`；
-  - `warn.base = var(--dsw-alias-state-warn-primary)`；
+  - `accent.base = color-mix(in srgb, var(--dsw-alias-state-success-primary) 65%, var(--dsw-alias-label-primary))`；
+  - `accent.weak = color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent)`；
+  - `warn.base = color-mix(in srgb, var(--dsw-alias-state-warn-primary) 65%, var(--dsw-alias-label-primary))`；
   - `radius.card = var(--evo-radius-surface)`。
 - `verify-client-tokens` 的 GROUPS 允许 `accent` / `warn`。
 - `gen-client-tokens` 重生成 `client-kit/src/tokens.ts`。

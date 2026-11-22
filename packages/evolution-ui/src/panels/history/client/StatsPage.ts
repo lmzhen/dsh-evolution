@@ -318,7 +318,7 @@ export const STATS_CSS = [
   '.evo-stats-title{margin:0;font-size:24px;line-height:1.2;font-weight:700;color:var(--dsw-alias-label-primary,#20261f)}',
   '.evo-stats-title:focus-visible{outline:var(--evo-focus-ring,2px solid #2f6b58);outline-offset:2px}',
   '.evo-stats-lede{margin:7px 0 0;max-width:680px;color:var(--dsw-alias-label-secondary,#6f766d);font-size:13px;line-height:1.6}',
-  '.evo-stats-primary{flex:0 0 auto;height:38px;padding:0 14px;border:0;border-radius:9px;background:var(--evo-accent-base);color:#fff;font:inherit;font-size:12.5px;font-weight:650;cursor:pointer}',
+  '.evo-stats-primary{flex:0 0 auto;height:38px;padding:0 14px;border:0;border-radius:9px;background:var(--evo-accent-base);color:var(--dsw-alias-label-primary-inverted);font:inherit;font-size:12.5px;font-weight:650;cursor:pointer}',
   '.evo-stats-primary:focus-visible{outline:var(--evo-focus-ring,2px solid #2f6b58);outline-offset:2px}',
   '.evo-stats-summary{display:flex;flex-wrap:wrap;gap:8px}',
   '.evo-stats-stat{display:flex;align-items:center;justify-content:space-between;gap:18px;min-width:132px;padding:9px 12px;border:1px solid var(--dsw-alias-border-l2,#e5e2da);border-radius:10px;background:var(--dsw-alias-bg-layer-1,#fff)}',
