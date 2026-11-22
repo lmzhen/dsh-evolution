@@ -28,7 +28,7 @@ describe('state provider auto', () => {
     // The marker is the explicit switch; a non-empty store image is required, so
     // a half-migration cannot silently serve an empty authority.
     await writeStateStoreSnapshot(ctx.evolutionIo.provider(), join(evolution, 'state', 'store.json'), { review: {}, curator: null, pending: {} })
-    await ctx.evolutionIo.provider().writeText(join(evolution, 'state', STATE_MIGRATION_MARKER), '{}\n')
+    await ctx.evolutionIo.provider().writeText(join(evolution, 'state', STATE_MIGRATION_MARKER), JSON.stringify({ target: 'store' }))
     expect(await ctx.evolutionState.loadCuratorState()).toBeNull()
   })
 

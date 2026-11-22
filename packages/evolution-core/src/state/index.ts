@@ -9,7 +9,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values'
@@ -114,6 +114,9 @@ export class EvolutionState extends Service {
     const marker = join(this.home, 'state', STATE_MIGRATION_MARKER)
     if (existsSync(marker)) {
       const storePath = join(this.home, 'state', 'store.json')
+      let target: unknown
+      try { target = (JSON.parse(readFileSync(marker, 'utf8')) as { target?: unknown }).target } catch { target = undefined }
+      if (target !== 'store') throw new Error('evolution-state: the migration marker is invalid (target != store): ' + marker)
       // A marker without a non-empty store is a half-migration; failing loud is
       // safer than silently serving an empty state authority.
       if (!existsSync(storePath) || statSync(storePath).size === 0) {
