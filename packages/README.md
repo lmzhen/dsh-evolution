@@ -1,6 +1,6 @@
 # Evolution plugin family — package reference
 
-This directory holds the 21 packages of the dsh-evolution family. For the user guide, start at [README.md](../README.md) or [docs/](../docs/README.md); this file is the package map and maintainer reference.
+This directory holds the 20 packages of the dsh-evolution family. For the user guide, start at [README.md](../README.md) or [docs/](../docs/README.md); this file is the package map and maintainer reference.
 
 ## Package map
 

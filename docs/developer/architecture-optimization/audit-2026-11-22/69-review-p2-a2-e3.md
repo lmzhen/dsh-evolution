@@ -22,10 +22,12 @@ release 门的 traceability 之前允许从 `traceability.source` 里正则解�
 - 缺失即红，不再从自由文本猜；
 - 新负例：删掉 `measuredCommit` 必红。
 
-旧 rehearsal 仍无该字段，下一次发布前必须重新测量，行为不变（预期失败）。
+`assemble-release-evidence --release` 也要求 `rehearsal.traceability.measuredCommit === measuredCommit`：旧 rehearsal 在装配阶段就失败，而不是等到 verify；下一次发布前必须重新测量。
+
+`publish-scoped` 同时拒绝 staged manifest 里任何非 `@lmzhen/` 包名，堵住手工把 dev staging 直接 publish 的错 scope 路径。
 
 ## 验证
 
-- approval + release-evidence：4 files / 72 tests passed；
+- approval + release-evidence：4 files / 73 tests passed；release-evidence 16 tests；
 - local gates: 61 pass / 0 fail / 3 cannot-decide；
 - 全量 family 套件：442 files / 2429 tests passed（1081.35s）。

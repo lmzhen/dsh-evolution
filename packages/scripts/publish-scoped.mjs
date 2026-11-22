@@ -147,6 +147,10 @@ const manifest = JSON.parse(readFileSync(join(distRoot, 'manifest.json'), 'utf8'
 const order = JSON.parse(readFileSync(join(distRoot, 'publish-order.json'), 'utf8'))
 
 const expected = Object.keys(manifest).sort()
+const wrongScope = expected.filter((name) => !name.startsWith('@lmzhen/'))
+if (wrongScope.length > 0) {
+  throw new Error('publish-scoped: staged manifest carries non-@lmzhen package(s): ' + wrongScope.join(', ') + ' — refusing to publish under the wrong npm scope')
+}
 const listed = order.flat().sort()
 // V8-18 (0.3.48): the F-103 vacuum-guard discipline — an empty manifest or an
 // empty publish order would compare equal and the run would print "publish

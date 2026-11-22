@@ -276,6 +276,14 @@ describe('release-evidence assembly (W3 injection)', () => {
     } finally { await rm(dir, { recursive: true, force: true }) }
   })
 
+  it('refuses release assembly when traceability was not measured at this commit', async () => {
+    const inputs = rehearsalInputs()
+    delete (inputs.traceability as Record<string, unknown>).measuredCommit
+    const result = await runAssemble(staging(), inputs, ['--release', '--gates-from-manifest', 'ci', '--ci-face', 'release.yml@refs/tags/v' + FAMILY_VERSION, '--os', 'linux', '--commit', 'a'.repeat(40), '--tag', 'v' + FAMILY_VERSION])
+    expect(result.code).toBe(1)
+    expect(result.stderr).toContain('traceability.measuredCommit')
+  })
+
   it('normalizes an abbreviated rehearsal spike commit to the measured full sha', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'assemble-measured-sha-'))
     const report = join(dir, 'gates.json')
