@@ -55,3 +55,10 @@
 - family-facts.testing-policy.must 同步；gate-manifest/CONTRIBUTING 重新生成。
 - 实测 config 生效：lane=full(ci=off) members=436 excluded=72 marked=508/508；单 spec 4 tests passed。
 - gen-gate-manifest --check 0；verify-gate-manifest 0；verify-check-registry 0。
+
+## 7. 追加（2026-11-22）：alias 顺序修正
+
+- 全量套件暴露 306 个 0-test 文件：短前缀 alias（如 @deepseek-ai/dsh-evolution-adapter）先匹配，
+  把 /ports、/values 等 subpath 截走。
+- 修复：alias 过滤后按 find 长度降序排序，长 subpath 先匹配。
+- 验证：approval.spec 35 tests passed；全量套件其余文件恢复。

@@ -1,5 +1,5 @@
 // @tier fast
-// @vitest-environment happy-dom
+// @vitest-environment jsdom
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 import { act } from 'react-dom/test-utils'
 import { createRoot, type Root } from 'react-dom/client'
@@ -20,6 +20,21 @@ const source = (): MergeSource => ({
   body: async (): Promise<MergeOutcome<MergeBody>> => ({ ok: true, payload: { name: 'a', side: 'live', text: '', markdown: false, truncated: false, totalBytes: 0 } }),
   history: async (): Promise<MergeOutcome<{ items: MergeHistoryItem[] }>> => ({ ok: true, payload: { items: [] } }),
 })
+if (typeof globalThis.localStorage === 'undefined') {
+  const entries = new Map<string, string>()
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: {
+      get length() { return entries.size },
+      clear: () => entries.clear(),
+      getItem: (key: string) => entries.get(key) ?? null,
+      key: (index: number) => [...entries.keys()][index] ?? null,
+      removeItem: (key: string) => { entries.delete(key) },
+      setItem: (key: string, value: string) => { entries.set(key, String(value)) },
+    },
+    configurable: true,
+  })
+}
+
 let host: HTMLElement
 let root: Root
 beforeEach(() => { localStorage.clear(); host = document.createElement('div'); document.body.append(host); root = createRoot(host) })

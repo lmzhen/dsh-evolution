@@ -84,6 +84,7 @@ if (existsSync(ADAPTER)) {
 // missing tree makes vitest fail to start its forks ("Failed to start forks worker") instead of
 // failing the spec that needed it. The dropped entries are PRINTED - an alias silently skipped
 // would be a resolution nobody can see.
+aliasList = [...aliasList].sort((left, right) => String(right.find).length - String(left.find).length)
 const aliasesAll = aliasList;
 aliasList = aliasList.filter((entry) => typeof entry?.replacement === "string" && existsSync(entry.replacement));
 console.log("vitest.family.config: alias=" + String(aliasList.length) + "/" + String(aliasesAll.length) + " (live/total from the adapter; the pin above is the sha of the file that produced them)"

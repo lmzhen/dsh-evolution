@@ -103,6 +103,7 @@ const assembled = {
   traceability: rehearsal.traceability ?? evidence.traceability,
   faces: rehearsal.faces ?? evidence.faces,
   ciFace: ciFace === '' ? evidence.ciFace : { os: os === '' ? 'unknown' : os, workflowRef: ciFace },
+  ...(artifacts === undefined ? {} : { artifacts }),
   ...(commit === '' ? {} : { commit }),
   ...(tag === '' ? {} : { tag }),
   ...(release ? { evidenceStatus: 'measured', generatedAt: new Date().toISOString() } : {}),

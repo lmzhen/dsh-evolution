@@ -99,3 +99,8 @@ evidence v2 增可选的 `artifacts`：
   两个负例。
 - 注意：`release-evidence-rehearsal.json` 里的旧 artifact hash 与新 dist 不匹配是**预期失败**；
   下一次发布前必须重新测量 S1-S4，不得沿用旧 spike。未发布。
+
+## 追加：--dist 必须写入 assembled.artifacts
+
+- 复核发现 assemble 只读 --dist，未把 artifacts 赋给 assembled；release 校验因此误报缺 artifacts。
+- 已修复：读取后写入 assembled.artifacts；release-evidence.spec 15 tests passed。
