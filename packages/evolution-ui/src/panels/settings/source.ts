@@ -28,9 +28,5 @@ export function sectionSnapshotOf(snapshot: ConfigFormSnapshotLike): ParamSectio
     writable: snapshot.writable,
     // U-5: the composition layer a cleared field reverts to (the platform's `base`).
     base: isSection(snapshot.base) ? snapshot.base : undefined,
-    // G5/W7 S5: the platform's `mode` is no longer modelled — every family row writes the host
-    // configuration (the card states that once, as a fixed line). An unavailable row is not-served.
-    ...snapshot.status === 'unavailable' ? { reason: ((snapshot as { reason?: string }).reason ?? 'not-served') as 'not-served' } : {},
-    ...(snapshot as { stale?: boolean }).stale === true ? { stale: true } : {},
   }
 }

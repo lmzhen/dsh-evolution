@@ -1032,26 +1032,6 @@
       "pt": "Modificado",
       "ru": "Изменено"
     },
-    "projectionFailed": {
-      "zh": "这一块读设置时出错，已记入日志；其它参数不受影响",
-      "en": "Something went wrong reading this section's settings; it's been logged. Other settings are unaffected",
-      "ja": "この項目の設定読み取りでエラーが発生し、ログに記録されました。他のパラメータには影響ありません",
-      "es": "no se pudo leer este bloque y el error quedó en el log; los demás parámetros no se ven afectados",
-      "fr": "la lecture de cette ligne a échoué et l’erreur est dans le journal ; les autres paramètres ne sont pas affectés",
-      "de": "Beim Lesen dieser Einstellung ist ein Fehler aufgetreten; er steht im Log. Andere Parameter sind nicht betroffen",
-      "pt": "erro ao ler as configurações deste bloco, registrado no log; os outros parâmetros não são afetados",
-      "ru": "Не удалось прочитать этот блок настроек, ошибка записана в журнал; остальные параметры не затронуты"
-    },
-    "readbackStale": {
-      "zh": "显示的是最后一次成功读取的值；当前回读失败，刷新后可能变化。",
-      "en": "Showing the last value that read back successfully; the current read-back failed, so it may change after a refresh.",
-      "ja": "最後に正常に読み取れた値を表示しています。今回の再読み取りに失敗したため、更新後に値が変わる可能性があります。",
-      "es": "Se muestran los últimos valores leídos con éxito; la relectura actual falló y pueden cambiar al actualizar.",
-      "fr": "Affichage des dernières valeurs lues avec succès ; la relecture actuelle a échoué et elles peuvent changer après actualisation.",
-      "de": "Angezeigt werden die zuletzt erfolgreich gelesenen Werte; das erneute Lesen ist fehlgeschlagen, nach dem Aktualisieren kann sich das ändern.",
-      "pt": "Mostrando os valores da última leitura bem-sucedida; a releitura atual falhou e pode mudar depois de atualizar.",
-      "ru": "Показаны последние успешно прочитанные значения; повторное чтение не удалось, после обновления они могут измениться."
-    },
     "readonly": {
       "zh": "本次会话不允许写入设置（临时运行模式）",
       "en": "Settings can't be written in this session (temporary run mode)",
@@ -1121,26 +1101,6 @@
       "de": "Wird zurückgesetzt…",
       "pt": "restaurando…",
       "ru": "Возвращаем…"
-    },
-    "saveConflict": {
-      "zh": "没保存上：这些设置刚在别的页面被改过。请刷新后再保存一次。",
-      "en": "This value wasn’t saved because the settings were changed on another page. Reload the page, then save again.",
-      "ja": "この値は保存できませんでした。別のページで設定が変わっています。読み込み直してから、もう一度保存してください。",
-      "es": "El valor no se guardó: otra página cambió los ajustes. Vuelve a cargarlos y guarda otra vez.",
-      "fr": "Cette valeur n’a pas été enregistrée : les paramètres ont été modifiés depuis une autre page. Rechargez-les avant d’enregistrer.",
-      "de": "Der Wert wurde nicht gespeichert: Die Einstellungen wurden auf einer anderen Seite geändert. Lade sie neu und speichere dann noch einmal.",
-      "pt": "O valor não foi salvo: as configurações mudaram em outra página. Confira os valores atuais e salve novamente.",
-      "ru": "Значение не сохранилось: настройки успели изменить на другой странице. Посмотрите текущие значения и сохраните ещё раз."
-    },
-    "saveReadbackFailed": {
-      "zh": "写入已被接受，但回读失败；点刷新重读后再确认。",
-      "en": "The write went through, but reading it back failed. Hit Refresh and read it again.",
-      "ja": "書き込みは受理されましたが、再読み取りに失敗しました。「更新」を押して再読み取りしてから確認してください。",
-      "es": "La escritura se aceptó, pero la relectura falló; actualiza y compruébalo.",
-      "fr": "L’écriture a été acceptée, mais la relecture a échoué ; actualisez puis vérifiez.",
-      "de": "Der Schreibvorgang wurde angenommen, das Zurücklesen ist aber fehlgeschlagen; aktualisiere und prüfe erneut.",
-      "pt": "A escrita foi aceita, mas a releitura falhou; clique em Atualizar e confirme.",
-      "ru": "Запись принята, но прочитать её обратно не удалось; нажмите «Обновить» и проверьте."
     },
     "saved": {
       "zh": "已保存。",

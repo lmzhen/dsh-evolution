@@ -23,8 +23,8 @@ import type { SupportedLocale } from '@lmzhen/dsh-evolution-client-kit/generated
  * scope performs a recovery read before it resolves), so this record carries only what the effect
  * needs to render: whether it was accepted, and whether it was a reset (which reads differently).
  */
-type PendingWrite = { readonly accepted: boolean; readonly resets: boolean; readonly field?: string; readonly readbackFailed?: boolean; readonly kind?: 'conflict' | 'transport' | 'validation' }
-import type { ParamSectionSnapshot, SettingsPathOpLike, SettingsSaveResult } from './seam.ts'
+type PendingWrite = { readonly accepted: boolean; readonly resets: boolean; readonly field?: string }
+import type { ParamSectionSnapshot, SettingsPathOpLike } from './seam.ts'
 
 /** Generated-copy language. */
 export type ParamLanguage = SupportedLocale
@@ -273,7 +273,6 @@ export interface ParamCardViewProps {
   lang?: () => ParamLanguage
   /** ONE call per save, carrying every dirty field as one op list (T5-01/A56). */
   mutateOnce: (ops: readonly SettingsParamOp[], baseRevision?: number) => Promise<boolean>
-  saveOnce?: (ops: readonly SettingsParamOp[]) => Promise<SettingsSaveResult>
   /** Ask the scope to drop one override; resolves when the scope answered, not when it landed. */
   clear: (field: string, baseRevision?: number) => Promise<boolean>
   /** The current row state, from whichever source owns it (the bound hook or the page). */
@@ -288,7 +287,7 @@ export interface ParamCardViewProps {
  * @returns the card.
  */
 export function ParamCardView(props: ParamCardViewProps): ReactNode {
-  const { t, fields, mutateOnce, saveOnce, clear, namespace, snapshot } = props
+  const { t, fields, mutateOnce, clear, namespace, snapshot } = props
   const lang: ParamLanguage = props.lang?.() ?? 'zh'
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Record<string, string>>({})
@@ -327,14 +326,10 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     // requested values read a REFUSED write as accepted whenever the value already matched (a
     // concurrent editor, or a field the operator had already overridden) — the exact "refused but
     // reported as saved" defect. The platform resolves `false` for a refusal, so trust it.
-    if (pending.readbackFailed === true) {
-      setError(t('saveReadbackFailed'))
-      return
-    }
     if (!pending.accepted) {
       // A refused reset reads differently from a refused save: in the first the row still shows the
       // operator's value, which is what a reader who clicked "restore default" needs to be told.
-      setError(t(pending.resets ? 'resetRefused' : pending.kind === 'conflict' ? 'saveConflict' : 'refused'))
+      setError(t(pending.resets ? 'resetRefused' : 'refused'))
       return
     }
     if (pending.accepted) {
@@ -349,15 +344,8 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     }
   }, [pending, snapshot.user, t])
   if (snapshot.status === 'loading') return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('loading'))
-  // Three different absences, told apart on screen because the operator's next move differs:
-  // this UI has no settings seat (compose the settings surface), the seat serves no such row
-  // (compose the row), or projecting that row failed (read the log). They must never read the
-  // same, and none of them may be a blank card.
   if (snapshot.status === 'unavailable') {
-    const key: MessageKey = snapshot.reason === 'seat-missing'
-      ? 'seatMissing'
-      : snapshot.reason === 'projection-failed' ? 'projectionFailed' : 'unavailable'
-    return createElement('p', { className: 'evolution-param-note', role: 'status' }, t(key))
+    return createElement('p', { className: 'evolution-param-note', role: 'status' }, t('unavailable'))
   }
   const user = isSection(snapshot.user) ? snapshot.user : {}
   const value = isSection(snapshot.value) ? snapshot.value : {}
@@ -426,10 +414,8 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
         // which the Plugins page fenced with the render-time revision — the second field was then
         // refused by the host and its change silently did not land.
         const ops: SettingsParamOp[] = dirty.map(field => ({ op: 'set', path: [keyOf(field)], value: parseFor(field.control, textOf(field)) }))
-        const result = saveOnce === undefined
-          ? { written: await mutateOnce(ops, baseRevision.current ?? props.revision), readback: 'ok' as const }
-          : await saveOnce(ops)
-        setPending({ accepted: result.written && result.readback === 'ok', readbackFailed: result.written && result.readback === 'failed', ...(result.kind === undefined ? {} : { kind: result.kind }), resets: false })
+        const written = await mutateOnce(ops, baseRevision.current ?? props.revision)
+        setPending({ accepted: written, resets: false })
       } catch (caught) {
         // Transport-level failures (and any future shell that rejects): keep the draft
         // so nothing the operator typed is lost.
@@ -452,8 +438,7 @@ export function ParamCardView(props: ParamCardViewProps): ReactNode {
     open
       ? createElement('div', { className: 'evolution-param-body' },
         hintKey === undefined ? null : createElement('p', { className: 'evolution-param-note' }, t(hintKey)),
-        snapshot.stale === true ? createElement('p', { className: 'evolution-param-note', role: 'status', 'data-role': 'stale-note' }, t('readbackStale')) : null,
-        disabled ? createElement('p', { className: 'evolution-param-note', role: 'status' }, t('readonly')) : null,
+            disabled ? createElement('p', { className: 'evolution-param-note', role: 'status' }, t('readonly')) : null,
         fields.length === 0
           ? createElement('p', { className: 'evolution-param-note', role: 'status' }, t('empty'))
           // U-3: the generated table already carries `group`; it was never rendered. One heading per

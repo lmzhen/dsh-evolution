@@ -12,14 +12,6 @@
 
 import type { ConfigFormLike as KitConfigFormLike, ConfigFormSnapshotLike as KitConfigFormSnapshotLike, ConfigFormsSeat as KitConfigFormsSeat, ConfigPathOpLike, LocaleSeat as KitLocaleSeat } from '@lmzhen/dsh-evolution-client-kit'
 
-/** Structured result of one settings write, separating acceptance from readback. */
-export interface SettingsSaveResult {
-  readonly written: boolean
-  readonly readback: 'ok' | 'failed'
-  readonly kind?: 'conflict' | 'transport' | 'validation'
-  readonly failure?: unknown
-}
-
 /** Snapshot of one settings row, as the client seat reports it. */
 export interface ParamSectionSnapshot {
   status: 'loading' | 'ready' | 'unavailable'
@@ -29,14 +21,6 @@ export interface ParamSectionSnapshot {
   writable: boolean
   /** U-5: the composition layer a cleared field reverts to (platform `base`, previously dropped). */
   base: Record<string, unknown> | undefined
-  /**
-   * Why an `unavailable` snapshot is unavailable: this bundle found no settings seat at
-   * all, or the seat is there and serves no such row. The two read differently to the
-   * operator (one is the UI's own gap, the other is a row that is not composed).
-   */
-  reason?: 'seat-missing' | 'not-served' | 'projection-failed' | 'readback-failed' | 'transport'
-  /** Last-known values are still shown; the row could not be re-read. */
-  stale?: boolean
 }
 
 /** One ordered field operation; client-kit owns the shape. */
