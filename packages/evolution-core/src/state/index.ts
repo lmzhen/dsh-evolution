@@ -9,7 +9,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values'
@@ -86,15 +86,37 @@ export class EvolutionState extends Service {
   /** P2-5: the multi-provider refusal is not a mount-time-only check. A provider
    * registered after this row mounted used to make registration order the effective
    * medium with no pin — exactly the silent rebind the mount check exists to stop. */
+  /** Validate the marker + a real store image before auto may select it. */
+  private assertMarkerStore(): void {
+    const marker = join(this.home, 'state', STATE_MIGRATION_MARKER)
+    if (!existsSync(marker)) return
+    const storePath = join(this.home, 'state', 'store.json')
+    let markerBody: unknown
+    let storeBody: unknown
+    try {
+      markerBody = JSON.parse(readFileSync(marker, 'utf8'))
+      storeBody = JSON.parse(readFileSync(storePath, 'utf8'))
+    } catch (error) {
+      throw new Error('evolution-state: the migration marker/store is missing or unreadable: ' + (error instanceof Error ? error.message : String(error)))
+    }
+    if (typeof markerBody !== 'object' || markerBody === null || (markerBody as { target?: unknown }).target !== 'store') {
+      throw new Error('evolution-state: the migration marker is invalid (target != store): ' + marker)
+    }
+    const image = storeBody as { version?: unknown; review?: unknown; pending?: unknown; curator?: unknown }
+    if (typeof image !== 'object' || image === null || image.version !== 1
+      || typeof image.review !== 'object' || image.review === null || Array.isArray(image.review)
+      || typeof image.pending !== 'object' || image.pending === null || Array.isArray(image.pending)) {
+      throw new Error('evolution-state: the migration marker points at an invalid/empty store image: ' + storePath)
+    }
+  }
+
   private assertProviderChoice(): void {
     if (this.providerName === 'auto') {
       const names = this.ctx.evolutionStateStorage.providerNames()
-      if (existsSync(join(this.home, 'state', STATE_MIGRATION_MARKER))) {
+      const marker = join(this.home, 'state', STATE_MIGRATION_MARKER)
+      if (existsSync(marker)) {
         if (!names.includes(PROVIDER_STORE)) throw new Error('evolution-state: the migration marker exists but no "' + PROVIDER_STORE + '" provider is registered')
-        const storePath = join(this.home, 'state', 'store.json')
-        if (!existsSync(storePath) || statSync(storePath).size === 0) {
-          throw new Error('evolution-state: the migration marker exists but the store is missing/empty: ' + storePath)
-        }
+        this.assertMarkerStore()
       }
       return
     }
@@ -113,15 +135,8 @@ export class EvolutionState extends Service {
     const names = this.ctx.evolutionStateStorage.providerNames()
     const marker = join(this.home, 'state', STATE_MIGRATION_MARKER)
     if (existsSync(marker)) {
-      const storePath = join(this.home, 'state', 'store.json')
-      let target: unknown
-      try { target = (JSON.parse(readFileSync(marker, 'utf8')) as { target?: unknown }).target } catch { target = undefined }
-      if (target !== 'store') throw new Error('evolution-state: the migration marker is invalid (target != store): ' + marker)
-      // A marker without a non-empty store is a half-migration; failing loud is
-      // safer than silently serving an empty state authority.
-      if (!existsSync(storePath) || statSync(storePath).size === 0) {
-        throw new Error('evolution-state: the migration marker exists but the store is missing/empty: ' + storePath + ' (restore the store or remove the marker to keep using domain)')
-      }
+      // Full image validation: size alone lets a whitespace/truncated file pass.
+      this.assertMarkerStore()
       return PROVIDER_STORE
     }
     if (names.includes(PROVIDER_DOMAIN)) return PROVIDER_DOMAIN

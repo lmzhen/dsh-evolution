@@ -101,7 +101,8 @@ store-migration: 4 tests passed（含迁移后 auto 读 store、删 marker 回�
 验证：
 
 ```text
-core state: 9 files / 54 tests passed
+core state: 9 files / 56 tests passed
+全量 family 套件: 446 files / 2447 tests passed（1169.62s）
 全量 family 套件: 446 files / 2446 tests passed（1188.86s）
 `run-gates local`: 61 pass / 0 fail / 3 cannot-decide
 ```

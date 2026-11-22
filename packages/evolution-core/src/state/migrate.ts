@@ -63,11 +63,15 @@ async function migrateDomainToStoreUnlocked(ctx: Context, options: StateMigratio
   // domain row mounted, and opening the same KV domain a second time fails with
   // already-open. The optional listReviewStates() is the migration read; the
   // fallback is for a host that runs the migration before the state row mounts.
-  const mounted = (ctx as unknown as { evolutionStateStorage?: { provider(name?: string): { listReviewStates?(): Promise<readonly { sessionId: string; record: StoredReviewState }[]>; listPending(status?: string): Promise<readonly PendingRecord[]>; loadCuratorState(): Promise<CuratorStateRecord | null> } | undefined } }).evolutionStateStorage?.provider?.('domain')
+  const mounted = (ctx as unknown as { evolutionStateStorage?: { provider(name?: string): { reload?(): Promise<void>; listReviewStates?(): Promise<readonly { sessionId: string; record: StoredReviewState }[]>; listPending(status?: string): Promise<readonly PendingRecord[]>; loadCuratorState(): Promise<CuratorStateRecord | null> } | undefined } }).evolutionStateStorage?.provider?.('domain')
   let review: Record<string, StoredReviewState> = {}
   let pending: Record<string, PendingRecord> = {}
   let curator: CuratorStateRecord | null = null
   if (mounted?.listReviewStates !== undefined) {
+    // The mounted provider is authoritative in memory; another host may have
+    // written since its last open. Refresh under the same state lock before the
+    // snapshot, otherwise the store is built from a stale domain cache.
+    await mounted.reload?.()
     for (const row of await mounted.listReviewStates()) review[row.sessionId] = row.record
     for (const status of PENDING_STATUSES) {
       for (const record of await mounted.listPending(status)) if (pending[record.id] === undefined) pending[record.id] = record

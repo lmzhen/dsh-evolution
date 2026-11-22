@@ -96,6 +96,18 @@ describe('domain → StateStore migration', () => {
     await stateWrite
   })
 
+  it('refreshes the mounted domain cache before taking the snapshot', async () => {
+    const home = await tempRoot('dsh-state-migrate-stale-')
+    const a = await mountStateStack(home, { evolution: true })
+    const b = await mountStateStack(home, { evolution: true })
+    // Open A's domain cache, then write through B; A must reload under the lock.
+    expect(await a.evolutionState.listPending('pending')).toEqual([])
+    await b.evolutionStateStorage.provider('domain').savePending({ id: 'from-b', kind: 'memory', summary: 'b', args: {}, createdAt: '2026-01-01T00:00:00.000Z', status: 'pending' })
+    const io = a.evolutionIo.provider()
+    await migrateDomainToStore(a, { io, home })
+    expect((await createStateStoreProvider({ io, home }).listPending('pending')).map(row => row.id)).toEqual(['from-b'])
+  })
+
   it('dry-run refuses an existing store instead of reporting a false dry success', async () => {
     const { ctx, home, io } = await seeded()
     await io.writeText(join(home, 'state', 'store.json'), '{}\n')
