@@ -234,3 +234,4 @@
 | [53-p2-read-tickets.md](53-p2-read-tickets.md) | P2：history 读 ticket 按 kind 分开 |
 | [54-p2-dead-ui-contract.md](54-p2-dead-ui-contract.md) | P2：删除 client-kit/history 死契约与假 face |
 | [55-p2-local-require.md](55-p2-local-require.md) | P2：client require 改 bundle 局部绑定 |
+| [56-p2-merge-view-ledger.md](56-p2-merge-view-ledger.md) | P2：merge tab 响应式 + 计数共享解析 |

@@ -6,7 +6,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import { createSkillHistoryApi } from './api.ts'
 import { createApprovalApi } from '../../settings/api.ts'
-import { registerSurface, PAGE_SURFACE_CSS, ROUTES, type ConfigFormLike, type ConfigFormsSeat, type Translate } from '@lmzhen/dsh-evolution-client-kit'
+import { fetchMergePendingCount, registerSurface, PAGE_SURFACE_CSS, type ConfigFormLike, type ConfigFormsSeat, type Translate } from '@lmzhen/dsh-evolution-client-kit'
 import { confirmModeFrom, type PendingCardFace } from '../../settings/PendingCard.ts'
 import { dictionaries as settingsDictionaries, NS as SETTINGS_NS } from '../../settings/messages.ts'
 import { bindLocale } from '@lmzhen/dsh-evolution-client-kit'
@@ -68,6 +68,12 @@ export function apply(ctx: ClientContext): void {
       return entries.some(entry => entry.options?.id === (view === 'merge' ? 'merge' : 'skill-health'))
     } catch { return false }
   }
+  const subscribeViews = (listener: () => void): (() => void) => {
+    try {
+      const slots = (ctx as unknown as { slots?: { subscribe?: (name: string, fn: () => void) => () => void } }).slots
+      return slots?.subscribe?.('evolution.workbench.view', listener) ?? (() => {})
+    } catch { return () => {} }
+  }
   const pendingT = bindLocale(ctx, SETTINGS_NS, settingsDictionaries, 'en', false).t
   const historyFace = (t: Translate): PanelFace => ({
     t,
@@ -85,16 +91,7 @@ export function apply(ctx: ClientContext): void {
 
   const loadTaskCounts = async (): Promise<WorkbenchTaskCounts> => {
     const pending = approvalApi.pending().then(answer => answer.ok ? answer.data.length : 0).catch(() => 0)
-    const merge = (async (): Promise<number> => {
-      try {
-        const response = await fetch(ROUTES.merge.view, { headers: { accept: 'application/json' } })
-        if (!response.ok) return 0
-        const body = await response.json() as { ok?: boolean; data?: unknown; counts?: unknown }
-        const raw = (body.ok === true ? body.data : body) as { counts?: { pending?: unknown; active?: { pending?: unknown } } } | undefined
-        const count = Number(raw?.counts?.active?.pending ?? raw?.counts?.pending ?? 0)
-        return Number.isFinite(count) && count > 0 ? count : 0
-      } catch { return 0 }
-    })()
+    const merge = fetchMergePendingCount()
     const [pendingCount, mergeCount] = await Promise.all([pending, merge])
     return { pending: pendingCount, merge: mergeCount }
   }
@@ -115,6 +112,7 @@ export function apply(ctx: ClientContext): void {
       pending: pendingFace(),
       stats: { t, loadStats: api.stats },
       hasView,
+      subscribeViews,
       loadTaskCounts,
     }),
     children: { 'evolution.workbench.view': { kind: 'list', scope: 'root' } },

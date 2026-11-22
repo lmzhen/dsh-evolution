@@ -25,6 +25,8 @@ export interface WorkbenchFace {
   readonly stats?: Omit<StatsFace, 'view' | 'onView' | 'layout' | 'openSkill' | 'onOrganize'>
   /** Whether a feature view is actually mounted (merge is optional). */
   readonly hasView?: (view: 'merge') => boolean
+  /** Subscribe to the view ledger so a late merge half still supplies its tab. */
+  readonly subscribeViews?: (listener: () => void) => () => void
   /** Read-only task counts for the first landing; absent keeps history. */
   readonly loadTaskCounts?: (() => Promise<WorkbenchTaskCounts>) | undefined
 }
@@ -106,7 +108,11 @@ export function WorkbenchPage(props: WorkbenchFace & { readonly renderSlot?: (na
     if (state.origin === 'data') props.store.backToData()
     else props.store.backToList()
   }
-  const hasMerge = props.hasView?.('merge') ?? true
+  const hasMerge = useSyncExternalStore(
+    props.subscribeViews ?? (() => () => {}),
+    () => props.hasView?.('merge') ?? true,
+    () => props.hasView?.('merge') ?? true,
+  )
   const hasData = props.stats !== undefined
   const sharedStats = useSharedStats(props.stats?.loadStats)
   const [statsEpoch, setStatsEpoch] = useState(0)

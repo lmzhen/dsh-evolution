@@ -122,6 +122,20 @@ describe('history workbench', () => {
     second.unmount()
   })
 
+  it('adds the merge tab when the view ledger gains the merge half', async () => {
+    let merge = false
+    const listeners = new Set<() => void>()
+    render(h(WorkbenchPage, {
+      t: (key: string) => key, store: createWorkbenchStore(), history: face(), pending: pendingFace(),
+      hasView: (view: 'merge') => view === 'merge' && merge,
+      subscribeViews: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    }))
+    expect(document.getElementById('evo-workbench-tab-merge')).toBeNull()
+    merge = true
+    act(() => { for (const listener of listeners) listener() })
+    await waitFor(() => { expect(document.getElementById('evo-workbench-tab-merge')).not.toBeNull() })
+  })
+
   it('opens the data overview, navigates a name into history and updates counts only on explicit refresh', async () => {
     let errorCount = 0
     const loadStats = vi.fn(async () => ({

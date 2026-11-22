@@ -15,6 +15,7 @@ export { DataTable, DATA_TABLE_CSS, type DataTableColumn, type DataTableProps, t
 export { PLATFORM_MENU, renderPlatformMenu, menuPrimitivesFrom, type RowMenuAction, type MenuPrimitives, type MenuSurfaceComponent, type MenuItemButtonComponent } from './presentation/action-menu.ts'
 export type { PresentationTone, PresentationAction, DecisionFact, DecisionModel } from './presentation/types.ts'
 export { ROUTES } from './generated/routes.generated.ts'
+export { fetchMergePendingCount } from './merge-count.ts'
 export { FALLBACKS } from './generated/fallbacks.generated.ts'
 export * from './generated/contracts.generated.ts'
 export * from './generated/states.generated.ts'
