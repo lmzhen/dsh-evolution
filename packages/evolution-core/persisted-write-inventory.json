@@ -342,6 +342,15 @@
       "marker": "transactIo(io, path, task)",
       "state": [],
       "note": "fileMutationLock updates the lock record through transactIo; no private direct-write fallback remains."
+    },
+    {
+      "id": "state-store",
+      "path": "<evolutionHome>/state/store.json",
+      "writer": "evolution-core/src/state/store.ts",
+      "serializedBy": "transact",
+      "marker": "transactIo(io, file",
+      "state": [],
+      "note": "File-backed StateStore provider (D1a, not mounted yet): every mutation is one transactIo read-modify-write; no process-local authority."
     }
   ]
 }
