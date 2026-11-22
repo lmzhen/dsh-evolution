@@ -250,3 +250,4 @@
 | [69-review-p2-a2-e3.md](69-review-p2-a2-e3.md) | 复核残余 P2：A2 双 reload、E3 结构化 traceability |
 | [70-contract-merged.md](70-contract-merged.md) | Phase F：platform-contract 并入 adapter |
 | [71-platform-renamed.md](71-platform-renamed.md) | Phase F：adapter 改名 evolution-platform |
+| [72-npm-platform-placeholder.md](72-npm-platform-placeholder.md) | 新 npm 包 @lmzhen/dsh-evolution-platform 的 0.0.0 占位与 Trusted Publisher |
