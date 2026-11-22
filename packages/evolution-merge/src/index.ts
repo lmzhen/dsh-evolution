@@ -394,3 +394,6 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     scope.effect(() => () => { runs.cancelAll() }, 'evolution-merge: runs')
   })
 }
+
+export { MergeUnitTransactions, unitEvidenceDigest, type UnitBackend, type UnitPlan } from './unit-protocol.ts'
+export { skillLibraryUnitBackend } from './skill-library-unit-backend.ts'

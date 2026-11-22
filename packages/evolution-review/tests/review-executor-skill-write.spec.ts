@@ -13,7 +13,7 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import SkillUsageRegistry from '@deepseek-ai/dsh-evolution-skill-discovery/usage'
 import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as NodeIo from '@deepseek-ai/dsh-evolution-core/io-node'
-import * as ToolSkillManage from '../../tool-skill-manage/src/index.ts'
+import * as ToolSkillManage from '@deepseek-ai/dsh-tool-skill-manage'
 import { clearReviewChannel, withReviewContext } from '@deepseek-ai/dsh-evolution-core'
 import { runReview } from '../src/review-executor.ts'
 import type { ReviewLlmPort, ReviewParent, ReviewToolPort } from '../src/review-executor.ts'

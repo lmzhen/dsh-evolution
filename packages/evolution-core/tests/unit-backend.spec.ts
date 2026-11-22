@@ -5,8 +5,7 @@ import { expect, it } from 'vitest'
 import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { skillLibraryUnitBackend } from '../../evolution-merge/src/skill-library-unit-backend.ts'
-import { MergeUnitTransactions, type UnitPlan } from '../../evolution-merge/src/unit-protocol.ts'
+import { MergeUnitTransactions, skillLibraryUnitBackend, type UnitPlan } from '@deepseek-ai/dsh-evolution-merge'
 
 it('commits through the real SkillLibrary adapter', async () => {
   const root = await tempRoot('dsh-unit-backend-')

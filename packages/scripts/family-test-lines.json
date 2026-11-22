@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-22T00:57:29.732Z",
-  "tree": "cd15652b",
+  "measuredAt": "2026-11-22T01:14:00.538Z",
+  "tree": "8eca6464",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -877,6 +877,16 @@
       "spec": "packages/evolution-review/tests/review-executor-skill-write.spec.ts",
       "id": "@deepseek-ai/dsh-agent-loop-testkit",
       "kind": "testkit",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-review/tests/review-executor-skill-write.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-review"
+    },
+    {
+      "spec": "packages/evolution-review/tests/review-executor-skill-write.spec.ts",
+      "id": "@deepseek-ai/dsh-tool-skill-manage",
+      "kind": "platform",
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-skill-write.spec.ts:1",

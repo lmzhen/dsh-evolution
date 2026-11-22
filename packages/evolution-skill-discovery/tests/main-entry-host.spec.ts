@@ -8,7 +8,7 @@ import { createUserMessage, LlmAdapter, type GenerateOptions, type LlmResolvedMo
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
-import EvolutionIoRegistry from '../../evolution-core/src/io-registry.ts'
+import EvolutionIoRegistry from '@deepseek-ai/dsh-evolution-core/io-registry'
 import * as mainEntry from '../src/main-entry.ts'
 
 const dirs: string[] = []
