@@ -81,6 +81,12 @@ const platformFloor = platformLine.floor
 // Explicit non-release pack (main-branch CI): never inferred from the version
 // string, so a real release that passes a wrong --version still fails below.
 const devBuild = argv.includes('--dev-build')
+// The published family lives under the @lmzhen scope. A release with another scope would publish
+// under the wrong npm namespace; dev builds may use a throwaway scope for staging drills.
+if (!devBuild && scope !== '@lmzhen') {
+  console.error('prepare-release: release scope must be @lmzhen (got ' + scope + '); pass --dev-build for a non-release pack')
+  process.exit(2)
+}
 
 // v21 (S-4): reconcile the release version with the PACKAGE MANIFESTS before
 // anything is staged. The install side (install-layered familyVersion)

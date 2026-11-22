@@ -126,6 +126,14 @@ describe('layered installer', () => {
     await expect(readFile(join(home, 'profiles', 'web', 'package.json'), 'utf8')).rejects.toThrow()
   }, 60_000)
 
+  it('release refuses a non-@lmzhen npm scope', async () => {
+    const script = fileURLToPath(new URL('../../scripts/prepare-release.mjs', import.meta.url))
+    const error = await run(process.execPath, [script, '--scope', '@wrong', '--version', '0.0.0'])
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(error?.code).toBe(2)
+    expect(error?.stderr).toContain('release scope must be @lmzhen')
+  }, 30_000)
+
   it('uninstalls a legacy layered profile without touching user data', async () => {
     const home = await tempRoot('dsh-installer-uninstall-')
     const profileDir = join(home, 'profiles', 'evo-test')
