@@ -1,0 +1,57 @@
+# D1b 设计：domain → StateStore 显式迁移与切换
+
+前置：D1a 已验证 file provider（`state/store.ts`）通过 conformance，且不挂载、不改变行为。
+
+## 目标
+
+把 pending / review / curator 三类现有 durable state 从 `storage-domain` provider 迁到 `store` 文件 provider，并让 bundle 默认 `evolution-state.provider` 指向 `store`；不删除旧 domain 数据，保留一个版本的回退窗口。
+
+## 迁移命令
+
+```text
+/evolution migrate state [--dry-run]
+```
+
+- 默认拒绝覆盖已有 `<evolutionHome>/state/store.json`；
+- 先打开旧 `EVOLUTION_DOMAIN`，逐表读取并应用 `recordIssue` 校验；任一非法记录 ⇒ 整次迁移失败，不写 store；
+- 读出 review 全部 session 行（直接读 domain table，`EvolutionStateStorage` 没有 list-sessions 方法）、curator 单行、pending 全部行；
+- 在内存组装完整 StoreFile：`{ version:1, review, curator, pending }`；
+- 用 `io.createTextIfAbsent(store.json, serialized)` 发布：文件已存在会 EEXIST，迁移不会覆盖；发布是完整文件，不会出现半迁移；
+- 成功后写 `state/.migrated-from-domain.json`（时间、counts、源 provider `domain`、目标 `store`）；
+- **不删除/不修改 domain 数据**；
+- `--dry-run` 只读、只打印 counts，不写 store/marker。
+
+失败路径：
+
+| 失败点 | 结果 |
+|---|---|
+| domain 打不开/校验失败 | store 不写，原数据不变 |
+| store 已存在 | 命令失败，不覆盖 |
+| createTextIfAbsent 失败 | store 不写，可重试 |
+| 成功写 store 后 marker 写失败 | store 已完整；命令报告 marker 缺失，重启后仍可读 store |
+
+## 切换
+
+1. 用户运行迁移；
+2. bundle row `evolution-state` 的 `config.provider` 从 `domain` 改为 `store`；
+3. domain provider 仍注册但不再被选中（保留一个版本的只读回退）；
+4. 下一个 minor 删除 `domain` provider 与 storage-domain rows。
+
+回退：
+
+- 把 `provider` 改回 `domain` 并重启；domain 数据从未被改，store 文件保留；
+- 不需要“反向迁移”。
+
+## 验收
+
+- 迁移负例：已有 store、非法 domain 记录、domain 打开失败 ⇒ 均不写 store；
+- 迁移正例：domain 写入的 pending/review/curator 全部经 store provider 读出，字段完整；
+- 切换负例：provider 配错在 mount 期报错（现有 registry 已做）；
+- 双进程：迁移命令与运行中的 host 不并发；命令在 host 停止/未持有迁移锁时执行（若不能保证，先做 `--dry-run` + host 停止提示）；
+- 回滚演练：切回 domain 后 pending/review/curator 仍可读。
+
+## 范围边界
+
+- 本步只迁 pending/review/curator；activity/usage 仍是文件侧车，D1c 另议；
+- approval 的完整 SkillPlan 属于 Phase D 审批面，本步不改 plan 形状；
+- UI/提示词/aux 前缀无变化。

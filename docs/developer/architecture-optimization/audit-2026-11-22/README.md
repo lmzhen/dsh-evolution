@@ -255,3 +255,4 @@
 | [74-line-subpath.md](74-line-subpath.md) | family source 子路径进入 line manifest |
 | [75-structural-triage.md](75-structural-triage.md) | 剩余结构项逐项判断；DCR-3 草案（D1-D3 做，D4-D9 登记） |
 | [76-statestore-provider.md](76-statestore-provider.md) | D1a：file-backed StateStore provider（未挂载） |
+| [77-statestore-migration-design.md](77-statestore-migration-design.md) | D1b：domain → StateStore 迁移与切换设计 |
