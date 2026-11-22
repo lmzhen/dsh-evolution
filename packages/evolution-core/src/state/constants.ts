@@ -19,6 +19,8 @@ export const CURATOR_STATE_KEY = 'primary'
 /** Provider names as registered on the `evolutionStateStorage` seam. */
 export const PROVIDER_DOMAIN = 'domain'
 export const PROVIDER_STORE = 'store'
+/** Marker written after an explicit domain→store migration; `auto` uses it to pick the authority. */
+export const STATE_MIGRATION_MARKER = '.migrated-from-domain.json'
 
 /** Domain table names of the evolution storage-domain spec. */
 export const REVIEW_STATE_TABLE = 'review_state'

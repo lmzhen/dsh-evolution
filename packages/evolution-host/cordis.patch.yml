@@ -35,20 +35,15 @@
       # G8-B2: shipped default. The platform base bundle mounts the storage-domain
       # facility over its json backend, so this provider registers the KV domain
       # without the family owning a second file medium.
+    - id: evolution-state-store
+      name: '@deepseek-ai/dsh-evolution-core/state/store-plugin'
     - id: evolution-state
       name: '@deepseek-ai/dsh-evolution-core/state'
-      # S1-D1 (0.3.80): the medium is PINNED explicitly. The row used to carry
-      # no pin on purpose (V10-16): the registry has NO fallback, so the
-      # effective provider was whichever row registered first — json while the
-      # domain row above stays `disabled: true`, but any overlay that merely
-      # ENABLED the domain row silently switched the family's whole state
-      # medium to an empty domain (pending list blank, approvals unresolvable,
-      # historical json state invisible) with a single ambiguous-provider warn
-      # as the only signal. The pin makes json the deterministic shipped
-      # default; switching to domain is a deliberate overlay override of THIS
-      # row's config (`provider: domain` — the config replaces wholesale).
+      # D1b: `auto` selects `store` after /evolution migrate state writes the
+      # migration marker, and `domain` otherwise. The old domain data is never
+      # deleted, so reverting is removing the marker + restarting.
       config:
-        provider: domain
+        provider: auto
 
     # ── memory seam: registry and provider, no model tool ───────────────────
     - id: memory

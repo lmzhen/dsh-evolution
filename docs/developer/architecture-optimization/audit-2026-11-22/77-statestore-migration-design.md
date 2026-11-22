@@ -77,3 +77,15 @@ run-gates local: 61 pass / 0 fail / 3 cannot-decide
 ```
 
 已接 `/evolution migrate state [--dry-run]`（commands 3 tests，commands 全套 52 tests）；仍待 bundle provider 切换、domain provider 删除与回滚演练。
+
+## D1b-2 实现进度
+
+- `/evolution migrate state [--dry-run]` 已接入：commands 3 tests + commands 全套 52 tests；
+- bundle 新增 `evolution-state-store` row（注册 `store` provider），并新增 `state/store-plugin.ts`；
+- `evolution-state` row 的 `provider` 从 `domain` 改为 `auto`；
+- `auto`：有迁移 marker ⇒ `store`；否则 `domain`；marker 存在但 store provider 未挂载 ⇒ fail loud；
+- 回退：删除 marker 并重启 ⇒ 回 `domain`；旧 domain 数据从未修改；
+- 全量 family 套件：446 files / 2442 tests passed（1171.60s）；
+- `run-gates local`: 61 pass / 0 fail / 3 cannot-decide。
+
+仍待：删除 domain provider/row、更新 `evolution-state-domain` 的运行时描述、真实升级/回滚演练。

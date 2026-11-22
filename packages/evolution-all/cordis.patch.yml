@@ -49,12 +49,15 @@
       # G8-B2: shipped default. The platform base bundle mounts the storage-domain
       # facility over its json backend, so this provider registers the KV domain
       # without the family owning a second file medium.
+    - id: evolution-state-store
+      name: '@deepseek-ai/dsh-evolution-core/state/store-plugin'
     - id: evolution-state
       name: '@deepseek-ai/dsh-evolution-core/state'
-      # S1-D1 (0.3.80) / G8-B2: the medium is PINNED to the platform storage-domain
-      # provider — the shipped default since evolution-state-json was retired.
+      # D1b: `auto` selects `store` after /evolution migrate state writes the
+      # migration marker, and `domain` otherwise. The old domain data is never
+      # deleted, so reverting is removing the marker + restarting.
       config:
-        provider: domain
+        provider: auto
 
     # ── memory seam: registry, provider, model-facing tool ───────────────────
     - id: memory

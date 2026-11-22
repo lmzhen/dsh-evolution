@@ -149,6 +149,7 @@
         "evolution-core::tests/skill-write-intent.spec.ts",
         "evolution-core::tests/skill-write-service.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
+        "evolution-core::tests/state/state-auto.spec.ts",
         "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
         "evolution-core::tests/text-budgets.spec.ts",
@@ -506,6 +507,7 @@
         "evolution-core::tests/skill-write-service.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
         "evolution-core::tests/state/domain/compatibility.spec.ts",
+        "evolution-core::tests/state/state-auto.spec.ts",
         "evolution-core::tests/state/state.spec.ts",
         "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
@@ -1182,6 +1184,7 @@
         "evolution-core::tests/skill-write-service.spec.ts",
         "evolution-core::tests/state-store.spec.ts",
         "evolution-core::tests/state/domain/compatibility.spec.ts",
+        "evolution-core::tests/state/state-auto.spec.ts",
         "evolution-core::tests/state/state.spec.ts",
         "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
@@ -1796,6 +1799,7 @@
         "evolution-core::tests/state/domain/domain-state.spec.ts",
         "evolution-core::tests/state/domain/domain.spec.ts",
         "evolution-core::tests/state/domain/provider-consistency.spec.ts",
+        "evolution-core::tests/state/state-auto.spec.ts",
         "evolution-core::tests/state/state.spec.ts",
         "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
@@ -2215,11 +2219,11 @@
   "counts": {
     "fast": {
       "gates": 64,
-      "specs": 137
+      "specs": 138
     },
     "pre-tag": {
       "gates": 64,
-      "specs": 445
+      "specs": 446
     },
     "ci-only": {
       "gates": 10,
@@ -2227,16 +2231,16 @@
     },
     "full(ci=off)": {
       "gates": 64,
-      "specs": 445
+      "specs": 446
     },
     "full(ci=on)": {
       "gates": 74,
-      "specs": 516
+      "specs": 517
     }
   },
   "specs": {
-    "total": 516,
-    "marked": 516,
+    "total": 517,
+    "marked": 517,
     "unmarked": 0
   }
 }

@@ -9,6 +9,9 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { evolutionHome } from '../state-store.ts'
 import type Schema from '@deepseek-ai/schemastery'
 import type {
   CuratorStateRecord,
@@ -17,6 +20,7 @@ import type {
   PendingStatus,
   ReviewStateRecord,
 } from './storage.ts'
+import { PROVIDER_DOMAIN, PROVIDER_STORE, STATE_MIGRATION_MARKER } from './storage.ts'
 
 export * from './storage.ts'
 
@@ -40,7 +44,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export interface Config {
-  /** Pin a provider by name; empty = first registered provider. */
+  /** Pin a provider by name; `auto` picks store after the migration marker, else domain. */
   provider?: string
 }
 
@@ -60,7 +64,7 @@ export class EvolutionState extends Service {
     // the first state access, far away from the mistake (the registry's
     // precise "not registered" error now surfaces at start). With an empty
     // registry (mount order not settled yet) the check stays lazy by design.
-    if (this.providerName && ctx.evolutionStateStorage.hasProviders()) {
+    if (this.providerName !== '' && this.providerName !== 'auto' && ctx.evolutionStateStorage.hasProviders()) {
       ctx.evolutionStateStorage.provider(this.providerName)
     }
     // G2b/2b.1: the UNPINNED case, refused at MOUNT. Two media with no pin means the effective one is
@@ -76,6 +80,13 @@ export class EvolutionState extends Service {
    * registered after this row mounted used to make registration order the effective
    * medium with no pin — exactly the silent rebind the mount check exists to stop. */
   private assertProviderChoice(): void {
+    if (this.providerName === 'auto') {
+      const names = this.ctx.evolutionStateStorage.providerNames()
+      if (existsSync(join(evolutionHome(), 'state', STATE_MIGRATION_MARKER)) && !names.includes(PROVIDER_STORE)) {
+        throw new Error('evolution-state: the migration marker exists but no "' + PROVIDER_STORE + '" provider is registered')
+      }
+      return
+    }
     if (this.providerName !== '') return
     const names = this.ctx.evolutionStateStorage.providerNames()
     if (names.length <= 1) return
@@ -86,9 +97,18 @@ export class EvolutionState extends Service {
     )
   }
 
+  /** `auto` is the migration switch: the marker is the explicit one-way signal. */
+  private autoProviderName(): string {
+    const names = this.ctx.evolutionStateStorage.providerNames()
+    if (existsSync(join(evolutionHome(), 'state', STATE_MIGRATION_MARKER))) return PROVIDER_STORE
+    if (names.includes(PROVIDER_DOMAIN)) return PROVIDER_DOMAIN
+    return names[0] ?? ''
+  }
+
   private storage(): EvolutionStateStorage {
     this.assertProviderChoice()
-    return this.ctx.evolutionStateStorage.provider(this.providerName || undefined)
+    const name = this.providerName === 'auto' ? this.autoProviderName() : this.providerName
+    return this.ctx.evolutionStateStorage.provider(name || undefined)
   }
 
   /** A2: refresh the mounted provider before a decision reads pending state. */

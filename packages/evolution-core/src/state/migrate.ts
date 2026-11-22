@@ -17,6 +17,7 @@ import { writeStateStoreSnapshot, type StoredReviewState } from './store.ts'
 import { EVOLUTION_DOMAIN } from './domain/index.ts'
 import {
   CURATOR_STATE_KEY,
+  STATE_MIGRATION_MARKER,
   CURATOR_STATE_TABLE,
   PENDING_TABLE,
   REVIEW_STATE_TABLE,
@@ -42,8 +43,7 @@ export interface StateMigrationResult {
   readonly dryRun: boolean
 }
 
-/** Marker written after a successful snapshot; it is evidence, not the authority. */
-export const STATE_MIGRATION_MARKER = '.migrated-from-domain.json'
+export { STATE_MIGRATION_MARKER }
 
 /**
  * Migrate the three state tables. The store file is published with

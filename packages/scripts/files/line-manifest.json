@@ -1,5 +1,5 @@
 {
-  "pin": "07683656",
+  "pin": "e3eb0b61",
   "bed": {
     "mono": "overlay"
   },
@@ -158,6 +158,11 @@
       "id": "@deepseek-ai/dsh-evolution-core/state/migrate",
       "kind": "evo-src-subpath",
       "relPath": "packages/evolution/evolution-core/src/state/migrate.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-core/state/store-plugin",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-core/src/state/store-plugin.ts"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-curator",

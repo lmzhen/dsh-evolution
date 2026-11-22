@@ -26,10 +26,12 @@ describe('evolution-host composition', () => {
     expect(maintenanceRows).toHaveLength(1)
   })
 
-  it('ships the storage-domain provider enabled, pinned on the state row (G8-B2)', () => {
+  it('ships domain + store providers and selects via the migration marker (D1b)', () => {
     const domain = rows.find(row => rowId(row) === 'evolution-state-domain')
     expect(domain?.disabled).toBeUndefined()
+    const store = rows.find(row => rowId(row) === 'evolution-state-store')
+    expect(store?.disabled).toBeUndefined()
     const state = rows.find(row => rowId(row) === 'evolution-state')
-    expect(JSON.stringify(state?.config)).toContain('domain')
+    expect(state?.config).toMatchObject({ provider: 'auto' })
   })
 })

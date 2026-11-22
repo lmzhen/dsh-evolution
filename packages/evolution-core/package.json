@@ -106,6 +106,10 @@
     "./state/migrate": {
       "types": "./lib/types/state/migrate.d.ts",
       "default": "./lib/state/migrate.js"
+    },
+    "./state/store-plugin": {
+      "types": "./lib/types/state/store-plugin.d.ts",
+      "default": "./lib/state/store-plugin.js"
     }
   },
   "files": [
