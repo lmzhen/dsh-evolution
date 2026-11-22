@@ -536,8 +536,10 @@ export class EvolutionApproval extends Service {
   async list(status: PendingStatus = 'pending'): Promise<PendingRecord[]> {
     // The convergence runs before EVERY read of a window, so no reader can see a record the TTL has
     // already passed (the CLI, the card and the doctor all go through here).
+    const ttl = this.ttl()
     await this.expireStale()
-    await this.refreshState()
+    // expireStale already reloaded when the TTL sweep is active; avoid a second domain reopen.
+    if (ttl <= 0) await this.refreshState()
     return await this.state().listPending(status)
   }
 

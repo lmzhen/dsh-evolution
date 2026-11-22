@@ -124,6 +124,7 @@ describe('release-evidence schema v2', () => {
       ['unevaluated pass', (doc) => { delete (doc.gates as Array<Record<string, unknown>>)[0]!.criterionEvaluated }],
       ['short traceability', (doc) => { (doc.traceability as Record<string, unknown>).covered = 51 }],
       ['traceability on another commit', (doc) => { (doc.traceability as Record<string, unknown>).measuredCommit = 'b'.repeat(40) }],
+      ['traceability without a structured commit', (doc) => { delete (doc.traceability as Record<string, unknown>).measuredCommit }],
       ['wrong universe', (doc) => { (doc.traceability as Record<string, unknown>).universe = { A: 22, B: 18, C: 11 } }],
       ['rehearsal status', (doc) => { doc.evidenceStatus = 'rehearsal' }],
       ['missing platformLine', (doc) => { delete doc.platformLine }],

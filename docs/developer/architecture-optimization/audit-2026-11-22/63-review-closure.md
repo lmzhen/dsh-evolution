@@ -17,8 +17,8 @@
 | 项 | owner | expiry | 判据 |
 |---|---|---|---|
 | A2 executing-rescue 仍无 claim，在途 approve 可能被 reject 覆盖为 rejected | approval | 下一 minor | 只允许“pid 已死”的 rescue，并补双进程负例 |
-| A2 list/expire 每条记录 reload，TTL>0 时 pending 轮询有抖动/O(n) | approval | 下一 minor | GET 走 listReadonly 或轻量 freshness；expire 负例覆盖 reload/marker |
-| E3 traceability 的 source fallback 可能把其他 40-hex 当 commit | release | 下一 minor | release 只接受结构化 `traceability.measuredCommit`，并补 parser 误判测试 |
+| ~~A2 list/expire 双 reload~~ **已关闭** | approval | — | TTL>0 只由 expireStale reload；TTL=0 list 自己 reload 一次 |
+| ~~E3 traceability source fallback~~ **已关闭** | release | — | release 只接受结构化 `traceability.measuredCommit`；缺字段/不一致均红 |
 | E3 artifacts 只与证据自比，不校验应发布 22 包集合 | release | 下一 minor | 与发布包清单对账 |
 | ~~E4 40min CI 预算~~ **已关闭** | gates | — | `full(ci=on)` 实跑 513 files / 3080 tests / 1118.44s，见 [65](65-ci-lane.md) |
 | A3 `prepared-unit recovery left N unresolved` 仍是 warn | core-write | 下一 minor | 区分测试夹具污染与真实残留，并给清理/拒绝判据 |
