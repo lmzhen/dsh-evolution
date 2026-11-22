@@ -19,7 +19,7 @@ import { readTokens, renderModule } from './gen-client-tokens.mjs'
 import { clientHalfDirs } from './lib-family-packages.mjs'
 
 /** The nine groups the scale is made of, in the order the source declares them. */
-const GROUPS = ['type', 'space', 'radius', 'hairline', 'measure', 'leading', 'tone', 'focus', 'cap']
+const GROUPS = ['type', 'space', 'radius', 'hairline', 'measure', 'leading', 'tone', 'focus', 'cap', 'accent', 'warn']
 
 /** A custom property that belongs to this scale. */
 const NAME = /^--evo-[a-z]+-[a-z0-9]+$/
@@ -83,7 +83,7 @@ for (const group of GROUPS) {
   if (!declared.includes(group)) problems.push('client-tokens.json: group ' + group + ' is missing')
 }
 for (const group of declared) {
-  if (!GROUPS.includes(group)) problems.push('client-tokens.json: group ' + group + ' is not one of the nine')
+  if (!GROUPS.includes(group)) problems.push('client-tokens.json: group ' + group + ' is not one of the declared groups')
   const entries = Object.keys(groups[group] ?? {})
   if (entries.length === 0) problems.push('client-tokens.json: group ' + group + ' is empty')
 }

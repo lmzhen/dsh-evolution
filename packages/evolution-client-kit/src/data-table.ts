@@ -93,12 +93,12 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactNode {
 
 /** Styles for the primitive; the page owns token scope. */
 export const DATA_TABLE_CSS = [
-  '.evo-data-scroll{overflow:auto;max-width:100%;min-width:0;border-radius:var(--evo-radius-card,12px);outline:none}',
+  '.evo-data-scroll{overflow:auto;max-width:100%;min-width:0;border-radius:var(--evo-radius-card);outline:none}',
   '.evo-data-scroll:focus-visible{outline:var(--evo-focus-ring,2px solid #2f6b58);outline-offset:var(--evo-focus-offset,2px)}',
   '.evo-data-table{width:100%;border-collapse:separate;border-spacing:0;min-width:880px;font-size:var(--evo-type-sm,13px)}',
   '.evo-data-caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}',
   '.evo-data-th{position:sticky;top:0;z-index:2;padding:8px 10px;border-bottom:1px solid var(--dsw-alias-border-l2,#e5e2da);background:var(--dsw-alias-bg-layer-2,#faf9f5);color:var(--dsw-alias-label-tertiary,#9aa096);font-size:11px;font-weight:600;text-align:left;white-space:nowrap}',
-  '.evo-data-th-active{color:var(--evo-accent,#2f6b58);background:var(--evo-accent-weak,#f2f8f4)}',
+  '.evo-data-th-active{color:var(--evo-accent-base);background:var(--evo-accent-weak)}',
   '.evo-data-sort{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;padding:0;cursor:pointer;border-radius:4px}',
   '.evo-data-sort:focus-visible{outline:var(--evo-focus-ring,2px solid #2f6b58);outline-offset:2px}',
   '.evo-data-mark{font-size:10px;opacity:.8}',

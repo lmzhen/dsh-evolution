@@ -225,3 +225,4 @@
 | [44-bundle-roster-platform.md](44-bundle-roster-platform.md) | Phase B/P2：生产 bundle 用 io-platform + 本地门禁 61 pass |
 | [45-p2-docs-truth.md](45-p2-docs-truth.md) | P2：文档声明与当前门禁对齐 |
 | [46-full-suite-truth.md](46-full-suite-truth.md) | E3/E4/测试环境：全量套件真绿 |
+| [47-p2-client-tokens.md](47-p2-client-tokens.md) | P2：客户端 token 补齐、去掉写死 fallback |

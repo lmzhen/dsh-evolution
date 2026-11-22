@@ -5,72 +5,169 @@
     "fails the gate when either copy drifts from this file. Browser halves cannot import evolution-core",
     "(every @deepseek-ai/* specifier is external in build-client.mjs), so the scale is generated into the",
     "packages rather than shared at runtime.",
-    "radius.control = 8px WAS the platform\u2019s own field radius on the 0.1.5 line (a literal border-radius:8px",
+    "radius.control = 8px WAS the platform’s own field radius on the 0.1.5 line (a literal border-radius:8px",
     "in packages/client/ui-primitives/src/Input.module.css and the plugins-settings stylesheet). The 0.2.x",
     "line moved both to the theme token: packages/client/ui-primitives/src/Input.module.css:8 is now",
     "border-radius: var(--dsw-radius-md), and packages/client/ui-theme/src/styles/base.css:18 defines that",
-    "token as 12px \u2014 so the platform field radius is 12px while this token is still 8px (settings-ui\u2019s",
-    "6px was the original outlier; unifying it was W6). Following the platform\u2019s new radius is G2\u2019s",
+    "token as 12px — so the platform field radius is 12px while this token is still 8px (settings-ui’s",
+    "6px was the original outlier; unifying it was W6). Following the platform’s new radius is G2’s",
     "decision, taken with the client seam that renders these panels; recorded here so it is a decision and",
     "not drift.",
     "hairline = .5px is the hairline width both surfaces already used.",
-    "measure.read = 80ch is the single reading measure (\u2248 40em, \u2248 40 CJK glyphs at the panel type size).",
-    "G0.2 settled one value, not a wide/narrow pair (\u00a715.4).",
-    "leading.base = 1.5 is what both surfaces already use; the reading face\u2019s own leading is decided in G4",
+    "measure.read = 80ch is the single reading measure (≈ 40em, ≈ 40 CJK glyphs at the panel type size).",
+    "G0.2 settled one value, not a wide/narrow pair (§15.4).",
+    "leading.base = 1.5 is what both surfaces already use; the reading face’s own leading is decided in G4",
     "against a screenshot, from this same token.",
-    "cap.* are the container limits that remain: the list column (280px) and the source view\u2019s scroll",
-    "cap (260px, the platform command card\u2019s own metric). The preview\u2019s 420px cap is GONE with W20 —",
+    "cap.* are the container limits that remain: the list column (280px) and the source view’s scroll",
+    "cap (260px, the platform command card’s own metric). The preview’s 420px cap is GONE with W20 —",
     "a document is read by scrolling the pane, not through a window inside it.",
     "No entry here is speculative: every value is in use in one of the two stylesheets, or is the",
     "platform value that replaces the outlier (radius.control)."
   ],
   "groups": {
     "type": {
-      "lg": { "value": "calc(1em + 2px)", "why": "the panel title and the settings card title today" },
-      "body": { "value": "1em", "why": "body text; the settings card rooted this in --dsh-content-font-size (W5)" },
-      "sm": { "value": "calc(1em - 1px)", "why": "the panel root size, group headings, and the card\u2019s 13px labels" },
-      "xs": { "value": "calc(1em - 2px)", "why": "the card\u2019s 12px hints, counts and errors" }
+      "lg": {
+        "value": "calc(1em + 2px)",
+        "why": "the panel title and the settings card title today"
+      },
+      "body": {
+        "value": "1em",
+        "why": "body text; the settings card rooted this in --dsh-content-font-size (W5)"
+      },
+      "sm": {
+        "value": "calc(1em - 1px)",
+        "why": "the panel root size, group headings, and the card’s 13px labels"
+      },
+      "xs": {
+        "value": "calc(1em - 2px)",
+        "why": "the card’s 12px hints, counts and errors"
+      }
     },
     "space": {
-      "2": { "value": "2px" },
-      "4": { "value": "4px" },
-      "6": { "value": "6px" },
-      "8": { "value": "8px" },
-      "10": { "value": "10px" },
-      "12": { "value": "12px" },
-      "14": { "value": "14px" },
-      "16": { "value": "16px" },
-      "20": { "value": "20px" }
+      "2": {
+        "value": "2px"
+      },
+      "4": {
+        "value": "4px"
+      },
+      "6": {
+        "value": "6px"
+      },
+      "8": {
+        "value": "8px"
+      },
+      "10": {
+        "value": "10px"
+      },
+      "12": {
+        "value": "12px"
+      },
+      "14": {
+        "value": "14px"
+      },
+      "16": {
+        "value": "16px"
+      },
+      "20": {
+        "value": "20px"
+      }
     },
     "radius": {
-      "chip": { "value": "4px", "why": "the settings card\u2019s source chip" },
-      "control": { "value": "8px", "why": "the platform\u2019s field/button radius (Input.module.css)" },
-      "surface": { "value": "12px", "why": "the panel\u2019s code block and preview cards, from the platform command card" },
-      "pill": { "value": "999px", "why": "the capsule; a state, not a control" }
+      "chip": {
+        "value": "4px",
+        "why": "the settings card’s source chip"
+      },
+      "control": {
+        "value": "8px",
+        "why": "the platform’s field/button radius (Input.module.css)"
+      },
+      "surface": {
+        "value": "12px",
+        "why": "the panel’s code block and preview cards, from the platform command card"
+      },
+      "pill": {
+        "value": "999px",
+        "why": "the capsule; a state, not a control"
+      },
+      "card": {
+        "value": "var(--evo-radius-surface)",
+        "why": "a card surface is the same radius as the other surfaces"
+      }
     },
     "hairline": {
-      "width": { "value": ".5px", "why": "the hairline both surfaces draw; the LEVEL stays a platform alias (l1 container / l2 structure)" },
-      "marker": { "value": "2px", "why": "the tinted edge of one rendered diff block" }
+      "width": {
+        "value": ".5px",
+        "why": "the hairline both surfaces draw; the LEVEL stays a platform alias (l1 container / l2 structure)"
+      },
+      "marker": {
+        "value": "2px",
+        "why": "the tinted edge of one rendered diff block"
+      }
     },
     "measure": {
-      "read": { "value": "80ch", "why": "the reading measure of the document face (G4)" }
+      "read": {
+        "value": "80ch",
+        "why": "the reading measure of the document face (G4)"
+      }
     },
     "leading": {
-      "base": { "value": "1.5", "why": "the line height both surfaces already use" }
+      "base": {
+        "value": "1.5",
+        "why": "the line height both surfaces already use"
+      }
     },
     "tone": {
-      "quiet": { "value": "var(--dsw-alias-label-secondary)", "why": "a control that changes nothing" },
-      "primary": { "value": "var(--dsw-alias-brand-primary)", "why": "the one key that writes, or the field a card was overridden in" },
-      "danger": { "value": "var(--dsw-alias-state-error-primary)", "why": "refusals, failures, removed text" },
-      "success": { "value": "var(--dsw-alias-state-success-primary)", "why": "added text, a write that landed" }
+      "quiet": {
+        "value": "var(--dsw-alias-label-secondary)",
+        "why": "a control that changes nothing"
+      },
+      "primary": {
+        "value": "var(--dsw-alias-brand-primary)",
+        "why": "the one key that writes, or the field a card was overridden in"
+      },
+      "danger": {
+        "value": "var(--dsw-alias-state-error-primary)",
+        "why": "refusals, failures, removed text"
+      },
+      "success": {
+        "value": "var(--dsw-alias-state-success-primary)",
+        "why": "added text, a write that landed"
+      }
     },
     "focus": {
-      "ring": { "value": "2px solid var(--dsw-alias-label-primary)", "why": "the platform sidebar row\u2019s inset ring; one definition, both faces" },
-      "offset": { "value": "-2px" }
+      "ring": {
+        "value": "2px solid var(--dsw-alias-label-primary)",
+        "why": "the platform sidebar row’s inset ring; one definition, both faces"
+      },
+      "offset": {
+        "value": "-2px"
+      }
     },
     "cap": {
-      "aside": { "value": "280px", "why": "the panel\u2019s list column" },
-      "block": { "value": "260px", "why": "the source view\u2019s scroll cap, from the platform command card" }
+      "aside": {
+        "value": "280px",
+        "why": "the panel’s list column"
+      },
+      "block": {
+        "value": "260px",
+        "why": "the source view’s scroll cap, from the platform command card"
+      }
+    },
+    "accent": {
+      "base": {
+        "value": "var(--dsw-alias-brand-primary)",
+        "why": "the one state/accent colour both panels already used"
+      },
+      "weak": {
+        "value": "color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent)",
+        "why": "the tinted active surface; replaces a literal fallback"
+      }
+    },
+    "warn": {
+      "base": {
+        "value": "var(--dsw-alias-state-warn-primary)",
+        "why": "needs-attention/warning text"
+      }
     }
   }
 }
