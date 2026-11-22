@@ -45,6 +45,7 @@ run-gates local: 61 pass / 0 fail / 3 cannot-decide
 - 生成 `evolution-platform/src/contract/ports.generated.ts`：
   - `CommandsPort = Pick<CommandRuntime, 'register'>`；
   - `ToolsPort = Pick<ToolsService, 'register' | 'guard' | 'restrict'> & { get/resolve/execute }`；
+  - `WorkingDirectoryPort = Pick<WorkingDirectoryService, 'ensure'>`；
 - 手工 `commands.ts`/`tools.ts` 只做再导出，不再手抄这几个方法签名；
 - `contract-ports.spec.ts` 运行 `--check`，生成物漂移会红。
 
