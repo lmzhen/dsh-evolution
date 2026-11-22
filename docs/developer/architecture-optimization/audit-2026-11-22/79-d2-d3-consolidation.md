@@ -18,7 +18,9 @@ target-writer: 4 tests
 unit-kernel: 27 tests
 mutation-context/crash/recovery/unit-engine: 9 tests
 build-lib: 0
+approval.spec: 37 tests passed
 run-gates local: 61 pass / 0 fail / 3 cannot-decide
+全量 family suite: 447 files / 2448 tests passed（1205.48s）
 ```
 
 ### 仍未做
