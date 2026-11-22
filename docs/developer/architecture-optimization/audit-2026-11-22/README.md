@@ -233,3 +233,4 @@
 | [52-p2-loadmore.md](52-p2-loadmore.md) | P2：load-more 失败保留行/游标 |
 | [53-p2-read-tickets.md](53-p2-read-tickets.md) | P2：history 读 ticket 按 kind 分开 |
 | [54-p2-dead-ui-contract.md](54-p2-dead-ui-contract.md) | P2：删除 client-kit/history 死契约与假 face |
+| [55-p2-local-require.md](55-p2-local-require.md) | P2：client require 改 bundle 局部绑定 |

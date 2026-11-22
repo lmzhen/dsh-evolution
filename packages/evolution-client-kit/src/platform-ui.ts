@@ -9,9 +9,13 @@ export const PLATFORM_UI_MODULE = '@deepseek-ai/dsh-client-ui-primitives'
 
 type ClientRequire = (id: string) => unknown
 
-/** The loader injects its synchronous require onto the page before factory bodies run. */
+// The build wrapper declares this module-local binding before the bundled body; it is the loader's
+// factory `require`, not a page global. `typeof` is safe when the source is imported directly in tests.
+declare const __dshClientRequire: ClientRequire | undefined
+
+/** The loader's factory require, scoped to this bundle. */
 function clientRequire(): ClientRequire | undefined {
-  return (globalThis as { __dshClientRequire?: ClientRequire }).__dshClientRequire
+  return typeof __dshClientRequire === 'function' ? __dshClientRequire : undefined
 }
 
 /** The module row, or undefined in a deployment that does not compose it. */

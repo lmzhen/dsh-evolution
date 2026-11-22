@@ -46,7 +46,7 @@ function artifact(id, body) {
     '\tfactory: (require) => {',
     '\t\tvar module = { exports: {} };',
     '\t\tvar exports = module.exports;',
-    '\t\tglobalThis.__dshClientRequire = require;',
+    '\t\tvar __dshClientRequire = require;',
     indented,
     '\t\treturn module.exports;',
     '\t}',
