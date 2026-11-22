@@ -20,7 +20,7 @@ mutation-context/crash/recovery/unit-engine: 9 tests
 build-lib: 0
 approval.spec: 37 tests passed
 run-gates local: 61 pass / 0 fail / 3 cannot-decide
-全量 family suite: 447 files / 2448 tests passed（1205.48s）
+全量 family suite: 447 files / 2450 tests passed（1134.94s）
 ```
 
 ### 已补：真正的 prepare/commit 两阶段
@@ -29,7 +29,7 @@ run-gates local: 61 pass / 0 fail / 3 cannot-decide
 - `commit(prepared)` 是唯一持久写阶段：journal/snapshot prepared → 写 target → unit-written/committed → hooks；失败回滚并释放 lease；
 - `apply()` 变为 prepare + commit；`release()` 允许调用方在未 commit 时释放；
 - 新增测试：prepare 后文件/journal/snapshot 零变化；release 后可重新 prepare；
-- unit-kernel: 29 tests passed；全量 447 files / 2450 tests passed（1124.72s）。
+- unit-kernel: 29 tests passed；全量 447 files / 2450 tests passed（1134.94s）。
 
 ### 仍未做
 
