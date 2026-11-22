@@ -34,6 +34,20 @@ it('does not dispose the shared merge store when the panel unmounts', async () =
   expect(dispose).not.toHaveBeenCalled()
   expect(() => store.start()).not.toThrow()
 })
+it('refreshes the merge store when its tab becomes active again', async () => {
+  const viewCall = vi.fn(async () => ({ ok: true as const, payload: view() }))
+  const store = new MergeStore({ ...source, view: viewCall })
+  host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+  await act(async () => { root?.render(createElement(MergeView, { store, t: (key: string) => key, activeView: 'merge' } as never)) })
+  await vi.waitFor(() => { expect(viewCall).toHaveBeenCalled() })
+  const before = viewCall.mock.calls.length
+  await act(async () => { root?.render(createElement(MergeView, { store, t: (key: string) => key, activeView: 'history' } as never)) })
+  await act(async () => { root?.render(createElement(MergeView, { store, t: (key: string) => key, activeView: 'merge' } as never)) })
+  await vi.waitFor(() => { expect(viewCall.mock.calls.length).toBeGreaterThan(before) })
+})
+
 it('does not start the merge store while another workbench tab is active', async () => {
   const viewSpy = vi.fn(async () => ({ ok: true as const, payload: view() }))
   const sourceWithSpy: MergeSource = { ...source, view: viewSpy }

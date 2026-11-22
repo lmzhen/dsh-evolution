@@ -9,7 +9,7 @@
 
 - `MergeView` 只在 `activeView === 'merge'` 时渲染 `MergePanel`，非活动返回 `null`；
 - `MergeStore` 仍由 client apply effect 持有，unmount 不 dispose（原有生命周期测试覆盖）；
-- 回到 merge tab 时重新挂载并 `start()`，排序/筛选状态在 store 与 localStorage，不丢。
+- 回到 merge tab 时重新挂载，并在 inactive→active 时 `refresh()`；排序/筛选状态在 store 与 localStorage，不丢。
 
 ## 验证
 
