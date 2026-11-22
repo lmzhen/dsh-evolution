@@ -28,7 +28,7 @@
 | domain 打不开/校验失败 | store 不写，原数据不变 |
 | store 已存在 | 命令失败，不覆盖 |
 | createTextIfAbsent 失败 | store 不写，可重试 |
-| 成功写 store 后 marker 写失败 | store 已完整；命令报告 marker 缺失，重启后仍可读 store |
+| 成功写 store 后 marker 写失败 | store 已完整，但 auto 仍走 domain；重试会因已有 store 被拒，需要人工核对后补 marker 或移走 store |
 
 ## 切换
 
@@ -85,7 +85,7 @@ store-migration: 4 tests passed（含迁移后 auto 读 store、删 marker 回�
 - bundle 新增 `evolution-state-store` row（注册 `store` provider），并新增 `state/store-plugin.ts`；
 - `evolution-state` row 的 `provider` 从 `domain` 改为 `auto`；
 - `auto`：有迁移 marker ⇒ `store`；否则 `domain`；marker 存在但 store provider 未挂载 ⇒ fail loud；
-- 回退：删除 marker 并重启 ⇒ 回 `domain`；旧 domain 数据从未修改；
+- 回退：删除 marker 并重启 ⇒ 回 `domain`；旧 domain 数据从未修改。**注意：回退后，store 使用期间的新写不会回到 domain，回退前请确认没有只存在于 store 的待批准写入。**
 - 全量 family 套件：446 files / 2442 tests passed（1171.60s）；
 - `run-gates local`: 61 pass / 0 fail / 3 cannot-decide。
 
