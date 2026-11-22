@@ -23,13 +23,19 @@ run-gates local: 61 pass / 0 fail / 3 cannot-decide
 全量 family suite: 447 files / 2448 tests passed（1205.48s）
 ```
 
+### 已补：真正的 prepare/commit 两阶段
+
+- `prepare(request)` 获取 lease/claim、读取全部 target、校验 CAS/write-validation，**不写 journal、snapshot、audit、event**；返回持有 lease 的 `PreparedMutation`；
+- `commit(prepared)` 是唯一持久写阶段：journal/snapshot prepared → 写 target → unit-written/committed → hooks；失败回滚并释放 lease；
+- `apply()` 变为 prepare + commit；`release()` 允许调用方在未 commit 时释放；
+- 新增测试：prepare 后文件/journal/snapshot 零变化；release 后可重新 prepare；
+- unit-kernel: 29 tests passed；全量 447 files / 2450 tests passed（1124.72s）。
+
 ### 仍未做
 
-- 目标 `UnitKernel.prepare(plan) / commit(prepared)` 两阶段还没有；当前仍是 `apply(request)` 内部完成校验+提交；
+- `plan(input: SkillIntent)` 仍由 SkillWriteService 负责，UnitKernel 接收的是 `MutationRequest` 而不是领域 `UnitPlan`；
 - 旧 journal 的只读迁移器未写；
 - PlanService 的 tool/approval/system 全链路尚未全部改到 UnitKernel。
-
-因此本段只关闭“两个公共写入口/公共名漂移”，不能宣称 D2 完成。
 
 ## D3：可机械派生的平台端口改为生成
 

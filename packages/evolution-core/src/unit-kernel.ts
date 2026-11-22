@@ -244,6 +244,20 @@ export interface UnitKernelOptions {
   now?: () => number
 }
 
+export interface PreparedMutation {
+  readonly kind: 'prepared'
+  readonly unitId: string
+  readonly request: MutationRequest
+  readonly primary: string
+  readonly validation: MutationValidation
+  readonly snapshots: readonly { target: string; before: string | null; after: string | null; baseline: string | null }[]
+  readonly eventOps: readonly MutationSnapshotOp[]
+  readonly changed: string[]
+  readonly warnings: string[]
+  readonly bestEffort: (task: () => Promise<void>) => Promise<void>
+  release(): Promise<void>
+}
+
 export interface MutationResult {
   ok: boolean
   unitId: string
@@ -329,124 +343,156 @@ export class UnitKernel {
     }
   }
 
-  async apply(request: MutationRequest): Promise<MutationResult> {
+  /**
+   * Phase 1: acquire the lease/claim and read every target, verifying CAS and
+   * write validation. This performs NO durable write (no journal, snapshot,
+   * audit or event). The returned handle holds the lease until commit() or
+   * release(); callers must use try/finally.
+   */
+  async prepare(request: MutationRequest): Promise<PreparedMutation | MutationResult> {
     const primary = request.name.trim()
     const unitId = request.unitId ?? 'u-' + String(this.now()) + '-' + Math.random().toString(36).slice(2)
     const validation = validateMutationRequest(request, this.limits)
     if (!validation.ok) return { ok: false, unitId, dryRun: request.dryRun === true, changed: [], errors: validation.errors }
-    if (request.dryRun === true) return { ok: true, unitId, dryRun: true, changed: [], errors: [] }
-    return await this.serial(async () => {
-      let lease: MutationLockLease
+    let lease: MutationLockLease
+    try {
+      lease = await this.lock.acquire(await this.resolveTargetKeys(this.targetKeys))
+    } catch (error) {
+      const code = error instanceof TransactionNotInvokedError ? 'transact-not-invoked' : 'unit-fence-failed'
+      return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }
+    }
+    let claim: { release(): Promise<void> } | undefined
+    const release = async (): Promise<void> => {
+      await claim?.release().catch(() => {})
+      await lease.release()
+    }
+    if (this.claim !== undefined) {
       try {
-        lease = await this.lock.acquire(await this.resolveTargetKeys(this.targetKeys))
+        claim = await this.claim.acquire(primary, this.claimRunId ?? this.context?.runId ?? '')
       } catch (error) {
-        const code = error instanceof TransactionNotInvokedError ? 'transact-not-invoked' : 'unit-fence-failed'
-        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }
+        await lease.release()
+        return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'claim-failed', message: error instanceof Error ? error.message : String(error) }] }
       }
-      let claim: { release(): Promise<void> } | undefined
-      if (this.claim !== undefined) {
-        try {
-          claim = await this.claim.acquire(primary, this.claimRunId ?? this.context?.runId ?? '')
-        } catch (error) {
-          await lease.release()
-          return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'claim-failed', message: error instanceof Error ? error.message : String(error) }] }
+    }
+    const snapshots: Array<{ target: string; before: string | null; after: string | null; baseline: string | null }> = []
+    try {
+      for (const op of validation.ops) {
+        const current = await this.io.readText(op.target)
+        const baseline = op.expected === undefined ? current : op.expected
+        if (current !== baseline) {
+          await release()
+          return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'cas-drift', message: 'target changed after plan', target: op.target }] }
+        }
+        snapshots.push({ target: op.target, before: current, after: op.kind === 'write' ? op.content : null, baseline })
+      }
+      for (const op of validation.ops) {
+        const refusal = this.validateWrite?.(op) ?? null
+        if (refusal !== null) {
+          await release()
+          return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'write-validation', message: refusal, target: op.target }] }
         }
       }
-      const changed: string[] = []
-      const warnings: string[] = []
-      const bestEffort = async (task: () => Promise<void>): Promise<void> => {
+    } catch (error) {
+      await release()
+      return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'write-failed', message: error instanceof Error ? error.message : String(error) }] }
+    }
+    const eventOps: MutationSnapshotOp[] = snapshots.map(snapshot => {
+      const op = validation.ops.find(entry => entry.target === snapshot.target)
+      return {
+        target: snapshot.target,
+        before: snapshot.before,
+        after: op?.kind === 'write' ? op.content : null,
+        ...(op?.skill === undefined ? {} : { skill: op.skill }),
+      }
+    })
+    const changed: string[] = []
+    const warnings: string[] = []
+    const bestEffort = async (task: () => Promise<void>): Promise<void> => {
+      try {
+        await task()
+      } catch (error) {
+        if (!isCommittedWarning(error)) throw error
+        warnings.push(error instanceof Error ? error.message : String(error))
+      }
+    }
+    return { kind: 'prepared', unitId, request, primary, validation, snapshots, eventOps, changed, warnings, bestEffort, release }
+  }
+
+  /** Phase 2: the only durable write phase. Releases the prepare lease in all paths. */
+  async commit(prepared: PreparedMutation): Promise<MutationResult> {
+    const { unitId, request, primary, validation, snapshots, eventOps, changed, warnings, bestEffort } = prepared
+    const cleanup = request.cleanupPaths === undefined ? {} : { cleanup: request.cleanupPaths }
+    try {
+      if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, journalId: this.journalId, state: 'prepared', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
+      await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'prepared', changed: [], target: validation.roots.find(root => root.name === primary)?.name ?? primary, roots: validation.roots.map(root => root.name) }))
+      for (const op of validation.ops) {
+        const snapshot = snapshots.find(entry => entry.target === op.target)
+        if (snapshot === undefined) throw new Error('snapshot missing for ' + op.target)
         try {
-          await task()
+          const opWarnings = await this.applyOp(op, snapshot.baseline)
+          warnings.push(...opWarnings)
+          changed.push(op.target)
         } catch (error) {
+          if ((error as { noWrite?: boolean } | undefined)?.noWrite !== true) changed.push(op.target)
           if (!isCommittedWarning(error)) throw error
           warnings.push(error instanceof Error ? error.message : String(error))
         }
       }
-      const snapshots: Array<{ target: string; before: string | null; after: string | null; baseline: string | null }> = []
+      await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'unit-written', changed, target: primary, roots: validation.roots.map(root => root.name) }))
+      if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, journalId: this.journalId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
+      await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) }))
       try {
-        for (const op of validation.ops) {
-          const current = await this.io.readText(op.target)
-          const baseline = op.expected === undefined ? current : op.expected
-          if (current !== baseline) {
-            return { ok: false, unitId, dryRun: false, changed, errors: [{ code: 'cas-drift', message: 'target changed after plan', target: op.target }] }
-          }
-          snapshots.push({ target: op.target, before: current, after: op.kind === 'write' ? op.content : null, baseline })
-        }
-        for (const op of validation.ops) {
-          const refusal = this.validateWrite?.(op) ?? null
-          if (refusal !== null) return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code: 'write-validation', message: refusal, target: op.target }] }
-        }
-        const eventOps: MutationSnapshotOp[] = snapshots.map(snapshot => {
-          const op = validation.ops.find(entry => entry.target === snapshot.target)
-          return {
-            target: snapshot.target,
-            before: snapshot.before,
-            after: op?.kind === 'write' ? op.content : null,
-            ...(op?.skill === undefined ? {} : { skill: op.skill }),
-          }
-        })
-        const cleanup = request.cleanupPaths === undefined ? {} : { cleanup: request.cleanupPaths }
-        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, journalId: this.journalId, state: 'prepared', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
-        await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'prepared', changed: [], target: validation.roots.find(root => root.name === primary)?.name ?? primary, roots: validation.roots.map(root => root.name) }))
-        for (const op of validation.ops) {
-          const snapshot = snapshots.find(entry => entry.target === op.target)
-          if (snapshot === undefined) throw new Error('snapshot missing for ' + op.target)
-          try {
-            const opWarnings = await this.applyOp(op, snapshot.baseline)
-            warnings.push(...opWarnings)
-            changed.push(op.target)
-          } catch (error) {
-            if ((error as { noWrite?: boolean } | undefined)?.noWrite !== true) changed.push(op.target)
-            if (!isCommittedWarning(error)) throw error
-            warnings.push(error instanceof Error ? error.message : String(error))
-          }
-        }
-        await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'unit-written', changed, target: primary, roots: validation.roots.map(root => root.name) }))
-        // P2-1: the committed snapshot is the recovery authority. Write it BEFORE the journal's
-        // committed phase so a crash in this window recovers as committed, never rolled back.
-        if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, journalId: this.journalId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
-        await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) }))
-        try {
-          await this.hooks?.committed?.({ unitId, changed, ops: eventOps, roots: validation.roots.map(root => root.name) })
-        } catch {
-          // Hooks are audit/history/event side effects; a completed write must not be rolled back by one.
-        }
-        return { ok: true, unitId, dryRun: false, changed, errors: [], ...(warnings.length === 0 ? {} : { warnings }) }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        let rollbackFailure = ''
-        try {
-          await this.rollback(snapshots.filter(snapshot => changed.includes(snapshot.target)))
-        } catch (rollbackError) {
-          rollbackFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
-        }
-        const detail = rollbackFailure === '' ? message : message + '; rollback failed: ' + rollbackFailure
-        const failureCode = (error as { code?: string } | undefined)?.code === 'transact-not-invoked' ? 'transact-not-invoked' : 'write-failed'
-        await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'failed', changed, error: detail })
-        try {
-          await this.hooks?.rolledBack?.({
-            unitId,
-            changed,
-            ops: snapshots.map(snapshot => {
-              const op = validation.ops.find(entry => entry.target === snapshot.target)
-              return {
-                target: snapshot.target,
-                before: snapshot.before,
-                after: op?.kind === 'write' ? op.content : null,
-                ...(op?.skill === undefined ? {} : { skill: op.skill }),
-              }
-            }),
-            roots: validation.roots.map(root => root.name),
-          })
-        } catch {
-          // best-effort hook; the structured write error remains authoritative
-        }
-        return { ok: false, unitId, dryRun: false, changed, errors: [{ code: failureCode, message: detail }] }
-      } finally {
-        await claim?.release().catch(() => {})
-        await lease.release()
+        await this.hooks?.committed?.({ unitId, changed, ops: eventOps, roots: validation.roots.map(root => root.name) })
+      } catch {
+        // Hooks are audit/history/event side effects; a completed write must not be rolled back by one.
       }
-    })
+      return { ok: true, unitId, dryRun: false, changed, errors: [], ...(warnings.length === 0 ? {} : { warnings }) }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      let rollbackFailure = ''
+      try {
+        await this.rollback(snapshots.filter(snapshot => changed.includes(snapshot.target)))
+      } catch (rollbackError) {
+        rollbackFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+      }
+      const detail = rollbackFailure === '' ? message : message + '; rollback failed: ' + rollbackFailure
+      const failureCode = (error as { code?: string } | undefined)?.code === 'transact-not-invoked' ? 'transact-not-invoked' : 'write-failed'
+      await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'failed', changed, error: detail })
+      try {
+        await this.hooks?.rolledBack?.({
+          unitId,
+          changed,
+          ops: snapshots.map(snapshot => {
+            const op = validation.ops.find(entry => entry.target === snapshot.target)
+            return {
+              target: snapshot.target,
+              before: snapshot.before,
+              after: op?.kind === 'write' ? op.content : null,
+              ...(op?.skill === undefined ? {} : { skill: op.skill }),
+            }
+          }),
+          roots: validation.roots.map(root => root.name),
+        })
+      } catch {
+        // best-effort hook; the structured write error remains authoritative
+      }
+      return { ok: false, unitId, dryRun: false, changed, errors: [{ code: failureCode, message: detail }] }
+    } finally {
+      await prepared.release()
+    }
+  }
+
+  async apply(request: MutationRequest): Promise<MutationResult> {
+    if (request.dryRun === true) {
+      const unitId = request.unitId ?? 'u-' + String(this.now()) + '-' + Math.random().toString(36).slice(2)
+      const validation = validateMutationRequest(request, this.limits)
+      return validation.ok
+        ? { ok: true, unitId, dryRun: true, changed: [], errors: [] }
+        : { ok: false, unitId, dryRun: true, changed: [], errors: validation.errors }
+    }
+    const prepared = await this.prepare(request)
+    if ((prepared as PreparedMutation).kind !== 'prepared') return prepared as MutationResult
+    return await this.commit(prepared as PreparedMutation)
   }
 
   /** Recover every prepared snapshot known to the port; safe to call at boot. */

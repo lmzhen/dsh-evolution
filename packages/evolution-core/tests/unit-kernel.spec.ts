@@ -1,7 +1,7 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
 import { type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { UnitKernel, type MutationRequest, type MutationLockPort, type MutationJournalRecord, type MutationSnapshotPort, type UnitKernelHooks } from '@deepseek-ai/dsh-evolution-core/write'
+import { UnitKernel, type MutationRequest, type MutationLockPort, type MutationJournalRecord, type MutationSnapshotPort, type UnitKernelHooks, type PreparedMutation } from '@deepseek-ai/dsh-evolution-core/write'
 
 class MemoryIo implements EvolutionIoLike {
   readonly files = new Map<string, string>()
@@ -75,6 +75,38 @@ describe('UnitKernel executor', () => {
     expect(result.ok).toBe(false)
     expect(io.files.get('source/A.md')).toBe('oldA')
     expect(io.files.get('source/B.md')).toBe('changedB')
+  })
+
+  it('prepare is side-effect free and commit is the only writer', async () => {
+    const io = new MemoryIo()
+    io.files.set('source/SKILL.md', 'old')
+    const snapshots = new MemorySnapshots()
+    const journals: MutationJournalRecord[] = []
+    const unitKernel = unit(io, { snapshots, journal: { async write(record) { journals.push(record) } } })
+    const prepared = await unitKernel.prepare(request())
+    expect(prepared).toMatchObject({ kind: 'prepared' })
+    expect(io.files.get('source/SKILL.md')).toBe('old')
+    expect(snapshots.items.size).toBe(0)
+    expect(journals).toHaveLength(0)
+    const result = await unitKernel.commit(prepared as PreparedMutation)
+    expect(result.ok).toBe(true)
+    expect(io.files.get('source/SKILL.md')).toBe('new')
+    expect([...snapshots.items.values()]).toHaveLength(1)
+    expect([...snapshots.items.values()][0]).toMatchObject({ state: 'committed' })
+  })
+
+  it('a prepared handle can be released without committing', async () => {
+    const io = new MemoryIo()
+    io.files.set('source/SKILL.md', 'old')
+    const unitKernel = unit(io)
+    const prepared = await unitKernel.prepare(request())
+    expect(prepared).toMatchObject({ kind: 'prepared' })
+    await (prepared as PreparedMutation).release()
+    // Re-acquiring proves the lease/claim was released.
+    const again = await unitKernel.prepare(request())
+    expect(again).toMatchObject({ kind: 'prepared' })
+    await (again as PreparedMutation).release()
+    expect(io.files.get('source/SKILL.md')).toBe('old')
   })
 
   it('derives recovery lock keys from the snapshot', async () => {
