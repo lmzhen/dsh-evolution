@@ -36,4 +36,4 @@
 3. **真实 web 验收未做**：安装/启动不算整体通过；发布前后必须做真实 web 操作与截图/E2E。
 4. **D1c domain fallback**：本版保留 domain provider/row 作为迁移窗口；发布说明必须写“先 `/evolution migrate state`、重启后用 store、domain 留一版回退”，且 DCR-4 用户确认前不能声称 domain authority 删除完成。
 5. **trusted publisher 未 OTP 复核**：`npm trust list` 本会话被 EOTP 挡住；正式 tag 前必须核对 repo/file/environment。
-6. **全量套件需在最终 HEAD 复跑**：当前记录 447 files / 2451 tests；serial/digest 修复后需更新 reading。
+6. **全量套件需在最终 HEAD 复跑**：当前记录 447 files / 2454 tests；serial/digest 修复后需更新 reading。

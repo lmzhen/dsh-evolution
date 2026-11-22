@@ -22,6 +22,8 @@
 | 重启 | 迁移后重启宿主无 activation 失败，auto 选 store，页面继续可用 |
 | 截图 | `D:\dsh\_after_store_1440.png`、`D:\dsh\_lab60_1024.png`、`D:\dsh\_lab60_390.png` |
 
+全量 family 套件（最终 HEAD）：447 files / 2454 tests passed（1181.28s）。
+
 合并 scan 在无模型 key 的隔离宿主上启动后进入 `failed`（screening 阶段），不是 state bootstrap 失败；合并页 200 已证明状态可读。真实模型合并需另配 key 的宿主，不在本候选的 UI 验收范围。
 
 ## 本轮修复的启动/新装 P1
