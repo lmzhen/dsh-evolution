@@ -13,4 +13,5 @@
 - `s4-hmr + settings-u5`: 2 files / 6 tests passed；
 - `verify-probes`: 23 probes，spec set/mutation fixture 均存在；
 - family test-lines/taxonomy 重生成；
-- local gates 待跑。
+- local gates: 61 pass / 0 fail / 3 cannot-decide；
+- 全量套件最终复跑：442 files / 2431 tests passed（986.74s）。
