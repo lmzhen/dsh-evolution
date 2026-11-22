@@ -18,6 +18,7 @@ export const CURATOR_STATE_KEY = 'primary'
 
 /** Provider names as registered on the `evolutionStateStorage` seam. */
 export const PROVIDER_DOMAIN = 'domain'
+export const PROVIDER_STORE = 'store'
 
 /** Domain table names of the evolution storage-domain spec. */
 export const REVIEW_STATE_TABLE = 'review_state'

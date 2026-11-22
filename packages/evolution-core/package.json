@@ -98,6 +98,10 @@
     "./state/domain": {
       "types": "./lib/types/state/domain/index.d.ts",
       "default": "./lib/state/domain/index.js"
+    },
+    "./state/store": {
+      "types": "./lib/types/state/store.d.ts",
+      "default": "./lib/state/store.js"
     }
   },
   "files": [
