@@ -31,7 +31,7 @@ createStateStoreProvider({ io, home?, path? })
 - 共享 `runStateProviderConsistency` conformance 通过；
 - 跨 provider 实例可见（证明没有进程内 authority）；
 - 非法记录拒绝、损坏 store 拒绝、resolved cap 生效；
-- `store-provider.spec.ts`: 5 tests passed；build 0。
+- `store-provider.spec.ts`: 5 tests passed；core state 全组 7 files / 46 tests passed；build 0；`run-gates local`: 61/0/3。
 
 ## 边界
 
