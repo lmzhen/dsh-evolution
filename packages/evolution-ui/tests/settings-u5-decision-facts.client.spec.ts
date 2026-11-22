@@ -46,9 +46,11 @@ describe('U-5/S5: where the value comes from, and where a save goes', () => {
     cleanup()
   })
 
-  it('an unavailable row is not-served, never excused as session memory', () => {
+  it('an unavailable row stays unavailable, without inventing a platform reason', () => {
     const snap = { status: 'unavailable' } as unknown as Parameters<typeof sectionSnapshotOf>[0]
-    expect(sectionSnapshotOf(snap).reason).toBe('not-served')
+    const projected = sectionSnapshotOf(snap)
+    expect(projected.status).toBe('unavailable')
+    expect(projected.reason).toBeUndefined()
   })
 
   it('names the value a reset would restore (the seat base)', () => {

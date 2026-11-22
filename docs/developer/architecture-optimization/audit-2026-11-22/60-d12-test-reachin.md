@@ -5,7 +5,7 @@
 
 - `evolution-core/tests/unit-backend.spec.ts` → `evolution-merge/src/*`；
 - `evolution-core/tests/unit-transaction.spec.ts` → `evolution-merge/src/unit-protocol.ts`；
-- `evolution-host/tests/s4-hmr-double-apply.spec.ts` → `evolution-ui/src/panels/history/host.ts`；
+- `evolution-host/tests/s4-hmr-double-apply.spec.ts` → `evolution-ui/src/panels/history/host.ts`；该用例搬到 `evolution-ui/tests`，改为包内相对导入；
 - `evolution-review/tests/review-executor-skill-write.spec.ts` → `tool-skill-manage/src/index.ts`；
 - `evolution-skill-discovery/tests/main-entry*.spec.ts` → `evolution-core/src/io-registry.ts`。
 
@@ -13,7 +13,7 @@
 
 - `evolution-merge` 根导出补 `MergeUnitTransactions`、`unitEvidenceDigest`、`UnitBackend`、`UnitPlan`、`skillLibraryUnitBackend`；
   core 测试改从包根导入；
-- UI 测试走 UI 包已有的 `./src/*` 显式 export；
+- S4 HMR 用例搬到 UI 包，包内 import；
 - review 测试改从 `@deepseek-ai/dsh-tool-skill-manage` 根导入；
 - skill-discovery 两处改从 `@deepseek-ai/dsh-evolution-core/io-registry` 导入；
 - 测试不再绕过包导出与 `.d.ts`。

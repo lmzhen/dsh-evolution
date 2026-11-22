@@ -239,3 +239,4 @@
 | [58-p2-resolver-deps.md](58-p2-resolver-deps.md) | P2：删除 dsh.resolverDependencies |
 | [59-d11-dead-validator.md](59-d11-dead-validator.md) | D11：删除无调用 baseline 验证器 |
 | [60-d12-test-reachin.md](60-d12-test-reachin.md) | D12：测试跨包 reach-in 改走包导出 |
+| [61-final-suite-align.md](61-final-suite-align.md) | S4 用例归位 + U5 适配 P2-3 |
