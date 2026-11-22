@@ -95,7 +95,8 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
   // Every rows read takes a ticket, and only the newest one may write state. Without it a slow reply
   // for skill A lands while B is open: B would show A's rows, and B's restore buttons would post A's
   // version number at B's name — a write against the wrong skill.
-  const readTicket = useRef(0)
+  const readTickets = useRef({ versions: 0, preview: 0, diff: 0 })
+  const selectedRef = useRef(selected)
 
   const failureSource = useRef<'read' | 'write' | undefined>(undefined)
   const failed = (error: unknown, source: 'read' | 'write' = 'read'): void => {
@@ -127,14 +128,15 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
 
   /** Load one version body under the shared read ticket; used by the current default and the toggle. */
   const loadPreview = (name: string, v: number): void => {
-    const ticket = readTicket.current + 1
-    readTicket.current = ticket
+    const ticket = readTickets.current.preview + 1
+    readTickets.current.preview = ticket
     setBodies(current => new Map(current).set(v, { kind: 'loading', ticket }))
+    const stale = (): boolean => selectedRef.current !== name || readTickets.current.preview !== ticket
     void face.loadBody(name, v).then((body) => {
-      if (readTicket.current !== ticket) { setBodies(current => dropIfTicket(current, v, ticket)); return }
+      if (stale()) { setBodies(current => dropIfTicket(current, v, ticket)); return }
       setBodies(current => new Map(current).set(v, { kind: 'ready', body, ticket }))
     }).catch((error: unknown) => {
-      if (readTicket.current !== ticket) { setBodies(current => dropIfTicket(current, v, ticket)); return }
+      if (stale()) { setBodies(current => dropIfTicket(current, v, ticket)); return }
       setBodies(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error), ticket }))
     })
   }
@@ -154,9 +156,11 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
    * @param keepContent - keep the current rows while the re-read lands.
    */
   const showVersions = (name: string, onFailure: (error: unknown) => void = failed, keepContent = false): void => {
-    const ticket = readTicket.current + 1
-    readTicket.current = ticket
+    const ticket = readTickets.current.versions + 1
+    readTickets.current.versions = ticket
     if (!keepContent) {
+      readTickets.current.preview += 1
+      readTickets.current.diff += 1
       setPayload(undefined)
       setVersionsFailed(undefined)
       setPending(undefined)
@@ -165,7 +169,7 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
       setBodies(new Map())
     }
     void face.loadVersions(name).then((next) => {
-      if (readTicket.current !== ticket) return
+      if (selectedRef.current !== name || readTickets.current.versions !== ticket) return
       setPayload(next)
       clearReadFailure()
       if (keepContent) return
@@ -175,7 +179,7 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
         loadPreview(name, current.v)
       }
     }).catch((error: unknown) => {
-      if (readTicket.current !== ticket) return
+      if (selectedRef.current !== name || readTickets.current.versions !== ticket) return
       // T5-09: the pane needs its own answer, not only the notice.
       setVersionsFailed(failedMessage(error))
       onFailure(error)
@@ -198,6 +202,10 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
     reloadSkills()
     if (selected !== undefined) showVersions(selected, failed, true)
   }
+
+  useEffect(() => {
+    selectedRef.current = selected
+  }, [selected])
 
   useEffect(() => {
     if (selected === undefined || selected === '') {
@@ -256,15 +264,16 @@ export function useSkillHistory(face: PanelFace): SkillHistoryController {
     // Both lazy reads take the SAME ticket as a rows read: a slow reply for a skill the operator has
     // already left must not land in the next skill's map, where the version numbers would name a
     // different body (or a different file).
-    const ticket = readTicket.current + 1
-    readTicket.current = ticket
+    const ticket = readTickets.current.diff + 1
+    readTickets.current.diff = ticket
     if (kind === 'diff') {
       setDiffs(current => new Map(current).set(v, { kind: 'loading', ticket }))
+      const stale = (): boolean => selectedRef.current !== name || readTickets.current.diff !== ticket
       void face.loadDiff(name, v).then((diff) => {
-        if (readTicket.current !== ticket) { setDiffs(current => dropIfTicket(current, v, ticket)); return }
+        if (stale()) { setDiffs(current => dropIfTicket(current, v, ticket)); return }
         setDiffs(current => new Map(current).set(v, { kind: 'ready', diff, ticket }))
       }).catch((error: unknown) => {
-        if (readTicket.current !== ticket) { setDiffs(current => dropIfTicket(current, v, ticket)); return }
+        if (stale()) { setDiffs(current => dropIfTicket(current, v, ticket)); return }
         setDiffs(current => new Map(current).set(v, { kind: 'failed', message: failedMessage(error), ticket }))
       })
       return

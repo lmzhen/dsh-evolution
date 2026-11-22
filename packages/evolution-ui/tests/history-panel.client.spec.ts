@@ -197,6 +197,18 @@ describe('skill-history panel: the state machine a renderer can see', () => {
     expect(screen.queryByText('late')).toBeNull()
   })
 
+  it('P2-10: refresh does not invalidate an already-expanded preview', async () => {
+    const loadBody = vi.fn(async (_name: string, v: number) => ({ v, display: '# one', chars: 5, truncated: false }))
+    const loadVersions = vi.fn(async () => payload())
+    render(createElement(SkillHistoryPanel, makeFace({ loadBody, loadVersions })))
+    await openSkill('alpha')
+    await screen.findByText('# one')
+    fireEvent.click(screen.getByRole('button', { name: 'refresh' }))
+    await waitFor(() => { expect(loadVersions).toHaveBeenCalledTimes(2) })
+    expect(screen.getByText('# one')).toBeTruthy()
+    expect(loadBody).toHaveBeenCalledTimes(1)
+  })
+
   it('F4: a failed preview is retried by clicking the same row again', async () => {
     let calls = 0
     const loadBody = vi.fn(async (_name: string, v: number) => {

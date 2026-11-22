@@ -231,3 +231,4 @@
 | [50-p2-workspace-id.md](50-p2-workspace-id.md) | P2：panel workspace id 走平台真服务 |
 | [51-p2-hidden-merge.md](51-p2-hidden-merge.md) | P2：非活动 merge 视图不启动 + 不挂 focus |
 | [52-p2-loadmore.md](52-p2-loadmore.md) | P2：load-more 失败保留行/游标 |
+| [53-p2-read-tickets.md](53-p2-read-tickets.md) | P2：history 读 ticket 按 kind 分开 |
