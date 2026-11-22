@@ -552,14 +552,20 @@ export class EvolutionApproval extends Service {
     // holding an id must not execute a record the window already closed.
     await this.expireStale()
     if (await this.alreadyExecuted(id)) return { ok: false, message: '待批准写入「' + id + '」已执行过（跨进程记录），不会重复回放。' }
-    const result = await this.withApprovalLease(id, async () => {
-      await this.refreshState()
-      if (await this.alreadyExecuted(id)) return { ok: false, message: '待批准写入「' + id + '」已执行过（跨进程记录），不会重复回放。' }
-      const resolved = await this.dedupe(`approve:${id}`, () => this.doApprove(id, audit))
-      if (resolved.ok) await this.markExecuted(id)
-      return resolved
+    // Dedupe OUTSIDE the lease: concurrent callers must share one execution.
+    // When the dedupe sat inside `withApprovalLease`, the second caller lost the
+    // non-blocking lease and returned a false "lease busy" even though the first
+    // caller was already running the same replay (v21 T-6 pins this).
+    return await this.dedupe(`approve:${id}`, async () => {
+      const result = await this.withApprovalLease(id, async () => {
+        await this.refreshState()
+        if (await this.alreadyExecuted(id)) return { ok: false, message: '待批准写入「' + id + '」已执行过（跨进程记录），不会重复回放。' }
+        const resolved = await this.doApprove(id, audit)
+        if (resolved.ok) await this.markExecuted(id)
+        return resolved
+      })
+      return result ?? { ok: false, message: '待批准写入「' + id + '」正在被另一个批准/过期进程处理：lease 被占用。' }
     })
-    return result ?? { ok: false, message: '待批准写入「' + id + '」正在被另一个批准/过期进程处理：lease 被占用。' }
   }
 
   /** S2-P2-22 (0.3.80): return an ORPHANED executing record to the pending

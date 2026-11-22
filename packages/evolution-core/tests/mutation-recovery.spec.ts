@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
 import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
-import { MutationUnit, fileMutationLock, unitJournalPort, unitSnapshotPort } from '@deepseek-ai/dsh-evolution-core/write'
+import { UnitKernel, fileMutationLock, unitJournalPort, unitSnapshotPort } from '@deepseek-ai/dsh-evolution-core/write'
 
 it('recovers a prepared tree-change snapshot before the first write', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dsh-evo-recover-'))
@@ -45,7 +45,7 @@ it('update records a unit that undo restores', async () => {
     const unitId = versions.map(version => (version as { unitId?: string }).unitId).filter((id): id is string => id !== undefined && id !== '').at(-1)
     expect(unitId).toBeDefined()
     if (unitId === undefined) return
-    const unit = new MutationUnit({ nested: true,
+    const unit = new UnitKernel({ nested: true,
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
@@ -73,7 +73,7 @@ it('patch records a unit that undo restores', async () => {
     const unitId = versions.map(version => (version as { unitId?: string }).unitId).filter((id): id is string => id !== undefined && id !== '').at(-1)
     expect(unitId).toBeDefined()
     if (unitId === undefined) return
-    const unit = new MutationUnit({ nested: true,
+    const unit = new UnitKernel({ nested: true,
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
@@ -100,7 +100,7 @@ it('create undo removes the body and the managed marker', async () => {
     const unitId = versions.map(version => (version as { unitId?: string }).unitId).filter((id): id is string => id !== undefined && id !== '').at(-1)
     expect(unitId).toBeDefined()
     if (unitId === undefined) return
-    const unit = new MutationUnit({ nested: true,
+    const unit = new UnitKernel({ nested: true,
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),

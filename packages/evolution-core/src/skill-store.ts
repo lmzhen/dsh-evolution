@@ -55,7 +55,7 @@ import { FUZZY_MAX_PATTERN_CHARS, FUZZY_MAX_WORK, trimPatternBoundaries, fuzzyPa
 import { makeSerialQueue } from './serial.ts'
 import { supportRefs } from './support-refs.ts'
 import { selectSections } from './section-selection.ts'
-import { MutationUnit, fileMutationLock, type MutationLockPort, type MutationResult, type MutationUnitHooks, type MutationUnitOptions } from './mutation-unit.ts'
+import { UnitKernel, fileMutationLock, type MutationLockPort, type MutationResult, type UnitKernelHooks, type UnitKernelOptions } from './unit-kernel.ts'
 import { mutationLockFrom } from './mutation-authority.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
@@ -951,10 +951,10 @@ export class SkillLibrary {
 
   /**
    * Transitional root lock for mutators that still own their write path. The
-   * extract/restructure path takes the same lock through MutationUnit, so those
+   * extract/restructure path takes the same lock through UnitKernel, so those
    * two paths cannot interleave with create/update/patch across processes.
    */
-  private unitHeadForOps(ops: readonly import('./mutation-unit.ts').MutationSnapshotOp[], roots: readonly string[], provenance: ReadonlyMap<string, string> = new Map()): UnitHead {
+  private unitHeadForOps(ops: readonly import('./unit-kernel.ts').MutationSnapshotOp[], roots: readonly string[], provenance: ReadonlyMap<string, string> = new Map()): UnitHead {
     const moves: Array<Record<string, unknown>> = []
     for (const op of ops) {
       if (op.skill === undefined || basename(op.target) === 'SKILL.md') continue
@@ -1052,15 +1052,15 @@ export class SkillLibrary {
   }
 
 
-  /** The one MutationUnit constructor: storage ports are fixed here, callers pass the rest. */
-  private commitUnit(options: Omit<MutationUnitOptions, 'io' | 'journal' | 'snapshots'>): MutationUnit {
+  /** The one UnitKernel constructor: storage ports are fixed here, callers pass the rest. */
+  private commitUnit(options: Omit<UnitKernelOptions, 'io' | 'journal' | 'snapshots'>): UnitKernel {
     const plan = PLAN_SINK.getStore()
     if (plan !== undefined) {
       // Multi-op plan collection: the core mutators still perform every read,
       // validation and CAS anchor check, but their write unit only records the
       // final op. The plan then commits the collected ops through one real unit.
       return {
-        apply: async (request: Parameters<MutationUnit['apply']>[0]) => {
+        apply: async (request: Parameters<UnitKernel['apply']>[0]) => {
           for (const op of request.ops) {
             const skill = op.skill ?? request.name
             const dir = this.dirOf(skill)
@@ -1077,9 +1077,9 @@ export class SkillLibrary {
           }
           return { ok: true, unitId: request.unitId ?? 'plan-item-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8), dryRun: false, changed: request.ops.map(op => op.target), errors: [] }
         },
-      } as unknown as MutationUnit
+      } as unknown as UnitKernel
     }
-    return new MutationUnit({
+    return new UnitKernel({
       io: this.io,
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
@@ -3582,7 +3582,7 @@ export class SkillLibrary {
       ...(write.expected === undefined ? {} : { expected: write.expected }),
       skill: name,
     }))
-    const hooks: MutationUnitHooks = {
+    const hooks: UnitKernelHooks = {
       committed: async event => {
         let headPlaced = false
         for (const op of event.ops) {
@@ -3695,7 +3695,7 @@ export class SkillLibrary {
     }
     const summary = 'extract ' + plan.parts.map(part => part.heading).join(', ') + ' from ' + source + ' to ' + target
     const roots = [source, target]
-    const hooks: MutationUnitHooks = {
+    const hooks: UnitKernelHooks = {
       committed: async event => {
         const provenance = new Map<string, string>()
         for (const move of [...plan.support.shared, ...plan.support.external]) provenance.set(join(targetDir, ...move.to.split('/')), move.provenance)
@@ -4101,7 +4101,7 @@ export class SkillLibrary {
    * Commit a multi-op plan as one atomic unit. Each op is first prepared by the
    * existing single-op mutator in a collector context (so its validation and
    * anchor/CAS checks stay the source of truth), then all collected writes are
-   * handed to ONE MutationUnit. Any preparation failure or stale anchor leaves
+   * handed to ONE UnitKernel. Any preparation failure or stale anchor leaves
    * every target untouched.
    */
   private async applyMulti(plan: SkillWritePlan): Promise<SkillWriteResult> {

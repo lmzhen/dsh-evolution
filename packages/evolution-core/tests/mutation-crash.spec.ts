@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { spawnTsx } from '../../test-support/tsx-launcher.ts'
-import { MutationUnit } from '../src/mutation-unit.ts'
+import { UnitKernel } from '../src/unit-kernel.ts'
 import { unitJournalPort, unitSnapshotPort } from '../src/mutation-storage-adapter.ts'
 
 async function waitFor(path: string, timeoutMs: number): Promise<string> {
@@ -16,7 +16,7 @@ async function waitFor(path: string, timeoutMs: number): Promise<string> {
   throw new Error('timeout waiting for ' + path)
 }
 
-it('recovers a MutationUnit after the process is killed between ops', async () => {
+it('recovers a UnitKernel after the process is killed between ops', async () => {
   const home = await tempRoot('dsh-mutation-crash-')
   const skills = join(home, 'skills')
   const source = join(skills, 'source', 'SKILL.md')
@@ -25,14 +25,14 @@ it('recovers a MutationUnit after the process is killed between ops', async () =
   await mkdir(join(skills, 'target'), { recursive: true })
   await writeFile(source, 'old-source', 'utf8')
   await writeFile(target, 'old-target', 'utf8')
-  const unitUrl = new URL('../src/mutation-unit.ts', import.meta.url).href
+  const unitUrl = new URL('../src/unit-kernel.ts', import.meta.url).href
   const ioUrl = new URL('../src/io.ts', import.meta.url).href
   const adapterUrl = new URL('../src/mutation-storage-adapter.ts', import.meta.url).href
   const scriptPath = join(home, 'crash.mts')
   const pidPath = join(home, 'child.pid')
   await writeFile(scriptPath, `
 import { writeFile } from 'node:fs/promises'
-import { MutationUnit } from ${JSON.stringify(unitUrl)}
+import { UnitKernel } from ${JSON.stringify(unitUrl)}
 import { nodeEvolutionIo } from ${JSON.stringify(ioUrl)}
 import { unitJournalPort, unitSnapshotPort } from ${JSON.stringify(adapterUrl)}
 const home = ${JSON.stringify(home)}
@@ -41,7 +41,7 @@ const io = { ...base, async transact(path, task) {
   if (path.replaceAll('\\\\', '/').endsWith('target/SKILL.md')) { await writeFile(${JSON.stringify(pidPath)}, String(process.pid)); await new Promise(() => { setInterval(() => {}, 1000) }) }
   return base.transact(path, task)
 } }
-const unit = new MutationUnit({ nested: true, io, limits: { maxSkillFileBytes: 100000, maxSkillContentChars: 100000 }, snapshots: unitSnapshotPort(io, home), journal: unitJournalPort(io, home), now: () => 1 })
+const unit = new UnitKernel({ nested: true, io, limits: { maxSkillFileBytes: 100000, maxSkillContentChars: 100000 }, snapshots: unitSnapshotPort(io, home), journal: unitJournalPort(io, home), now: () => 1 })
 const result = await unit.apply({ name: 'source', roots: [{ name: 'source', protection: 'write' }], rootDirs: { source: ${JSON.stringify(skills)} }, ops: [
   { kind: 'write', target: ${JSON.stringify(source)}, content: 'new-source' },
   { kind: 'write', target: ${JSON.stringify(target)}, content: 'new-target' },
@@ -54,7 +54,7 @@ if (!result.ok) process.exit(2)
   await new Promise<void>(resolve => child.once('exit', () => { resolve() }))
 
   const io = nodeEvolutionIo()
-  const recovery = new MutationUnit({ nested: true, io, limits: { maxSkillFileBytes: 100000, maxSkillContentChars: 100000 }, snapshots: unitSnapshotPort(io, home), journal: unitJournalPort(io, home) })
+  const recovery = new UnitKernel({ nested: true, io, limits: { maxSkillFileBytes: 100000, maxSkillContentChars: 100000 }, snapshots: unitSnapshotPort(io, home), journal: unitJournalPort(io, home) })
   const results = await recovery.recoverPrepared()
   expect(results.some(result => result.ok)).toBe(true)
   expect(await readFile(source, 'utf8')).toBe('old-source')

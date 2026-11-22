@@ -257,3 +257,4 @@
 | [76-statestore-provider.md](76-statestore-provider.md) | D1a：file-backed StateStore provider（未挂载） |
 | [77-statestore-migration-design.md](77-statestore-migration-design.md) | D1b：domain → StateStore 迁移与切换设计 |
 | [78-d1c-transition.md](78-d1c-transition.md) | D1c：domain provider 删除的过渡/DCR-4 草案 |
+| [79-d2-d3-consolidation.md](79-d2-d3-consolidation.md) | D2/D3 第一段：UnitKernel 公共名收口、可派生端口生成 |

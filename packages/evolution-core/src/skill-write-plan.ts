@@ -2,7 +2,7 @@
  * Plan-level write types for the single skill-write provider.
  *
  * This is NOT a second low-level intent layer: `skill-write-intent.ts` owns
- * create/replace/edit decisions and `mutation-unit.ts` owns the transaction.
+ * create/replace/edit decisions and `unit-kernel.ts` owns the transaction.
  * A plan is the domain-level unit the tool, approval and system writers share;
  * `SkillLibrary.apply(plan)` maps each op to the existing mutators/intent.
  *

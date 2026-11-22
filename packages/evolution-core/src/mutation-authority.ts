@@ -1,7 +1,7 @@
 import { HomeFence } from './home-fence.ts'
 import { LeaseStore } from './lease-store.ts'
 import type { EvolutionIoLike } from './io.ts'
-import type { MutationLockLease, MutationLockPort } from './mutation-unit.ts'
+import type { MutationLockLease, MutationLockPort } from './unit-kernel.ts'
 import { TargetLockSet } from './authority.ts'
 
 export interface MutationAuthorityOptions {

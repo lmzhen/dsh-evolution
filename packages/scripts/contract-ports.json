@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "description": "Family-facing ports that can be derived mechanically from the platform's public service types. Every service name here must be exported by the named platform package.",
+  "ports": [
+    {
+      "name": "CommandsPort",
+      "module": "@deepseek-ai/dsh-commands",
+      "service": "CommandRuntime",
+      "members": [
+        "register"
+      ],
+      "extra": ""
+    },
+    {
+      "name": "ToolsPort",
+      "module": "@deepseek-ai/dsh-tools",
+      "service": "ToolsService",
+      "members": [
+        "register",
+        "guard",
+        "restrict"
+      ],
+      "extra": " & {\n  /** The visible tool under this scope, or undefined; the opt-in probe reads this. */\n  get(name: string, scope?: unknown): unknown\n  /** Resolve the step admission for one review child agent. */\n  resolve?(context: unknown): Promise<unknown>\n  /** Raw execute for callers that own the platform call shape (review aux path). */\n  execute?<T = unknown>(input: unknown): Promise<T>\n}"
+    }
+  ]
+}

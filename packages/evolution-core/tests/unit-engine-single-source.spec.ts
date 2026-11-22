@@ -16,12 +16,12 @@ it('keeps the generic unit engine in core and the merge protocol in merge', () =
       if (!entry.name.endsWith('.ts')) continue
       const text = readFileSync(full, 'utf8')
       const rel = relative(root, full).split('\\').join('/')
-      if (/export class (MutationUnit|MergeUnitTransactions)\b/.test(text)) hits.push(rel)
+      if (/export class (UnitKernel|MergeUnitTransactions)\b/.test(text)) hits.push(rel)
     }
   }
   visit(root)
   expect(hits).toEqual([
-    'evolution-core/src/mutation-unit.ts',
+    'evolution-core/src/unit-kernel.ts',
     'evolution-merge/src/unit-protocol.ts',
   ])
   const commitExecute = readFileSync(join(root, 'evolution-merge/src/commit-execute.ts'), 'utf8')
@@ -33,8 +33,8 @@ it('keeps the generic unit engine in core and the merge protocol in merge', () =
   expect(start).toBeGreaterThan(0)
   const body = store.slice(start, end)
   expect(body).toContain('this.commitUnit(')
-  expect(body).not.toContain('new MutationUnit')
-  expect(store.match(/new MutationUnit/g)).toHaveLength(1)
+  expect(body).not.toContain('new UnitKernel')
+  expect(store.match(/new UnitKernel/g)).toHaveLength(1)
   expect(body).not.toContain('this.io.writeText')
   expect(body).not.toContain('this.io.remove')
 })

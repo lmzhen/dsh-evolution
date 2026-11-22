@@ -3,7 +3,7 @@ import { contentHash } from './mutations.ts'
 import { readUnitSnapshot, unitSnapshotsDir, unitStorageKey, writeUnitSnapshot, type UnitSnapshot } from './unit-storage.ts'
 import { unitJournalPath, writeUnitJournal, type UnitJournal, type UnitJournalPhase } from './unit-journal.ts'
 import type { EvolutionIoLike } from './io.ts'
-import type { MutationJournalPort, MutationJournalRecord, MutationSnapshot, MutationSnapshotPort } from './mutation-unit.ts'
+import type { MutationJournalPort, MutationJournalRecord, MutationSnapshot, MutationSnapshotPort } from './unit-kernel.ts'
 
 /**
  * Production adapter onto the existing unit snapshot store. A tree-change

@@ -1,6 +1,5 @@
 /** The one byte-write engine surface. Consumers must import it from the documented subpath. */
 export * from './unit-kernel.ts'
-export * from './mutation-unit.ts'
 export * from './mutation-storage-adapter.ts'
 export * from './unit-claim.ts'
 export * from './unit-journal.ts'

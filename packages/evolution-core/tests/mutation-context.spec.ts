@@ -1,6 +1,6 @@
 // @tier fast
 import { describe, expect, it } from 'vitest'
-import { MutationUnit, type MutationSnapshotPort } from '../src/mutation-unit.ts'
+import { UnitKernel, type MutationSnapshotPort } from '../src/unit-kernel.ts'
 import type { EvolutionIoLike } from '../src/io.ts'
 
 class MemoryIo implements EvolutionIoLike {
@@ -21,12 +21,12 @@ class Snapshots implements MutationSnapshotPort {
   async listPrepared() { return [] }
 }
 
-describe('MutationUnit context provenance', () => {
+describe('UnitKernel context provenance', () => {
   it('stamps owner, runId, leaseId on prepared and committed snapshots', async () => {
     const io = new MemoryIo()
     io.files.set('skill/SKILL.md', 'old')
     const snapshots = new Snapshots()
-    const unit = new MutationUnit({ nested: true,
+    const unit = new UnitKernel({ nested: true,
       io,
       limits: { maxSkillFileBytes: 1000, maxSkillContentChars: 1000 },
       snapshots,
