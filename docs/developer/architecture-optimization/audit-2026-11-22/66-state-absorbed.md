@@ -30,7 +30,7 @@
 - `build-lib` 0；
 - core state 6 files / 41 tests passed；
 - `run-gates local`: 61 pass / 0 fail / 3 cannot-decide；
-- 全量 family 套件：442 files / 2426 tests（首跑仅 installer 的旧 overlay 路径失败；同步后 installer 31/31 通过，待最终复跑确认）。
+- 全量 family 套件：442 files / 2426 tests passed（1028.20s）。
 
 ## 回退
 
