@@ -7,6 +7,7 @@ import { createElement } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { MergeBody, MergeHistoryItem, MergeOutcome, MergeRowView, MergeViewPayload, QueuePage } from '../src/client/api.ts'
 import { MergePanel } from '../src/client/Panel.ts'
+import { MergeView } from '../src/client/index.ts'
 import { MergeStore, type MergeSource } from '../src/client/MergeStore.ts'
 
 const view = (): MergeViewPayload => ({ counts: { verify: 0, pending: 0, fuse: 0, skipped: 0 }, expired: 0, tabs: [{ queue: 'verify', count: 0 }, { queue: 'pending', count: 0 }, { queue: 'fuse', count: 0 }, { queue: 'skipped', count: 0 }], commands: [], startCommands: { scan: 's', pair: 'p' }, notes: [], degraded: false, approval: { mergeApproval: false } })
@@ -33,5 +34,16 @@ it('does not dispose the shared merge store when the panel unmounts', async () =
   expect(dispose).not.toHaveBeenCalled()
   expect(() => store.start()).not.toThrow()
 })
-
+it('does not start the merge store while another workbench tab is active', async () => {
+  const viewSpy = vi.fn(async () => ({ ok: true as const, payload: view() }))
+  const sourceWithSpy: MergeSource = { ...source, view: viewSpy }
+  const store = new MergeStore(sourceWithSpy)
+  host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+  await act(async () => { root?.render(createElement(MergeView, { store, t: (key: string) => key, activeView: 'history' } as never)) })
+  expect(viewSpy).not.toHaveBeenCalled()
+  await act(async () => { root?.render(createElement(MergeView, { store, t: (key: string) => key, activeView: 'merge' } as never)) })
+  await vi.waitFor(() => { expect(viewSpy).toHaveBeenCalled() })
+})
 

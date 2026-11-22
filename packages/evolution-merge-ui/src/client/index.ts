@@ -1,6 +1,6 @@
 /** Browser half: one read-only merge view inside the shared evolution workbench. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { createElement, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { panelWorkspaceId, registerSurface, type ConfigFormsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
@@ -12,9 +12,9 @@ import { currentSessionId } from './session.ts'
 
 export const inject = ['slots', 'sessions', 'locale']
 
-/** The view component receives the workbench's activeView marker alongside its face. */
-function MergeView(props: MergeFace & { activeView?: string }): ReactNode {
-  return createElement('div', { hidden: props.activeView !== 'merge' }, MergePanel(props))
+/** The active tab mounts the panel; an inactive tab must not run its host reads or focus listeners. */
+export function MergeView(props: MergeFace & { activeView?: string }): ReactNode {
+  return props.activeView === 'merge' ? MergePanel(props) : null
 }
 
 /**

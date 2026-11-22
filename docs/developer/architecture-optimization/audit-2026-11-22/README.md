@@ -229,3 +229,4 @@
 | [48-p2-client-seats.md](48-p2-client-seats.md) | P2：client-seat 几何门禁跟随真实注册 |
 | [49-p2-configforms-shape.md](49-p2-configforms-shape.md) | P2：configForms 删手抄字段 |
 | [50-p2-workspace-id.md](50-p2-workspace-id.md) | P2：panel workspace id 走平台真服务 |
+| [51-p2-hidden-merge.md](51-p2-hidden-merge.md) | P2：非活动 merge 视图不启动 + 不挂 focus |
