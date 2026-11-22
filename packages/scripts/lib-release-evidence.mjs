@@ -27,6 +27,7 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
 const nonEmptyString = (value) => typeof value === 'string' && value.trim() !== ''
 
 const GIT_SHA = /^[a-f0-9]{7,40}$/
+const TRACE_COMMIT_IN_SOURCE = /(?:^|[^0-9a-f])([0-9a-f]{7,40})(?![0-9a-f])/i
 
 /**
  * Validate one spike evidence record (W10 §2 shape).
@@ -150,6 +151,14 @@ export function validateReleaseEvidence(evidence, options = {}) {
       if (!Number.isInteger(trace.covered) || trace.covered <= 0) problems.push('traceability.covered must report the covered item count')
       if (!Number.isInteger(trace.total) || trace.total !== TRACEABILITY_TOTAL) problems.push('traceability.total must be ' + String(TRACEABILITY_TOTAL))
       if (trace.planned !== false) problems.push('traceability reading must declare planned:false (strict mode)')
+      if (release) {
+        const declared = typeof trace.measuredCommit === 'string' && GIT_SHA.test(trace.measuredCommit)
+          ? trace.measuredCommit
+          : typeof trace.source === 'string' ? TRACE_COMMIT_IN_SOURCE.exec(trace.source)?.[1] : undefined
+        const measured = typeof evidence.measuredCommit === 'string' ? evidence.measuredCommit : undefined
+        if (declared === undefined) problems.push('release: traceability must name the measured commit (traceability.measuredCommit or a sha in traceability.source)')
+        else if (measured === undefined || declared !== measured) problems.push('release: traceability was measured on commit ' + declared + ', not the measured family commit ' + String(measured))
+      }
     }
   }
   if (release) {

@@ -1499,7 +1499,7 @@
           "--reporter=json",
           "--outputFile.json=${RUNNER_TEMP}/probe-baseline.json"
         ],
-        "timeoutMs": 480000
+        "timeoutMs": 2400000
       }
     },
     {

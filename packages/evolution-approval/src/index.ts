@@ -495,6 +495,7 @@ export class EvolutionApproval extends Service {
     // single read keeps the cut-off and the warning line describing the same number.
     const ttl = this.ttl()
     if (ttl <= 0) return []
+    await this.refreshState()
     const cutoff = Date.now() - ttl
     const expired: string[] = []
     for (const record of await this.state().listPending('pending')) {
@@ -503,6 +504,12 @@ export class EvolutionApproval extends Service {
       // posture the ordering helper takes — a missing timestamp must not decide anything).
       if (!Number.isFinite(stagedAt) || stagedAt > cutoff) continue
       await this.withApprovalLease(record.id, async () => {
+        await this.refreshState()
+        if (await this.alreadyExecuted(record.id)) return
+        const current = (await this.state().listPending('pending')).find(item => item.id === record.id)
+        if (current === undefined) return
+        const currentStagedAt = Date.parse(current.createdAt)
+        if (!Number.isFinite(currentStagedAt) || currentStagedAt > cutoff) return
         const claimId = this.newClaimId()
         const claimed = await this.state().claimPending(record.id, claimId)
         if (!claimed) return
@@ -530,6 +537,7 @@ export class EvolutionApproval extends Service {
     // The convergence runs before EVERY read of a window, so no reader can see a record the TTL has
     // already passed (the CLI, the card and the doctor all go through here).
     await this.expireStale()
+    await this.refreshState()
     return await this.state().listPending(status)
   }
 
@@ -627,7 +635,10 @@ export class EvolutionApproval extends Service {
   }
 
   async reject(id: string, audit: DecisionAudit): Promise<{ ok: boolean; message: string }> {
-    const result = await this.withApprovalLease(id, () => this.dedupe(`reject:${id}`, async () => {
+    const result = await this.withApprovalLease(id, async () => {
+      await this.refreshState()
+      if (await this.alreadyExecuted(id)) return { ok: false, message: '待批准写入「' + id + '」已执行过（跨进程记录），不会拒绝为未执行。' }
+      return await this.dedupe(`reject:${id}`, async () => {
       // Reject claims the record like approve does, so a pending write resolves
       // on a single gate (F-204). The executing-rescue branch below does NOT
       // hold a claim: an 'executing' record may be an approve runner still in
@@ -672,7 +683,8 @@ export class EvolutionApproval extends Service {
       }
       await this.recordDecision(resolution.record, audit)
       return { ok: true, message: `已拒绝 ${resolution.record.kind} 写入「${id}」。` }
-    }))
+      })
+    })
     return result ?? { ok: false, message: '待批准写入「' + id + '」正在被另一个批准/过期进程处理：lease 被占用。' }
   }
 

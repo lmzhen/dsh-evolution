@@ -72,7 +72,7 @@ function releasable(): Record<string, unknown> {
     gates: [{ id: 'gate-01', ok: true, reading: 'passed', criterionEvaluated: true }],
     spikes: SPIKE_IDS.map(id => spike(id)),
     artifacts: { count: 1, files: [{ name: 'family.tgz', sha256: 'b'.repeat(64) }] },
-    traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52, planned: false },
+    traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52, planned: false, measuredCommit: 'a'.repeat(40) },
   }
 }
 
@@ -123,6 +123,7 @@ describe('release-evidence schema v2', () => {
       ['synthetic gate', (doc) => { (doc.gates as Array<Record<string, unknown>>)[0]!.synthetic = true }],
       ['unevaluated pass', (doc) => { delete (doc.gates as Array<Record<string, unknown>>)[0]!.criterionEvaluated }],
       ['short traceability', (doc) => { (doc.traceability as Record<string, unknown>).covered = 51 }],
+      ['traceability on another commit', (doc) => { (doc.traceability as Record<string, unknown>).measuredCommit = 'b'.repeat(40) }],
       ['wrong universe', (doc) => { (doc.traceability as Record<string, unknown>).universe = { A: 22, B: 18, C: 11 } }],
       ['rehearsal status', (doc) => { doc.evidenceStatus = 'rehearsal' }],
       ['missing platformLine', (doc) => { delete doc.platformLine }],
@@ -251,7 +252,7 @@ describe('release-evidence assembly (W3 injection)', () => {
       versions: PLATFORM_LINE.cohort,
       readings: PLATFORM_LINE.cohort.map(version => ({ version, install: 'clean', boot: 200, activeRows: 29, expectedActiveRows: 29, disabledRows: ['evolution-skill-health'], doctor: 'ok', smoke: 'pass', source: 'ci' })),
     },
-    traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52, planned: false },
+    traceability: { universe: TRACEABILITY_UNIVERSE, covered: 52, total: 52, planned: false, measuredCommit: 'a'.repeat(40) },
   })
   it('merges the rehearsal planes, the CI face and the manifest gate ledger', async () => {
     const result = await runAssemble(staging(), rehearsalInputs(), ['--gates-from-manifest', 'ci', '--ci-face', 'release.yml@refs/tags/v0.27.0', '--os', 'linux', '--commit', 'a'.repeat(40), '--tag', 'v' + FAMILY_VERSION])

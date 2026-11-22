@@ -213,6 +213,29 @@ describe('evolution-approval', () => {
     }
   })
 
+  it('A2/P1: an executed marker also blocks reject, so a stale host cannot overwrite an approved record', async () => {
+    const home = await tempRoot('dsh-approval-reject-blocked-')
+    const previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const ctx = await mountStateStack(home, { evolution: true, approval: true })
+      const decision = await ctx.evolutionApproval.request({ kind: 'memory', summary: 'reject-blocked', args: {}, origin: 'background_review' })
+      const markerPath = join(home, 'evolution', 'approval', 'executed', encodeURIComponent(decision.pendingId!))
+      await mkdir(join(home, 'evolution', 'approval', 'executed'), { recursive: true })
+      await writeFile(markerPath, 'earlier-process\n')
+      const reload = vi.spyOn(ctx.evolutionState, 'reload')
+      const rejected = await ctx.evolutionApproval.reject(decision.pendingId!, AUDIT)
+      expect(rejected.ok).toBe(false)
+      expect(rejected.message).toContain('已执行过')
+      expect(reload).toHaveBeenCalled()
+      expect(await ctx.evolutionApproval.list('pending')).toHaveLength(1)
+      expect(await ctx.evolutionApproval.list('rejected')).toHaveLength(0)
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+    }
+  })
+
   it('keeps a pending record when the runner fails and retains rejection audit', async () => {
     const home = await tempRoot('dsh-approval-fail-')
     const ctx = await mountStateStack(home, { evolution: true, approval: true })
