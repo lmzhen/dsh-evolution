@@ -97,7 +97,13 @@ export class MergeStore {
   }
 
   start(): void {
-    if (this.started || this.disposed) return
+    if (this.disposed) return
+    // The store survives an unmounted tab; a remount must re-read instead of showing the
+    // snapshot it left behind. The first mount still does exactly one load.
+    if (this.started) {
+      this.refresh()
+      return
+    }
     this.started = true
     void this.loadView()
     void this.loadQueue(this.snapshot.queue, this.snapshot.expiredOnly)

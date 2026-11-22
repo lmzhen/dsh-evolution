@@ -1,6 +1,6 @@
 /** Browser half: one read-only merge view inside the shared evolution workbench. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { createElement, useEffect, type ReactNode } from 'react'
+import { createElement, type ReactNode } from 'react'
 import { panelWorkspaceId, registerSurface, type ConfigFormsSeat } from '@lmzhen/dsh-evolution-client-kit'
 import * as api from './api.ts'
 import { PANEL_ID, PANEL_ORDER } from './ids.ts'
@@ -14,11 +14,7 @@ export const inject = ['slots', 'sessions', 'locale']
 
 /** The active tab mounts the panel; an inactive tab must not run its host reads or focus listeners. */
 export function MergeView(props: MergeFace & { activeView?: string }): ReactNode {
-  const active = props.activeView === 'merge'
-  // The store is owned by apply() and survives unmount, so a returning tab would otherwise show
-  // the snapshot it left behind. Refresh on the inactive->active transition, not in the background.
-  useEffect(() => { if (active) props.store.refresh() }, [active, props.store])
-  return active ? createElement(MergePanel, props) : null
+  return props.activeView === 'merge' ? createElement(MergePanel, props) : null
 }
 
 /**
