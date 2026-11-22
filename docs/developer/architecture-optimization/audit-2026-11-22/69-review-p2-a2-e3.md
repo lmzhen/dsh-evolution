@@ -27,4 +27,5 @@ release 门的 traceability 之前允许从 `traceability.source` 里正则解�
 ## 验证
 
 - approval + release-evidence：4 files / 72 tests passed；
-- local gates 待跑。
+- local gates: 61 pass / 0 fail / 3 cannot-decide；
+- 全量 family 套件：442 files / 2429 tests passed（1081.35s）。
