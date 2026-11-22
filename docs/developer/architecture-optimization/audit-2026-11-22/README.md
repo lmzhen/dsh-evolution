@@ -226,3 +226,4 @@
 | [45-p2-docs-truth.md](45-p2-docs-truth.md) | P2：文档声明与当前门禁对齐 |
 | [46-full-suite-truth.md](46-full-suite-truth.md) | E3/E4/测试环境：全量套件真绿 |
 | [47-p2-client-tokens.md](47-p2-client-tokens.md) | P2：客户端 token 补齐、去掉写死 fallback |
+| [48-p2-client-seats.md](48-p2-client-seats.md) | P2：client-seat 几何门禁跟随真实注册 |

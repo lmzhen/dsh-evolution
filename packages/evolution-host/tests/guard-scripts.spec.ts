@@ -900,6 +900,22 @@ describe('client-seat guard (G2 sentry)', () => {
     expect(failed?.stderr).toContain('client view: card namespace "evolution-review" is mounted by no bundle row')
   })
 
+  it('E: the seat guard follows registerSurface sidebar icons and shorthand size', async () => {
+    const root = await fixture()
+    await mkdir(join(root, 'upstream', 'packages', 'client', 'ui-sidebar', 'src', 'client'), { recursive: true })
+    await writeFile(join(root, 'upstream', 'packages', 'client', 'ui-sidebar', 'src', 'client', 'PanelIcon.tsx'),
+      "export function PanelIcon({ size, active }) { return renderSlot('sidebar.panellist', { size, active }) }\n", 'utf8')
+    await mkdir(join(root, 'demo-panel', 'src', 'client'), { recursive: true })
+    await writeFile(join(root, 'demo-panel', 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-demo-panel', dsh: { client: { platform: 'web' } } }), 'utf8')
+    await writeFile(join(root, 'demo-panel', 'src', 'client', 'index.ts'),
+      "export const inject = []\n\nfunction DemoIcon(props: { size?: number } = {}): unknown {\n  const box = 26\n  return createElement('svg', { width: String(box), height: String(box) })\n}\n\nexport function apply(ctx) {\n  registerSurface(ctx, { surface: 'sidebar', icon: DemoIcon })\n}\n", 'utf8')
+    const failed = await run(process.execPath, [clientSeats, root, '--upstream', join(root, 'upstream'), '--strict'], { encoding: 'utf8' })
+      .then(() => null, (caught: unknown) => caught as { code?: number; stderr?: string })
+    expect(failed?.code).toBe(1)
+    expect(failed?.stderr).toContain('sidebar icon DemoIcon')
+    expect(failed?.stderr).toContain('does not come from size')
+  })
+
   it('E: the seat guard rejects an occupant that draws at a box of its own', async () => {
     const root = await fixture()
     // The seat's caller passes the value, and the platform's own occupants hand that size to their

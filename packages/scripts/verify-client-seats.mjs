@@ -22,7 +22,7 @@
  * Usage: node verify-client-seats.mjs <evolution-root> [--upstream <platform-root>] [--strict]
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 
 const argv = process.argv.slice(2)
 const rootArg = argv.find(arg => !arg.startsWith('--'))
@@ -257,7 +257,8 @@ function parameterizedSeats(platformRoot) {
       for (const match of text.matchAll(/renderSlot\(\s*'([^']+)'/g)) {
         const open = text.indexOf('(', match.index)
         if (open < 0) continue
-        if (/\bsize\s*:/.test(callText(text, open))) seats.add(match[1])
+        const call = callText(text, open)
+        if (/\bsize\s*:/.test(call) || /\bsize\s*[,}]/.test(call)) seats.add(match[1])
       }
     }
   }
@@ -358,6 +359,42 @@ if (upstream !== undefined) {
         const found = occupantProblems(body)
         for (const problem of found) {
           problems.push(pkg.dir + '/' + String(rel) + ': occupant of ' + seat + ' (' + occupant + ') ' + problem + ' — draw at the size the seat passes (the row owns the glyph slot, its inset and the gap)')
+        }
+      }
+    }
+  }
+  // Family sidebar panels register through the kit's `registerSurface`/`registerSidebarPanel` verb, not
+  // through a literal `slots.register({ name: '<seat>' ... })` in the feature package. Follow that verb
+  // and judge its icon component, which is the seat's actual occupant.
+  if (seats.has('sidebar.panellist')) {
+    for (const pkg of packages) {
+      const dirs = []
+      const collect = (dir) => {
+        if (!existsSync(dir)) return
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const full = join(dir, entry.name)
+          if (entry.isDirectory()) { if (entry.name !== 'tests' && entry.name !== 'node_modules') collect(full) }
+          else if (/\.tsx?$/.test(entry.name)) dirs.push(full)
+        }
+      }
+      collect(join(root, pkg.dir, 'src'))
+      for (const file of dirs) {
+        const text = readFileSync(file, 'utf8')
+        for (const match of text.matchAll(/registerSurface\s*(?:<[^>]*>)?\s*\(/g)) {
+          const args = callText(text, match.index + match[0].length - 1)
+          if (!/surface\s*:\s*'sidebar'/.test(args)) continue
+          const icon = /icon\s*:\s*([A-Za-z_$][\w$]*)/.exec(args)
+          if (icon === null) continue
+          const body = componentBody(text, icon[1]) ?? componentBody(
+            dirs.map(candidate => readFileSync(candidate, 'utf8')).find(candidate => componentBody(candidate, icon[1]) !== undefined) ?? '',
+            icon[1],
+          )
+          if (body === undefined) {
+            notes.push(pkg.dir + '/' + relative(root, file) + ': sidebar icon ' + icon[1] + ' is not a function declaration in this package - geometry unchecked')
+            continue
+          }
+          checked += 1
+          for (const problem of occupantProblems(body)) problems.push(pkg.dir + '/' + relative(root, file) + ': sidebar icon ' + icon[1] + ' ' + problem + ' - draw at the size the seat passes')
         }
       }
     }
