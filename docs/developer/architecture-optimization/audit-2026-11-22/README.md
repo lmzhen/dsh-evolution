@@ -253,3 +253,4 @@
 | [72-npm-platform-placeholder.md](72-npm-platform-placeholder.md) | 新 npm 包 @lmzhen/dsh-evolution-platform 的 0.0.0 占位与 Trusted Publisher |
 | [73-release-dryrun.md](73-release-dryrun.md) | 改名后的发布链 dev 打包/publish dry-run |
 | [74-line-subpath.md](74-line-subpath.md) | family source 子路径进入 line manifest |
+| [75-structural-triage.md](75-structural-triage.md) | 剩余结构项逐项判断；DCR-3 草案（D1-D3 做，D4-D9 登记） |
