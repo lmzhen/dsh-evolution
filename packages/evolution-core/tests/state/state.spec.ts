@@ -1,10 +1,10 @@
 // @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state/storage'
-import EvolutionState from '../src/index.ts'
-import { tempRoot } from '../../test-support/temp-home.ts'
-import { mountStateStack } from '../../test-support/state-stack.ts'
+import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-core/state/storage'
+import EvolutionState from '../../src/state/index.ts'
+import { tempRoot } from '../../../test-support/temp-home.ts'
+import { mountStateStack } from '../../../test-support/state-stack.ts'
 
 describe('evolution-state', () => {
   it('delegates to the mounted storage provider', async () => {

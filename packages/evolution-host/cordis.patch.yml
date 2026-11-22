@@ -29,14 +29,14 @@
 
     # ── durable state: registry + platform storage-domain provider ───────────
     - id: evolution-state-storage
-      name: '@deepseek-ai/dsh-evolution-state/storage'
+      name: '@deepseek-ai/dsh-evolution-core/state/storage'
     - id: evolution-state-domain
-      name: '@deepseek-ai/dsh-evolution-state/domain'
+      name: '@deepseek-ai/dsh-evolution-core/state/domain'
       # G8-B2: shipped default. The platform base bundle mounts the storage-domain
       # facility over its json backend, so this provider registers the KV domain
       # without the family owning a second file medium.
     - id: evolution-state
-      name: '@deepseek-ai/dsh-evolution-state'
+      name: '@deepseek-ai/dsh-evolution-core/state'
       # S1-D1 (0.3.80): the medium is PINNED explicitly. The row used to carry
       # no pin on purpose (V10-16): the registry has NO fallback, so the
       # effective provider was whichever row registered first — json while the

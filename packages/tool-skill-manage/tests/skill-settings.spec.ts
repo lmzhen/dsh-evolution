@@ -136,9 +136,9 @@ describe('skill write settings (G3/S3.4 + G1)', () => {
     const { Storage, storageBackendServiceKey } = await import('@deepseek-ai/dsh-storage')
     const { JsonStorageBackend } = await import('@deepseek-ai/dsh-storage-json')
     const DomainFacility = await import('@deepseek-ai/dsh-storage-domain')
-    const DomainState = await import('@deepseek-ai/dsh-evolution-state/domain')
-    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-state/storage')).default
-    const EvolutionState = (await import('@deepseek-ai/dsh-evolution-state')).default
+    const DomainState = await import('@deepseek-ai/dsh-evolution-core/state/domain')
+    const EvolutionStateStorage = (await import('@deepseek-ai/dsh-evolution-core/state/storage')).default
+    const EvolutionState = (await import('@deepseek-ai/dsh-evolution-core/state')).default
     await ctx.plugin(Storage)
     const backend = new JsonStorageBackend(join(root, 'storage'))
     ctx.storage.backend.register('test-json', backend)

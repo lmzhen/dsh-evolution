@@ -5,9 +5,6 @@
       "path": "../evolution-core"
     },
     {
-      "path": "../evolution-state"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {

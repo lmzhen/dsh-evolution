@@ -1,15 +1,15 @@
 /**
  * Provider seam for durable evolution state.
  *
- * The state CONSUMER (`@deepseek-ai/dsh-evolution-state`) never touches a
+ * The state CONSUMER (`@deepseek-ai/dsh-evolution-core/state`) never touches a
  * medium. Providers register here: `domain` (storage-domain KV) and `json`
  * (IO-seam files) are the two shipped providers.
- * @module @deepseek-ai/dsh-evolution-state/storage
+ * @module @deepseek-ai/dsh-evolution-core/state/storage
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
-import type { EvolutionStateStorage, PendingRecord, PendingStatus } from '@deepseek-ai/dsh-evolution-core/contract'
-export type { CuratorStateRecord, EvolutionStateStorage, PendingKind, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '@deepseek-ai/dsh-evolution-core/contract'
+import type { EvolutionStateStorage, PendingRecord, PendingStatus } from '../contract.ts'
+export type { CuratorStateRecord, EvolutionStateStorage, PendingKind, PendingRecord, PendingResolution, PendingStatus, ReviewStateRecord } from '../contract.ts'
 // S3-2: the two caps live in ./constants.ts (the conformance suite reads them
 // without importing this entry); the local import feeds the pure rules below.
 import { PENDING_RESOLVED_CAP, REVIEW_STATE_SESSION_CAP } from './constants.ts'
@@ -186,7 +186,7 @@ export class EvolutionStateStorageRegistry extends Service {
       throw new Error(`evolution state storage provider "${name}" is not registered`)
     }
     const first = this.providers.values().next().value
-    if (!first) throw new Error('no evolution state storage provider registered; mount @deepseek-ai/dsh-evolution-state-domain or @deepseek-ai/dsh-evolution-state-domain')
+    if (!first) throw new Error('no evolution state storage provider registered; mount @deepseek-ai/dsh-evolution-core/state/domain or @deepseek-ai/dsh-evolution-core/state/domain')
     // v28 G3.1 (STATE-04): the io registry refuses multi-default ambiguity;
     // here two providers can silently coexist and the effective one is
     // REGISTRATION ORDER — enabling the domain row in an overlay rebinds every

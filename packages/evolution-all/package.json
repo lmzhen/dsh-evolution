@@ -45,7 +45,6 @@
     "@deepseek-ai/dsh-evolution-skill-discovery": "workspace:^",
     "@deepseek-ai/dsh-evolution-ui": "workspace:^",
     "@deepseek-ai/dsh-memory": "workspace:^",
-    "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-evolution-activity": "workspace:^",
     "@deepseek-ai/dsh-evolution-review": "workspace:^",

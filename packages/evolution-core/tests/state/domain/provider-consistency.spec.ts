@@ -4,10 +4,10 @@ import { Context } from '@deepseek-ai/cordis'
 import { Storage, storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state/storage'
-import * as DomainState from '../../src/domain/index.ts'
-import { runStateProviderConsistency } from '@deepseek-ai/dsh-evolution-state'
-import { tempRoot } from '../../../test-support/temp-home.ts'
+import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-core/state/storage'
+import * as DomainState from '../../../src/state/domain/index.ts'
+import { runStateProviderConsistency } from '@deepseek-ai/dsh-evolution-core/state'
+import { tempRoot } from '../../../../test-support/temp-home.ts'
 
 async function mount(home: string) {
   const ctx = new Context()

@@ -9,12 +9,12 @@
  * `args` was shared by reference on domain, and a non-cloneable payload
  * poisoned every later read. Both providers now call these functions.
  *
- * @module @deepseek-ai/dsh-evolution-state/storage/src/record-contract
+ * @module @deepseek-ai/dsh-evolution-core/state/storage/src/record-contract
  */
 
 import { CURATOR_STATE_TABLE, PENDING_TABLE, REVIEW_STATE_TABLE } from './constants.ts'
-import type { PendingKind, PendingStatus } from '@deepseek-ai/dsh-evolution-core/contract'
-export type { PendingKind, PendingStatus } from '@deepseek-ai/dsh-evolution-core/contract'
+import type { PendingKind, PendingStatus } from '../contract.ts'
+export type { PendingKind, PendingStatus } from '../contract.ts'
 
 /** The three seam tables a record can belong to. */
 export type SeamRecordTable = typeof REVIEW_STATE_TABLE | typeof CURATOR_STATE_TABLE | typeof PENDING_TABLE

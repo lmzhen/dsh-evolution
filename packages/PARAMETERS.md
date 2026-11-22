@@ -128,7 +128,7 @@ E3 行的第八列写 `卡：<row-id>`——**那张卡渲染的就是这一行�
 | `skill-usage.eventsHome` | E1 | none | cordis | skill-usage | — | 无（path） | Directory holding the family event log the usage store reads. |
 | `memory-files.root` | E1 | none | cordis | memory-files | — | 无（path） | Directory holding MEMORY.md and USER.md (empty = $DSH_HOME/memories). |
 | `evolution-feedback.path` | E1 | none | cordis | evolution-feedback | — | 无（path） | Event log the feedback scorer reads (empty = family events file). |
-| `evolution-state.provider` | E2 | none | cordis | evolution-state | — | 无（identity） | Registered state-store provider name. |
+| `evolution-state.provider` | E2 | none | cordis | evolution-core | — | 无（identity） | Registered state-store provider name. |
 | `memory.provider` | E2 | none | cordis | memory | — | 无（identity） | Registered memory provider name. |
 | `memory-files.providerName` | E2 | none | cordis | memory-files | — | 无（identity） | Name this package registers as the memory provider. |
 | `substantiveMinToolCalls` | E2 | none | cordis | evolution-review | — | 无（internal） | Tool calls that make a turn count as substantive. |

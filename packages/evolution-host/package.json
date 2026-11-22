@@ -25,7 +25,6 @@
     }
   },
   "dependencies": {
-    "@deepseek-ai/dsh-evolution-state": "workspace:^",
     "@deepseek-ai/dsh-memory": "workspace:^",
     "@deepseek-ai/dsh-evolution-approval": "workspace:^",
     "@deepseek-ai/dsh-evolution-review": "workspace:^",

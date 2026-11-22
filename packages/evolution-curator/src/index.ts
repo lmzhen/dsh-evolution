@@ -72,7 +72,7 @@ import { CURATOR_PROMPT, CURATOR_DRY_RUN_BANNER, PROMPT_BUNDLE, verifyPromptBund
 import { blobPath } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillHealthAssessment, SkillHealthThresholds } from '@deepseek-ai/dsh-evolution-core/skills'
-import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-state'
+import type { CuratorStateRecord } from '@deepseek-ai/dsh-evolution-core/state'
 import type { Session } from '@deepseek-ai/dsh-evolution-platform-contract'
 
 

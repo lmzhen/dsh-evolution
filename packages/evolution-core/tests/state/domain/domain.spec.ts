@@ -5,10 +5,10 @@ import { Context } from '@deepseek-ai/cordis'
 import { Storage, storageBackendServiceKey, type KvUnitDescriptor } from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import * as DomainFacility from '@deepseek-ai/dsh-storage-domain'
-import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-state/storage'
-import { PENDING_KINDS, PENDING_STATUSES, REVIEW_STATE_TABLE } from '@deepseek-ai/dsh-evolution-state'
-import * as DomainState from '../../src/domain/index.ts'
-import { tempRoot } from '../../../test-support/temp-home.ts'
+import EvolutionStateStorageRegistry from '@deepseek-ai/dsh-evolution-core/state/storage'
+import { PENDING_KINDS, PENDING_STATUSES, REVIEW_STATE_TABLE } from '@deepseek-ai/dsh-evolution-core/state'
+import * as DomainState from '../../../src/state/domain/index.ts'
+import { tempRoot } from '../../../../test-support/temp-home.ts'
 
 describe('evolution-state-domain', () => {
   it('persists state through the storage-domain KV domain', async () => {
@@ -33,7 +33,7 @@ describe('evolution-state-domain', () => {
     }
     expect([...shape.kind.options]).toEqual([...PENDING_KINDS])
     expect([...shape.status.options]).toEqual([...PENDING_STATUSES])
-    const source = readFileSync(new URL('../../src/domain/index.ts', import.meta.url), 'utf8')
+    const source = readFileSync(new URL('../../../src/state/domain/index.ts', import.meta.url), 'utf8')
     expect(source).toContain('z.enum(PENDING_KINDS)')
     expect(source).toContain('z.enum(PENDING_STATUSES)')
   })

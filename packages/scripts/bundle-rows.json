@@ -287,11 +287,11 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-state/storage'"
+        "      name: '@deepseek-ai/dsh-evolution-core/state/storage'"
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-state/storage'"
+          "  name: '@deepseek-ai/dsh-evolution-core/state/storage'"
         ]
       },
       "leads": {
@@ -307,14 +307,14 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-state/domain'",
+        "      name: '@deepseek-ai/dsh-evolution-core/state/domain'",
         "      # G8-B2: shipped default. The platform base bundle mounts the storage-domain",
         "      # facility over its json backend, so this provider registers the KV domain",
         "      # without the family owning a second file medium."
       ],
       "bodies": {
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-state/domain'"
+          "  name: '@deepseek-ai/dsh-evolution-core/state/domain'"
         ]
       },
       "leads": {
@@ -330,7 +330,7 @@
       ],
       "lead": [],
       "body": [
-        "      name: '@deepseek-ai/dsh-evolution-state'",
+        "      name: '@deepseek-ai/dsh-evolution-core/state'",
         "      # S1-D1 (0.3.80) / G8-B2: the medium is PINNED to the platform storage-domain",
         "      # provider — the shipped default since evolution-state-json was retired.",
         "      config:",
@@ -338,14 +338,14 @@
       ],
       "bodies": {
         "all": [
-          "      name: '@deepseek-ai/dsh-evolution-state'",
+          "      name: '@deepseek-ai/dsh-evolution-core/state'",
           "      # S1-D1 (0.3.80) / G8-B2: the medium is PINNED to the platform storage-domain",
           "      # provider — the shipped default since evolution-state-json was retired.",
           "      config:",
           "        provider: domain"
         ],
         "host": [
-          "      name: '@deepseek-ai/dsh-evolution-state'",
+          "      name: '@deepseek-ai/dsh-evolution-core/state'",
           "      # S1-D1 (0.3.80): the medium is PINNED explicitly. The row used to carry",
           "      # no pin on purpose (V10-16): the registry has NO fallback, so the",
           "      # effective provider was whichever row registered first — json while the",
@@ -360,14 +360,14 @@
           "        provider: domain"
         ],
         "preset": [
-          "      name: '@deepseek-ai/dsh-evolution-state'",
+          "      name: '@deepseek-ai/dsh-evolution-core/state'",
           "      # S1-D1 (0.3.80) / G8-B2: the medium is PINNED to the platform storage-domain",
           "      # provider — the shipped default since evolution-state-json was retired.",
           "      config:",
           "        provider: domain"
         ],
         "standalone": [
-          "  name: '@deepseek-ai/dsh-evolution-state'",
+          "  name: '@deepseek-ai/dsh-evolution-core/state'",
           "  config:",
           "    provider: domain"
         ]

@@ -10,7 +10,7 @@
  * declaration MOVES onto the platform spec - the fields exist precisely so a domain can state this once.
  * It must not then live in two places.
  *
- * @module @deepseek-ai/dsh-evolution-state-domain/compatibility
+ * @module @deepseek-ai/dsh-evolution-core/state/domain/compatibility
  */
 
 /** How bad it is to lose one record of a table, by whether the data can come back. */

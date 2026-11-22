@@ -61,7 +61,7 @@ describe('evolution-agent composition', () => {
     expect(names).not.toContain('@deepseek-ai/dsh-memory')
     expect(names).not.toContain('@deepseek-ai/dsh-memory/files')
     expect(names).not.toContain('@deepseek-ai/dsh-evolution-skill-discovery/usage')
-    expect(names).not.toContain('@deepseek-ai/dsh-evolution-state')
+    expect(names).not.toContain('@deepseek-ai/dsh-evolution-core/state')
     expect(names).not.toContain('@deepseek-ai/dsh-evolution-approval')
   })
 

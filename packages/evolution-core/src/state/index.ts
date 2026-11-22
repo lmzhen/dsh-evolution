@@ -4,7 +4,7 @@
  * The service owns no medium and performs no IO. It resolves the mounted
  * provider from `ctx.evolutionStateStorage` (see evolution-state-json and
  * evolution-state-domain); `provider` config may pin one by name.
- * @module @deepseek-ai/dsh-evolution-state
+ * @module @deepseek-ai/dsh-evolution-core/state
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'

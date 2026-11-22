@@ -11,7 +11,6 @@ This directory holds the 22 packages of the dsh-evolution family. For the user g
 | `evolution-platform-contract` | Pure family-facing platform contract: capabilities, Result vocabulary, all host port interfaces (`HostPlatformPorts`); no host runtime import |
 | `evolution-adapter` | The only host-facing adapter: platform ports, `evolutionPlatform` service, runtime helper values |
 | `evolution-core` | SkillLibrary, MemoryStore, write kernel/unit transactions, prompts, projections, events, presets, `./restrictor` plugin; `./io-registry` + `./io-node` (IO seam), `./authority-plugin` (the `evolutionMutationAuthority` home lock service), `./policy`, `./contract` |
-| `evolution-state` | domain provider (subpath `./domain`);  State facade and provider pinning |
 
 ### Domain services
 

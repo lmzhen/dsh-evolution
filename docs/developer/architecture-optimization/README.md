@@ -62,7 +62,7 @@
 | [26](D:/dsh/_research/plugin-code-audit-2026-11-09/audit-2026-11-12/reports/26-architecture-optimization-plan.md) | 目标架构（外部报告目录） |
 | [27](D:/dsh/_research/plugin-code-audit-2026-11-09/audit-2026-11-12/reports/27-architecture-goal-and-document-index.md) | goal、DCR、backlog、发布门 |
 
-> `docs/developer/architecture.md` 的 “36 个包” 是历史包组/逻辑行口径；当前物理源码包是 22 个、发布包 22 个。
+> `docs/developer/architecture.md` 的 “36 个包” 是历史包组/逻辑行口径；当前物理源码包是 21 个、发布包 21 个。
 
 ## 5. 规则
 

@@ -1,5 +1,5 @@
 {
-  "pin": "ec0dcf05",
+  "pin": "6a9bad5b",
   "bed": {
     "mono": "overlay"
   },
@@ -88,11 +88,6 @@
       "id": "@deepseek-ai/dsh-evolution-skill-health",
       "kind": "evo-src",
       "relPath": "packages/evolution/evolution-skill-health"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-state",
-      "kind": "evo-src",
-      "relPath": "packages/evolution/evolution-state"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-ui",

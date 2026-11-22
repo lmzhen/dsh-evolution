@@ -108,12 +108,12 @@ describe('layered installer', () => {
     const builtMarker = fileURLToPath(new URL('../../evolution-core/lib/index.js', import.meta.url))
     if (existsSync(builtMarker)) expect(stdout).not.toContain('unbuilt:')
     else expect(stdout).toContain('unbuilt:')
-    const sourceTypes = fileURLToPath(new URL('../../evolution-state/lib/types/storage.d.ts', import.meta.url))
+    const sourceTypes = fileURLToPath(new URL('../../evolution-core/lib/types/state/storage.d.ts', import.meta.url))
     if (existsSync(sourceTypes)) {
       await expect(readFile(
-        join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-state/lib/types/storage.d.ts'),
+        join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-core/lib/types/state/storage.d.ts'),
         'utf8',
-      )).resolves.toContain('evolution-state/storage')
+      )).resolves.toContain('evolution-core/state/storage')
     }
 
     const patchRows = insertedRows(loadOverlayPatches('test', join(profileDir, 'node_modules/@deepseek-ai/dsh-evolution-host/cordis.patch.yml')))

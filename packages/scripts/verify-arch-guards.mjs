@@ -688,7 +688,7 @@ const CORE_ALLOWED_FAMILY = new Set([
   '@deepseek-ai/dsh-evolution-core/contract',
   '@deepseek-ai/dsh-evolution-platform-contract',
   '@deepseek-ai/dsh-evolution-adapter',
-  '@deepseek-ai/dsh-evolution-state',
+  '@deepseek-ai/dsh-evolution-core/state',
   '@deepseek-ai/dsh-memory',
 ])
 // N6 (v39): composition-only packages (see docblock).
@@ -1930,7 +1930,7 @@ const PROFILES_LITERAL_RE = /['"]profiles[\\/]/
     ['H2', () => ghostServiceKeys(['evolutionReview'], new Set()).length === 1
       && ghostServiceKeys(['evolutionIo'], new Set(['evolutionIo'])).length === 0],
     ['N5', () => [...'import x from \'@deepseek-ai/dsh-evolution-review\''.matchAll(FAMILY_IMPORT_RE)].filter(m => !CORE_ALLOWED_FAMILY.has(m[1])).length === 1
-      && [...'import x from \'@deepseek-ai/dsh-evolution-state\''.matchAll(FAMILY_IMPORT_RE)].filter(m => !CORE_ALLOWED_FAMILY.has(m[1])).length === 0],
+      && [...'import x from \'@deepseek-ai/dsh-evolution-core/state\''.matchAll(FAMILY_IMPORT_RE)].filter(m => !CORE_ALLOWED_FAMILY.has(m[1])).length === 0],
     ['N6', () => bundleRuntimeResidue('import x from \'y\'\nexport {}') === ''
       && bundleRuntimeResidue('export const LOADER = 1') !== ''
       && bundleRuntimeResidue('// prose only\nexport * from \'y\'') === ''],

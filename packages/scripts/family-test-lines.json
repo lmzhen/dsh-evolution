@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-22T03:06:28.149Z",
-  "tree": "ec0dcf05",
+  "measuredAt": "2026-11-22T04:17:28.477Z",
+  "tree": "6a9bad5b",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
@@ -400,6 +400,96 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/session-projection.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/state/domain/domain-state.spec.ts",
+      "id": "@deepseek-ai/dsh-storage",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-core/tests/state/domain/domain-state.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/state/domain/domain-state.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-core/tests/state/domain/domain-state.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/state/domain/domain-state.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-domain",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-core/tests/state/domain/domain-state.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/state/domain/domain.spec.ts",
+      "id": "@deepseek-ai/dsh-storage",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-core/tests/state/domain/domain.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/state/domain/domain.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-core/tests/state/domain/domain.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/state/domain/domain.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-domain",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-core/tests/state/domain/domain.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/state/domain/provider-consistency.spec.ts",
+      "id": "@deepseek-ai/dsh-storage",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-core/tests/state/domain/provider-consistency.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/state/domain/provider-consistency.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-json",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-core/tests/state/domain/provider-consistency.spec.ts:1",
+      "expiry": "0.60.0",
+      "owner": "evolution-core"
+    },
+    {
+      "spec": "packages/evolution-core/tests/state/domain/provider-consistency.spec.ts",
+      "id": "@deepseek-ai/dsh-storage-domain",
+      "kind": "platform",
+      "expectLine": "both",
+      "status": "expected",
+      "reasonRef": "packages/evolution-core/tests/state/domain/provider-consistency.spec.ts:1",
       "expiry": "0.60.0",
       "owner": "evolution-core"
     },
@@ -1272,96 +1362,6 @@
       "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
       "expiry": "0.60.0",
       "owner": "evolution-skill-discovery"
-    },
-    {
-      "spec": "packages/evolution-state/tests/domain/domain-state.spec.ts",
-      "id": "@deepseek-ai/dsh-storage",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-state/tests/domain/domain-state.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-state"
-    },
-    {
-      "spec": "packages/evolution-state/tests/domain/domain-state.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-json",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-state/tests/domain/domain-state.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-state"
-    },
-    {
-      "spec": "packages/evolution-state/tests/domain/domain-state.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-domain",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-state/tests/domain/domain-state.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-state"
-    },
-    {
-      "spec": "packages/evolution-state/tests/domain/domain.spec.ts",
-      "id": "@deepseek-ai/dsh-storage",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-state/tests/domain/domain.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-state"
-    },
-    {
-      "spec": "packages/evolution-state/tests/domain/domain.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-json",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-state/tests/domain/domain.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-state"
-    },
-    {
-      "spec": "packages/evolution-state/tests/domain/domain.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-domain",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-state/tests/domain/domain.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-state"
-    },
-    {
-      "spec": "packages/evolution-state/tests/domain/provider-consistency.spec.ts",
-      "id": "@deepseek-ai/dsh-storage",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-state/tests/domain/provider-consistency.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-state"
-    },
-    {
-      "spec": "packages/evolution-state/tests/domain/provider-consistency.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-json",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-state/tests/domain/provider-consistency.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-state"
-    },
-    {
-      "spec": "packages/evolution-state/tests/domain/provider-consistency.spec.ts",
-      "id": "@deepseek-ai/dsh-storage-domain",
-      "kind": "platform",
-      "expectLine": "both",
-      "status": "expected",
-      "reasonRef": "packages/evolution-state/tests/domain/provider-consistency.spec.ts:1",
-      "expiry": "0.60.0",
-      "owner": "evolution-state"
     },
     {
       "spec": "packages/memory/tests/files/memory-budget-surfaces.spec.ts",

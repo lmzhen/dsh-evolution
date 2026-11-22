@@ -562,26 +562,6 @@
       "ru": "Поддержка хранения",
       "pt": "Suporte ao armazenamento"
     },
-    "evolution-state.description": {
-      "zh": "内部机制，无需设置。",
-      "en": "Internal component. Nothing to configure.",
-      "ja": "内部用で、設定する項目はありません。",
-      "es": "Es de uso interno y no hay nada que configurar.",
-      "fr": "Élément interne : rien à régler.",
-      "de": "Nur intern; hier gibt es nichts einzustellen.",
-      "ru": "Внутренняя часть, настраивать нечего.",
-      "pt": "De uso interno; não há nada para configurar."
-    },
-    "evolution-state.title": {
-      "zh": "进度保存",
-      "en": "Saved progress",
-      "ja": "状態の保存",
-      "es": "Progreso guardado",
-      "fr": "Progression enregistrée",
-      "de": "Gespeicherter Fortschritt",
-      "ru": "Сохранённый прогресс",
-      "pt": "Progresso salvo"
-    },
     "evolution-threat.description": {
       "zh": "改记忆、改技能时，先查一遍有没有不安全的内容。",
       "en": "Checks the agent's memory and skill changes for unsafe content.",

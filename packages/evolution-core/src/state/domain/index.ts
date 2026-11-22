@@ -5,7 +5,7 @@
  * DSH storage-domain data form: schema-validated, change-emitting, durable KV
  * with whatever backend the domain facility routes (`json`, `sqlite`, remote
  * RPC, …). The provider is one of several implementations of the same seam.
- * @module @deepseek-ai/dsh-evolution-state-domain
+ * @module @deepseek-ai/dsh-evolution-core/state/domain
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -61,7 +61,7 @@ function isDomainErrorCode(error: unknown, code: string): boolean {
  * Review-state record schema of the storage-domain table.
  * @internal Referenced only by this package's own tests and EVOLUTION_DOMAIN
  * below — not public API surface (audit v10 S-03); the record contract lives
- * in `@deepseek-ai/dsh-evolution-state-storage` types.
+ * in `@deepseek-ai/dsh-evolution-core/state-storage` types.
  */
 export const reviewStateSchema = z.object({
   turnsSinceMemory: z.number().int().nonnegative(),
