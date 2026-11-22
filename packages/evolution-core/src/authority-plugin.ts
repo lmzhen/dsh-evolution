@@ -24,7 +24,8 @@ export const name = 'evolution-authority'
 export const inject = ['evolutionIo']
 
 /** Expose the single home/run-fenced mutation authority to domain packages. */
-export function apply(ctx: Context, config: Config = { keyedSkillLocks: false }): void {
+export async function apply(ctx: Context, config: Config = { keyedSkillLocks: false }): Promise<void> {
+  await ctx.evolutionIo.whenReady()
   const authority = new MutationAuthority({
     io: ctx.evolutionIo.provider(),
     home: evolutionHome(),

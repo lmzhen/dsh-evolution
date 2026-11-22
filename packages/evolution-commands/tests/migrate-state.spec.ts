@@ -55,6 +55,19 @@ describe('/evolution migrate state', () => {
     }
   })
 
+  it('accepts the parser positional form `state`', async () => {
+    const { ctx, home } = await seeded()
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const result = await runMigrateStateCommand({ ...command({ dryRun: true, positionals: ['state'] }), ctx })
+      expect(result.kind).toBe('success')
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+    }
+  })
+
   it('rejects a third positional instead of silently ignoring it', async () => {
     const { ctx } = await seeded()
     const result = await runMigrateStateCommand({ ...command({ positionals: ['extra'] }), ctx })

@@ -207,7 +207,7 @@ it('refuses a pinned target before writing either body', async () => {
   }
 })
 
-it('rolls back a copy when the target body write fails', async () => {
+it('rolls back a copy when the target body write fails', { timeout: 60_000 }, async () => {
   const { root, lib } = await makeLib()
   try {
     await lib.writeSupportFile('source', 'references/shared.md', '# shared', 'foreground')

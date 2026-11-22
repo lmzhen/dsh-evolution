@@ -1,7 +1,7 @@
 import { readTextOrNull } from './read-probe.ts'
 /** G3 Batch -1 state bootstrap: one readiness gate, backup/journal migration. */
 import { createHash } from 'node:crypto'
-import { chmod } from 'node:fs/promises'
+import { chmod, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { transactIo, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { migrateV2ToV3, type QuarantinedRow, type V3State } from './migrate-v3.ts'
@@ -9,6 +9,12 @@ import { isV3Row, type V3Row } from './row-v3.ts'
 import { stagingIndexPath, writeStagingIndex } from './staging-index.ts'
 
 export function mergeStatePath(home: string): string { return join(home, 'merge', 'merge-state.json') }
+
+/** Bootstrap-only directory creation for the state lock/file on a fresh home. */
+export async function ensureMergeDir(home: string): Promise<void> {
+  const dirs = ['merge', 'merge/run-meta', 'merge/runs', 'merge/receipts', 'merge/journals', 'merge/unit-journals', 'merge/units', 'merge/staging-index', 'reports']
+  for (const dir of dirs) await mkdir(join(home, dir), { recursive: true })
+}
 export function v2BackupPath(home: string): string { return join(home, 'merge', 'merge-state.v2.bak.json') }
 export function migrationJournalPath(home: string): string { return join(home, 'merge', 'merge-state.migration.json') }
 export function migrationReportPath(home: string): string { return join(home, 'merge', 'merge-state.migration.report.json') }
@@ -135,8 +141,7 @@ async function completeJournal(io: EvolutionIoLike, home: string, journal: Migra
 
 /** Read-only readiness probe. Never migrates, never writes. */
 export async function readStateReadiness(io: EvolutionIoLike, home: string): Promise<StateReadiness> {
-  let raw: string | null
-  try { raw = await io.readText(mergeStatePath(home)) } catch { return blocked('merge-state-needs-repair', 'state file is unreadable') }
+  const raw = await readTextOrNull(io, mergeStatePath(home))
   if (raw === null) return { ok: true, schema: 3, migrated: false, state: { schemaVersion: 3, rows: [] }, quarantine: [], report: await readReport(io, home) }
   const body = parseBody(raw)
   if (body === null) return blocked('merge-state-needs-repair', 'state file is not a JSON object')
@@ -166,6 +171,7 @@ export const ensureV3Ready = ensureMergeStateReady
 
 /** One readiness/migration gate; used by startup and every write entry. */
 export async function ensureMergeStateReady(io: EvolutionIoLike, home: string, fence?: { run<T>(body: () => Promise<T>): Promise<T> }): Promise<StateReadiness> {
+  await ensureMergeDir(home)
   let outcome: StateReadiness | undefined
   let migrated = false
   try {

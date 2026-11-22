@@ -7,6 +7,7 @@
  * to switch `evolution-state.provider` to `store`.
  * @module evolution-commands/src/host-commands/migrate-state
  */
+import type { Context } from '@deepseek-ai/cordis'
 import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
 import { migrateDomainToStore } from '@deepseek-ai/dsh-evolution-core/state/migrate'
@@ -26,27 +27,29 @@ const err = (text: string): CommandResult => ({ kind: 'error', text })
 
 export function runMigrateStateCommand(context: MigrateStateContext): CommandResult | Promise<CommandResult> {
   if (context.ctx === undefined) return err(hostCommandText(context.locale, 'command.migrate state.error', { message: 'command context unavailable' }))
-  // The command's words already matched `migrate state`; a third word is a typo.
-  if (context.command.positionals.length > 0) {
+  // The platform parser keeps `state` as a positional even though the def lists
+  // both words; accept that form and reject any extra word.
+  const positionals = context.command.positionals
+  if (positionals.length > 1 || (positionals.length === 1 && positionals[0] !== 'state')) {
     return err(hostCommandText(context.locale, 'help.migrate state'))
   }
   const dryRun = context.command.flags.get('dry-run') === true
-  const registry = (context.ctx as unknown as {
-    evolutionIo?: { provider(name?: string): EvolutionIoLike | undefined } | undefined
-  }).evolutionIo
-  const io = registry?.provider?.()
-  if (io === undefined) {
-    return err(hostCommandText(context.locale, 'command.migrate state.error', { message: 'evolutionIo provider is not mounted' }))
-  }
-  return (async (): Promise<CommandResult> => {
-    try {
-      const result = await migrateDomainToStore(context.ctx as never, { io, home: evolutionHome(), dryRun })
-      const values = { review: result.reviewSessions, pending: result.pending, curator: result.curator ? 'yes' : 'no', path: result.path }
-      return ok(hostCommandText(context.locale, dryRun ? 'command.migrate state.dry' : 'command.migrate state.done', values))
-    } catch (error) {
-      return err(hostCommandText(context.locale, 'command.migrate state.error', {
-        message: error instanceof Error ? error.message : String(error),
-      }))
-    }
-  })()
+  // The command handler context is a restricted child: a bare `ctx.get` does
+  // not grant the services. Inject first, then migrate on the scoped context.
+  return new Promise<CommandResult>(resolve => {
+    ;(context.ctx as unknown as Context).inject(['evolutionIo', 'evolutionStateStorage'], (scoped) => {
+      void (async (): Promise<void> => {
+        try {
+          const io = (scoped as unknown as { evolutionIo: { provider(): EvolutionIoLike } }).evolutionIo.provider()
+          const result = await migrateDomainToStore(scoped, { io, home: evolutionHome(), dryRun })
+          const values = { review: result.reviewSessions, pending: result.pending, curator: result.curator ? 'yes' : 'no', path: result.path }
+          resolve(ok(hostCommandText(context.locale, dryRun ? 'command.migrate state.dry' : 'command.migrate state.done', values)))
+        } catch (error) {
+          resolve(err(hostCommandText(context.locale, 'command.migrate state.error', {
+            message: error instanceof Error ? error.message : String(error),
+          })))
+        }
+      })()
+    })
+  })
 }

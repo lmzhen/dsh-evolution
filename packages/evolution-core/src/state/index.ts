@@ -80,7 +80,10 @@ export class EvolutionState extends Service {
     // That used to be a warn-once at the first state access; the judgement is that it belongs here, because
     // after the first read the deployment has already operated on the wrong medium. The pin is THIS row
     // config, which is exactly why the registry cannot make this call itself — it never sees the pin.
-    this.assertProviderChoice()
+    // `auto` may legitimately mount before the store provider row has finished
+    // its own async IO wait; the marker/provider check runs on the first state
+    // operation, after every row is mounted.
+    if (this.providerName !== 'auto') this.assertProviderChoice()
   }
 
   /** P2-5: the multi-provider refusal is not a mount-time-only check. A provider

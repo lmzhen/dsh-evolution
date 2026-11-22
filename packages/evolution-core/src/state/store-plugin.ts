@@ -20,7 +20,8 @@ export const inject = ['evolutionStateStorage', 'evolutionIo']
  * idempotent, so keep one provider per home instead of constructing a new registrant. */
 const providers = new Map<string, ReturnType<typeof createStateStoreProvider>>()
 
-export function apply(ctx: Context): void {
+export async function apply(ctx: Context): Promise<void> {
+  await ctx.evolutionIo.whenReady()
   const home = evolutionHome()
   let provider = providers.get(home)
   if (provider === undefined) {

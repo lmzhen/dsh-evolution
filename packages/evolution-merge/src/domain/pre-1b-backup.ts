@@ -48,7 +48,8 @@ async function walk(io: EvolutionIoLike, root: string, rel = ''): Promise<string
     if (text !== null) return [rel]
   } catch (error) {
     const code = error instanceof Error && 'code' in error ? String((error as { code?: unknown }).code) : ''
-    if (code !== 'EISDIR' && code !== 'ENOTDIR') throw error
+    const message = error instanceof Error ? error.message : String(error)
+    if (code !== 'EISDIR' && code !== 'ENOTDIR' && code !== 'FS_NOT_FILE' && code !== 'FS_NOT_DIRECTORY' && !/not a regular file/i.test(message)) throw error
   }
   const names = await io.list(path)
   const found: string[] = []

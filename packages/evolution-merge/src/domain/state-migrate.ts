@@ -3,7 +3,6 @@
  * so a backup/journal fix in one path cannot drift from the other.
  */
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { ensureMergeStateReady } from './state-bootstrap.ts'
 import { normalizePairLedger } from './pair-ledger.ts'
 import { readV4Readiness } from './schema4.ts'
 
@@ -23,15 +22,13 @@ export type MigrateToV4Result =
 export async function migrateMergeStateToV4(
   io: EvolutionIoLike,
   home: string,
-  fence?: { run<T>(body: () => Promise<T>): Promise<T> },
+  _fence?: { run<T>(body: () => Promise<T>): Promise<T> },
 ): Promise<MigrateToV4Result> {
   const v4 = await readV4Readiness(io, home)
   if (v4.ok) return { ok: true, migrated: false }
   if (v4.code === 'merge-state-forward-only' || v4.code === 'merge-state-needs-repair') {
     return { ok: false, code: v4.code, message: v4.message }
   }
-  const v3 = await ensureMergeStateReady(io, home, fence)
-  if (!v3.ok) return { ok: false, code: v3.code, message: v3.message }
   const normalized = await normalizePairLedger(io, home)
   if (!normalized.ok) return { ok: false, code: 'merge-state-needs-repair', message: normalized.message ?? 'v3->v4 normalize failed' }
   return normalized.backupRef === undefined

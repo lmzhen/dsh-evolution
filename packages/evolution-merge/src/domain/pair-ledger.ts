@@ -3,7 +3,7 @@ import { readTextOrNull } from './read-probe.ts'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
-import { readStateReadiness, mergeStatePath, StateBlockedError } from './state-bootstrap.ts'
+import { ensureMergeDir, readStateReadiness, mergeStatePath, StateBlockedError } from './state-bootstrap.ts'
 import { transactIo } from '@deepseek-ai/dsh-evolution-core'
 import { createPre1bBackup } from './pre-1b-backup.ts'
 import { adoptLegacyProduction } from './stage-aggregate.ts'
@@ -68,6 +68,9 @@ export function pairLedger(io: EvolutionIoLike, home: string, fence?: { run<T>(b
 
 /** v3-to-v4 normalize: backup -> production stage adopt -> v4 state. Not called in 1b-2a. */
 export async function normalizePairLedger(io: EvolutionIoLike, home: string): Promise<NormalizeResult> {
+  // A fresh profile has no merge/ directory; the state lock and the state file
+  // both need it. This is bootstrap protocol, not a second state medium.
+  await ensureMergeDir(home)
   const v4 = await readV4Readiness(io, home)
   if (v4.ok) return { ok: true, migrated: false }
   if (v4.code !== 'merge-state-normalize-required' && v4.code !== 'merge-state-v4-required') return { ok: false, migrated: false, message: v4.code + ': ' + v4.message }

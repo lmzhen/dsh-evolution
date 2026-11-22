@@ -32,6 +32,19 @@ describe('state provider auto', () => {
     expect(await ctx.evolutionState.loadCuratorState()).toBeNull()
   })
 
+  it('mounts before the store provider and validates on the first operation', async () => {
+    const root = await tempRoot('dsh-state-auto-order-')
+    const evolution = join(root, 'evolution')
+    process.env.DSH_HOME = root
+    const ctx = await mountStateStack(evolution)
+    await writeStateStoreSnapshot(ctx.evolutionIo.provider(), join(evolution, 'state', 'store.json'), { review: {}, curator: null, pending: {} })
+    await ctx.evolutionIo.provider().writeText(join(evolution, 'state', STATE_MIGRATION_MARKER), JSON.stringify({ target: 'store' }))
+    // The state row mounts before the store provider row; it must not throw here.
+    await ctx.plugin(EvolutionState, { provider: 'auto', home: evolution })
+    await ctx.plugin(StorePlugin)
+    expect(await ctx.evolutionState.loadCuratorState()).toBeNull()
+  })
+
   it('fails loud when the marker exists but the store is missing', async () => {
     const root = await tempRoot('dsh-state-auto-half-')
     const evolution = join(root, 'evolution')

@@ -42,6 +42,16 @@ it('removes only through a terminal v4 event', async () => {
   expect(await pairLedger(io, home).transact(tx => tx.rows())).toEqual([])
 })
 
+it('bootstraps v4 from an empty home (fresh install)', async () => {
+  const home = await tempRoot('dsh-row-tx-fresh-')
+  const io = nodeEvolutionIo()
+  const rows = await pairLedger(io, home).transact(tx => tx.rows())
+  expect(rows).toEqual([])
+  const raw = JSON.parse(await readFile(mergeStatePath(home), 'utf8'))
+  expect(raw.schemaVersion).toBe(4)
+  expect(raw.pre1b.backupRef).toMatch(/^pre-1b-/)
+})
+
 it('refuses invalid v4 rows without touching the file', async () => {
   const home = await tempRoot('dsh-row-tx-bad-')
   const io = nodeEvolutionIo()

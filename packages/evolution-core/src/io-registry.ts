@@ -43,6 +43,7 @@ export class EvolutionIoRegistry extends Service {
   /** P2-3 (v15): per-name dispose — the idempotent re-registration returns
    * the SAME function instance, so double-dispose is a single removal. */
   private readonly disposals = new Map<string, () => void>()
+  private readonly readyResolvers: Array<() => void> = []
 
   constructor(ctx: Context) {
     super(ctx, 'evolutionIo')
@@ -90,6 +91,7 @@ export class EvolutionIoRegistry extends Service {
     }
     this.providers.set(provider.name, provider)
     this.disposals.set(provider.name, dispose)
+    for (const resolve of this.readyResolvers.splice(0)) resolve()
     return dispose
   }
 
@@ -99,6 +101,13 @@ export class EvolutionIoRegistry extends Service {
   // v20 (A-3): `hasProvider(name)` removed for the same reason — its only
   // callers were this package's own spec; a presence probe goes through
   // `provider(name)`, which fails loud on a missing name.
+
+  /** Resolve once at least one provider exists; plugins that construct with a
+   * provider in apply() await this instead of racing the registration row. */
+  whenReady(): Promise<void> {
+    if (this.providers.size > 0) return Promise.resolve()
+    return new Promise<void>(resolve => { this.readyResolvers.push(resolve) })
+  }
 
   provider(name?: string): EvolutionIo {
     if (name) {
