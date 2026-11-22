@@ -22,7 +22,7 @@ export interface WorkbenchFace {
   readonly history: PanelFace
   readonly pending: PendingCardFace
   /** The data overview view; absent in older test hosts that do not mount the stats page. */
-  readonly stats?: StatsFace
+  readonly stats?: Omit<StatsFace, 'view' | 'onView' | 'layout' | 'openSkill' | 'onOrganize'>
   /** Whether a feature view is actually mounted (merge is optional). */
   readonly hasView?: (view: 'merge') => boolean
   /** Read-only task counts for the first landing; absent keeps history. */

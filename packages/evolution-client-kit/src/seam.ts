@@ -27,6 +27,8 @@ export interface PanelBodyOptions {
   key: string
   /** The face handed to the component: data and callbacks only, never a service. */
   inject: () => unknown
+  /** Child slots the main keyed occupant declares. */
+  children?: Readonly<Record<string, { readonly kind: 'list' | 'keyed'; readonly scope: 'root' }>>
 }
 
 /** The locale seat: one namespace registration and a bound translator. */

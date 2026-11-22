@@ -32,8 +32,6 @@ export interface SidebarPanelSpec<Face> {
   body: (t: Translate) => Face
   /** Child slots the main keyed occupant declares (the rc.3 main contract). */
   children?: Readonly<Record<string, { readonly kind: 'list' | 'keyed'; readonly scope: 'root' }>>
-  /** Optional store owned by this registration; the platform binds it to the occupant. */
-  store?: unknown
 }
 
 /** Fail loud when a client bundle is mounted without the shell seats it consumes. */
@@ -66,7 +64,6 @@ export function registerSidebarPanel<Face>(ctx: ClientContext, spec: SidebarPane
         key: spec.id,
         inject: (): Face => spec.body(t),
         ...(spec.children === undefined ? {} : { children: spec.children }),
-        ...(spec.store === undefined ? {} : { store: spec.store }),
       },
       spec.component,
     )

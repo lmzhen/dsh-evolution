@@ -232,3 +232,4 @@
 | [51-p2-hidden-merge.md](51-p2-hidden-merge.md) | P2：非活动 merge 视图不启动 + 不挂 focus |
 | [52-p2-loadmore.md](52-p2-loadmore.md) | P2：load-more 失败保留行/游标 |
 | [53-p2-read-tickets.md](53-p2-read-tickets.md) | P2：history 读 ticket 按 kind 分开 |
+| [54-p2-dead-ui-contract.md](54-p2-dead-ui-contract.md) | P2：删除 client-kit/history 死契约与假 face |
