@@ -14,6 +14,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 function operations(overrides: Partial<RetrievalOperations> = {}): RetrievalOperations {
   return {
+    available: true,
     describe: vi.fn(async () => ({ ok: true as const, value: { SILICONFLOW_API_KEY: absent, BAMBOO_API_KEY: absent } })),
     set: vi.fn(async () => ({ ok: true as const, value: undefined })),
     unset: vi.fn(async () => ({ ok: true as const, value: undefined })),
@@ -25,9 +26,9 @@ it('renders both optional key fields and the local-mode status', async () => {
   const ops = operations()
   render(createElement(RetrievalCard, { t, operations: ops }))
   await waitFor(() => { expect(screen.getByText('检索增强（可选）')).toBeTruthy() })
-  expect(screen.getByText('硅基流动 API Key')).toBeTruthy()
-  expect(screen.getByText('StartLux 判别 API Key')).toBeTruthy()
-  expect(screen.getByText('当前：本地模式')).toBeTruthy()
+  expect(screen.getByText('SiliconFlow API Key')).toBeTruthy()
+  expect(screen.getByText('StartLux 精排 API Key')).toBeTruthy()
+  expect(screen.getByText('当前：向量和精排都用本地')).toBeTruthy()
   expect(screen.getAllByText('未设置').length).toBeGreaterThan(0)
 })
 
@@ -35,7 +36,7 @@ it('writes only non-empty drafts through the credential remote and re-reads', as
   const ops = operations()
   render(createElement(RetrievalCard, { t, operations: ops }))
   await waitFor(() => { expect(screen.getByText('检索增强（可选）')).toBeTruthy() })
-  const input = screen.getByLabelText('硅基流动 API Key') as HTMLInputElement
+  const input = screen.getByLabelText('SiliconFlow API Key') as HTMLInputElement
   fireEvent.change(input, { target: { value: ' sf-key ' } })
   fireEvent.click(screen.getByText('保存'))
   await waitFor(() => { expect(ops.set).toHaveBeenCalledWith('SILICONFLOW_API_KEY', ' sf-key ') })
@@ -48,16 +49,16 @@ it('shows configured state without ever putting the stored value into the draft'
     describe: vi.fn(async () => ({
       ok: true as const,
       value: {
-        SILICONFLOW_API_KEY: { configured: true, writable: true, source: 'environment' },
+        SILICONFLOW_API_KEY: { configured: true, writable: true, source: 'env' },
         BAMBOO_API_KEY: { configured: false, writable: true },
       },
     })),
   })
   render(createElement(RetrievalCard, { t, operations: ops }))
-  await waitFor(() => { expect(screen.getByText('当前：向量云端 · 判别本地')).toBeTruthy() })
-  const input = screen.getByLabelText('硅基流动 API Key') as HTMLInputElement
+  await waitFor(() => { expect(screen.getByText('当前：向量走云端，精排用本地')).toBeTruthy() })
+  const input = screen.getByLabelText('SiliconFlow API Key') as HTMLInputElement
   expect(input.value).toBe('')
-  expect(screen.getByText('来源：环境变量')).toBeTruthy()
+  expect(screen.getByText('来自环境变量')).toBeTruthy()
 })
 
 it('keeps the card usable but says so when the deployment has no writable credential store', async () => {
@@ -65,15 +66,56 @@ it('keeps the card usable but says so when the deployment has no writable creden
     describe: vi.fn(async () => ({ ok: true as const, value: { SILICONFLOW_API_KEY: { configured: false, writable: false }, BAMBOO_API_KEY: { configured: false, writable: false } } })),
   })
   render(createElement(RetrievalCard, { t, operations: ops }))
-  await waitFor(() => { expect(screen.getByText('当前部署未提供凭据服务，无法在此保存 Key；仍可使用环境变量。')).toBeTruthy() })
+  await waitFor(() => { expect(screen.getByText('当前环境不支持保存 Key；用环境变量配置仍然生效。')).toBeTruthy() })
 })
 
 it('surfaces a write refusal and does not claim a save', async () => {
   const ops = operations({ set: vi.fn(async () => ({ ok: false as const, message: 'credential/rejected: read only' })) })
   render(createElement(RetrievalCard, { t, operations: ops }))
   await waitFor(() => { expect(screen.getByText('检索增强（可选）')).toBeTruthy() })
-  fireEvent.change(screen.getByLabelText('StartLux 判别 API Key'), { target: { value: 'bamboo-key' } })
+  fireEvent.change(screen.getByLabelText('StartLux 精排 API Key'), { target: { value: 'bamboo-key' } })
   await act(async () => { fireEvent.click(screen.getByText('保存')) })
   await waitFor(() => { expect(screen.getByRole('alert').textContent).toContain('credential/rejected') })
   expect(screen.queryByText('已保存')).toBeNull()
+})
+
+it('hides Remove for a key that comes from the environment', async () => {
+  const ops = operations({
+    describe: vi.fn(async () => ({ ok: true as const, value: { SILICONFLOW_API_KEY: { configured: true, writable: true, source: 'env' }, BAMBOO_API_KEY: absent } })),
+  })
+  render(createElement(RetrievalCard, { t, operations: ops }))
+  await waitFor(() => { expect(screen.getByText('来自环境变量')).toBeTruthy() })
+  expect(screen.queryByText('删除 Key')).toBeNull()
+})
+
+it('reports removal as removal rather than as a save', async () => {
+  const ops = operations({
+    describe: vi.fn(async () => ({ ok: true as const, value: { SILICONFLOW_API_KEY: { configured: true, writable: true, source: 'file' }, BAMBOO_API_KEY: absent } })),
+  })
+  render(createElement(RetrievalCard, { t, operations: ops }))
+  await waitFor(() => { expect(screen.getByText('删除 Key')).toBeTruthy() })
+  await act(async () => { fireEvent.click(screen.getByText('删除 Key')) })
+  await waitFor(() => { expect(screen.getByText('已删除 Key')).toBeTruthy() })
+  expect(ops.unset).toHaveBeenCalledWith('SILICONFLOW_API_KEY')
+  expect(screen.queryByText('已保存')).toBeNull()
+})
+
+it('separates a read failure from an unsupported credential store', async () => {
+  const ops = operations({ describe: vi.fn(async () => ({ ok: false as const, message: 'transport rejected' })) })
+  render(createElement(RetrievalCard, { t, operations: ops }))
+  await waitFor(() => { expect(screen.getByText('读取 Key 状态失败')).toBeTruthy() })
+  expect(screen.getByText('transport rejected')).toBeTruthy()
+  expect(screen.queryByText('当前环境不支持保存 Key；用环境变量配置仍然生效。')).toBeNull()
+})
+
+it('renders the unavailable state once when the deployment has no credential remote', async () => {
+  const unavailable = '当前环境不支持保存 Key；用环境变量配置仍然生效。'
+  const ops: RetrievalOperations = {
+    available: false,
+    describe: vi.fn(async () => ({ ok: false as const, message: unavailable })),
+    set: vi.fn(async () => ({ ok: false as const, message: unavailable })),
+    unset: vi.fn(async () => ({ ok: false as const, message: unavailable })),
+  }
+  render(createElement(RetrievalCard, { t, operations: ops }))
+  await waitFor(() => { expect(screen.getAllByText(unavailable)).toHaveLength(1) })
 })

@@ -156,63 +156,82 @@ export async function resolveRetrievalCredentials(
 - 合并建议页只放一行状态/入口：`检索增强：本地模式 [去设置]` / `检索增强：云端已启用 [去设置]`；不出现 Key 输入。
 - 点击“去设置”使用平台 `openSettings('evolution')`；若当前面板 props 不可达，只显示静态提示，不硬编码 URL/路由。
 
-### 5.2 卡片文案（中文源）
+### 5.2 卡片文案（中文源，母语审校后）
 
 ```text
 检索增强（可选）
 
-为追求更优的相似 skill 筛选能力，可配置以下 API。
-不配置也可正常使用，仅使用本地模型。
+想让相似技能筛得更准，可以配置下面两个 API Key（只配一个也行）。不配置也能正常使用，只用本地模型。
+当前：向量和精排都用本地
 
-硅基流动 API Key                  [未设置]  [设置]
-  用于向量相似度；固定模型 Qwen3-Embedding-8B（备用 bge-m3）
-  获取 Key：登录硅基流动 → API 密钥 → 新建并复制
-  https://cloud.siliconflow.cn/account/ak
+SiliconFlow API Key                 [未设置]
+  用于计算向量相似度；模型固定为 Qwen3-Embedding-8B（备用 bge-m3）。
+  获取 SiliconFlow API Key
 
-StartLux 判别 API Key             [未设置]  [设置]
-  用于精排判别；固定模型 StartLux-Decision-27B
-  获取 Key：Bamboo 注册后在 API Keys 创建（分组选 default）
-  https://bamboonode.dev/register
-  https://bamboonode.dev/tokens
+StartLux 精排 API Key               [未设置]
+  用于精排相似技能；模型固定为 StartLux-Decision-27B。
+  在 Bamboo 注册后，到 API Keys 页面新建 Key（分组选 default）。
+  注册 Bamboo    获取 Bamboo API Key
 
-当前：本地模式 · 配置后下一次合并扫描生效
-Key 只保存在本机凭据中，不会回显。
+API Key 只保存在本机，保存后不再显示。
+改动从下一次合并扫描起生效。
+                                      [保存]
 ```
 
-### 5.3 文案键
+### 5.3 文案键（最终）
 
 | key | 中文 | English |
 |---|---|---|
-| `retrieval.title` | 检索增强（可选） | Retrieval enhancement (optional) |
-| `retrieval.intro` | 为追求更优的相似 skill 筛选能力，可配置以下 API。不配置也可正常使用，仅使用本地模型。 | For better similar-skill screening, you can configure the APIs below. Without them, local models are used and the pipeline still runs. |
-| `retrieval.embedding.label` | 硅基流动 API Key | SiliconFlow API key |
-| `retrieval.embedding.hint` | 用于向量相似度；固定模型 Qwen3-Embedding-8B（备用 bge-m3）。 | Used for vector similarity. Fixed model: Qwen3-Embedding-8B (fallback bge-m3). |
-| `retrieval.ranker.label` | StartLux 判别 API Key | StartLux decision API key |
-| `retrieval.ranker.hint` | 用于精排判别；固定模型 StartLux-Decision-27B。 | Used for reranking. Fixed model: StartLux-Decision-27B. |
-| `retrieval.getKey` | 获取 Key | Get key |
-| `retrieval.configured` | 已设置 | Configured |
-| `retrieval.notConfigured` | 未设置 | Not configured |
-| `retrieval.sourceEnv` | 来源：环境变量 | Source: environment |
-| `retrieval.sourceStore` | 来源：本机凭据 | Source: local credentials |
-| `retrieval.currentLocal` | 当前：本地模式 | Current: local models |
-| `retrieval.currentEnhanced` | 当前：云端增强已启用 | Current: cloud enhancement enabled |
-| `retrieval.currentMixed` | 当前：向量云端 · 判别本地 | Current: cloud embeddings · local ranking |
-| `retrieval.currentRanker` | 当前：向量本地 · 判别云端 | Current: local embeddings · cloud ranking |
-| `retrieval.applyHint` | 配置后下一次合并扫描生效。 | Applies to the next merge scan. |
-| `retrieval.secretNote` | Key 只保存在本机凭据中，不会回显。 | Keys are stored in local credentials and never displayed again. |
-| `retrieval.clear` | 清除 | Clear |
-| `retrieval.unavailable` | 当前部署未提供凭据服务，无法在此保存 Key；仍可使用环境变量。 | Credential storage is unavailable in this deployment; environment variables still work. |
+| `retrievalTitle` | 检索增强（可选） | Retrieval enhancement (optional) |
+| `retrievalIntro` | 想让相似技能筛得更准，可以配置下面两个 API Key（只配一个也行）。不配置也能正常使用，只用本地模型。 | To screen similar skills more accurately, add the two API keys below (one is enough). Without them, screening uses only local models and still works. |
+| `retrievalEmbeddingLabel` | SiliconFlow API Key | SiliconFlow API key |
+| `retrievalEmbeddingHint` | 用于计算向量相似度；模型固定为 {model}（备用 {fallback}）。 | Used for vector similarity. Fixed model: {model} (fallback: {fallback}). |
+| `retrievalRankerLabel` | StartLux 精排 API Key | StartLux ranking API key |
+| `retrievalRankerHint` | 用于精排相似技能；模型固定为 {model}。 | Used for ranking similar skills. Fixed model: {model}. |
+| `retrievalRankerHelp` | 在 Bamboo 注册后，到 API Keys 页面新建 Key（分组选 default）。 | Sign up for Bamboo, then create a key under API Keys (group: default). |
+| `retrievalGetEmbeddingKey` | 获取 SiliconFlow API Key | Get a SiliconFlow API key |
+| `retrievalGetRankerKey` | 获取 Bamboo API Key | Get a Bamboo API key |
+| `retrievalRegisterBamboo` | 注册 Bamboo | Sign up for Bamboo |
+| `retrievalConfigured` | 已设置 | Configured |
+| `retrievalNotConfigured` | 未设置 | Not set |
+| `retrievalSourceEnv` | 来自环境变量 | Set from an environment variable |
+| `retrievalSourceStore` | 已保存在本机 | Saved on this machine |
+| `retrievalCurrentLocal` | 当前：向量和精排都用本地 | Current: local vectors and ranking |
+| `retrievalCurrentEnhanced` | 当前：向量和精排都走云端 | Current: cloud vectors and ranking |
+| `retrievalCurrentMixed` | 当前：向量走云端，精排用本地 | Current: cloud vectors, local ranking |
+| `retrievalCurrentRanker` | 当前：向量用本地，精排走云端 | Current: local vectors, cloud ranking |
+| `retrievalApplyHint` | 改动从下一次合并扫描起生效。 | Changes take effect on the next merge run. |
+| `retrievalSecretNote` | API Key 只保存在本机，保存后不再显示。 | API keys are stored only on this machine and never shown again. |
+| `retrievalSave` | 保存 | Save |
+| `retrievalWorking` | 处理中… | Working… |
+| `retrievalSaved` | 已保存 | Saved |
+| `retrievalCleared` | 已删除 Key | Key removed |
+| `retrievalOperationFailed` | 操作失败：{message} | Couldn’t complete the change: {message} |
+| `retrievalClear` | 删除 Key | Remove key |
+| `retrievalUnavailable` | 当前环境不支持保存 Key；用环境变量配置仍然生效。 | This environment can’t store keys; keys set through environment variables still work. |
+| `retrievalLoading` | 正在读取… | Reading… |
+| `retrievalReadFailed` | 读取 Key 状态失败 | Couldn’t read key status |
+| `settings.retrievalHint` | 检索增强（可选）在「设置 → 能力进化」里配置，也能看当前状态。 | Set up and check retrieval enhancement (optional) in Settings → Capability evolution. |
 
-英文为 sentence case；其余 6 语言按 locale 流程由母语审校，不硬编码、不直译模型名和 URL。
+8 语言已经过独立母语审校：术语冻结为“检索增强 / 能力进化 / 向量 / 精排 / API Key”；模型名不翻译；所有 locale 的 `{model}`、`{fallback}`、`{message}`、URL 和技术名保持。
 
 ### 5.4 状态与交互
 
-- 空值：`未设置`，状态行说明本地模式；允许保存空/清除。
-- 已设置：只显示 `已设置` 与来源，不回显 Key；`清除` 调用 `credentials.unset`。
-- 凭据服务缺失：显示 `unavailable`，禁用输入；后台 env 仍可工作。
+- 空值：`未设置`，状态行说明本地模式；允许保存空/删除。
+- 已设置：只显示状态与来源，不回显 Key；来源为 `env` 时隐藏“删除 Key”，来源为 `file` 时显示并调用 `credentials.unset`。
+- 凭据服务缺失：显示 `retrievalUnavailable`，禁用输入；读取失败显示 `retrievalReadFailed` + Host 诊断，不冒充“不支持存储”。
 - 保存失败：显示 Host 返回的 refusal 文本，不清空已有状态。
+- 保存与删除的通知分开：`retrievalSaved` / `retrievalCleared` / `retrievalOperationFailed`。
 - 不在 UI 显示 API URL、模型下拉、多提供方选项。
 - `测试连接` 属于后续增强，本版不做，避免把 Key 放进额外探测请求。
+
+### 5.5 母语审校结论
+
+- 8 个 locale 各一名独立母语审校，只读；无 P0，P1/P2 按术语统一后合并，不逐条平均。
+- 术语冻结：功能名“检索增强”；设置栏目“能力进化”；步骤用“向量 / 精排”；不再用“判别”指 ④.5；模型名保留原文。
+- 状态语义修正：来源为 `env` 时只读并隐藏“删除 Key”；保存与删除通知分开；读取失败与“不支持存储”分开；保存/删除共用操作失败文案。
+- 链接：两个 Key 链接分别命名为“获取 SiliconFlow API Key / 获取 Bamboo API Key”，并补 Bamboo 注册链接；避免同名不同目标。
+- 模型展示用产品名 Qwen3-Embedding-8B / StartLux-Decision-27B，不展示内部 slug；固定模型事实不变。
 
 ## 6. 行为矩阵
 
@@ -280,11 +299,22 @@ Key 只保存在本机凭据中，不会回显。
 
 ## 12. 实现进度（本 goal 内持续更新）
 
-- 已落地：`retrieval-contract.json` + host/client generated contract + `--check` 脚本；host `resolveRetrievalCredentials`；engine `screen(credentials)` wrapper-only env 桥（vendor 324 文件字节校验通过，engine 2 个桥测试）；`evolution-ui` 设置页 `RetrievalCard`（两把可选 Key、来源、保存/清除、不可用/失败状态）；`retrieval-credentials` 单测、`retrieval-card` 5 个组件测试、UI 8 locale key。
+- 已落地：`retrieval-contract.json` + host/client generated contract + `--check` 脚本；host `resolveRetrievalCredentials`；engine `screen(credentials)` wrapper-only env 桥（vendor 324 文件字节校验通过，engine 2 个桥测试）；`evolution-ui` 设置页 `RetrievalCard`（两把可选 Key、来源、保存/清除、不可用/失败状态）；`retrieval-credentials` 单测、`retrieval-card` 9 个组件测试、`MergeSettings` 1 个指路测试、UI 8 locale 经独立母语审校。
 - 已落地：合并建议页高级区静态提示“检索增强在设置 → 自进化配置”（当前面板 props 无 openSettings，不硬编码路由；状态入口待平台公开 seam）；
-- 真机验证：lab84 fresh profile（0.60.1 dev pack）设置页截图；假 Key 保存后显示“向量云端 · 判别本地/来源本机凭据”，清除后回到本地模式（测试 key 已清除）。
-- 待落地：合并页可点击状态入口、8 语言母语审校、全量门禁/发布链。
+- 真机验证：lab84 fresh profile（0.60.1 dev pack）最终设置页截图 `D:/dsh/_lab84_settings_final2.png`；假 Key 保存后显示“向量走云端，精排用本地 / 已保存在本机”，清除后回到本地模式（测试 key 已清除）。
+- 待落地：合并页可点击状态入口（当前为静态指路）、全量门禁/发布链、真实官方 API Key 端到端。
 - 已知偏差/修正：初始“运行状态透传”改为 wrapper-only env 桥（vendor 冻结）；UI 字段使用家族自己的 password 输入而非直接 import 平台 `SettingsSecretField`（编译 face 约束）；凭据写入仍是平台 `remote.credentials`，语义不变。
+
+## 12.1 DCR-5：冻结引擎 + wrapper 凭据桥（用户确认 2026-11-24）
+
+目标与 engine README 的字节冻结存在字面冲突：goal 禁止写 `process.env`，而 engine 只从两个 env refs 读 Key；改 vendor 会破坏 `verify-upstream` 的 324 文件字节门禁。
+
+用户确认冻结门禁的目的是防止后续对引擎的实质修改，而不是禁止它的既有公开输入接口。因此选择 **A：engine 零改动 + wrapper 持久投影**：
+
+- vendor 324 文件保持字节相等；`verify-upstream` 已从 local-only 扩到 `ci-static`（gate-58），任何后续改引擎的提交都会在本地和 CI 失败。
+- wrapper 只把平台凭据投影到引擎本来就读取的 `SILICONFLOW_API_KEY` / `BAMBOO_API_KEY`；不是临时逐 scan shim：值在插件生命周期内保持，清空/卸载恢复 ambient env。
+- 代价明确：goal 字面的“不写 process.env”不满足，作为 DCR 例外记录；Key 仍不进 cfg/report/run.meta/日志/客户端。
+- 不选 B（vendor Key 端口）：它会打破冻结门禁，且上游更新需维护生产补丁；不选 C（平台新 seam）：当前 engine 没有公开凭据端口。
 
 ## 13. 与审计台账的关系
 

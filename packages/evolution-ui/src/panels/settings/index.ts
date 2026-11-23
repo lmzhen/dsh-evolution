@@ -79,10 +79,12 @@ export function apply(ctx: ClientContext): void {
     unset(ref: string): Promise<{ ok: true } | { ok: false; error: { message: string } }>
   } | undefined
   const retrievalOperations: RetrievalOperations = credentialRemote === undefined ? {
+    available: false,
     describe: async () => ({ ok: false, message: t('retrievalUnavailable') }),
     set: async () => ({ ok: false, message: t('retrievalUnavailable') }),
     unset: async () => ({ ok: false, message: t('retrievalUnavailable') }),
   } : {
+    available: true,
     describe: async refs => {
       const answer = await credentialRemote.describe(refs)
       return answer.ok ? { ok: true, value: answer.value } : { ok: false, message: answer.error.message }

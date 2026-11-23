@@ -1963,14 +1963,14 @@
       "ru": "Другое объединение сейчас обрабатывает эту цель; повторите немного позже."
     },
     "settings.retrievalHint": {
-      "zh": "检索增强（可选）在「设置 → 自进化」中配置和查看。",
-      "en": "Retrieval enhancement (optional) is configured in Settings → Self-evolution.",
-      "ja": "検索強化（任意）は「設定 → 自己進化」で設定・確認できます。",
-      "es": "La mejora de búsqueda (opcional) se configura en Ajustes → Autoevolución.",
-      "fr": "L’amélioration de la recherche (facultative) se configure dans Réglages → Auto-évolution.",
-      "de": "Die optionale Suche-Verbesserung wird unter Einstellungen → Selbstevolution konfiguriert.",
-      "pt": "A melhoria de busca (opcional) é configurada em Configurações → Autoevolução.",
-      "ru": "Улучшение поиска (необязательно) настраивается в разделе «Настройки → Самоэволюция»."
+      "zh": "检索增强（可选）在「设置 → 能力进化」里配置，也能看当前状态。",
+      "en": "Set up and check retrieval enhancement (optional) in Settings → Capability evolution.",
+      "ja": "検索強化（任意）は「設定 → 能力進化」で設定でき、現在の状態もそこで確認できます。",
+      "es": "La mejora de búsqueda (opcional) se configura y se consulta en Ajustes → Evolución de capacidades.",
+      "fr": "L’amélioration de la recherche (facultative) se configure et se consulte dans Réglages → Évolution des capacités.",
+      "de": "Suche verbessern (optional) stellst du unter Einstellungen → Fähigkeitsentwicklung ein; dort siehst du auch den aktuellen Status.",
+      "ru": "Улучшение поиска (необязательно) настраивается в разделе «Настройки → Развитие возможностей»; там же виден текущий статус.",
+      "pt": "A melhoria de busca (opcional) fica em Configurações → Evolução de capacidades; lá também aparece o estado atual."
     }
   }
 }

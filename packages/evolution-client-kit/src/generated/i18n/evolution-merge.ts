@@ -201,7 +201,7 @@ export const dictionaries = {
     "decide.reason.over-limit": "合并后的正文超出上限，未写入；请先精简内容。",
     "decide.reason.target": "目标技能现在不可写，或已被其他合并占用；刷新后重试。",
     "decide.reason.busy": "另一个合并操作正在处理这个目标，请稍后重试。",
-    "settings.retrievalHint": "检索增强（可选）在「设置 → 自进化」中配置和查看。"
+    "settings.retrievalHint": "检索增强（可选）在「设置 → 能力进化」里配置，也能看当前状态。"
   },
   en: {
     "action.approve": "Copy approve command",
@@ -400,7 +400,7 @@ export const dictionaries = {
     "decide.reason.over-limit": "The merged body is over the limit, so nothing was written. Shorten it first.",
     "decide.reason.target": "The target skill is no longer writable or is taken by another merge; refresh and try again.",
     "decide.reason.busy": "Another merge is working on this target; try again shortly.",
-    "settings.retrievalHint": "Retrieval enhancement (optional) is configured in Settings → Self-evolution."
+    "settings.retrievalHint": "Set up and check retrieval enhancement (optional) in Settings → Capability evolution."
   },
   ja: {
     "action.approve": "承認コマンドをコピー",
@@ -599,7 +599,7 @@ export const dictionaries = {
     "decide.reason.over-limit": "統合後の本文が上限を超えているため、書き込んでいません。先に内容を短くしてください。",
     "decide.reason.target": "対象スキルが書き込み不可か、別の統合で使用中です。更新して再試行してください。",
     "decide.reason.busy": "別の統合がこの対象を処理中です。しばらくしてから再試行してください。",
-    "settings.retrievalHint": "検索強化（任意）は「設定 → 自己進化」で設定・確認できます。"
+    "settings.retrievalHint": "検索強化（任意）は「設定 → 能力進化」で設定でき、現在の状態もそこで確認できます。"
   },
   es: {
     "action.approve": "Copiar el comando de aprobación",
@@ -798,7 +798,7 @@ export const dictionaries = {
     "decide.reason.over-limit": "El cuerpo fusionado supera el límite y no se escribió; acórtalo primero.",
     "decide.reason.target": "El skill destino ya no se puede escribir o lo ocupa otra fusión; actualiza y vuelve a intentarlo.",
     "decide.reason.busy": "Otra fusión está trabajando en este destino; inténtalo de nuevo en un momento.",
-    "settings.retrievalHint": "La mejora de búsqueda (opcional) se configura en Ajustes → Autoevolución."
+    "settings.retrievalHint": "La mejora de búsqueda (opcional) se configura y se consulta en Ajustes → Evolución de capacidades."
   },
   fr: {
     "action.approve": "Copier la commande d’approbation",
@@ -997,7 +997,7 @@ export const dictionaries = {
     "decide.reason.over-limit": "Le texte fusionné dépasse la limite et n’a pas été écrit ; raccourcissez-le d’abord.",
     "decide.reason.target": "Le skill cible n’est plus modifiable ou est utilisé par une autre fusion ; actualisez puis réessayez.",
     "decide.reason.busy": "Une autre fusion travaille sur cette cible ; réessayez dans un instant.",
-    "settings.retrievalHint": "L’amélioration de la recherche (facultative) se configure dans Réglages → Auto-évolution."
+    "settings.retrievalHint": "L’amélioration de la recherche (facultative) se configure et se consulte dans Réglages → Évolution des capacités."
   },
   de: {
     "action.approve": "Freigabe-Befehl kopieren",
@@ -1196,7 +1196,7 @@ export const dictionaries = {
     "decide.reason.over-limit": "Der zusammengeführte Text überschreitet das Zeichenlimit und wurde nicht geschrieben; kürze ihn zuerst.",
     "decide.reason.target": "Der Ziel-Skill ist nicht mehr beschreibbar oder wird von einem anderen Merge belegt; aktualisiere und versuche es erneut.",
     "decide.reason.busy": "Ein anderer Merge bearbeitet dieses Ziel; versuche es gleich erneut.",
-    "settings.retrievalHint": "Die optionale Suche-Verbesserung wird unter Einstellungen → Selbstevolution konfiguriert."
+    "settings.retrievalHint": "Suche verbessern (optional) stellst du unter Einstellungen → Fähigkeitsentwicklung ein; dort siehst du auch den aktuellen Status."
   },
   ru: {
     "action.approve": "Скопировать команду одобрения",
@@ -1395,7 +1395,7 @@ export const dictionaries = {
     "decide.reason.over-limit": "Объединённый текст превышает лимит и не записан; сначала сократите его.",
     "decide.reason.target": "Целевой навык больше недоступен для записи или занят другим объединением; обновите страницу и повторите.",
     "decide.reason.busy": "Другое объединение сейчас обрабатывает эту цель; повторите немного позже.",
-    "settings.retrievalHint": "Улучшение поиска (необязательно) настраивается в разделе «Настройки → Самоэволюция»."
+    "settings.retrievalHint": "Улучшение поиска (необязательно) настраивается в разделе «Настройки → Развитие возможностей»; там же виден текущий статус."
   },
   pt: {
     "action.approve": "Copiar comando de aprovação",
@@ -1594,7 +1594,7 @@ export const dictionaries = {
     "decide.reason.over-limit": "O corpo mesclado passou do limite e não foi gravado; encurte-o primeiro.",
     "decide.reason.target": "A skill de destino não pode mais ser gravada ou está em uso por outra mesclagem; atualize e tente novamente.",
     "decide.reason.busy": "Outra mesclagem está trabalhando neste destino; tente novamente em instantes.",
-    "settings.retrievalHint": "A melhoria de busca (opcional) é configurada em Configurações → Autoevolução."
+    "settings.retrievalHint": "A melhoria de busca (opcional) fica em Configurações → Evolução de capacidades; lá também aparece o estado atual."
   },
 } as const
 

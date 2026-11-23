@@ -33,6 +33,14 @@ export const guards = [
     registration: {"reason":"smoke-built-entries needs built lib artifacts that a source checkout does not carry","owner":"scripts/gates","expiry":"0.60.0","plan":"run after build-lib on the build line","renewal":"Renewed at 0.56.0 (expiry 0.60.0): smoke-built-entries still needs built lib artifacts and a complete platform scope; local runs remain a registered cannot-decide, CI runs it after build."},
   }),
 
+  gate("gate-85", {
+    kind: "script",
+    tree: "mirror",
+    title: "`node packages/scripts/gen-retrieval-contract.mjs --check`",
+    argv: ["node","packages/scripts/gen-retrieval-contract.mjs","--check"],
+    lanes: ["local","ci-static"],
+  }),
+
   gate("gate-06", {
     kind: "script",
     tree: "mirror",
@@ -423,7 +431,8 @@ export const guards = [
     tree: "mirror",
     title: "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 发布 parity：UPSTREAM.json 的逐文件 bytes/sha256 与 testPatchSet 的 patchedBytes/patchedSha256 必须全等；缺文件/不匹配→exit 1。GAP-P0-05 的发布门禁）",
     argv: ["node","packages/evolution-merge-engine/verify-upstream.mjs"],
-    lanes: ["local"],
+    ci: { cwd: "upstream", argv: ["node","packages/evolution/evolution-merge-engine/verify-upstream.mjs"] },
+    lanes: ["local","ci-static"],
   }),
 
   gate("gate-60", {

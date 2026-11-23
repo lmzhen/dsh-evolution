@@ -21,6 +21,8 @@ export type RetrievalAnswer<T> = { readonly ok: true; readonly value: T } | { re
 
 /** The Remote calls this card performs. */
 export interface RetrievalOperations {
+  /** Whether this deployment exposes a writable credential service at all. */
+  readonly available: boolean
   describe(refs: readonly string[]): Promise<RetrievalAnswer<Readonly<Record<string, RetrievalCredentialInfo>>>>
   set(ref: string, value: string): Promise<RetrievalAnswer<undefined>>
   unset(ref: string): Promise<RetrievalAnswer<undefined>>
@@ -51,7 +53,7 @@ export function RetrievalCard(props: RetrievalCardFace): ReactNode {
   const refs = RETRIEVAL_CREDENTIAL_REFS
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
   const [draft, setDraft] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'save' | 'clear' | null>(null)
   const [notice, setNotice] = useState('')
   const [failure, setFailure] = useState('')
 
@@ -66,15 +68,16 @@ export function RetrievalCard(props: RetrievalCardFace): ReactNode {
   if (phase.kind === 'loading') {
     return createElement('section', { className: 'evolution-param-card', 'data-role': 'retrieval-card' },
       createElement('div', { className: 'evolution-param-body' },
-        createElement('p', { className: 'evolution-param-hint' }, t('retrievalTitle')),
+        createElement('h3', { className: 'evolution-param-card-title' }, t('retrievalTitle')),
+        createElement('p', { className: 'evolution-param-hint', role: 'status' }, t('retrievalLoading')),
       ))
   }
   if (phase.kind === 'failed') {
     return createElement('section', { className: 'evolution-param-card', 'data-role': 'retrieval-card' },
       createElement('div', { className: 'evolution-param-body' },
         createElement('h3', { className: 'evolution-param-card-title' }, t('retrievalTitle')),
-        createElement('p', { className: 'evolution-param-hint', role: 'status' }, t('retrievalUnavailable')),
-        createElement('p', { className: 'evolution-param-hint' }, phase.message),
+        createElement('p', { className: 'evolution-param-hint', role: 'status' }, operations.available ? t('retrievalReadFailed') : t('retrievalUnavailable')),
+        phase.message === t('retrievalUnavailable') ? null : createElement('p', { className: 'evolution-param-hint' }, phase.message),
       ))
   }
 
@@ -92,39 +95,39 @@ export function RetrievalCard(props: RetrievalCardFace): ReactNode {
   const unavailable = !embedding.writable && !ranker.writable
 
   const save = async (): Promise<void> => {
-    setBusy(true); setNotice(''); setFailure('')
+    setBusy('save'); setNotice(''); setFailure('')
     try {
       for (const [ref, value] of Object.entries(draft)) {
         if (value === '') continue
         const answer = await operations.set(ref, value)
-        if (!answer.ok) { setFailure(t('retrievalSaveFailed', { message: answer.message })); return }
+        if (!answer.ok) { setFailure(t('retrievalOperationFailed', { message: answer.message })); return }
       }
       setDraft({})
       await load()
       setNotice(t('retrievalSaved'))
     } catch (error) {
-      setFailure(t('retrievalSaveFailed', { message: error instanceof Error ? error.message : String(error) }))
+      setFailure(t('retrievalOperationFailed', { message: error instanceof Error ? error.message : String(error) }))
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
   const clear = async (ref: string): Promise<void> => {
-    setBusy(true); setNotice(''); setFailure('')
+    setBusy('clear'); setNotice(''); setFailure('')
     try {
       const answer = await operations.unset(ref)
-      if (!answer.ok) { setFailure(t('retrievalSaveFailed', { message: answer.message })); return }
+      if (!answer.ok) { setFailure(t('retrievalOperationFailed', { message: answer.message })); return }
       await load()
-      setNotice(t('retrievalSaved'))
+      setNotice(t('retrievalCleared'))
     } catch (error) {
-      setFailure(t('retrievalSaveFailed', { message: error instanceof Error ? error.message : String(error) }))
+      setFailure(t('retrievalOperationFailed', { message: error instanceof Error ? error.message : String(error) }))
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
-  const sourceLabel = (item: RetrievalCredentialInfo): string => item.source === 'environment' ? t('retrievalSourceEnv') : item.source === undefined ? '' : t('retrievalSourceStore')
-  const stateLabel = (item: RetrievalCredentialInfo): string => item.configured ? (sourceLabel(item) || t('retrievalConfigured')) : t('retrievalNotConfigured')
+  const sourceLabel = (item: RetrievalCredentialInfo): string => item.source === 'env' ? t('retrievalSourceEnv') : item.source === 'file' ? t('retrievalSourceStore') : ''
+  const stateLabel = (item: RetrievalCredentialInfo): string => !item.configured ? t('retrievalNotConfigured') : (sourceLabel(item) || t('retrievalConfigured'))
   const field = (ref: string, label: MessageKey, hint: string, item: RetrievalCredentialInfo, id: string): ReactNode => createElement('div', { key: ref, className: 'evolution-retrieval-field' },
     createElement('label', { className: 'evolution-retrieval-label', htmlFor: id }, t(label)),
     createElement('p', { className: 'evolution-param-hint' }, stateLabel(item)),
@@ -138,7 +141,7 @@ export function RetrievalCard(props: RetrievalCardFace): ReactNode {
       onChange: (event: { target: { value: string } }) => setDraft(previous => ({ ...previous, [ref]: event.target.value })),
     }),
     createElement('p', { className: 'evolution-param-hint' }, hint),
-    item.configured
+    item.configured && item.source !== 'env'
       ? createElement('button', {
         type: 'button',
         className: 'evolution-param-button',
@@ -162,7 +165,7 @@ export function RetrievalCard(props: RetrievalCardFace): ReactNode {
           className: 'evolution-param-link',
           href: RETRIEVAL_HELP_LINKS.siliconflow,
           target: '_blank', rel: 'noreferrer',
-        }, t('retrievalGetKey')),
+        }, t('retrievalGetEmbeddingKey')),
         field(refs.ranker, 'retrievalRankerLabel',
           t('retrievalRankerHint', { model: RETRIEVAL_FIXED_MODELS.rankerLabel }),
           ranker, 'retrieval-ranker-key'),
@@ -170,9 +173,14 @@ export function RetrievalCard(props: RetrievalCardFace): ReactNode {
         createElement('div', { className: 'evolution-retrieval-links' },
           createElement('a', {
             className: 'evolution-param-link',
+            href: RETRIEVAL_HELP_LINKS.bambooRegister,
+            target: '_blank', rel: 'noreferrer',
+          }, t('retrievalRegisterBamboo')),
+          createElement('a', {
+            className: 'evolution-param-link',
             href: RETRIEVAL_HELP_LINKS.bambooKeys,
             target: '_blank', rel: 'noreferrer',
-          }, t('retrievalGetKey')),
+          }, t('retrievalGetRankerKey')),
         ),
       ),
       createElement('p', { className: 'evolution-param-hint' }, t('retrievalSecretNote')),
@@ -185,7 +193,7 @@ export function RetrievalCard(props: RetrievalCardFace): ReactNode {
           'data-primary': 'true',
           disabled: busy || unavailable || Object.values(draft).every(value => value === ''),
           onClick: () => { void save() },
-        }, busy ? t('retrievalSaving') : t('retrievalSave')),
+        }, busy === 'save' ? t('retrievalWorking') : t('retrievalSave')),
       ),
       notice !== '' ? createElement('p', { className: 'evolution-param-hint', role: 'status' }, notice) : null,
       failure !== '' ? createElement('p', { className: 'evolution-param-hint', role: 'alert' }, failure) : null,

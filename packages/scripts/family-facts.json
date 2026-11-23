@@ -599,7 +599,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "dd5421c3d360848788948a1df19852b2ee19228d58c23aa2573139b0b3ac8186",
+        "sha256": "da0873360090e63fedd7c6f8043146301cc2a401342039811ea82d22cdd65752",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -620,6 +620,11 @@
             "id": "gate-05",
             "tier": "fast",
             "criterion": "smoke-built-entries"
+          },
+          {
+            "id": "gate-85",
+            "tier": "fast",
+            "criterion": "gen-retrieval-contract"
           },
           {
             "id": "gate-06",

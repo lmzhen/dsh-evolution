@@ -83,6 +83,25 @@
       }
     },
     {
+      "id": "gate-85",
+      "kind": "script",
+      "human": "`node packages/scripts/gen-retrieval-contract.mjs --check`",
+      "argv": [
+        "node",
+        "packages/scripts/gen-retrieval-contract.mjs",
+        "--check"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
+    },
+    {
       "id": "gate-06",
       "kind": "script",
       "human": "`node packages/scripts/verify-dependency-closure.mjs packages --strict`",
@@ -1046,11 +1065,20 @@
       ],
       "tree": "mirror",
       "profiles": [
-        "local"
+        "local",
+        "ci"
       ],
       "lanes": [
-        "local"
-      ]
+        "local",
+        "ci-static"
+      ],
+      "ci": {
+        "cwd": "upstream",
+        "argv": [
+          "node",
+          "packages/evolution/evolution-merge-engine/verify-upstream.mjs"
+        ]
+      }
     },
     {
       "id": "gate-60",
