@@ -1,3 +1,14 @@
+## 0.60.0 (2026-11-23) — 目标架构收口：StateStore 迁移、UnitKernel、派生端口
+
+- D1：新增文件 StateStore provider、显式 `/evolution migrate state [--dry-run]`、迁移 marker、`provider: auto`；状态操作与迁移共用跨进程 `state.lock`，迁移前刷新 domain provider，迁移后重启自动使用 store；
+- D1：marker 只接受 `target=store` + 完整 store image；缺失/不可读/空白 store fail loud；domain 数据只读保留一个迁移窗口，回退是删除 marker 并重启；
+- D2：旧 MutationUnit 公共名退役，UnitKernel 成为唯一多文件事务入口，拥有 lock/claim/journal/snapshot/recover/undo；新增真正的 `prepare()`（零持久副作用）与 `commit()` 两阶段；低层字节写收敛为内部 TargetWriter；
+- D3：CommandsPort/ToolsPort/WorkingDirectoryPort 从平台公开 service 类型生成，生成物有 `--check`；其余不兼容端口保留 family-facing 手写；
+- 启动：IO provider 就绪 `whenReady()`、authority/store 等 provider 注册后再构造；`/evolution migrate state` 在 command 注入 scope 内执行；auto 的 marker 校验延后到首次状态操作；
+- 合并：fresh home 自动 bootstrap schema4 + pre1b backup，修复 legacy v1/v2/v3 journal 迁移路径、unreadable state 的 fail-closed 读取、平台目录错误识别；
+- 审批：并发 approve 的 dedupe 移到 lease 外，两个并发调用共享同一次回放；
+- 验证：全量 family 448 files / 2456 tests；lab60 真机 20/20、迁移/重启/store、技能页 1440/1024/390、merge view 200。
+
 ## 0.59.6 (2026-11-22) — skill 写入单 Provider 重构
 
 - 引入 SkillWritePlan/apply，tool/审批/内部 writer 统一走单 provider；
