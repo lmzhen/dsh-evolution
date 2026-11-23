@@ -30,6 +30,20 @@ for (const e of doc.files) {
   }
   if (b.length !== e.bytes || sha(b) !== e.sha256) { console.error('MISMATCH', rel); bad++ }
 }
+const normalizeCredentialLines = b => b.toString('utf8').split(/\r?\n/).filter(line => !/retrievalCredentials|\bcredentials\b|\bcredential\b/.test(line)).join('\n')
+const substance = doc.substance?.files
+if (!Array.isArray(substance) || substance.length === 0) { console.error('SUBSTANCE MANIFEST MISSING'); bad++ }
+else {
+  for (const entry of substance) {
+    if (typeof entry.path !== 'string' || typeof entry.purpose !== 'string' || entry.purpose.trim() === '') { console.error('SUBSTANCE ENTRY INVALID', String(entry.path)); bad++; continue }
+    const full = join(root, entry.path)
+    if (!existsSync(full)) { console.error('SUBSTANCE MISSING', entry.path); bad++; continue }
+    const raw = readFileSync(full)
+    const content = entry.mode === 'normalize' ? Buffer.from(normalizeCredentialLines(raw)) : raw
+    if (content.length !== entry.bytes || sha(content) !== entry.sha256) { console.error('SUBSTANCE MISMATCH', entry.path); bad++ }
+  }
+}
 const sourcePatches = (doc.sourcePatchSet ?? []).length
-console.log(bad === 0 ? 'ENGINE SUBSTANCE OK ' + doc.vendorFileCount + ' (declared credential patches: ' + sourcePatches + ')' : 'ENGINE SUBSTANCE FAIL ' + bad)
+const fingerprints = Array.isArray(substance) ? substance.length : 0
+console.log(bad === 0 ? 'ENGINE SUBSTANCE OK ' + doc.vendorFileCount + ' (declared credential patches: ' + sourcePatches + '; substantive fingerprints: ' + fingerprints + ')' : 'ENGINE SUBSTANCE FAIL ' + bad)
 process.exit(bad === 0 ? 0 : 1)

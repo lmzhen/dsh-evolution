@@ -120,6 +120,29 @@ export async function resolveRetrievalCredentials(
 - 新增 parity/回归测试证明无 Key 路径 cfg/report 不变、档位/阈值/seed 不漂移。
 - gate-58 改名为 engine substance parity；local + ci-static 都跑。
 
+### 4.3.1 实质覆盖清单
+
+`UPSTREAM.json.substance` 单独冻结 18 个实质面，不依赖 5 个传输补丁的 hash：
+
+| 面 | 文件 | 方式 |
+|---|---|---|
+| 步骤顺序 | `src/pipeline/compose.js`、`pipeline/index.js` | exact |
+| 配置参数默认/上下界 | `src/config/schema.js` | exact |
+| 随机种子/floor jitter | `src/screening/candidates.js` | exact |
+| 模型/档位/floors | `models/registry.json`、`src/embed/registry.js` | exact |
+| MinHash/LSH 参数 | `src/data/minhash_params.json` | exact |
+| 判定 prompt/provider | `src/judge/prompt.js`、`judge/deepseek.js` | exact |
+| 降级分类 | `src/degrade.js` | exact |
+| 语义选择/精排 | `screening/semantic.js`、`rerank/index.js` | 去 credential 行后 hash |
+| stage 接线/scan | `stages/semantic.js`、`stages/rerank.js`、`scan.js` | 去 credential 行后 hash |
+| 外层 judge/stage/report 接线 | `src/engine.js` | 去 credential 行后 hash |
+
+`verify-upstream` 同时校验：324 文件基线 bytes/hash、5 个 sourcePatchSet、18 个 substance fingerprint；任何 steps/config/prompt/seed/threshold 改动都会红，只有 credential 传输行可从 normalize 清单排除。
+
+```text
+ENGINE SUBSTANCE OK 324 (declared credential patches: 5; substantive fingerprints: 18)
+```
+
 ### 4.4 共享常量
 
 `packages/scripts/retrieval-contract.json` 是唯一源，生成：

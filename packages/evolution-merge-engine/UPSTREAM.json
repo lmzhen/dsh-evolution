@@ -1754,5 +1754,137 @@
       "patchedBytes": 23324,
       "reason": "use explicit ranker key in the same API tier; local fallback order unchanged"
     }
-  ]
+  ],
+  "substance": {
+    "schemaVersion": 1,
+    "note": "Substantive surfaces frozen independently of credential transport patches; normalize removes only credential/key transport lines.",
+    "files": [
+      {
+        "path": "vendor/skill-merge-pipeline/src/config/schema.js",
+        "mode": "exact",
+        "purpose": "config parameter defaults/limits",
+        "sha256": "c86bfb2db473843d11b667500a7b92b0d9ea0e3653de874a221455ce3721db6f",
+        "bytes": 20474
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/screening/candidates.js",
+        "mode": "exact",
+        "purpose": "seed selection and floor jitter",
+        "sha256": "5bcc8a6dad3f22a45e325f57007903d244c653a1b896522f48049380754cd204",
+        "bytes": 10218
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/models/registry.json",
+        "mode": "exact",
+        "purpose": "model ids, tier order, floors",
+        "sha256": "f09f27f4d209f5beb8a5e867a9522b16636f807eac5ee6293ea5a19255e90427",
+        "bytes": 9655
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/data/minhash_params.json",
+        "mode": "exact",
+        "purpose": "MinHash/LSH parameters",
+        "sha256": "f638ae97a3a02091901b57f63feecdf9494744631c45a2e4525b8793187daca1",
+        "bytes": 6977
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/pipeline/compose.js",
+        "mode": "exact",
+        "purpose": "stage order",
+        "sha256": "38ef56bb4c0cf86650ab4b4818b00d18770806bd0f5d6882e09fd8992cfeb5a8",
+        "bytes": 782
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/pipeline/index.js",
+        "mode": "exact",
+        "purpose": "stage runner/context",
+        "sha256": "b2185a491a6a919671549a3a840ef40945c5662aaab3454bf647ef9225924efe",
+        "bytes": 4166
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/embed/registry.js",
+        "mode": "exact",
+        "purpose": "embedding tier order",
+        "sha256": "87c0fba4fc4d3c11c265694ade4ef5174c8ffd4f57ec3e256a66601294fc1242",
+        "bytes": 4594
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/judge/prompt.js",
+        "mode": "exact",
+        "purpose": "judge prompt",
+        "sha256": "4bc96d1ac4ed3e8208c94317932c4047ada72f402188026bd30d8cae01ed9115",
+        "bytes": 3463
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/judge/deepseek.js",
+        "mode": "exact",
+        "purpose": "judge provider/fallback",
+        "sha256": "78d2606462af74a097ca6d9733613d64aa477afa1ba9d6815ae3c017f15029d3",
+        "bytes": 1805
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/degrade.js",
+        "mode": "exact",
+        "purpose": "degradation classification",
+        "sha256": "88e7b35cf5bab2ee370a122f2bc8ca5c11e92a16e6ef77679693b9be3868ab92",
+        "bytes": 1962
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/screening/semantic.js",
+        "mode": "normalize",
+        "purpose": "semantic selection/threshold use, key line excluded",
+        "sha256": "0d95b4d9c6f69b1be6e9ff2ca1c53c0da449f6d4fc1770071f593caca3057779",
+        "bytes": 8163
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/rerank/index.js",
+        "mode": "normalize",
+        "purpose": "rerank tier/score/prompt, key line excluded",
+        "sha256": "c45955a3c0659d84357043ef7368fecdb2d5701db03c7bbe46ffb587219adc84",
+        "bytes": 22546
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/stages/semantic.js",
+        "mode": "normalize",
+        "purpose": "semantic stage wiring, key line excluded",
+        "sha256": "37c79aa8183ba8a8c514102497f37914584a2b731bd13172d86bf6954e1e86a7",
+        "bytes": 969
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/stages/rerank.js",
+        "mode": "normalize",
+        "purpose": "rerank stage wiring, key line excluded",
+        "sha256": "556a89051413e06fe5de67a1504da7a69cee78e9d353a54ae0efae96496fee97",
+        "bytes": 371
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/scan.js",
+        "mode": "normalize",
+        "purpose": "scan orchestration, key line excluded",
+        "sha256": "0d20897e532259fbd58f94dd12d07ec61695dc98a1569bfe7d6237fad4434003",
+        "bytes": 5882
+      },
+      {
+        "path": "src/engine.js",
+        "mode": "normalize",
+        "purpose": "wrapper judge/stage/report wiring, key line excluded",
+        "sha256": "412b5e23f14c18d36b25c8afed1a2a258e8dde00b6d549aeb7964ecc62e559b4",
+        "bytes": 5768
+      },
+      {
+        "path": "src/report-map.js",
+        "mode": "exact",
+        "purpose": "report/candidate mapping",
+        "sha256": "d08c36e7e74cc16e6fa927fdfd9d79204d67355a3aaf100c77babdafde31e38a",
+        "bytes": 3135
+      },
+      {
+        "path": "data/minhash_params.json",
+        "mode": "exact",
+        "purpose": "packaged MinHash parameter asset",
+        "sha256": "f638ae97a3a02091901b57f63feecdf9494744631c45a2e4525b8793187daca1",
+        "bytes": 6977
+      }
+    ]
+  }
 }
