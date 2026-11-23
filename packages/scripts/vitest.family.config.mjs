@@ -13,7 +13,7 @@
 // refuses to run (exit 2, CANNOT DECIDE) instead of letting a platform TypeError look like a broken
 // environment. FAMILY_ALLOW_ABSENT_ADAPTER=1 downgrades that refusal to a printed warning.
 import { createHash } from "node:crypto";
-import { transform as esbuildTransform } from "esbuild";
+import { transformWithEsbuild } from "vite";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -151,7 +151,7 @@ const platformSourceDecorators = {
     if (!id.endsWith(".ts") && !id.endsWith(".tsx")) return null;
     if (!/[\\/]packages[\\/](?!evolution[\\/])/.test(id)) return null;
     if (id.includes("node_modules")) return null;
-    const result = await esbuildTransform(code, {
+    const result = await transformWithEsbuild(code, id, {
       loader: id.endsWith(".tsx") ? "tsx" : "ts",
       format: "esm",
       target: "es2022",
