@@ -13,6 +13,7 @@
 // refuses to run (exit 2, CANNOT DECIDE) instead of letting a platform TypeError look like a broken
 // environment. FAMILY_ALLOW_ABSENT_ADAPTER=1 downgrades that refusal to a printed warning.
 import { createHash } from "node:crypto";
+import { transform as esbuildTransform } from "esbuild";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -137,14 +138,32 @@ if (members.size === 0) {
   process.exit(2);
 }
 
+// The resolver maps some platform packages to their upstream source (.ts).
+// Those sources use legacy method decorators (`@Remote`); Vite 8's oxc
+// transform leaves the decorator in the SSR output and Node reports
+// "Invalid or unexpected token". Transform platform .ts with esbuild (which
+// honors experimentalDecorators) before oxc sees it. Family .ts is skipped:
+// its own build already carries the decorator flag.
+const platformSourceDecorators = {
+  name: "family-platform-source-decorators",
+  enforce: "pre",
+  async transform(code, id) {
+    if (!id.endsWith(".ts") && !id.endsWith(".tsx")) return null;
+    if (!/[\\/]packages[\\/](?!evolution[\\/])/.test(id)) return null;
+    if (id.includes("node_modules")) return null;
+    const result = await esbuildTransform(code, {
+      loader: id.endsWith(".tsx") ? "tsx" : "ts",
+      format: "esm",
+      target: "es2022",
+      tsconfigRaw: { compilerOptions: { experimentalDecorators: true, useDefineForClassFields: false } },
+    });
+    return { code: result.code, map: null };
+  },
+};
+
 export default {
+  plugins: [platformSourceDecorators],
   resolve: { alias: aliasList },
-  // The resolver maps some platform packages to their source (.ts). Those
-  // sources use legacy method decorators (`@Remote`); without this tsconfigRaw
-  // esbuild leaves the decorator in the SSR module and Node reports
-  // "Invalid or unexpected token". The family tree itself compiles with the
-  // same flag, so this only restores the platform transform.
-  esbuild: { tsconfigRaw: { compilerOptions: { experimentalDecorators: true } } },
   test: {
     root: familyTree,
     testTimeout: specTimeoutMs,
