@@ -345,10 +345,11 @@ API Key 只保存在本机，保存后不再显示。
 
 - 定向：30 tests 通过（engine explicit-key 2、engine substance 4、engine remote-key 1、host resolver 3、UI card 10、merge settings/status、merge routes、api retrieval、i18n/gates）。
 - 本地全量：Node 22 + `D:\dsh-homes\_suite-home` 下 3122 passed / 6 failed；6 个失败全部是 `evolution-host/tests/installer.spec.ts` 与 `installation-matrix.spec.ts` 的本地 installer 环境（EPERM `evolution` mkdir / 60s 超时），无 feature 失败。
-- CI 全量已绿：run `45233347190`（commit `88020e4b`）9/9 jobs 成功：platform line、pack release bytes、cohort validate、validate released upstream、validate node22、desktop install、cohort evidence；publish 未执行（非发布 tag）。
+- CI 全量已绿：run `45237801695`（commit `e2fd06a7`）9/9 jobs 成功：platform line、pack release bytes、cohort validate、validate released upstream、validate node22、desktop install、cohort evidence；publish 未执行（非发布 tag）。
 - 本地门禁：`run-gates local` pass=62 / fail=0 / cannotDecide=3（gate-05 构建产物、gate-29 缺 plane home、gate-81 health admission；均为未注册 cannot-decide，后续按 gate 语义收口）；已重新生成 `line-manifest.json` / `check-taxonomy.json` 并同步 overlay。
 - engine 实质门禁：`ENGINE SUBSTANCE OK 324 (declared credential patches: 7; substantive fingerprints: 19)`。
-- 未发布；最终 fresh npm/web 验收和独立复核待后续轮次。
+- 独立复核（review-current）在 `5216e0e2`/`88020e4b` 后无 P0/P1；剩余 P2 为 fetch-stub 测试、token 归一化残差、gate-86 的 CI 校验时序、文档计数等，均已修复或登记后置。
+- 未发布；最终 fresh npm/web 验收和用户版本确认待后续轮次。
 
 ## 13. 与审计台账的关系
 
