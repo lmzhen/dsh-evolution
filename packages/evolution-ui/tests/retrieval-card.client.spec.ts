@@ -119,3 +119,12 @@ it('renders the unavailable state once when the deployment has no credential rem
   render(createElement(RetrievalCard, { t, operations: ops }))
   await waitFor(() => { expect(screen.getAllByText(unavailable)).toHaveLength(1) })
 })
+
+it('treats project-env and user-env as read-only sources, not removable store records', async () => {
+  const ops = operations({
+    describe: vi.fn(async () => ({ ok: true as const, value: { SILICONFLOW_API_KEY: { configured: true, writable: true, source: 'project-env' }, BAMBOO_API_KEY: absent } })),
+  })
+  render(createElement(RetrievalCard, { t, operations: ops }))
+  await waitFor(() => { expect(screen.getByText('来自环境变量')).toBeTruthy() })
+  expect(screen.queryByText('删除 Key')).toBeNull()
+})

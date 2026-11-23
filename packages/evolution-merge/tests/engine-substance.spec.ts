@@ -21,6 +21,12 @@ it('keeps the stage order that the substance gate protects', () => {
   ])
 })
 
+it('wires runtime retrieval credentials into the live semantic stage', () => {
+  const semantic = buildScanStages().find(stage => stage.id === 'semantic')
+  expect(semantic).toBeDefined()
+  expect(semantic?.run.toString()).toContain('retrievalCredentials')
+})
+
 it('keeps the pipeline defaults, seed and degradation wiring', () => {
   const cfg = makeConfig({}) as Record<string, unknown>
   expect(cfg).toMatchObject({

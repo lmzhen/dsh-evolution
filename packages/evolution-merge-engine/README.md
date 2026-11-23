@@ -12,6 +12,6 @@ Model directories and registry files are resolved from the configured model root
 
 Stages ①–⑤ are specially tuned and frozen: do not change their substantive behavior, prompts, scoring, thresholds, seed selection, degradation order, or stage semantics. `verify-upstream.mjs` protects those surfaces by byte hash of every file except a declared `sourcePatchSet`.
 
-The only allowed source patch set is the credential transport (`scan.js`, `stages/semantic.js`, `stages/rerank.js`, `screening/semantic.js`, `rerank/index.js`): it passes an explicit API key to the existing provider construction and must not change tier order, floors, prompts, seed, or fallback behavior. Every patch entry names its reason in `UPSTREAM.json`; add parity tests with the patch.
+The declared source patch set covers credential transport (`scan.js`, `pipeline/index.js`, `stages/semantic.js`, `stages/rerank.js`, `screening/semantic.js`, `rerank/index.js`) and two pre-existing upstream prompt-input patches (`corpus.js`, `extract.js`): it passes an explicit API key to the existing provider construction and must not change tier order, floors, prompts, seed, or fallback behavior. Every patch entry names its reason in `UPSTREAM.json`; add parity tests with the patch.
 
 Vendor documentation, fixtures, golden reports, and generated parity output are upstream/test material, not this package's user documentation.

@@ -4280,7 +4280,7 @@ function makeSemanticStage() {
     async run(ctx, env) {
       const byPath = new Map(env.prefilter.kept.map((s) => [s.path, s]));
       const args = env.params && env.params.semanticArgs ? env.params.semanticArgs : {};
-      const res = await runSemantic(env.lexical.passed, byPath, semanticCfg(ctx), { signal: ctx.signal });
+      const res = await runSemantic(env.lexical.passed, byPath, semanticCfg(ctx), { signal: ctx.signal, ...ctx.state.retrievalCredentials === void 0 ? {} : { credentials: ctx.state.retrievalCredentials } });
       return { data: { selected: res.selected, scored: res.scored, byPath, floors_used: res.stats.floors_used || null }, stats: res.stats, counters: { pairs_in: res.stats.pairs_in || 0, selected: res.stats.selected || 0 }, degraded: res.stats.embedder_degraded === true };
     }
   });

@@ -126,7 +126,7 @@ export function RetrievalCard(props: RetrievalCardFace): ReactNode {
     }
   }
 
-  const sourceLabel = (item: RetrievalCredentialInfo): string => item.source === 'env' ? t('retrievalSourceEnv') : item.source === 'file' ? t('retrievalSourceStore') : ''
+  const sourceLabel = (item: RetrievalCredentialInfo): string => item.source === 'file' ? t('retrievalSourceStore') : item.source === undefined ? '' : t('retrievalSourceEnv')
   const stateLabel = (item: RetrievalCredentialInfo): string => !item.configured ? t('retrievalNotConfigured') : (sourceLabel(item) || t('retrievalConfigured'))
   const field = (ref: string, label: MessageKey, hint: string, item: RetrievalCredentialInfo, id: string): ReactNode => createElement('div', { key: ref, className: 'evolution-retrieval-field' },
     createElement('label', { className: 'evolution-retrieval-label', htmlFor: id }, t(label)),
@@ -141,7 +141,7 @@ export function RetrievalCard(props: RetrievalCardFace): ReactNode {
       onChange: (event: { target: { value: string } }) => setDraft(previous => ({ ...previous, [ref]: event.target.value })),
     }),
     createElement('p', { className: 'evolution-param-hint' }, hint),
-    item.configured && item.source !== 'env'
+    item.configured && item.source === 'file'
       ? createElement('button', {
         type: 'button',
         className: 'evolution-param-button',

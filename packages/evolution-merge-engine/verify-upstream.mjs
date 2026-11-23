@@ -13,7 +13,15 @@ const SOURCE_PATCH_ALLOWLIST = new Set([
   'node/src/stages/rerank.js',
   'node/src/screening/semantic.js',
   'node/src/rerank/index.js',
+  'node/src/pipeline/index.js',
+  'node/src/corpus.js',
+  'node/src/extract.js',
 ])
+const TEST_PATCH_PREFIXES = ['node/parity/', 'node/test/']
+for (const entry of doc.testPatchSet ?? []) {
+  if (!TEST_PATCH_PREFIXES.some(prefix => String(entry.path).startsWith(prefix))) { console.error('TEST PATCH OUTSIDE TEST TREE', entry.path); bad++ }
+  if (typeof entry.reason !== 'string' || entry.reason.trim() === '') { console.error('TEST PATCH WITHOUT REASON', entry.path); bad++ }
+}
 for (const entry of doc.sourcePatchSet ?? []) {
   if (!SOURCE_PATCH_ALLOWLIST.has(entry.path)) { console.error('SOURCE PATCH NOT ALLOWED', entry.path); bad++ }
   if (typeof entry.reason !== 'string' || entry.reason.trim() === '') { console.error('SOURCE PATCH WITHOUT REASON', entry.path); bad++ }
@@ -30,7 +38,7 @@ for (const e of doc.files) {
   }
   if (b.length !== e.bytes || sha(b) !== e.sha256) { console.error('MISMATCH', rel); bad++ }
 }
-const normalizeCredentialLines = b => b.toString('utf8').split(/\r?\n/).filter(line => !/retrievalCredentials|\bcredentials\b|\bcredential\b/.test(line)).join('\n')
+const normalizeCredentialLines = b => b.toString('utf8').replace(/retrievalCredentials|\bcredentials?\b/g, 'CREDENTIAL')
 const substance = doc.substance?.files
 if (!Array.isArray(substance) || substance.length === 0) { console.error('SUBSTANCE MANIFEST MISSING'); bad++ }
 else {

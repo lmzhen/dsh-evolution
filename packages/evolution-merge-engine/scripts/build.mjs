@@ -1,9 +1,13 @@
+import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
+// The published lib is derived from the checked-in bundle. Always rebuild it
+// from src/index.js so reviewed source and shipped bytes cannot diverge.
+execFileSync(process.execPath, [join(root, 'scripts', 'bundle-source.mjs')], { cwd: root, stdio: 'inherit' })
 const lib = join(root, 'lib')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const version = String(pkg.version)

@@ -1,3 +1,5 @@
+// Build note: lib/index.js is generated from src/index.bundle.js; scripts/build.mjs
+// regenerates that bundle from this file on every build.
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

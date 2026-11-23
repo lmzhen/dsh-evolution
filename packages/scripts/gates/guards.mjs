@@ -429,7 +429,7 @@ export const guards = [
   gate("gate-58", {
     kind: "script",
     tree: "mirror",
-    title: "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 实质冻结：仅允许声明的 5 个凭据传输 sourcePatchSet；其余 vendor 文件 bytes/sha256 必须与 upstream 全等；steps/config/prompt/seed/threshold 等 18 个实质面另行 fingerprint）",
+    title: "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 实质冻结：仅允许声明的 8 个 sourcePatchSet（凭据传输 + 上游 prompt-input 补丁）；其余 vendor 文件 bytes/sha256 必须与 upstream 全等；steps/config/prompt/seed/threshold 等 18 个实质面另行 fingerprint）",
     argv: ["node","packages/evolution-merge-engine/verify-upstream.mjs"],
     ci: { cwd: "upstream", argv: ["node","packages/evolution/evolution-merge-engine/verify-upstream.mjs"] },
     lanes: ["local","ci-static"],

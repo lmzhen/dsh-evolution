@@ -59,6 +59,7 @@ interface WireFacts {
   readonly fallback: readonly { readonly id: string; readonly command: string }[]
   readonly startCommands: { readonly scan: string; readonly pair: string }
   readonly notes: readonly string[]; readonly degraded: boolean
+  readonly retrieval?: { readonly embedding: boolean; readonly ranker: boolean }
 }
 interface WireRun {
   readonly id: string; readonly state: string; readonly command?: string; readonly stage?: string
@@ -199,6 +200,7 @@ export async function view(): Promise<MergeOutcome<MergeViewPayload>> {
     ...(facts.active === null ? {} : { activeRun: toRun(facts.active) }),
     ...(facts.last === null ? {} : { lastRun: toRun(facts.last) }),
     approval: { mergeApproval: facts.approval.mergeApproval, ...(platformWrite === undefined ? {} : { platformWrite }) },
+    ...(facts.retrieval === undefined ? {} : { retrieval: facts.retrieval }),
   } }
 }
 

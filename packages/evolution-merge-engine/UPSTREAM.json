@@ -24,18 +24,6 @@
       "patchedSha256": "885ad65a600da93f2bf1c7571e7a93bcc080694ae3f7ba02f0e70b74665d531f",
       "patchedBytes": 2761,
       "reason": "normalize candidate paths to <skill>/SKILL.md so parity is independent of the corpus absolute prefix; test-only."
-    },
-    {
-      "path": "node/src/corpus.js",
-      "patchedSha256": "6210baa0439c10d50f4729b38822b0706c6dd0fb742dfdc3063083bc87cfe442",
-      "patchedBytes": 3920,
-      "reason": "preserve frontmatter whenToUse as corpus metadata (0.30.39 root-cause fix); additive field, filtering stages unchanged."
-    },
-    {
-      "path": "node/src/extract.js",
-      "patchedSha256": "df90f4d7dd1022f6906329bbb859d91ad3906e2be15dad050ee429e3930d3a96",
-      "patchedBytes": 1341,
-      "reason": "include whenToUse in the head extract so merge prompts see the caller trigger (0.30.39); prompt input only, filter pipeline unchanged."
     }
   ],
   "versionVector": {
@@ -1753,6 +1741,24 @@
       "patchedSha256": "259b17aafc814c3af34229d1d026ab496ac8f709951dac7518555b348c957808",
       "patchedBytes": 23324,
       "reason": "use explicit ranker key in the same API tier; local fallback order unchanged"
+    },
+    {
+      "path": "node/src/pipeline/index.js",
+      "patchedSha256": "72cb09d3f2252421eb4642279182a09d35c9b236be062de1b861a95880fe4557",
+      "patchedBytes": 4272,
+      "reason": "pass runtime retrieval credentials to makeSemanticStage; semantic selection/floors/stage order unchanged"
+    },
+    {
+      "path": "node/src/corpus.js",
+      "patchedSha256": "6210baa0439c10d50f4729b38822b0706c6dd0fb742dfdc3063083bc87cfe442",
+      "patchedBytes": 3920,
+      "reason": "preserve frontmatter whenToUse as corpus metadata (0.30.39 root-cause fix); additive field, filtering stages unchanged."
+    },
+    {
+      "path": "node/src/extract.js",
+      "patchedSha256": "df90f4d7dd1022f6906329bbb859d91ad3906e2be15dad050ee429e3930d3a96",
+      "patchedBytes": 1341,
+      "reason": "include whenToUse in the head extract so merge prompts see the caller trigger (0.30.39); prompt input only, filter pipeline unchanged."
     }
   ],
   "substance": {
@@ -1796,10 +1802,10 @@
       },
       {
         "path": "vendor/skill-merge-pipeline/src/pipeline/index.js",
-        "mode": "exact",
-        "purpose": "stage runner/context",
-        "sha256": "b2185a491a6a919671549a3a840ef40945c5662aaab3454bf647ef9225924efe",
-        "bytes": 4166
+        "mode": "normalize",
+        "purpose": "semantic stage orchestration, key transport excluded",
+        "sha256": "354818815bb219009bab15768fecf93e2f08e3f72723e14329ae93d15e11c61f",
+        "bytes": 4251
       },
       {
         "path": "vendor/skill-merge-pipeline/src/embed/registry.js",
@@ -1833,43 +1839,43 @@
         "path": "vendor/skill-merge-pipeline/src/screening/semantic.js",
         "mode": "normalize",
         "purpose": "semantic selection/threshold use, key line excluded",
-        "sha256": "0d95b4d9c6f69b1be6e9ff2ca1c53c0da449f6d4fc1770071f593caca3057779",
-        "bytes": 8163
+        "sha256": "8a09d1234920aa3755e2a1e3bda51411905d86b27d17f6358a8efa90e9a7e444",
+        "bytes": 8404
       },
       {
         "path": "vendor/skill-merge-pipeline/src/rerank/index.js",
         "mode": "normalize",
         "purpose": "rerank tier/score/prompt, key line excluded",
-        "sha256": "c45955a3c0659d84357043ef7368fecdb2d5701db03c7bbe46ffb587219adc84",
-        "bytes": 22546
+        "sha256": "1244dcabcb686013171ae5d846ab878f71d54be25e1feec967f9f3b9b7098007",
+        "bytes": 23320
       },
       {
         "path": "vendor/skill-merge-pipeline/src/stages/semantic.js",
         "mode": "normalize",
         "purpose": "semantic stage wiring, key line excluded",
-        "sha256": "37c79aa8183ba8a8c514102497f37914584a2b731bd13172d86bf6954e1e86a7",
-        "bytes": 969
+        "sha256": "afc80cb47972a70d90f94bfb469e9848fc34c8e4689b4ab993e259cb57256c70",
+        "bytes": 1170
       },
       {
         "path": "vendor/skill-merge-pipeline/src/stages/rerank.js",
         "mode": "normalize",
         "purpose": "rerank stage wiring, key line excluded",
-        "sha256": "556a89051413e06fe5de67a1504da7a69cee78e9d353a54ae0efae96496fee97",
-        "bytes": 371
+        "sha256": "e82a003b45c9d005731256306bd3274977488130fdc6c4d0e7699f7e12b9c120",
+        "bytes": 582
       },
       {
         "path": "vendor/skill-merge-pipeline/src/scan.js",
         "mode": "normalize",
         "purpose": "scan orchestration, key line excluded",
-        "sha256": "0d20897e532259fbd58f94dd12d07ec61695dc98a1569bfe7d6237fad4434003",
-        "bytes": 5882
+        "sha256": "8e8457fee427cb915a98d9dd04e55d1ba7b47bc7054193489143b0fc27e68c16",
+        "bytes": 5966
       },
       {
         "path": "src/engine.js",
         "mode": "normalize",
         "purpose": "wrapper judge/stage/report wiring, key line excluded",
-        "sha256": "412b5e23f14c18d36b25c8afed1a2a258e8dde00b6d549aeb7964ecc62e559b4",
-        "bytes": 5768
+        "sha256": "89218da57e5724d4f9ea9438e76ab4d3abc2c2b7586e2ebb21f9f6193adaf937",
+        "bytes": 6560
       },
       {
         "path": "src/report-map.js",
@@ -1884,6 +1890,20 @@
         "purpose": "packaged MinHash parameter asset",
         "sha256": "f638ae97a3a02091901b57f63feecdf9494744631c45a2e4525b8793187daca1",
         "bytes": 6977
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/corpus.js",
+        "mode": "exact",
+        "purpose": "upstream-approved corpus/prompt input patch",
+        "bytes": 3920,
+        "sha256": "6210baa0439c10d50f4729b38822b0706c6dd0fb742dfdc3063083bc87cfe442"
+      },
+      {
+        "path": "vendor/skill-merge-pipeline/src/extract.js",
+        "mode": "exact",
+        "purpose": "upstream-approved corpus/prompt input patch",
+        "bytes": 1341,
+        "sha256": "df90f4d7dd1022f6906329bbb859d91ad3906e2be15dad050ee429e3930d3a96"
       }
     ]
   }

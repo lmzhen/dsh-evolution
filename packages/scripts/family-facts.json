@@ -599,7 +599,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "75e0ff2c343f1ce8e2a89ad7091588fffd6a7f40e4a0e3891e3d8bc8647510db",
+        "sha256": "5ceaca10c43a766799ad54d18b9110fc31c57cfe4a895a1b6cb2d6eb8ed94f7f",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",

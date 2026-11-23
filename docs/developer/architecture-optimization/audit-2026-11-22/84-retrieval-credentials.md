@@ -63,7 +63,7 @@ merge host：RetrievalCredentials 端口
         │ 作为运行参数，不进入 cfg
         ▼
 merge-engine.screen(input.credentials)
-  ├─ engine：显式运行 Key 传入 provider（5 个声明式传输补丁）
+  ├─ engine：显式运行 Key 传入 provider（8 个声明式 sourcePatchSet）
   ├─ ④/④.5 档位、阈值、seed、降级顺序完全不变
   └─ 其余 stage / judge / seed / thresholds 完全不变
         ▼
@@ -122,7 +122,7 @@ export async function resolveRetrievalCredentials(
 
 ### 4.3.1 实质覆盖清单
 
-`UPSTREAM.json.substance` 单独冻结 18 个实质面，不依赖 5 个传输补丁的 hash：
+`UPSTREAM.json.substance` 单独冻结 20 个实质面，不依赖 8 个 sourcePatchSet 的 hash：
 
 | 面 | 文件 | 方式 |
 |---|---|---|
@@ -137,10 +137,10 @@ export async function resolveRetrievalCredentials(
 | stage 接线/scan | `stages/semantic.js`、`stages/rerank.js`、`scan.js` | 去 credential 行后 hash |
 | 外层 judge/stage/report 接线 | `src/engine.js` | 去 credential 行后 hash |
 
-`verify-upstream` 同时校验：324 文件基线 bytes/hash、5 个 sourcePatchSet、18 个 substance fingerprint；任何 steps/config/prompt/seed/threshold 改动都会红，只有 credential 传输行可从 normalize 清单排除。
+`verify-upstream` 同时校验：324 文件基线 bytes/hash、8 个 sourcePatchSet、20 个 substance fingerprint；任何 steps/config/prompt/seed/threshold 改动都会红，只有 credential 传输行可从 normalize 清单排除。
 
 ```text
-ENGINE SUBSTANCE OK 324 (declared credential patches: 5; substantive fingerprints: 18)
+ENGINE SUBSTANCE OK 324 (declared credential patches: 8; substantive fingerprints: 20)
 ```
 
 ### 4.4 共享常量
@@ -343,11 +343,11 @@ API Key 只保存在本机，保存后不再显示。
 
 ## 12.2 本轮验证状态（2026-11-24）
 
-- 定向：24 tests 通过（engine explicit-key 2、engine substance 3、host resolver 3、UI card 9、merge settings/status、merge routes、i18n/gates）。
+- 定向：29 tests 通过（engine explicit-key 2、engine substance 4、host resolver 3、UI card 10、merge settings/status、merge routes、api retrieval、i18n/gates）。
 - 本地全量：Node 22 + `D:\dsh-homes\_suite-home` 下 3122 passed / 6 failed；6 个失败全部是 `evolution-host/tests/installer.spec.ts` 与 `installation-matrix.spec.ts` 的本地 installer 环境（EPERM `evolution` mkdir / 60s 超时），无 feature 失败。
 - CI 全量已绿：run `45221992667`（commit `b8be64eb`）9/9 jobs 成功：platform line、pack release bytes、cohort validate、validate released upstream、validate node22、desktop install、cohort evidence；publish 未执行（非发布 tag）。
 - 本地门禁：`run-gates local` pass=62 / fail=0 / cannotDecide=3（gate-05 构建产物、gate-29 缺 plane home、gate-81 health admission；均为未注册 cannot-decide，后续按 gate 语义收口）；已重新生成 `line-manifest.json` / `check-taxonomy.json` 并同步 overlay。
-- engine 实质门禁：`ENGINE SUBSTANCE OK 324 (declared credential patches: 5; substantive fingerprints: 18)`。
+- engine 实质门禁：`ENGINE SUBSTANCE OK 324 (declared credential patches: 8; substantive fingerprints: 20)`。
 - 未发布；最终 fresh npm/web 验收和独立复核待后续轮次。
 
 ## 13. 与审计台账的关系

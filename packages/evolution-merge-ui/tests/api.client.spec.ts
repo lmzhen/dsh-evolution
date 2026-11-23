@@ -9,7 +9,7 @@ const facts = {
   active: null, last: null,
   approval: { mergeApproval: true, platformWrite: { enabled: false, capability: true } },
   fallback: [{ id: 'scan', command: '/evolution merge scan' }],
-  startCommands: { scan: 's', pair: 'p' }, notes: [], degraded: false,
+  startCommands: { scan: 's', pair: 'p' }, notes: [], degraded: false, retrieval: { embedding: true, ranker: false },
 }
 afterEach(() => { vi.unstubAllGlobals() })
 
@@ -21,6 +21,7 @@ describe('merge-ui client api', () => {
     expect(result).toMatchObject({ ok: true, payload: {
       counts: { pending: 1 }, commands: ['/evolution merge scan'],
       approval: { mergeApproval: true, platformWrite: { enabled: false, capability: true } },
+      retrieval: { embedding: true, ranker: false },
     } })
     expect(fetchMock).toHaveBeenCalledWith(HOST_ROUTES.view, { headers: { accept: 'application/json' } })
   })
