@@ -8,6 +8,7 @@ import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
+import { resolveRetrievalCredentials } from './domain/retrieval-credentials.ts'
 import { commandsPort, settingsPort, toolsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type HomeFence } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -283,6 +284,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       engine: { screen: engineScreen as unknown as EngineScreenPort['screen'] },
       select: selectWithErrors,
       cfg: { ...engineConfig, judge: runner === undefined ? 'stub' : 'deepseek', ...(engineInput.maxTokens === 0 ? {} : { maxTokens: engineInput.maxTokens }), ...(engineInput.timeoutMs === 0 ? {} : { timeoutMs: engineInput.timeoutMs }) },
+      credentials: async () => await resolveRetrievalCredentials(ctx as unknown as { get(name: string): unknown }),
       ...(runner === undefined ? {} : { runner }),
       async onSelection(selection, _runId, cards) {
         try {

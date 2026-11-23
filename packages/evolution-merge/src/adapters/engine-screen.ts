@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeCandidate } from '../contracts.ts'
 import type { SkillCard } from '../skill-card.ts'
+import type { RetrievalCredentials } from '../domain/retrieval-credentials.ts'
 
 export type EngineScreenResult =
   | { readonly ok: true; readonly report: Record<string, unknown> }
@@ -20,6 +21,7 @@ export interface EngineScreenPort {
     readonly corpusDir: string
     readonly outDir: string
     readonly cfg?: Record<string, unknown>
+    readonly credentials?: RetrievalCredentials
     readonly signal?: AbortSignal
     readonly onProgress?: (p: { stage: string; done?: number; total?: number }) => void
     readonly runner?: (prompt: string, cfg?: Record<string, unknown>, signal?: AbortSignal | undefined) => Promise<string>
@@ -40,6 +42,7 @@ export interface EngineScreeningDeps {
   readonly engine: EngineScreenPort
   readonly select: (report: Record<string, unknown>) => CandidateSelection
   readonly cfg?: Record<string, unknown>
+  readonly credentials?: () => Promise<RetrievalCredentials>
   readonly runner?: (prompt: string, cfg?: Record<string, unknown>, signal?: AbortSignal | undefined) => Promise<string>
   readonly onSelection?: (selection: CandidateSelection, runId: string, cards: readonly SkillCard[]) => Promise<void>
 }
@@ -65,10 +68,12 @@ export function createEngineScreening(deps: EngineScreeningDeps) {
     const corpusDir = await snapshotCards(deps.io, deps.home, runId, cards)
     const outDir = join(deps.home, 'merge', 'runs', runId, 'engine')
     const runner = deps.runner === undefined ? undefined : (prompt: string, cfg?: Record<string, unknown>) => deps.runner!(prompt, cfg, signal)
+    const credentials = deps.credentials === undefined ? undefined : await deps.credentials()
     const result = await deps.engine.screen({
       corpusDir,
       outDir,
       ...(deps.cfg === undefined ? {} : { cfg: deps.cfg }),
+      ...(credentials === undefined ? {} : { credentials }),
       ...(runner === undefined ? {} : { runner }),
       signal,
     })

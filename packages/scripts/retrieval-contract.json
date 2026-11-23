@@ -1,0 +1,16 @@
+{
+  "refs": {
+    "embedding": "SILICONFLOW_API_KEY",
+    "ranker": "BAMBOO_API_KEY"
+  },
+  "links": {
+    "siliconflow": "https://cloud.siliconflow.cn/account/ak",
+    "bambooRegister": "https://bamboonode.dev/register",
+    "bambooKeys": "https://bamboonode.dev/tokens"
+  },
+  "models": {
+    "embedding": "Qwen/Qwen3-Embedding-8B",
+    "embeddingFallback": "BAAI/bge-m3",
+    "ranker": "startlux-decision-27b-autothink"
+  }
+}

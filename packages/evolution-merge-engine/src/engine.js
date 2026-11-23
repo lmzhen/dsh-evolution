@@ -47,7 +47,7 @@ function wrapJudgeStage(stage, runner) {
   })
 }
 
-async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner }) {
+async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner, credentials }) {
   const o = { cfg, corpus: [corpusDir], out: outDir, signal, onProgress }
   ensureDir(outDir)
   const [skills] = corpus.loadCorpus(o.corpus)
@@ -55,7 +55,7 @@ async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runne
   cfg.rank_checkpoint = path.join(outDir, 'rank_scores.json')
   if (cfg.judge_cache && !cfg.judge_cache_path) cfg.judge_cache_path = path.join(outDir, 'judge_cache.json')
   const stages = buildScanStages().map(s => s.id === 'judge' ? wrapJudgeStage(s, runner) : s)
-  const res = await runPipeline({ cfg, out: outDir, stages, input: { skills }, signal, onProgress })
+  const res = await runPipeline({ cfg, out: outDir, stages, input: { skills }, signal, onProgress, ...(credentials === undefined ? {} : { state: { retrievalCredentials: credentials } }) })
   if (!res.ok) return { ok: false, error: res.error, exitCode: res.exitCode }
   const degradation = assessDegradation({ res, cfg })
   const pairs = res.stages.find(s => s.id === 'candidates')?.data?.pairs
@@ -71,18 +71,18 @@ async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runne
 }
 
 export async function screen(input) {
-  const { corpusDir, outDir, signal, onProgress, runner } = input
+  const { corpusDir, outDir, signal, onProgress, runner, credentials } = input
   if (!corpusDir || !outDir) return { ok: false, error: { code: 'BAD_INPUT', detail: 'corpusDir/outDir required' } }
   const cfg = makeConfig(input.cfg ?? {})
   try {
     const resolvedJudge = resolveJudge(cfg, process.env)
     if (resolvedJudge.mode === 'deepseek') {
       if (!runner) return { ok: false, error: { code: 'RUNNER_REQUIRED', stage: 'judge', retryable: false } }
-      const scan = await runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner })
+      const scan = await runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner, ...(credentials === undefined ? {} : { credentials }) })
       if (!scan.ok) return { ok: false, error: { code: 'SCAN_FAILED', stage: 'pipeline', detail: String(scan.error ?? ''), exitCode: scan.exitCode } }
       return { ok: true, report: { ...scan, envelope: envelope(corpusDir, outDir) } }
     }
-    const scan = await runScan({ corpus: [corpusDir], out: outDir, cfg, signal, onProgress })
+    const scan = await runScan({ corpus: [corpusDir], out: outDir, cfg, signal, onProgress, ...(credentials === undefined ? {} : { credentials }) })
     if (!scan.ok) return { ok: false, error: { code: 'SCAN_FAILED', stage: 'pipeline', detail: String(scan.error ?? ''), exitCode: scan.exitCode } }
     return { ok: true, report: { reportDoc: scan.reportDoc, sections: scan.sections, degradation: scan.degradation, strictFail: scan.strictFail, envelope: envelope(corpusDir, outDir) } }
   } catch (err) {
