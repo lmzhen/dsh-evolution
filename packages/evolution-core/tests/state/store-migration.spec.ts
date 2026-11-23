@@ -41,6 +41,15 @@ describe('domain → StateStore migration', () => {
     expect((await ctx.evolutionStateStorage.provider('domain').loadCuratorState())?.lastSummary).toBe('seed')
   })
 
+  it('recovers a published store whose marker write failed instead of refusing the retry', async () => {
+    const { ctx, home, io } = await seeded()
+    await migrateDomainToStore(ctx, { io, home })
+    await io.remove(join(home, 'state', STATE_MIGRATION_MARKER))
+    const retry = await migrateDomainToStore(ctx, { io, home })
+    expect(retry).toMatchObject({ reviewSessions: 1, pending: 1, curator: true })
+    expect(JSON.parse(await readFile(join(home, 'state', STATE_MIGRATION_MARKER), 'utf8'))).toMatchObject({ source: 'domain-store-recovered', pending: 1 })
+  })
+
   it('after migration, auto reads store; deleting the marker rolls back to domain', async () => {
     const previous = process.env.DSH_HOME
     const root = await tempRoot('dsh-state-auto-migration-')

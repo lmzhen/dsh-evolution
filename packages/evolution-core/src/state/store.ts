@@ -82,6 +82,12 @@ export async function writeStateStoreSnapshot(io: EvolutionIoLike, path: string,
   await io.writeText(path, text)
 }
 
+/** Read a validated store image; a corrupt store fails loud. */
+export async function readStateStoreSnapshot(io: EvolutionIoLike, path: string): Promise<StateStoreSnapshot> {
+  const store = parseStore(await io.readText(path))
+  return { review: store.review, curator: store.curator, pending: store.pending }
+}
+
 function invalid(message: string): never {
   throw new Error('evolution-state-store: ' + message)
 }

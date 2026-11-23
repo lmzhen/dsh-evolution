@@ -15,7 +15,7 @@ import { storageDomainPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values/fs'
 import { evolutionHome } from '../state-store.ts'
 import type { EvolutionIoLike } from '../io.ts'
-import { writeStateStoreSnapshot, type StoredReviewState } from './store.ts'
+import { readStateStoreSnapshot, writeStateStoreSnapshot, type StoredReviewState } from './store.ts'
 import { EVOLUTION_DOMAIN } from './domain/index.ts'
 import {
   CURATOR_STATE_KEY,
@@ -57,7 +57,31 @@ async function migrateDomainToStoreUnlocked(ctx: Context, options: StateMigratio
   const markerPath = join(home, 'state', STATE_MIGRATION_MARKER)
   const io = options.io
   if (await io.exists(storePath)) {
-    throw new Error('evolution-state-migrate: store already exists; refusing to overwrite it: ' + storePath)
+    try {
+      const existing = await readStateStoreSnapshot(io, storePath)
+      const recovered: StateMigrationResult = {
+        reviewSessions: Object.keys(existing.review).length,
+        pending: Object.keys(existing.pending).length,
+        curator: existing.curator !== null,
+        path: storePath,
+        dryRun: options.dryRun === true,
+      }
+      if (options.dryRun === true) return recovered
+      if (!(await io.exists(markerPath))) {
+        await io.writeText(markerPath, JSON.stringify({
+          migratedAt: new Date(options.now?.() ?? Date.now()).toISOString(),
+          source: 'domain-store-recovered',
+          target: 'store',
+          reviewSessions: recovered.reviewSessions,
+          pending: recovered.pending,
+          curator: recovered.curator,
+        }, null, 2) + '\n')
+      }
+      return recovered
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('refusing to overwrite')) throw error
+      throw new Error('evolution-state-migrate: store already exists; refusing to overwrite it: ' + storePath)
+    }
   }
   // Prefer the provider that is already mounted: the host normally has the
   // domain row mounted, and opening the same KV domain a second time fails with
