@@ -50,3 +50,10 @@
 - legacy v2/v1 → v4 迁移重新经过 v3 gate，再 normalize；新增 `state-migrate-v4.spec` 验证 v2 迁移；
 - v3 pending journal 也必须先过 v3 gate；新增 journal repair 用例；
 - readiness 使用 `probeText` 三态：unreadable 返回 `merge-state-needs-repair`，不再把未知读成空状态；目录/不可读测试覆盖。
+
+## 发布后 npm 验收（0.60.1）
+
+- registry 安装：`@lmzhen/dsh-evolution-all@0.60.1`，20/20 包；fresh home `D:\dsh-homes\lab601npm`；
+- 宿主 3095：diagnostics 200（0.60.1）、merge/view 200、匿名 401；
+- 背景：0.60.0 新装缺 `evolution-io-node` 导致 merge 503，0.60.1 在 host/all roster 中注册 node:fs provider 后修复（详见 83）；
+- tag CI run 45137239747 全绿，publish/verify published bytes 成功。

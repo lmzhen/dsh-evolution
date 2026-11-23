@@ -33,7 +33,11 @@
 - 0.60.1 dist 全新安装到 `D:\dsh-homes\lab601`：`diagnostics` 200 / family-version 0.60.1，`merge/view` **200**（不再需要手工补 profile patch）。
 - 发布链在 0.60.1 tag 上重跑。
 
-## 当前状态
+## 发布与真机验收结果
 
-- npm：0.60.0 已发布（存在新装 P1，被 0.60.1 修复）；0.60.1 待发布。
+- 0.60.1 tag CI：`https://github.com/lmzhen/dsh-evolution/actions/runs/45137239747`，9/9 jobs 成功（publish + verify published bytes 均成功）；
+- npm `@lmzhen/dsh-evolution-all@0.60.1` 从 registry 安装 20/20 包；fresh home `D:\dsh-homes\lab601npm`；
+- 宿主机 3095：`/` 200、diagnostics 200（family-version 0.60.1）、`merge/view` **200**、匿名 diagnostics 401；
+- 技能整理/数据总览真实界面 1440 截图已复核；
+- 结论：新装 P1 已由 0.60.1 修复并完成发布后验收。
 
