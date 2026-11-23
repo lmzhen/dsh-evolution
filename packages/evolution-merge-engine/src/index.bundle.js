@@ -1,4 +1,4 @@
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/contracts.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/contracts.js
 var CONTRACT_VERSION = "v1";
 var ExitCode = Object.freeze({ OK: 0, RUNTIME: 1, USAGE: 2 });
 var DiagnosticCode = Object.freeze({
@@ -23,7 +23,7 @@ var ReasonCode = Object.freeze({
   UNKNOWN: "unknown"
 });
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/errors.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/errors.js
 var AppError = class extends Error {
   constructor(message, opts = {}) {
     super(message);
@@ -114,7 +114,7 @@ var Diagnostics = class {
   }
 };
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/pipeline/context.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/pipeline/context.js
 function round1(n) {
   return Math.round(Number(n) * 10) / 10;
 }
@@ -177,7 +177,7 @@ function createContext(options) {
   return ctx;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/net/signal.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/net/signal.js
 function abortError(message) {
   const e = new Error(message || "\u64CD\u4F5C\u5DF2\u53D6\u6D88");
   e.name = "AbortError";
@@ -195,7 +195,7 @@ function withTimeout(signal, ms) {
   return timeoutSignal;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/pipeline/stage.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/pipeline/stage.js
 function bad(msg) {
   return new PipelineError(msg, { code: DiagnosticCode.INVALID, where: "stage" });
 }
@@ -256,10 +256,10 @@ async function runStages(stages, ctx, input) {
   return { results, data: out };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/static_table.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/static_table.js
 import path4 from "node:path";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/io/read.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/io/read.js
 import fs from "node:fs";
 import crypto from "node:crypto";
 function wrapRead(path23, err) {
@@ -327,7 +327,7 @@ function realPath(p) {
   }
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/io/bytes.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/io/bytes.js
 import fs2 from "node:fs";
 import path from "node:path";
 function ensureDir(p) {
@@ -375,7 +375,7 @@ function writeFileBytes(p, buffer) {
   }
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/safetensors.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/safetensors.js
 var ITEMSIZE = Object.freeze({ F32: 4, F16: 2, I8: 1 });
 function openTensor(file) {
   const fd = openFile(file, "r");
@@ -481,7 +481,7 @@ function f32ToF16(value) {
   return sign | e << 10 | m;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/text/trie.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/text/trie.js
 function buildTrie(scores, ids) {
   const pieces = [...ids.keys()].sort();
   let nodes = 1;
@@ -574,11 +574,11 @@ function tokenizeWithTrie(trie, tok, text) {
   return ids;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/text/artifact.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/text/artifact.js
 import path2 from "node:path";
 import os from "node:os";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/io/write.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/io/write.js
 import fs3 from "node:fs";
 import pathMod from "node:path";
 var SEQ2 = 0;
@@ -644,7 +644,7 @@ function writeCsv(target, spec) {
   writeText(target, text, { eol: o.eol || d.eol });
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/text/artifact.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/text/artifact.js
 var MAGIC = "DSKTOK1";
 var HEADER_VERSION = 1;
 var ARRAY_ORDER = Object.freeze(["ch", "first", "next", "pid", "score"]);
@@ -728,7 +728,7 @@ function load(file, tokenizerSha, builderVer) {
   }
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/text/tokenizer.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/text/tokenizer.js
 import * as path3 from "node:path";
 var BUILDER_VER = 1;
 var SUPPORTED_NORMALIZERS = /* @__PURE__ */ new Set(["Sequence", "Precompiled", "Replace", "Strip"]);
@@ -928,7 +928,7 @@ function sharedTokenizer(jsonPath, opts) {
   return inst;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/workers/pool.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/workers/pool.js
 import os2 from "node:os";
 import { Worker } from "node:worker_threads";
 var POOL_DEFAULTS = Object.freeze({ minItems: 500, minMs: 1500, maxWorkers: 4 });
@@ -1007,7 +1007,7 @@ async function runEncodePool(opts) {
   return { vectors: out, workers, chunks: chunks.length };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/static_table.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/static_table.js
 var DEFAULT_CACHE_ROWS = 2e4;
 function copyView(Ctor, raw, offset, count) {
   const bytes = count * Ctor.BYTES_PER_ELEMENT;
@@ -1201,11 +1201,11 @@ var StaticTable = class {
   }
 };
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/remote.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/remote.js
 import path5 from "node:path";
 import os3 from "node:os";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/net/proxy.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/net/proxy.js
 import net from "node:net";
 import tls from "node:tls";
 import { once } from "node:events";
@@ -1418,7 +1418,7 @@ async function proxiedFetch(targetUrl, init, opts) {
   throw new UnavailableError("\u4EE3\u7406\u91CD\u5B9A\u5411\u8FC7\u591A: " + targetUrl, { where: "proxy" });
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/remote.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/remote.js
 var USAGE = { calls: 0, input_tokens: 0, ms: 0, cost_cny: 0 };
 function readKey(envName, credPath) {
   const envVal2 = process.env[envName] || "";
@@ -1573,7 +1573,7 @@ var RemoteEmbedder = class {
   }
 };
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/attempt.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/attempt.js
 var REASON_CODES = Object.freeze(["no-key", "http-error", "timeout", "invalid-response", "all-down", "partial-fill", "unknown"]);
 function classifyReason(err) {
   if (err && typeof err.reasonCode === "string" && REASON_CODES.includes(err.reasonCode)) return err.reasonCode;
@@ -1634,7 +1634,7 @@ async function attemptSequence(steps) {
   throw e;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/chain.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/chain.js
 var ChainEmbedder = class {
   constructor(builders, opts) {
     this.builders = builders;
@@ -1719,10 +1719,10 @@ var ChainEmbedder = class {
   }
 };
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/registry.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/registry.js
 import path7 from "node:path";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/registry.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/registry.js
 import path6 from "node:path";
 import { fileURLToPath } from "node:url";
 var __dirname = path6.dirname(fileURLToPath(import.meta.url));
@@ -1888,7 +1888,7 @@ function validateRegistry(reg) {
   return reg;
 }
 function defaultRegistryPath() {
-  return path6.join(__dirname, "vendor", "skill-merge-pipeline", "models", "registry.json");
+  return path6.join(__dirname, "..", "..", "models", "registry.json");
 }
 function loadRegistry(file) {
   const f = file || defaultRegistryPath();
@@ -1939,7 +1939,7 @@ function verifyArtifact(registry, registryFile, id, opts) {
   return { ok: missing.length === 0 && mismatched.length === 0, id, dir, missing, mismatched };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/provider.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/provider.js
 var KNOWN_EMBED_BACKENDS = Object.freeze(["chain", "local", "remote", "onnx"]);
 function assertKnownBackend(cfg) {
   const backend = String(cfg && cfg.embed_backend || "local");
@@ -1949,7 +1949,7 @@ function assertKnownBackend(cfg) {
   return backend;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/registry.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/registry.js
 var _cached = null;
 var CALIBRATED_NAME = "registry.calibrated.json";
 function attachCalibration(loaded) {
@@ -2055,7 +2055,7 @@ function floorsFor(cfg, registry, tierLabel) {
   return { body_core: p.body_core, summary: p.summary };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/onnx.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/embed/onnx.js
 import path8 from "node:path";
 var ONNX_ARTIFACT = "onnx:e5-small";
 var INSTALL_HINT = "embed_backend=onnx \u9700\u8981\u53EF\u9009\u4F9D\u8D56 onnxruntime-node\uFF08npm install onnxruntime-node\uFF09\u4E0E ONNX \u6A21\u578B\uFF08skill-merge models ensure --include onnx\uFF09";
@@ -2167,7 +2167,7 @@ var OnnxEmbedder = class {
   }
 };
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/contract.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/contract.js
 var VIAS = Object.freeze(["summary", "body", "both"]);
 function viaFromNets(nets) {
   const set = new Set(Array.isArray(nets) ? nets : []);
@@ -2192,7 +2192,7 @@ function assertSelectedPairs(rows, at) {
   return rows;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/semantic.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/semantic.js
 var StreamedStaticEmbedder = class {
   constructor(modelDir, opts) {
     this.name = "model2vec-stream";
@@ -2369,7 +2369,7 @@ async function semanticSelect(passed, byPath, cfg, opts) {
   }
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/semantic.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/semantic.js
 async function runSemantic(passed, byPath, cfg, opts) {
   if (cfg.skip_stage4) {
     const stats2 = { skipped: true, pairs_in: passed.length, selected: passed.length };
@@ -2392,7 +2392,7 @@ var semanticStage = defineStage({
   }
 });
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/corpus.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/corpus.js
 import path9 from "node:path";
 import crypto2 from "node:crypto";
 var FM_RE = /^---\s*\n([\s\S]*?)\n---\s*\n?/;
@@ -2507,7 +2507,7 @@ function stripBoilerplate(skills, cfg) {
   return { paragraphs: total, boilerplate_paragraphs: dropped, floor, kinds: common.size };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/prefilter.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/prefilter.js
 function nameEntropy(name) {
   const s = String(name).toLowerCase().replace(/\s+/g, "");
   if (!s) return 0;
@@ -2544,7 +2544,7 @@ function prefilter(skills, cfg) {
   return [kept, dropped, stats];
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/prefilter.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/prefilter.js
 var prefilterStage = defineStage({
   id: "prefilter",
   requires: [],
@@ -2555,7 +2555,7 @@ var prefilterStage = defineStage({
   }
 });
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/ledger.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/ledger.js
 function pairKey(a, b) {
   return [a, b].sort().join("|");
 }
@@ -2585,7 +2585,7 @@ function mark(p, pairs, extra) {
   return Object.keys(data).length;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/textutil.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/textutil.js
 var CJK_RE = /^[\u4e00-\u9fff]+$/;
 var TOKEN_RE = /[A-Za-z0-9_]+|[\u4e00-\u9fff]+/g;
 function tokens(text) {
@@ -2624,7 +2624,7 @@ function jaccardSets(a, b) {
   return inter / (a.size + b.size - inter);
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/minhash/signature.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/minhash/signature.js
 import path10 from "node:path";
 import crypto3 from "node:crypto";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -2669,7 +2669,7 @@ function minhashSignature(features, numPerm) {
   return sig;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/minhash/lsh.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/minhash/lsh.js
 import path11 from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 var __dirname3 = path11.dirname(fileURLToPath3(import.meta.url));
@@ -2696,7 +2696,7 @@ function lshParams(threshold, onSnap) {
   return [p.b, p.r];
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/numeric.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/numeric.js
 function roundHalfEven(x, digits) {
   const d = digits === void 0 ? 0 : digits;
   const f = Math.pow(10, d);
@@ -2711,7 +2711,7 @@ function roundHalfEven(x, digits) {
   return sign * r / f;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/pyrandom.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/pyrandom.js
 var N = 624;
 var M = 397;
 var MATRIX_A = 2567483615;
@@ -2848,7 +2848,7 @@ var PyRandom = class {
   }
 };
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/candidates.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/candidates.js
 function projectionText(s, projection) {
   return projection === "summary" ? s.summary : s.body_core || s.body;
 }
@@ -3096,7 +3096,7 @@ function generateCandidates(skills, cfg) {
   return [selected, stats, byPath];
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/candidates.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/candidates.js
 var candidatesStage = defineStage({
   id: "candidates",
   requires: ["prefilter"],
@@ -3106,7 +3106,7 @@ var candidatesStage = defineStage({
   }
 });
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/lexical.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/screening/lexical.js
 function lexicalGate(skills, pairs, cfg) {
   const byPath = new Map(skills.map((s) => [s.path, s]));
   const rows = [];
@@ -3177,7 +3177,7 @@ function lexicalGate(skills, pairs, cfg) {
   }];
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/lexical.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/lexical.js
 var lexicalStage = defineStage({
   id: "lexical",
   requires: ["prefilter", "candidates"],
@@ -3187,7 +3187,7 @@ var lexicalStage = defineStage({
   }
 });
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/extract.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/extract.js
 var WHEN_RE = /何时用|何时使用|When to Use|触发|适用场景/i;
 var BOUND_RE = /不适用|不要用|边界|不覆盖|not cover|does not|限定|前提/;
 function sections(body) {
@@ -3221,7 +3221,7 @@ function bodyExcerpt(skill, maxChars) {
   return String(skill.body_core || skill.body).trim().slice(0, maxChars || 4e3);
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/rerank/provider.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/rerank/provider.js
 var RANKER_SCORE_RANGE = Object.freeze([0, 1]);
 function makeRankerProvider(spec) {
   const s = spec || {};
@@ -3244,7 +3244,7 @@ function assertRankerProvider(provider) {
   return provider;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/net/retry.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/net/retry.js
 function retryableReason(err) {
   const msg = String(err && err.message ? err.message : err);
   if (/HTTP (429|5\d\d)\b/.test(msg)) return true;
@@ -3293,7 +3293,7 @@ async function withRetry(fn, opts) {
   throw lastErr;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/rerank/index.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/rerank/index.js
 import path12 from "node:path";
 import crypto4 from "node:crypto";
 var LIDS = [];
@@ -3796,7 +3796,7 @@ async function rerank(rows, byPath, cfg, opts) {
   return [picked, stats];
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/rerank.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/rerank.js
 var rerankStage = defineStage({
   id: "rerank",
   requires: ["semantic"],
@@ -3806,13 +3806,13 @@ var rerankStage = defineStage({
   }
 });
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/judge.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/judge.js
 import path15 from "node:path";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/cascade.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/cascade.js
 import path14 from "node:path";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/prompt.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/prompt.js
 import crypto5 from "node:crypto";
 var PROMPT_VERSION = "judge-prompt-v1";
 var SYSTEM2 = [
@@ -3886,7 +3886,7 @@ function promptDigest(level, prompt) {
   return crypto5.createHash("sha256").update(canonicalStringify(rec)).digest("hex");
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/stub.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/stub.js
 var STUB_VERSION = "stub-v1";
 var STUB2_VERSION = "stub-v2";
 var V1 = Object.freeze({
@@ -3919,7 +3919,7 @@ function stubVerdictV2(level, evidence, floors) {
   return { verdict: v, reason: "stub2(\u5730\u677F\u9A71\u52A8): score=" + Number(s).toFixed(3) + " floor=" + Number(th).toFixed(3), evidence: [] };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/deepseek.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/deepseek.js
 var USAGE2 = { calls: 0, prompt_tokens: 0, completion_tokens: 0, cost_cny: 0 };
 var EFFORT_WIRE = {
   off: { thinking: { type: "disabled" } },
@@ -3950,7 +3950,7 @@ async function callDeepseek(prompt, cfg) {
   return data.choices[0].message.content;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/cache.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/cache.js
 import crypto6 from "node:crypto";
 import path13 from "node:path";
 var CACHE_VERSION = 1;
@@ -4004,7 +4004,7 @@ function openVerdictCache(cfg, promptDir) {
   return new VerdictCache(file);
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/evidence.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/evidence.js
 var EVIDENCE_KEYS = Object.freeze(["jaccard_summary", "jaccard_body", "body_cosine", "summary_cosine"]);
 function numOrNull(v) {
   if (v === void 0 || v === null) return null;
@@ -4021,10 +4021,10 @@ function buildEvidence(row) {
   };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/provider.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/provider.js
 import crypto7 from "node:crypto";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/verdict.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/verdict.js
 function parseVerdict(raw) {
   let t = String(raw).trim();
   if (t.startsWith("```")) {
@@ -4045,7 +4045,7 @@ function parseVerdict(raw) {
   return obj;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/provider.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/provider.js
 function sha256(s) {
   return crypto7.createHash("sha256").update(String(s)).digest("hex");
 }
@@ -4102,7 +4102,7 @@ function resolveJudgeProvider(cfg, env) {
   return makeJudgeProvider({ id, mode, promptSha, heuristic: true, fallback, judge: async (rows) => (rows || []).map((r) => stubFn(r.level, r.evidence || {})) });
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/cascade.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/judge/cascade.js
 var ROUTE = { l0_forward: [1, 0], l1_forward: [0] };
 function resolveJudge(cfg, env) {
   const p = resolveJudgeProvider(cfg, env);
@@ -4243,7 +4243,7 @@ async function judgeCascade(pairs, byPath, cfg, promptDir, runner) {
   return [out, stats];
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/judge.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/judge.js
 var judgeStage = defineStage({
   id: "judge",
   requires: ["semantic", "rerank"],
@@ -4261,7 +4261,7 @@ var judgeStage = defineStage({
   }
 });
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/pipeline/index.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/pipeline/index.js
 function semanticCfg(ctx) {
   const cfg = Object.assign({}, ctx.cfg);
   const dirs = ctx.state && ctx.state.modelDirs;
@@ -4346,16 +4346,16 @@ async function runPipeline(options) {
   return out;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/supply.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/supply.js
 import path19 from "node:path";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/firstrun.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/firstrun.js
 import path18 from "node:path";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/build.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/build.js
 import path17 from "node:path";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/provision.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/provision.js
 import path16 from "node:path";
 import { Readable as Readable2, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -4588,7 +4588,7 @@ async function ensureArtifacts(params) {
   return result;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/build.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/build.js
 var CHUNK_ROWS = 4e4;
 function fileMap(artifact) {
   const m = {};
@@ -4811,7 +4811,7 @@ async function ensureModels(params) {
   return { manifests, downloaded: prov.downloaded, built, skipped };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/config/schema.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/config/schema.js
 var CONFIG_FIELDS = [
   { "key": "min_name_entropy", "type": "float", "default": 1.5, "doc": "\u540D\u5B57\u71B5\u4E0B\u9650" },
   { "key": "min_name_tokens", "type": "int", "default": 2, "doc": "\u540D\u5B57\u6700\u5C11 token \u6570" },
@@ -4982,7 +4982,7 @@ var DEFAULTS = Object.fromEntries(CONFIG_FIELDS.map((x) => [x.key, JSON.parse(JS
 var FIELD_BY_KEY = new Map(CONFIG_FIELDS.map((x) => [x.key, x]));
 var CLI_BY_FLAG = new Map(CLI_OPTIONS.filter((x) => x.kind !== "help").map((x) => ["--" + x.flag, Object.assign({}, x, { flag: "--" + x.flag })]));
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/config.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/config.js
 function makeConfig(overrides) {
   const cfg = JSON.parse(JSON.stringify(DEFAULTS));
   if (overrides) {
@@ -4994,7 +4994,7 @@ function makeConfig(overrides) {
   return cfg;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/firstrun.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/firstrun.js
 function manualHint(registry, registryFile, missingIds, rootDir) {
   const lines = [];
   for (const id of missingIds) {
@@ -5059,7 +5059,7 @@ async function resolveModels(opts) {
   return result;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/supply.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/models/supply.js
 function configuredDirs(cfg) {
   return { int8: cfg.embedder_model, pca: cfg.embedder_model_last || cfg.embedder_model };
 }
@@ -5127,7 +5127,7 @@ async function supplyLocalModels(opts) {
   };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/provision.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/provision.js
 var provisionStage = defineStage({
   id: "provision",
   requires: ["lexical"],
@@ -5148,7 +5148,7 @@ var provisionStage = defineStage({
   }
 });
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/rank_plan.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/stages/rank_plan.js
 var rankPlanStage = defineStage({
   id: "rank_plan",
   requires: ["lexical"],
@@ -5162,7 +5162,7 @@ var rankPlanStage = defineStage({
   }
 });
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/pipeline/compose.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/pipeline/compose.js
 function byId(stages) {
   const map = /* @__PURE__ */ new Map();
   for (const s of stages) map.set(s.id, s);
@@ -5187,13 +5187,13 @@ function buildScanStages() {
   ];
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/scan.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/scan.js
 import path21 from "node:path";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/report.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/report.js
 import path20 from "node:path";
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/contracts/report.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/contracts/report.js
 var REPORT_SCHEMA_VERSION = 1;
 var REPORT_REQUIRED_TOP_KEYS = Object.freeze([
   "schemaVersion",
@@ -5242,7 +5242,7 @@ function assertReportModel(report) {
   return report;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/report.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/report.js
 var RUNTIME_ONLY_CONFIG_KEYS = Object.freeze(["rank_checkpoint", "judge_cache_path", "stub2_floors"]);
 var RESERVED_TOP_KEYS = Object.freeze(["schemaVersion", "generatedAt", "command", "meta", "config", "stages", "timings", "diagnostics", "used_mode", "degraded", "pairs_final"]);
 var CONFIG_KEYS = CONFIG_FIELDS.map((f) => f.key);
@@ -5483,7 +5483,7 @@ function writeArtifacts(outDir, spec) {
   return { dialect, eol: d.eol, sortKeys: d.sortKeys, files: ["run.meta.json", "report.json", "candidates.md", "candidates.csv", "pairs.csv"], views };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/degrade.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/degrade.js
 function stageStats2(res, id) {
   const s = (res && res.stages || []).find((x) => x.id === id);
   return s ? s.stats || {} : {};
@@ -5520,7 +5520,7 @@ function assessDegradation(opts) {
   };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/vendor/skill-merge-pipeline/src/scan.js
+// packages/evolution/evolution-merge-engine/vendor/skill-merge-pipeline/src/scan.js
 function stageData2(res, id) {
   const s = res.stages.find((x) => x.id === id);
   return s ? s.data : {};
@@ -5622,7 +5622,7 @@ function formatScanSummary(scan, opts) {
   return lines;
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/src/engine.js
+// packages/evolution/evolution-merge-engine/src/engine.js
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -5677,7 +5677,31 @@ async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runne
   writeArtifacts(outDir, { cfg, config: cfg, report: built.reportDoc, markdown: candidatesMarkdown({ rows: built.verdicts, rerankStats: built.rerankStats, rankPlan: built.rankPlan, judgeFallback: built.judgeFallback }), candidatesRows: candidatesCsvRows(built.verdicts), pairsRows: pairsCsvRows(built.verdicts) });
   return { ok: true, reportDoc: built.reportDoc, sections: built.sections, degradation, strictFail: cfg.strict === true && degradation.degraded };
 }
-async function screen(input) {
+var CREDENTIAL_ENV = Object.freeze({
+  embedding: "SILICONFLOW_API_KEY",
+  ranker: "BAMBOO_API_KEY"
+});
+var appliedCredentials = /* @__PURE__ */ new Map();
+function applyRetrievalCredentials(credentials) {
+  for (const [field, envName] of Object.entries(CREDENTIAL_ENV)) {
+    const value = credentials === void 0 ? void 0 : credentials[field];
+    const applied = appliedCredentials.get(envName);
+    if (typeof value === "string" && value !== "") {
+      if (applied === void 0) appliedCredentials.set(envName, { previous: process.env[envName] });
+      process.env[envName] = value;
+      continue;
+    }
+    if (applied !== void 0) {
+      if (applied.previous === void 0) delete process.env[envName];
+      else process.env[envName] = applied.previous;
+      appliedCredentials.delete(envName);
+    }
+  }
+}
+function clearRetrievalCredentials() {
+  applyRetrievalCredentials(void 0);
+}
+async function screenOnce(input) {
   const { corpusDir, outDir, signal, onProgress, runner } = input;
   if (!corpusDir || !outDir) return { ok: false, error: { code: "BAD_INPUT", detail: "corpusDir/outDir required" } };
   const cfg = makeConfig(input.cfg ?? {});
@@ -5696,6 +5720,10 @@ async function screen(input) {
     return { ok: false, error: { code: "ENGINE_ERROR", detail: String(err && err.stack || err) } };
   }
 }
+async function screen(input) {
+  applyRetrievalCredentials(input.credentials);
+  return await screenOnce(input);
+}
 function probe(cfgInput) {
   const cfg = makeConfig(cfgInput ?? {});
   const int8 = cfg.embedder_model ? join(cfg.embedder_model, "config.json") : "";
@@ -5709,7 +5737,7 @@ async function ensureModels2(cfgInput) {
   return { ok: true, models: "ok", dirs: resolved.dirs };
 }
 
-// dsh-evolution-mirror/packages/evolution-merge-engine/src/report-map.js
+// packages/evolution/evolution-merge-engine/src/report-map.js
 import { createHash as createHash2 } from "node:crypto";
 function pairKeyOf(a, b) {
   return [a, b].sort().join("\0");
@@ -5802,6 +5830,7 @@ function selectCandidates(report) {
 }
 export {
   buildScanStages,
+  clearRetrievalCredentials,
   ensureModels2 as ensureModels,
   formatScanSummary,
   makeConfig,

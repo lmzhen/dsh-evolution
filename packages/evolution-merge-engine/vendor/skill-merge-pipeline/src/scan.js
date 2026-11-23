@@ -26,7 +26,6 @@ export async function runScan(opts) {
   const res = await runPipeline({
     cfg, out, stages: buildScanStages(), input: { skills }, signal: o.signal,
     onProgress: typeof o.onProgress === "function" ? o.onProgress : undefined,
-    ...(o.credentials === undefined ? {} : { state: { retrievalCredentials: o.credentials } }),
   });
   if (!res.ok) return { ok: false, res, cfg, skills, bp, error: res.error, exitCode: res.exitCode };
 

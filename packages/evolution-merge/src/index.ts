@@ -4,7 +4,7 @@ import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = Omit<CordisContext, 'logger'> & HostContext
-import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
+import { clearRetrievalCredentials, screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
@@ -167,6 +167,7 @@ function formatUnreadyError(): string {
 export const inject: string[] = []
 
 export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): void {
+  ctx.effect(() => () => { clearRetrievalCredentials() }, 'evolution-merge: clear retrieval credentials')
 
   configureMergePresentation(ctx as unknown as MergePresentationContext)
   const startupParams = resolveMergeParams(rawConfig)

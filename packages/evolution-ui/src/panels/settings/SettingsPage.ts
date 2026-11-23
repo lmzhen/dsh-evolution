@@ -19,6 +19,7 @@ import type { DiagnosticsApi } from './diagnostics-state.ts'
 import type { ConfigFormLike, ConfigFormsSeat, RowConfigForm } from './seam.ts'
 import { FAMILY_VERSION } from './generated-about.ts'
 import { groupParamCards } from './settings-groups.ts'
+import { RetrievalCard, type RetrievalCardFace } from './RetrievalCard.ts'
 
 /** One namespace the page renders: its settings namespace (the Host entry id) and its fields. */
 export interface SettingsCardFace {
@@ -34,6 +35,8 @@ export interface EvolutionSettingsPageProps {
   readonly t: (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string
   readonly lang?: () => ParamLanguage
   readonly diagnostics: DiagnosticsApi
+  /** Optional retrieval credential card; absent in a host without the credentials Remote. */
+  readonly retrieval?: RetrievalCardFace
 }
 
 /**
@@ -77,6 +80,7 @@ export function EvolutionSettingsPage(props: EvolutionSettingsPageProps): ReactN
     createElement('h2', { className: 'evolution-params-title' }, t('title')),
     createElement('p', { className: 'evolution-params-subtitle' }, t('subtitle')),
     createElement('p', { className: 'evolution-params-about' }, FAMILY_VERSION + ' · ' + t('aboutPurpose')),
+    ...(props.retrieval === undefined ? [] : [createElement(RetrievalCard, { key: 'retrieval', ...props.retrieval })]),
     ...groupParamCards(rows).flatMap(({ group, items }) => [
       createElement('h3', { key: 'group-' + group, className: 'evolution-settings-group', 'data-role': 'settings-group' }, t(('group.' + group) as MessageKey)),
       ...items.map(({ card, form }, index) => createElement(RowConfigCard, {

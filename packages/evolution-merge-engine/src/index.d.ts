@@ -1,10 +1,15 @@
 export interface EngineCfg {
   [key: string]: unknown
 }
+export interface RetrievalCredentials {
+  embedding?: string
+  ranker?: string
+}
 export interface ScreenInput {
   corpusDir: string
   outDir: string
   cfg?: EngineCfg
+  credentials?: RetrievalCredentials
   signal?: AbortSignal
   onProgress?: (p: { stage: string; done?: number; total?: number }) => void
   runner?: (prompt: string, cfg?: Record<string, unknown>) => Promise<string>
@@ -25,6 +30,7 @@ export declare function buildScanStages(): unknown[]
 export declare function makeConfig(overrides?: Record<string, unknown>): Record<string, unknown>
 export declare function runScan(input: Record<string, unknown>): Promise<unknown>
 export declare function screen(input: ScreenInput): Promise<ScreenResult>
+export declare function clearRetrievalCredentials(): void
 export declare function probe(cfg?: EngineCfg): {
   models: 'ok' | 'missing' | 'partial'
   judge: string

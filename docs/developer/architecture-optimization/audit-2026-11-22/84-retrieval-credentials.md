@@ -11,7 +11,7 @@
 
 - 唯一可编辑项：`SILICONFLOW_API_KEY`、`BAMBOO_API_KEY` 的凭据值。
 - 模型、端点、档位顺序、阈值、prompt、`seed_mode`、`round_count`、`floor_jitter` 全部固定，不进入 UI。
-- Key 由平台 `ctx.credentials` 解析，UI 通过 `remote.credentials` 写入；不新增插件自有 secret 存储，不写 `process.env`，不把 Key 放进 `cfg` / report / run.meta / 日志 / 客户端快照。
+- Key 由平台 `ctx.credentials` 解析，UI 通过 `remote.credentials` 写入；不新增插件自有 secret 存储，不把 Key 放进 `cfg` / report / run.meta / 日志 / 客户端快照；为适配字节冻结的引擎，wrapper 只把它投影到引擎既有的两个 env refs。
 - 不配置 Key 时，engine 配置与当前逐字段相同；配置 Key 时，只让原本存在的云端档可用，不新增或重排 fallback。
 
 ## 2. 现状与证据
@@ -46,7 +46,7 @@
 3. **I7 验证绑定事实**：无 Key 路径的 engine cfg 必须有逐字段快照测试；Key 不能进入 report。
 4. **流水线策略不变**：不配置 Key 时 cfg 与当前相等；配置 Key 时不改变档位顺序、模型、阈值、prompt、seed/round/floor、降级 reason 集合。
 5. **仅凭据变化**：Key 只影响原有云端档的可用性，不新增 provider、不改 route、不增加 fallback。
-6. **安全**：Key 只向 Host 单向流动；UI 不回显；report/run.meta/日志/诊断/客户端快照不出现完整值。
+6. **安全**：Key 只向 Host 单向流动；UI 不回显；report/run.meta/日志/诊断/客户端快照不出现完整值。引擎冻结使 Key 必须经过既有的 env 接口；wrapper 记录原 env，dispose/清空时恢复，不向子进程主动传递。
 
 ## 4. 目标架构
 
@@ -63,8 +63,8 @@ merge host：RetrievalCredentials 端口
         │ 作为运行参数，不进入 cfg
         ▼
 merge-engine.screen(input.credentials)
-  ├─ semantic stage：RemoteEmbedder(..., { key: embedding })
-  ├─ rerank stage：API score(..., ranker key)
+  ├─ wrapper：投影到引擎既有的 env Key 接口（vendor 字节冻结）
+  ├─ ④/④.5 仍按原 env 读取与档位顺序执行
   └─ 其余 stage / judge / seed / thresholds 完全不变
         ▼
 report / run.meta / logs：无 Key
@@ -76,7 +76,7 @@ report / run.meta / logs：无 Key
 
 - `packages/credentials/credentials/src/index.ts`：`resolve` 每次操作解析；`describe` 只返回 `configured/source/writable/masked`；`set/unset` 是写入路径。
 - `packages/api/settings-controller/src/credentials.ts`：浏览器 `remote.credentials.describe/set/unset`，值不回传。
-- `packages/client/ui-primitives/src/settings-form/*`：`SettingsSecretField` 是标准 write-only 控件。
+- `packages/client/ui-primitives/src/settings-form/*`：`SettingsSecretField` 是标准 write-only 控件；family settings 的编译面不直接引用平台 Client 源（跨 face 会破坏 rootDir），家族卡片用自己的 password 输入 + 同一 `remote.credentials` 语义，平台仍是凭据 owner。
 - `packages/client/ui-settings/src/client/contract/slots.ts`：`openSettings(sectionId)` 用于合并页跳转。
 - `packages/client/ui-settings-models` 是同一凭据模式的既有实现，仅作范式，不复制其业务组件。
 
@@ -97,21 +97,26 @@ export async function resolveRetrievalCredentials(
 ```
 
 - 用 `ctx.get('credentials')` 可选读取，不允许必选注入；凭据服务缺失时返回空对象，引擎继续走现有 env 路径。
-- 每次 scan 前解析，不缓存到模块变量，不写 `process.env`。
+- 每次 scan 前解析，不缓存到模块变量；host 不直接写 `process.env`，由 engine wrapper 投影到冻结引擎的既有 env Key 接口。
 - `evolution-merge/src/adapters/engine-screen.ts` 增加 `credentials?: RetrievalCredentials` 透传。
 - `evolution-merge/src/index.ts` 不再把 Key 放进 `cfg`、`engineInput` 或 params。
 
-### 4.3 Engine 侧
+### 4.3 Engine 侧（wrapper-only，vendor 字节冻结）
 
-只增加**运行参数入口**：
+`packages/evolution-merge-engine/README.md` 明确要求 ①-⑤ 冻结，变更必须 wrapper-only；`verify-upstream` 对 324 个 vendor 文件做字节校验。因此初始计划里的“运行状态透传”不可用：不能改 vendor 的 stage/provider 签名。
 
-- `merge-engine/src/engine.js` 的 `screen(input)` 接受 `credentials?: RetrievalCredentials`；
-- `runWithRunner` / `runScan` 把它放入 `runPipeline` 的运行时 `state`（如 `state.retrievalCredentials`），不放入 `cfg`、不落入 report；
-- `stages/semantic.js` 构造 `RemoteEmbedder` 时传 `{ key: ctx.state.retrievalCredentials?.embedding }`；`RemoteEmbedder` 已支持显式 `o.key`；
-- `stages/rerank.js` 调用 `rerank(..., opts)` 时传 `rankerKey`；`scoreRemote` 和 `apiKeyConfigured` 都优先使用显式 key，否则回退当前 `BAMBOO_API_KEY` env；
-- 不修改 `embed/chain` 的档位顺序、`rank` 的 auto 选择顺序、`semantic`/`judge` 算法、`seed`/`floor` 逻辑。
+采用 wrapper-only 的凭据桥：
 
-如果实现发现必须改 vendor 的 stage 签名而不只是运行参数透传，先在本文记录影响面和 parity 证明，再修改；不得用 `process.env` 临时 shim 代替。
+- `packages/evolution-merge-engine/src/engine.js` 的 `screen(input)` 接受 `credentials?: RetrievalCredentials`；
+- wrapper 把两个值投影到引擎本来就读取的 env refs：
+  - embedding → `SILICONFLOW_API_KEY`
+  - ranker → `BAMBOO_API_KEY`
+- 写入前记录原 env；`clearRetrievalCredentials()` 或下一次扫描传空对象时恢复；host 在插件 dispose 时调用 clear；
+- 不修改 vendor 文件、不改 `cfg`、不改 report/run.meta；
+- semantic/rerank 的档位、阈值、prompt、seed、降级链不变；Key 只让原 env 路径从“无值”变为“有值”；
+- 不在 host 层直接写 env；写 env 是 wrapper 对冻结引擎的适配，不是第二套凭据源。
+
+这是对“运行参数透传”初始设计的明确修正：vendor 冻结优先于 transport 美观；代价是同一进程内两个扫描共享同一组 UI Key（凭据本来就是全局 refs）。错误 Key 仍走原降级链，不新增 fallback。
 
 ### 4.4 共享常量
 
@@ -192,6 +197,7 @@ Key 只保存在本机凭据中，不会回显。
 | `retrieval.currentLocal` | 当前：本地模式 | Current: local models |
 | `retrieval.currentEnhanced` | 当前：云端增强已启用 | Current: cloud enhancement enabled |
 | `retrieval.currentMixed` | 当前：向量云端 · 判别本地 | Current: cloud embeddings · local ranking |
+| `retrieval.currentRanker` | 当前：向量本地 · 判别云端 | Current: local embeddings · cloud ranking |
 | `retrieval.applyHint` | 配置后下一次合并扫描生效。 | Applies to the next merge scan. |
 | `retrieval.secretNote` | Key 只保存在本机凭据中，不会回显。 | Keys are stored in local credentials and never displayed again. |
 | `retrieval.clear` | 清除 | Clear |
@@ -244,7 +250,7 @@ Key 只保存在本机凭据中，不会回显。
 ## 8. 实施顺序与文件影响
 
 1. **设计/契约**：本文件；`retrieval-contract.json` + 生成器 + `--check`；UI 文案 key 冻结。
-2. **Engine 运行参数**：`merge-engine/src/engine.js`、vendor `stages/semantic.js`、`stages/rerank.js`、`rerank/index.js`、`embed/remote.js`（仅 key 透传）；parity/回归。
+2. **Engine wrapper**：`merge-engine/src/engine.js` 的 env 桥、`clearRetrievalCredentials`、重新生成 `src/index.bundle.js`；vendor 零改动，`verify-upstream` 324 文件保持通过。
 3. **Host 凭据端口**：`evolution-merge/src/domain/retrieval-credentials.ts`、`adapters/engine-screen.ts`、`index.ts`、`scan-run.ts` 透传。
 4. **UI**：`evolution-ui` settings store/card + `ui-primitives` secret field；`evolution-merge-ui` 状态/链接；8 locale。
 5. **测试/文档**：上述测试、report/run.meta 泄漏测试、真实 fresh 验收；更新包 README、INSTALL、索引。
@@ -262,7 +268,7 @@ Key 只保存在本机凭据中，不会回显。
 - 不提供模型名、API URL、多提供方选择；模型/端点固定。
 - 不改变 ⑤ 判决；`judge` 仍由平台聊天模型/现有 runner 决定。
 - 不改变 `seed_mode`、`round_count`、`floor_jitter`；当前默认 `run` 的随机性保持原样。
-- 不把 Key 用于其他插件或全局 `process.env`。
+- 不把 Key 用于其他插件；只为冻结引擎投影到它既有的两个 env refs，并在卸载/清空时恢复。
 - 不做连接测试；错误在下一次扫描中按现有降级语义暴露。
 - `mergeModelsRoot` 本地模型路径仍是内部 config，不进入此 UI。
 
@@ -272,7 +278,14 @@ Key 只保存在本机凭据中，不会回显。
 - 当前 seed 默认 `run`，两次运行可能不同；本设计不改，若将来要可复现需单独 DCR。
 - `ENGINE_FORBIDDEN_KEYS` 继续保留；本次不放开模型/路由配置面。
 
-## 12. 与审计台账的关系
+## 12. 实现进度（本 goal 内持续更新）
+
+- 已落地：`retrieval-contract.json` + host/client generated contract + `--check` 脚本；host `resolveRetrievalCredentials`；engine `screen(credentials)` wrapper-only env 桥（vendor 324 文件字节校验通过，engine 2 个桥测试）；`evolution-ui` 设置页 `RetrievalCard`（两把可选 Key、来源、保存/清除、不可用/失败状态）；`retrieval-credentials` 单测、`retrieval-card` 5 个组件测试、UI 8 locale key。
+- 已落地：合并建议页高级区静态提示“检索增强在设置 → 自进化配置”（当前面板 props 无 openSettings，不硬编码路由；状态入口待平台公开 seam）；
+- 待落地：合并页可点击状态入口、真实 fresh 验收、全量门禁/发布链。
+- 已知偏差/修正：初始“运行状态透传”改为 wrapper-only env 桥（vendor 冻结）；UI 字段使用家族自己的 password 输入而非直接 import 平台 `SettingsSecretField`（编译 face 约束）；凭据写入仍是平台 `remote.credentials`，语义不变。
+
+## 13. 与审计台账的关系
 
 - 完成 80-p2-ledger 中可随本组收口的 P2；其余按 owner/reason/expiry/判据保留或 DEFERRED。
 - 若实现中发现本文未覆盖的架构变化，先更新本文/10/11 或写 DCR，再改代码。

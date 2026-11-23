@@ -25,6 +25,7 @@ export function MergeSettings({ view, t }: { view: MergeViewPayload; t: Translat
   return createElement('div', { 'data-role': 'settings-card' },
     createElement('h3', { 'data-role': 'settings-title' }, t('settings.title')),
     createElement('p', { 'data-role': 'settings-path' }, t('settings.openPlatformPath')),
+    createElement('p', { 'data-role': 'settings-retrieval', className: 'merge-settings-note' }, t('settings.retrievalHint')),
     createElement('div', { 'data-role': 'settings-chips' },
       createElement(SettingChip, { section: 'merge-approval', label: t('settings.mergeApproval'), value: view.approval.mergeApproval, disabled: false, missing: false, t }),
       createElement(SettingChip, { section: 'platform-write', label: t('settings.platformWrite'), value: platformFallback, disabled: platformCapability === false, missing: platform === undefined, t }),

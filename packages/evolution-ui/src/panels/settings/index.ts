@@ -25,6 +25,7 @@ import { FAMILY_VERSION } from './generated-about.ts'
 import type { ConfigFormsSeat } from './seam.ts'
 import { bindLocale, injectPluginStyles } from '@lmzhen/dsh-evolution-client-kit'
 import { CSS, CSS_TAG_ID } from './styles.ts'
+import type { RetrievalCredentialInfo, RetrievalOperations } from './RetrievalCard.ts'
 
 /** The client services this half consumes. */
 export const inject = ['slots', 'locale'] as const
@@ -72,6 +73,29 @@ export function apply(ctx: ClientContext): void {
   const seat = (): ConfigFormsSeat | undefined => seam.get?.('configForms') as ConfigFormsSeat | undefined
   const cards = CLIENT_PARAM_SECTIONS.map(section => ({ namespace: section.namespace, fields: section.fields }))
   const diagnostics: DiagnosticsApi = createDiagnosticsApi()
+  const credentialRemote = seam.get?.('remote.credentials') as {
+    describe(refs: readonly string[]): Promise<{ ok: true; value: Readonly<Record<string, RetrievalCredentialInfo>> } | { ok: false; error: { message: string } }>
+    set(ref: string, value: string): Promise<{ ok: true } | { ok: false; error: { message: string } }>
+    unset(ref: string): Promise<{ ok: true } | { ok: false; error: { message: string } }>
+  } | undefined
+  const retrievalOperations: RetrievalOperations = credentialRemote === undefined ? {
+    describe: async () => ({ ok: false, message: t('retrievalUnavailable') }),
+    set: async () => ({ ok: false, message: t('retrievalUnavailable') }),
+    unset: async () => ({ ok: false, message: t('retrievalUnavailable') }),
+  } : {
+    describe: async refs => {
+      const answer = await credentialRemote.describe(refs)
+      return answer.ok ? { ok: true, value: answer.value } : { ok: false, message: answer.error.message }
+    },
+    set: async (ref, value) => {
+      const answer = await credentialRemote.set(ref, value)
+      return answer.ok ? { ok: true, value: undefined } : { ok: false, message: answer.error.message }
+    },
+    unset: async ref => {
+      const answer = await credentialRemote.unset(ref)
+      return answer.ok ? { ok: true, value: undefined } : { ok: false, message: answer.error.message }
+    },
+  }
   seam.slots.inject('settings.section', function* () {
     yield seam.slots.register({
       name: 'settings.section',
@@ -85,6 +109,7 @@ export function apply(ctx: ClientContext): void {
       t,
       lang: language,
       diagnostics,
+      retrieval: { t, operations: retrievalOperations },
     })) as unknown as (props: never) => unknown)
     // The nav glyph is addressed by the SAME id: an icon whose id names no section never renders.
     yield seam.slots.register({

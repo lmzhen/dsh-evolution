@@ -1251,6 +1251,236 @@
       "de": "1 läuft",
       "pt": "1 em execução",
       "ru": "Выполняется: 1"
+    },
+    "retrievalTitle": {
+      "zh": "检索增强（可选）",
+      "en": "Retrieval enhancement (optional)",
+      "ja": "検索強化（任意）",
+      "es": "Mejora de búsqueda (opcional)",
+      "fr": "Amélioration de la recherche (facultative)",
+      "de": "Suche verbessern (optional)",
+      "pt": "Melhoria de busca (opcional)",
+      "ru": "Улучшение поиска (необязательно)"
+    },
+    "retrievalIntro": {
+      "zh": "为追求更优的相似 skill 筛选能力，可配置以下 API。不配置也可正常使用，仅使用本地模型。",
+      "en": "For better similar-skill screening, you can configure the APIs below. Without them, local models are used and the pipeline still runs.",
+      "ja": "似たスキルの選別精度を上げたい場合、以下の API を設定できます。未設定でもローカルモデルで動作します。",
+      "es": "Para mejorar la selección de skills similares, puedes configurar estas API. Sin ellas se usan modelos locales y el proceso sigue funcionando.",
+      "fr": "Pour améliorer la sélection de skills similaires, vous pouvez configurer ces API. Sans elles, les modèles locaux sont utilisés et le traitement continue.",
+      "de": "Für eine bessere Auswahl ähnlicher Skills können Sie die folgenden APIs konfigurieren. Ohne sie laufen lokale Modelle und die Verarbeitung funktioniert weiter.",
+      "pt": "Para melhorar a seleção de skills semelhantes, você pode configurar estas APIs. Sem elas, modelos locais são usados e o fluxo continua.",
+      "ru": "Для более точного отбора похожих навыков можно настроить указанные API. Без них используются локальные модели, и обработка продолжает работать."
+    },
+    "retrievalEmbeddingLabel": {
+      "zh": "硅基流动 API Key",
+      "en": "SiliconFlow API key",
+      "ja": "SiliconFlow API キー",
+      "es": "Clave de API de SiliconFlow",
+      "fr": "Clé API SiliconFlow",
+      "de": "SiliconFlow-API-Schlüssel",
+      "pt": "Chave de API da SiliconFlow",
+      "ru": "API-ключ SiliconFlow"
+    },
+    "retrievalEmbeddingHint": {
+      "zh": "用于向量相似度；固定模型 {model}（备用 {fallback}）。",
+      "en": "Used for vector similarity. Fixed model: {model} (fallback {fallback}).",
+      "ja": "ベクトル類似度に使用します。固定モデル: {model}（代替 {fallback}）。",
+      "es": "Se usa para similitud vectorial. Modelo fijo: {model} (respaldo {fallback}).",
+      "fr": "Utilisée pour la similarité vectorielle. Modèle fixe : {model} (secours {fallback}).",
+      "de": "Wird für die Vektorähnlichkeit verwendet. Festes Modell: {model} (Ersatz {fallback}).",
+      "pt": "Usada para similaridade vetorial. Modelo fixo: {model} (reserva {fallback}).",
+      "ru": "Используется для векторного сходства. Фиксированная модель: {model} (резерв {fallback})."
+    },
+    "retrievalRankerLabel": {
+      "zh": "StartLux 判别 API Key",
+      "en": "StartLux decision API key",
+      "ja": "StartLux 判定 API キー",
+      "es": "Clave de API de decisión StartLux",
+      "fr": "Clé API de décision StartLux",
+      "de": "StartLux-Entscheidungs-API-Schlüssel",
+      "pt": "Chave de API de decisão StartLux",
+      "ru": "API-ключ решений StartLux"
+    },
+    "retrievalRankerHint": {
+      "zh": "用于精排判别；固定模型 {model}。",
+      "en": "Used for reranking. Fixed model: {model}.",
+      "ja": "再ランキング判定に使用します。固定モデル: {model}。",
+      "es": "Se usa para el reranking. Modelo fijo: {model}.",
+      "fr": "Utilisée pour le reranking. Modèle fixe : {model}.",
+      "de": "Wird für das Reranking verwendet. Festes Modell: {model}.",
+      "pt": "Usada para o reranking. Modelo fixo: {model}.",
+      "ru": "Используется для ранжирования. Фиксированная модель: {model}."
+    },
+    "retrievalGetKey": {
+      "zh": "获取 Key",
+      "en": "Get key",
+      "ja": "キーを取得",
+      "es": "Obtener clave",
+      "fr": "Obtenir la clé",
+      "de": "Schlüssel abrufen",
+      "pt": "Obter chave",
+      "ru": "Получить ключ"
+    },
+    "retrievalConfigured": {
+      "zh": "已设置",
+      "en": "Configured",
+      "ja": "設定済み",
+      "es": "Configurada",
+      "fr": "Configurée",
+      "de": "Konfiguriert",
+      "pt": "Configurada",
+      "ru": "Настроен"
+    },
+    "retrievalNotConfigured": {
+      "zh": "未设置",
+      "en": "Not configured",
+      "ja": "未設定",
+      "es": "Sin configurar",
+      "fr": "Non configurée",
+      "de": "Nicht konfiguriert",
+      "pt": "Não configurada",
+      "ru": "Не настроен"
+    },
+    "retrievalSourceEnv": {
+      "zh": "来源：环境变量",
+      "en": "Source: environment",
+      "ja": "取得元: 環境変数",
+      "es": "Origen: variable de entorno",
+      "fr": "Source : variable d’environnement",
+      "de": "Quelle: Umgebungsvariable",
+      "pt": "Origem: variável de ambiente",
+      "ru": "Источник: переменная окружения"
+    },
+    "retrievalSourceStore": {
+      "zh": "来源：本机凭据",
+      "en": "Source: local credentials",
+      "ja": "取得元: ローカル資格情報",
+      "es": "Origen: credenciales locales",
+      "fr": "Source : identifiants locaux",
+      "de": "Quelle: lokale Anmeldedaten",
+      "pt": "Origem: credenciais locais",
+      "ru": "Источник: локальные учётные данные"
+    },
+    "retrievalCurrentLocal": {
+      "zh": "当前：本地模式",
+      "en": "Current: local models",
+      "ja": "現在: ローカルモデル",
+      "es": "Actual: modelos locales",
+      "fr": "Actuel : modèles locaux",
+      "de": "Aktuell: lokale Modelle",
+      "pt": "Atual: modelos locais",
+      "ru": "Сейчас: локальные модели"
+    },
+    "retrievalCurrentEnhanced": {
+      "zh": "当前：云端增强已启用",
+      "en": "Current: cloud enhancement enabled",
+      "ja": "現在: クラウド強化が有効",
+      "es": "Actual: mejora en la nube activada",
+      "fr": "Actuel : amélioration cloud activée",
+      "de": "Aktuell: Cloud-Erweiterung aktiv",
+      "pt": "Atual: melhoria na nuvem ativada",
+      "ru": "Сейчас: облачное улучшение включено"
+    },
+    "retrievalCurrentMixed": {
+      "zh": "当前：向量云端 · 判别本地",
+      "en": "Current: cloud embeddings · local ranking",
+      "ja": "現在: ベクトルはクラウド・判定はローカル",
+      "es": "Actual: embeddings en la nube · ranking local",
+      "fr": "Actuel : embeddings cloud · ranking local",
+      "de": "Aktuell: Cloud-Embeddings · lokales Ranking",
+      "pt": "Atual: embeddings na nuvem · ranking local",
+      "ru": "Сейчас: облачные эмбеддинги · локальное ранжирование"
+    },
+    "retrievalApplyHint": {
+      "zh": "配置后下一次合并扫描生效。",
+      "en": "Applies to the next merge scan.",
+      "ja": "設定は次回のマージスキャンから反映されます。",
+      "es": "Se aplica en el próximo análisis de fusión.",
+      "fr": "S’applique à la prochaine analyse de fusion.",
+      "de": "Gilt ab dem nächsten Merge-Scan.",
+      "pt": "Aplica-se à próxima verificação de fusão.",
+      "ru": "Применяется при следующем сканировании слияния."
+    },
+    "retrievalSecretNote": {
+      "zh": "Key 只保存在本机凭据中，不会回显。",
+      "en": "Keys are stored in local credentials and never displayed again.",
+      "ja": "キーはローカル資格情報にのみ保存され、再表示されません。",
+      "es": "Las claves se guardan en credenciales locales y no se vuelven a mostrar.",
+      "fr": "Les clés sont stockées dans les identifiants locaux et ne sont plus affichées.",
+      "de": "Schlüssel werden nur in lokalen Anmeldedaten gespeichert und nie erneut angezeigt.",
+      "pt": "As chaves ficam nas credenciais locais e nunca são exibidas novamente.",
+      "ru": "Ключи хранятся только в локальных учётных данных и больше не отображаются."
+    },
+    "retrievalSave": {
+      "zh": "保存",
+      "en": "Save",
+      "ja": "保存",
+      "es": "Guardar",
+      "fr": "Enregistrer",
+      "de": "Speichern",
+      "pt": "Salvar",
+      "ru": "Сохранить"
+    },
+    "retrievalSaving": {
+      "zh": "保存中…",
+      "en": "Saving…",
+      "ja": "保存中…",
+      "es": "Guardando…",
+      "fr": "Enregistrement…",
+      "de": "Speichern…",
+      "pt": "Salvando…",
+      "ru": "Сохранение…"
+    },
+    "retrievalSaved": {
+      "zh": "已保存",
+      "en": "Saved",
+      "ja": "保存しました",
+      "es": "Guardado",
+      "fr": "Enregistré",
+      "de": "Gespeichert",
+      "pt": "Salvo",
+      "ru": "Сохранено"
+    },
+    "retrievalSaveFailed": {
+      "zh": "保存失败：{message}",
+      "en": "Save failed: {message}",
+      "ja": "保存に失敗しました: {message}",
+      "es": "Error al guardar: {message}",
+      "fr": "Échec de l’enregistrement : {message}",
+      "de": "Speichern fehlgeschlagen: {message}",
+      "pt": "Falha ao salvar: {message}",
+      "ru": "Не удалось сохранить: {message}"
+    },
+    "retrievalClear": {
+      "zh": "清除",
+      "en": "Clear",
+      "ja": "消去",
+      "es": "Borrar",
+      "fr": "Effacer",
+      "de": "Löschen",
+      "pt": "Limpar",
+      "ru": "Удалить"
+    },
+    "retrievalUnavailable": {
+      "zh": "当前部署未提供凭据服务，无法在此保存 Key；仍可使用环境变量。",
+      "en": "Credential storage is unavailable in this deployment; environment variables still work.",
+      "ja": "この配備では資格情報サービスが提供されていないため、ここではキーを保存できません。環境変数は引き続き使用できます。",
+      "es": "Este despliegue no ofrece almacenamiento de credenciales; las variables de entorno siguen funcionando.",
+      "fr": "Ce déploiement ne fournit pas de stockage d’identifiants ; les variables d’environnement restent utilisables.",
+      "de": "Diese Bereitstellung bietet keinen Anmeldedaten-Speicher; Umgebungsvariablen funktionieren weiterhin.",
+      "pt": "Esta implantação não oferece armazenamento de credenciais; variáveis de ambiente continuam funcionando.",
+      "ru": "В этой установке нет хранилища учётных данных; переменные окружения по-прежнему работают."
+    },
+    "retrievalCurrentRanker": {
+      "zh": "当前：向量本地 · 判别云端",
+      "en": "Current: local embeddings · cloud ranking",
+      "ja": "現在: ベクトルはローカル・判定はクラウド",
+      "es": "Actual: embeddings locales · ranking en la nube",
+      "fr": "Actuel : embeddings locaux · ranking cloud",
+      "de": "Aktuell: lokale Embeddings · Cloud-Ranking",
+      "pt": "Atual: embeddings locais · ranking na nuvem",
+      "ru": "Сейчас: локальные эмбеддинги · облачное ранжирование"
     }
   }
 }

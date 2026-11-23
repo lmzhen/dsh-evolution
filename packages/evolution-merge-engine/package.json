@@ -28,7 +28,8 @@
     "test": "node --test \"vendor/skill-merge-pipeline/test/*.test.js\"",
     "verify:upstream": "node verify-upstream.mjs",
     "verify:package": "node scripts/verify-package.mjs",
-    "verify:tarball": "node scripts/verify-tarball.mjs"
+    "verify:tarball": "node scripts/verify-tarball.mjs",
+    "bundle:source": "node scripts/bundle-source.mjs"
   },
   "license": "MIT"
 }

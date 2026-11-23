@@ -1,3 +1,5 @@
+// Build note: the published engine is src/index.bundle.js. After editing this file,
+// regenerate it with scripts/bundle-source.mjs before building lib.
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -47,7 +49,7 @@ function wrapJudgeStage(stage, runner) {
   })
 }
 
-async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner, credentials }) {
+async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner }) {
   const o = { cfg, corpus: [corpusDir], out: outDir, signal, onProgress }
   ensureDir(outDir)
   const [skills] = corpus.loadCorpus(o.corpus)
@@ -55,7 +57,7 @@ async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runne
   cfg.rank_checkpoint = path.join(outDir, 'rank_scores.json')
   if (cfg.judge_cache && !cfg.judge_cache_path) cfg.judge_cache_path = path.join(outDir, 'judge_cache.json')
   const stages = buildScanStages().map(s => s.id === 'judge' ? wrapJudgeStage(s, runner) : s)
-  const res = await runPipeline({ cfg, out: outDir, stages, input: { skills }, signal, onProgress, ...(credentials === undefined ? {} : { state: { retrievalCredentials: credentials } }) })
+  const res = await runPipeline({ cfg, out: outDir, stages, input: { skills }, signal, onProgress })
   if (!res.ok) return { ok: false, error: res.error, exitCode: res.exitCode }
   const degradation = assessDegradation({ res, cfg })
   const pairs = res.stages.find(s => s.id === 'candidates')?.data?.pairs
@@ -70,24 +72,60 @@ async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runne
   return { ok: true, reportDoc: built.reportDoc, sections: built.sections, degradation, strictFail: cfg.strict === true && degradation.degraded }
 }
 
-export async function screen(input) {
-  const { corpusDir, outDir, signal, onProgress, runner, credentials } = input
+// The vendored engine is byte-frozen: it reads these two keys from process.env.
+// This wrapper is the only credential bridge; values are applied for the scan and
+// left in place for the next scan (the same placement the historical env path used).
+const CREDENTIAL_ENV = Object.freeze({
+  embedding: 'SILICONFLOW_API_KEY',
+  ranker: 'BAMBOO_API_KEY',
+})
+const appliedCredentials = new Map()
+
+function applyRetrievalCredentials(credentials) {
+  for (const [field, envName] of Object.entries(CREDENTIAL_ENV)) {
+    const value = credentials === undefined ? undefined : credentials[field]
+    const applied = appliedCredentials.get(envName)
+    if (typeof value === 'string' && value !== '') {
+      if (applied === undefined) appliedCredentials.set(envName, { previous: process.env[envName] })
+      process.env[envName] = value
+      continue
+    }
+    if (applied !== undefined) {
+      if (applied.previous === undefined) delete process.env[envName]
+      else process.env[envName] = applied.previous
+      appliedCredentials.delete(envName)
+    }
+  }
+}
+
+/** Drop any UI-supplied keys and restore the ambient env values (plugin unload/test). */
+export function clearRetrievalCredentials() {
+  applyRetrievalCredentials(undefined)
+}
+
+async function screenOnce(input) {
+  const { corpusDir, outDir, signal, onProgress, runner } = input
   if (!corpusDir || !outDir) return { ok: false, error: { code: 'BAD_INPUT', detail: 'corpusDir/outDir required' } }
   const cfg = makeConfig(input.cfg ?? {})
   try {
     const resolvedJudge = resolveJudge(cfg, process.env)
     if (resolvedJudge.mode === 'deepseek') {
       if (!runner) return { ok: false, error: { code: 'RUNNER_REQUIRED', stage: 'judge', retryable: false } }
-      const scan = await runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner, ...(credentials === undefined ? {} : { credentials }) })
+      const scan = await runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner })
       if (!scan.ok) return { ok: false, error: { code: 'SCAN_FAILED', stage: 'pipeline', detail: String(scan.error ?? ''), exitCode: scan.exitCode } }
       return { ok: true, report: { ...scan, envelope: envelope(corpusDir, outDir) } }
     }
-    const scan = await runScan({ corpus: [corpusDir], out: outDir, cfg, signal, onProgress, ...(credentials === undefined ? {} : { credentials }) })
+    const scan = await runScan({ corpus: [corpusDir], out: outDir, cfg, signal, onProgress })
     if (!scan.ok) return { ok: false, error: { code: 'SCAN_FAILED', stage: 'pipeline', detail: String(scan.error ?? ''), exitCode: scan.exitCode } }
     return { ok: true, report: { reportDoc: scan.reportDoc, sections: scan.sections, degradation: scan.degradation, strictFail: scan.strictFail, envelope: envelope(corpusDir, outDir) } }
   } catch (err) {
     return { ok: false, error: { code: 'ENGINE_ERROR', detail: String(err && err.stack || err) } }
   }
+}
+
+export async function screen(input) {
+  applyRetrievalCredentials(input.credentials)
+  return await screenOnce(input)
 }
 
 export function probe(cfgInput) {

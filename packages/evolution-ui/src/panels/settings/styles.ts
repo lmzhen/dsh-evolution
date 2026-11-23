@@ -51,6 +51,13 @@ export const CSS = [
   '.evolution-param-label{display:flex;align-items:center;gap:var(--evo-space-6);color:var(--dsw-alias-label-primary);font-size:var(--evo-type-body);font-weight:500;line-height:var(--evo-leading-base)}',
   '.evolution-param-unit{color:var(--dsw-alias-label-tertiary);font-weight:400}',
   '.evolution-param-hint{margin:0;color:var(--dsw-alias-label-tertiary);font-size:var(--evo-type-sm);line-height:var(--evo-leading-base)}',
+  '.evolution-retrieval-fields{display:flex;flex-direction:column;gap:var(--evo-space-12);margin:var(--evo-space-12) 0}',
+  '.evolution-retrieval-field{display:flex;flex-direction:column;gap:var(--evo-space-6)}',
+  '.evolution-retrieval-label{color:var(--dsw-alias-label-primary);font-size:var(--evo-type-sm);font-weight:500}',
+  '.evolution-retrieval-actions{display:flex;justify-content:flex-end;margin-top:var(--evo-space-8)}',
+  '.evolution-param-link{color:var(--dsw-alias-label-link);font-size:var(--evo-type-sm);text-decoration:none}',
+  '.evolution-param-link:hover{text-decoration:underline}',
+  '.evolution-retrieval-links{display:flex;flex-wrap:wrap;gap:var(--evo-space-12)}',
   '.evolution-param-value{color:var(--dsw-alias-label-secondary);font-size:var(--evo-type-xs);line-height:var(--evo-leading-base)}',
   '.evolution-param-input{width:100%;box-sizing:border-box;padding:var(--evo-space-8) var(--evo-space-10);border:var(--evo-hairline-width) solid var(--dsw-alias-border-l2);border-radius:var(--evo-radius-control);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:var(--evo-type-body);line-height:var(--evo-leading-base)}',
   // The family's one focus ring, the same one the history panel draws: a field that only recoloured
