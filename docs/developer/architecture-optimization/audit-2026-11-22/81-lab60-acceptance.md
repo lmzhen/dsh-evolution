@@ -2,8 +2,8 @@
 
 ## 候选
 
-- 源：`D:\dsh\harness-rc3` overlay，source commit 族树 `d03bc190` 之后的本地修改；
-- 打包：`prepare-release.mjs --scope @lmzhen --version 0.60.0 --dev-build`，20 个 tarball；
+- 源：`D:\dsh\harness-rc3` overlay；measured family commit `c11f59df`；
+- 打包：`prepare-release.mjs --scope @lmzhen --version 0.60.0`（正式 pack），20 个 tarball；all tarball sha256 `200514eece4bd19f8dfa2ccddc4c41ce9c6946daa80ec5237ffb7994f0477cf7`；
 - 安装：`install-layered.mjs --from-dist packages/evolution/dist --home D:\dsh-homes\lab60 --profile web --mode all`，复制 20 个包；
 - 宿主：全局 `dsh --profile web --port 3091`，平台版本 0.2.2-rc.5；
 - 状态：`/evolution migrate state` 已执行，store=71 bytes，marker 存在；重启后 auto 使用 store。
@@ -41,11 +41,12 @@
 ## 未完成
 
 - 正式 release pack 需要 bump 全部 manifest 后重新打包（当前是 dev-build 0.60.0 候选，不能直接当最终产物）；
-- S1–S4/traceability release evidence 需在最终 dist 上重测；
-- 独立复核需在最终 HEAD 再跑一次 P0/P1；
+- S1–S4/traceability release evidence 已在最终 dist 上记录（rehearsal 绑定 `c11f59df` 与 all tarball sha256）；正式发布仍走 CI 证据装配；
+- 独立复核最终 HEAD 确认 P0=0 / P1=0；
 - D1c domain fallback、P2 台账中的 defer 项按 `80-p2-ledger.md`。
 
 ## 复核后修复（P1）
 
 - legacy v2/v1 → v4 迁移重新经过 v3 gate，再 normalize；新增 `state-migrate-v4.spec` 验证 v2 迁移；
+- v3 pending journal 也必须先过 v3 gate；新增 journal repair 用例；
 - readiness 使用 `probeText` 三态：unreadable 返回 `merge-state-needs-repair`，不再把未知读成空状态；目录/不可读测试覆盖。
