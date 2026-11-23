@@ -90,7 +90,8 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on c11f59df"
+    "source": "verify-traceability --strict on c11f59df",
+    "measuredCommit": "5efd2127029e55d5bc3bba19521b64e5e06af7ab"
   },
   "generatedAt": "2026-11-23T00:55:09.072Z",
   "cohort": {
