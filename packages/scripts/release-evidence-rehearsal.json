@@ -7,9 +7,9 @@
       "hostVersion": "0.2.2-rc.5",
       "familyVersion": "0.60.1",
       "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "38700c44894b104887e85fc132ab888409f0830210b869e9c0ce8b41a7ed3b5e",
+      "artifactSha256": "c4cfc42c92e78e43e8bafea9e10f51337f1ec9c97a2d68194edf89b303733831",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b",
+      "commit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
@@ -29,9 +29,9 @@
       "hostVersion": "0.2.2-rc.5",
       "familyVersion": "0.60.1",
       "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "38700c44894b104887e85fc132ab888409f0830210b869e9c0ce8b41a7ed3b5e",
+      "artifactSha256": "c4cfc42c92e78e43e8bafea9e10f51337f1ec9c97a2d68194edf89b303733831",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b",
+      "commit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -51,9 +51,9 @@
       "hostVersion": "0.2.2-rc.5",
       "familyVersion": "0.60.1",
       "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "38700c44894b104887e85fc132ab888409f0830210b869e9c0ce8b41a7ed3b5e",
+      "artifactSha256": "c4cfc42c92e78e43e8bafea9e10f51337f1ec9c97a2d68194edf89b303733831",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b",
+      "commit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
@@ -68,9 +68,9 @@
       "hostVersion": "0.2.2-rc.5",
       "familyVersion": "0.60.1",
       "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "38700c44894b104887e85fc132ab888409f0830210b869e9c0ce8b41a7ed3b5e",
+      "artifactSha256": "c4cfc42c92e78e43e8bafea9e10f51337f1ec9c97a2d68194edf89b303733831",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b",
+      "commit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -90,8 +90,8 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on 727ba17d",
-    "measuredCommit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b"
+    "source": "verify-traceability --strict on 4bf164b6",
+    "measuredCommit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9"
   },
   "generatedAt": "2026-11-23T00:55:09.072Z",
   "cohort": {
