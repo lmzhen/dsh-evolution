@@ -15,7 +15,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values'
+import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values/fs'
 import type { EvolutionIo } from './io-registry.ts'
 
 

@@ -20,7 +20,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { withFileLock as platformFileLock } from '@deepseek-ai/dsh-evolution-platform/values'
+import { withFileLock as platformFileLock } from '@deepseek-ai/dsh-evolution-platform/values/fs'
 import { isProcessAlive } from './io.ts'
 
 /** The lock handle a serialized body receives; `release` is a no-op when a scope owns it. */

@@ -42,6 +42,14 @@
     "./contract/result": {
       "types": "./lib/types/contract/result.d.ts",
       "default": "./lib/contract/result.js"
+    },
+    "./values/fs": {
+      "types": "./lib/types/values-fs.d.ts",
+      "default": "./lib/values-fs.js"
+    },
+    "./values/scope": {
+      "types": "./lib/types/values-scope.d.ts",
+      "default": "./lib/values-scope.js"
     }
   },
   "files": [

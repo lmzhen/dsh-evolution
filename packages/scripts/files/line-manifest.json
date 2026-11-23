@@ -1,5 +1,5 @@
 {
-  "pin": "2048d9dd",
+  "pin": "9af6d300",
   "bed": {
     "mono": "overlay"
   },
@@ -233,6 +233,16 @@
       "id": "@deepseek-ai/dsh-evolution-platform/contract/result",
       "kind": "evo-src-subpath",
       "relPath": "packages/evolution/evolution-platform/src/contract/result.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-platform/values/fs",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-platform/src/values-fs.ts"
+    },
+    {
+      "id": "@deepseek-ai/dsh-evolution-platform/values/scope",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-platform/src/values-scope.ts"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-review",

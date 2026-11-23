@@ -12,7 +12,7 @@ import z from '@deepseek-ai/schemastery'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values'
+import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values/fs'
 import { evolutionHome } from '../state-store.ts'
 import type Schema from '@deepseek-ai/schemastery'
 import type {
