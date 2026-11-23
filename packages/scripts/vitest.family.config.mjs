@@ -151,11 +151,16 @@ const platformSourceDecorators = {
     if (!id.endsWith(".ts") && !id.endsWith(".tsx")) return null;
     if (!/[\\/]packages[\\/](?!evolution[\\/])/.test(id)) return null;
     if (id.includes("node_modules")) return null;
-    const result = await transformWithEsbuild(code, id, {
+    // Platform decorators are RPC metadata; the family unit lane never
+    // registers those classes on a real connection. Stripping the decorator
+    // line keeps the platform source otherwise byte-for-byte intact and avoids
+    // both the oxc TS parse error and esbuild's legacy-decorator calling
+    // convention (typert's `Remote` is a standard decorator).
+    const undecorated = code.replace(/^\s*@[A-Za-z_$][\w$]*(?:\([^)]*\))?\s*$/gm, "");
+    const result = await transformWithEsbuild(undecorated, id, {
       loader: id.endsWith(".tsx") ? "tsx" : "ts",
       format: "esm",
       target: "es2022",
-      tsconfigRaw: { compilerOptions: { experimentalDecorators: true, useDefineForClassFields: false } },
     });
     return { code: result.code, map: null };
   },
