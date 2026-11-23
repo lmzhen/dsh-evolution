@@ -31,7 +31,10 @@ const familyLayout = existsSync(join(ROOT, "evolution-core", "package.json"));
 const scanRoot = familyLayout ? ROOT : join(ROOT, "packages");
 walk(scanRoot);
 
-const specDigest = createHash("sha256").update(specFiles.map((f) => readFileSync(f, "utf8")).sort().join("\u0000")).digest("hex");
+// Line endings are a checkout artifact, not test identity: the registry is
+// generated on Windows (CRLF) and verified on Linux CI (LF). Normalize before
+// hashing so the digest names the spec content, not the working tree.
+const specDigest = createHash("sha256").update(specFiles.map((f) => readFileSync(f, "utf8").replace(/\r\n/g, "\n")).sort().join("\u0000")).digest("hex");
 const candidates = [];
 for (const f of specFiles) {
   const text = readFileSync(f, "utf8");
