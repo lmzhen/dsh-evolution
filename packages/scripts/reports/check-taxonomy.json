@@ -176,6 +176,7 @@
         "evolution-merge-ui::tests/sorting-panel.client.spec.ts",
         "evolution-merge-ui::tests/sorting.client.spec.ts",
         "evolution-merge::tests/authoring-manifest.spec.ts",
+        "evolution-merge::tests/engine-substance.spec.ts",
         "evolution-merge::tests/run-meta-merge.spec.ts",
         "evolution-merge::tests/runtime-busy-target.spec.ts",
         "evolution-merge::tests/state-migrate-v4.spec.ts",
@@ -616,6 +617,7 @@
         "evolution-merge::tests/engine-config.spec.ts",
         "evolution-merge::tests/engine-credentials.spec.ts",
         "evolution-merge::tests/engine-probe.spec.ts",
+        "evolution-merge::tests/engine-substance.spec.ts",
         "evolution-merge::tests/errors-redaction.spec.ts",
         "evolution-merge::tests/errors.spec.ts",
         "evolution-merge::tests/failure-route.spec.ts",
@@ -1301,6 +1303,7 @@
         "evolution-merge::tests/engine-config.spec.ts",
         "evolution-merge::tests/engine-credentials.spec.ts",
         "evolution-merge::tests/engine-probe.spec.ts",
+        "evolution-merge::tests/engine-substance.spec.ts",
         "evolution-merge::tests/errors-redaction.spec.ts",
         "evolution-merge::tests/errors.spec.ts",
         "evolution-merge::tests/failure-route.spec.ts",
@@ -1934,6 +1937,7 @@
         "evolution-merge::tests/engine-config.spec.ts",
         "evolution-merge::tests/engine-credentials.spec.ts",
         "evolution-merge::tests/engine-probe.spec.ts",
+        "evolution-merge::tests/engine-substance.spec.ts",
         "evolution-merge::tests/errors-redaction.spec.ts",
         "evolution-merge::tests/errors.spec.ts",
         "evolution-merge::tests/failure-route.spec.ts",
@@ -2248,11 +2252,11 @@
   "counts": {
     "fast": {
       "gates": 65,
-      "specs": 141
+      "specs": 142
     },
     "pre-tag": {
       "gates": 65,
-      "specs": 452
+      "specs": 453
     },
     "ci-only": {
       "gates": 10,
@@ -2260,16 +2264,16 @@
     },
     "full(ci=off)": {
       "gates": 65,
-      "specs": 452
+      "specs": 453
     },
     "full(ci=on)": {
       "gates": 75,
-      "specs": 523
+      "specs": 524
     }
   },
   "specs": {
-    "total": 523,
-    "marked": 523,
+    "total": 524,
+    "marked": 524,
     "unmarked": 0
   }
 }
