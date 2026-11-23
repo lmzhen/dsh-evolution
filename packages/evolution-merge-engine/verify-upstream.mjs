@@ -9,7 +9,6 @@ let bad = 0
 const patched = new Map([...(doc.testPatchSet ?? []), ...(doc.sourcePatchSet ?? [])].map(x => [x.path, x]))
 const SOURCE_PATCH_ALLOWLIST = new Set([
   'node/src/scan.js',
-  'node/src/stages/semantic.js',
   'node/src/stages/rerank.js',
   'node/src/screening/semantic.js',
   'node/src/rerank/index.js',
@@ -18,11 +17,14 @@ const SOURCE_PATCH_ALLOWLIST = new Set([
   'node/src/extract.js',
 ])
 const TEST_PATCH_PREFIXES = ['node/parity/', 'node/test/']
+const SAFE_TREE_PATH = path => typeof path === 'string' && path.startsWith('node/') && !path.replace(/\\/g, '/').split('/').includes('..')
 for (const entry of doc.testPatchSet ?? []) {
+  if (!SAFE_TREE_PATH(entry.path)) { console.error('UNSAFE TEST PATCH PATH', entry.path); bad++ }
   if (!TEST_PATCH_PREFIXES.some(prefix => String(entry.path).startsWith(prefix))) { console.error('TEST PATCH OUTSIDE TEST TREE', entry.path); bad++ }
   if (typeof entry.reason !== 'string' || entry.reason.trim() === '') { console.error('TEST PATCH WITHOUT REASON', entry.path); bad++ }
 }
 for (const entry of doc.sourcePatchSet ?? []) {
+  if (!SAFE_TREE_PATH(entry.path)) { console.error('UNSAFE SOURCE PATCH PATH', entry.path); bad++ }
   if (!SOURCE_PATCH_ALLOWLIST.has(entry.path)) { console.error('SOURCE PATCH NOT ALLOWED', entry.path); bad++ }
   if (typeof entry.reason !== 'string' || entry.reason.trim() === '') { console.error('SOURCE PATCH WITHOUT REASON', entry.path); bad++ }
 }
@@ -38,7 +40,7 @@ for (const e of doc.files) {
   }
   if (b.length !== e.bytes || sha(b) !== e.sha256) { console.error('MISMATCH', rel); bad++ }
 }
-const normalizeCredentialLines = b => b.toString('utf8').replace(/retrievalCredentials|\bcredentials?\b/g, 'CREDENTIAL')
+const normalizeCredentialLines = b => b.toString('utf8').replace(/retrievalCredentials/g, 'RCRED').replace(/\bcredentials?\b/g, 'CRED')
 const substance = doc.substance?.files
 if (!Array.isArray(substance) || substance.length === 0) { console.error('SUBSTANCE MANIFEST MISSING'); bad++ }
 else {

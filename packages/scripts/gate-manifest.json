@@ -83,6 +83,31 @@
       }
     },
     {
+      "id": "gate-86",
+      "kind": "script",
+      "human": "`node packages/evolution-merge-engine/scripts/verify-bundle-fresh.mjs`（审过的 src/vendor 源码与入库 index.bundle.js/manifest 必须同源）",
+      "argv": [
+        "node",
+        "packages/evolution-merge-engine/scripts/verify-bundle-fresh.mjs"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ],
+      "ci": {
+        "cwd": "upstream",
+        "argv": [
+          "node",
+          "packages/evolution/evolution-merge-engine/scripts/verify-bundle-fresh.mjs"
+        ]
+      }
+    },
+    {
       "id": "gate-85",
       "kind": "script",
       "human": "`node packages/scripts/gen-retrieval-contract.mjs --check`",
@@ -1058,7 +1083,7 @@
     {
       "id": "gate-58",
       "kind": "script",
-      "human": "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 实质冻结：仅允许声明的 8 个 sourcePatchSet（凭据传输 + 上游 prompt-input 补丁）；其余 vendor 文件 bytes/sha256 必须与 upstream 全等；steps/config/prompt/seed/threshold 等 18 个实质面另行 fingerprint）",
+      "human": "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 实质冻结：仅允许声明的 7 个 sourcePatchSet（凭据传输 + 上游 prompt-input 补丁）；其余 vendor 文件 bytes/sha256 必须与 upstream 全等；steps/config/prompt/seed/threshold 等 18 个实质面另行 fingerprint）",
       "argv": [
         "node",
         "packages/evolution-merge-engine/verify-upstream.mjs"

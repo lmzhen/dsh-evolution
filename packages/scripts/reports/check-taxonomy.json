@@ -76,7 +76,8 @@
         "gate-80",
         "gate-81",
         "gate-82",
-        "gate-85"
+        "gate-85",
+        "gate-86"
       ],
       "specs": [
         "evolution-client-kit::tests/data-table.spec.ts",
@@ -176,6 +177,7 @@
         "evolution-merge-ui::tests/sorting-panel.client.spec.ts",
         "evolution-merge-ui::tests/sorting.client.spec.ts",
         "evolution-merge::tests/authoring-manifest.spec.ts",
+        "evolution-merge::tests/engine-remote-key.spec.ts",
         "evolution-merge::tests/engine-substance.spec.ts",
         "evolution-merge::tests/run-meta-merge.spec.ts",
         "evolution-merge::tests/runtime-busy-target.spec.ts",
@@ -287,7 +289,8 @@
         "gate-80",
         "gate-81",
         "gate-82",
-        "gate-85"
+        "gate-85",
+        "gate-86"
       ]
     },
     "pre-tag": {
@@ -360,7 +363,8 @@
         "gate-80",
         "gate-81",
         "gate-82",
-        "gate-85"
+        "gate-85",
+        "gate-86"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -617,6 +621,7 @@
         "evolution-merge::tests/engine-config.spec.ts",
         "evolution-merge::tests/engine-credentials.spec.ts",
         "evolution-merge::tests/engine-probe.spec.ts",
+        "evolution-merge::tests/engine-remote-key.spec.ts",
         "evolution-merge::tests/engine-substance.spec.ts",
         "evolution-merge::tests/errors-redaction.spec.ts",
         "evolution-merge::tests/errors.spec.ts",
@@ -882,7 +887,8 @@
         "gate-80",
         "gate-81",
         "gate-82",
-        "gate-85"
+        "gate-85",
+        "gate-86"
       ]
     },
     "ci-only": {
@@ -1046,7 +1052,8 @@
         "gate-80",
         "gate-81",
         "gate-82",
-        "gate-85"
+        "gate-85",
+        "gate-86"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -1303,6 +1310,7 @@
         "evolution-merge::tests/engine-config.spec.ts",
         "evolution-merge::tests/engine-credentials.spec.ts",
         "evolution-merge::tests/engine-probe.spec.ts",
+        "evolution-merge::tests/engine-remote-key.spec.ts",
         "evolution-merge::tests/engine-substance.spec.ts",
         "evolution-merge::tests/errors-redaction.spec.ts",
         "evolution-merge::tests/errors.spec.ts",
@@ -1568,7 +1576,8 @@
         "gate-80",
         "gate-81",
         "gate-82",
-        "gate-85"
+        "gate-85",
+        "gate-86"
       ]
     },
     "full(ci=on)": {
@@ -1652,7 +1661,8 @@
         "gate-80",
         "gate-81",
         "gate-82",
-        "gate-85"
+        "gate-85",
+        "gate-86"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -1937,6 +1947,7 @@
         "evolution-merge::tests/engine-config.spec.ts",
         "evolution-merge::tests/engine-credentials.spec.ts",
         "evolution-merge::tests/engine-probe.spec.ts",
+        "evolution-merge::tests/engine-remote-key.spec.ts",
         "evolution-merge::tests/engine-substance.spec.ts",
         "evolution-merge::tests/errors-redaction.spec.ts",
         "evolution-merge::tests/errors.spec.ts",
@@ -2245,35 +2256,36 @@
         "gate-80",
         "gate-81",
         "gate-82",
-        "gate-85"
+        "gate-85",
+        "gate-86"
       ]
     }
   },
   "counts": {
     "fast": {
-      "gates": 65,
-      "specs": 142
+      "gates": 66,
+      "specs": 143
     },
     "pre-tag": {
-      "gates": 65,
-      "specs": 453
+      "gates": 66,
+      "specs": 454
     },
     "ci-only": {
       "gates": 10,
       "specs": 71
     },
     "full(ci=off)": {
-      "gates": 65,
-      "specs": 453
+      "gates": 66,
+      "specs": 454
     },
     "full(ci=on)": {
-      "gates": 75,
-      "specs": 524
+      "gates": 76,
+      "specs": 525
     }
   },
   "specs": {
-    "total": 524,
-    "marked": 524,
+    "total": 525,
+    "marked": 525,
     "unmarked": 0
   }
 }

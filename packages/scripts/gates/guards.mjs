@@ -33,6 +33,15 @@ export const guards = [
     registration: {"reason":"smoke-built-entries needs built lib artifacts and a complete platform scope that a bare local overlay does not carry","owner":"scripts/gates","expiry":"0.61.0","plan":"run after build-lib with --platform on CI; local bare-overlay invocation stays a registered cannot-decide","renewal":"Renewed at 0.61.0: local overlay still lacks the platform scope; CI (`main release`) builds and validates the packed entries, so this registration covers only the no-build local invocation."},
   }),
 
+  gate("gate-86", {
+    kind: "script",
+    tree: "mirror",
+    title: "`node packages/evolution-merge-engine/scripts/verify-bundle-fresh.mjs`（审过的 src/vendor 源码与入库 index.bundle.js/manifest 必须同源）",
+    argv: ["node","packages/evolution-merge-engine/scripts/verify-bundle-fresh.mjs"],
+    ci: { cwd: "upstream", argv: ["node","packages/evolution/evolution-merge-engine/scripts/verify-bundle-fresh.mjs"] },
+    lanes: ["local","ci-static"],
+  }),
+
   gate("gate-85", {
     kind: "script",
     tree: "mirror",
@@ -429,7 +438,7 @@ export const guards = [
   gate("gate-58", {
     kind: "script",
     tree: "mirror",
-    title: "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 实质冻结：仅允许声明的 8 个 sourcePatchSet（凭据传输 + 上游 prompt-input 补丁）；其余 vendor 文件 bytes/sha256 必须与 upstream 全等；steps/config/prompt/seed/threshold 等 18 个实质面另行 fingerprint）",
+    title: "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 实质冻结：仅允许声明的 7 个 sourcePatchSet（凭据传输 + 上游 prompt-input 补丁）；其余 vendor 文件 bytes/sha256 必须与 upstream 全等；steps/config/prompt/seed/threshold 等 18 个实质面另行 fingerprint）",
     argv: ["node","packages/evolution-merge-engine/verify-upstream.mjs"],
     ci: { cwd: "upstream", argv: ["node","packages/evolution/evolution-merge-engine/verify-upstream.mjs"] },
     lanes: ["local","ci-static"],

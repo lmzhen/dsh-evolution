@@ -63,7 +63,7 @@ merge host：RetrievalCredentials 端口
         │ 作为运行参数，不进入 cfg
         ▼
 merge-engine.screen(input.credentials)
-  ├─ engine：显式运行 Key 传入 provider（8 个声明式 sourcePatchSet）
+  ├─ engine：显式运行 Key 传入 provider（7 个声明式 sourcePatchSet）
   ├─ ④/④.5 档位、阈值、seed、降级顺序完全不变
   └─ 其余 stage / judge / seed / thresholds 完全不变
         ▼
@@ -108,21 +108,21 @@ export async function resolveRetrievalCredentials(
 实现：
 
 - `vendor/src/scan.js` / `src/engine.js` 的 `screen(input)` 接受 `credentials?: RetrievalCredentials`，通过 `runPipeline` 的运行时 `state.retrievalCredentials` 传递；不进 cfg、不进 report。
-- `vendor/src/stages/semantic.js` / `stages/rerank.js` 从 `ctx.state.retrievalCredentials` 取显式 Key，传给 provider 构造。
+- `vendor/src/pipeline/index.js` 的 live semantic stage 从 `ctx.state.retrievalCredentials` 取显式 Key，传给 provider；`stages/rerank.js` 同理。
 - `vendor/src/screening/semantic.js` 的 `RemoteEmbedder` 使用显式 `key`（已支持 `o.key`）；`vendor/src/rerank/index.js` 的 `apiKeyConfigured/scoreRemote` 增加同语义显式 `credential`。
 - **不改** stage 顺序、模型、阈值、prompt、seed/round/floor、降级链、judge 逻辑。
 - `clearRetrievalCredentials` 不再需要；不写 `process.env`。
 
 门禁升级：`verify-upstream` 从“全文件字节相等”改为“实质冻结 + 声明式传输补丁”：
 
-- 允许 `UPSTREAM.json.sourcePatchSet` 列出的 5 个凭据传输文件使用 patched hash，且 reason 必须非空、路径必须在 allowlist；
+- 允许 `UPSTREAM.json.sourcePatchSet` 列出的 7 个文件使用 patched hash，且 reason 必须非空、路径必须在 allowlist；
 - 其余全部 vendor 文件（含 `models/registry.json`、`data/minhash_params.json`、`config/schema.js`、`screening/candidates.js`、`pipeline/compose.js`、`judge/**`、prompt 相关文件）仍必须与 upstream 字节相等；
 - 新增 parity/回归测试证明无 Key 路径 cfg/report 不变、档位/阈值/seed 不漂移。
 - gate-58 改名为 engine substance parity；local + ci-static 都跑。
 
 ### 4.3.1 实质覆盖清单
 
-`UPSTREAM.json.substance` 单独冻结 20 个实质面，不依赖 8 个 sourcePatchSet 的 hash：
+`UPSTREAM.json.substance` 单独冻结 19 个实质面，不依赖 7 个 sourcePatchSet 的 hash：
 
 | 面 | 文件 | 方式 |
 |---|---|---|
@@ -134,13 +134,13 @@ export async function resolveRetrievalCredentials(
 | 判定 prompt/provider | `src/judge/prompt.js`、`judge/deepseek.js` | exact |
 | 降级分类 | `src/degrade.js` | exact |
 | 语义选择/精排 | `screening/semantic.js`、`rerank/index.js` | 去 credential 行后 hash |
-| stage 接线/scan | `stages/semantic.js`、`stages/rerank.js`、`scan.js` | 去 credential 行后 hash |
+| stage 接线/scan | `pipeline/index.js`、`stages/rerank.js`、`scan.js` | 去 credential 行后 hash |
 | 外层 judge/stage/report 接线 | `src/engine.js` | 去 credential 行后 hash |
 
-`verify-upstream` 同时校验：324 文件基线 bytes/hash、8 个 sourcePatchSet、20 个 substance fingerprint；任何 steps/config/prompt/seed/threshold 改动都会红，只有 credential 传输行可从 normalize 清单排除。
+`verify-upstream` 同时校验：324 文件基线 bytes/hash、7 个 sourcePatchSet、19 个 substance fingerprint；任何 steps/config/prompt/seed/threshold 改动都会红，只有 credential 传输行可从 normalize 清单排除。
 
 ```text
-ENGINE SUBSTANCE OK 324 (declared credential patches: 8; substantive fingerprints: 20)
+ENGINE SUBSTANCE OK 324 (declared credential patches: 7; substantive fingerprints: 19)
 ```
 
 ### 4.4 共享常量
@@ -294,7 +294,7 @@ API Key 只保存在本机，保存后不再显示。
 ## 8. 实施顺序与文件影响
 
 1. **设计/契约**：本文件；`retrieval-contract.json` + 生成器 + `--check`；UI 文案 key 冻结。
-2. **Engine 显式端口**：`merge-engine/src/engine.js` 接受运行 Key，vendor 5 个凭据传输文件取 `ctx.state.retrievalCredentials`；更新 `UPSTREAM.json.sourcePatchSet` 与 `verify-upstream` 实质冻结门禁；重新生成 `src/index.bundle.js`。
+2. **Engine 显式端口**：`merge-engine/src/engine.js` 接受运行 Key，7 个声明式补丁取 `ctx.state.retrievalCredentials`；更新 `UPSTREAM.json.sourcePatchSet` 与 `verify-upstream` 实质冻结门禁；重新生成 `src/index.bundle.js`。
 3. **Host 凭据端口**：`evolution-merge/src/domain/retrieval-credentials.ts`、`adapters/engine-screen.ts`、`index.ts`、`scan-run.ts` 透传。
 4. **UI**：`evolution-ui` settings store/card + `ui-primitives` secret field；`evolution-merge-ui` 状态/链接；8 locale。
 5. **测试/文档**：上述测试、report/run.meta 泄漏测试、真实 fresh 验收；更新包 README、INSTALL、索引。
@@ -324,17 +324,17 @@ API Key 只保存在本机，保存后不再显示。
 
 ## 12. 实现进度（本 goal 内持续更新）
 
-- 已落地：`retrieval-contract.json` + host/client generated contract + `--check` 脚本；host `resolveRetrievalCredentials`；engine `screen(credentials)` explicit runtime key（5 个声明式传输补丁；其余 vendor 字节与实质面校验通过；engine 2 个测试）；`evolution-ui` 设置页 `RetrievalCard`（两把可选 Key、来源、保存/清除、不可用/失败状态）；`retrieval-credentials` 单测、`retrieval-card` 9 个组件测试、`MergeSettings` 1 个指路测试、UI 8 locale 经独立母语审校。
+- 已落地：`retrieval-contract.json` + host/client generated contract + `--check` 脚本；host `resolveRetrievalCredentials`；engine `screen(credentials)` explicit runtime key（7 个声明式 sourcePatchSet；其余 vendor 字节与 19 个实质 fingerprint 通过；engine 4 个测试）；`evolution-ui` 设置页 `RetrievalCard`（两把可选 Key、来源、保存/清除、不可用/失败状态）；`retrieval-credentials` 单测、`retrieval-card` 10 个组件测试、`MergeSettings` 1 个指路测试、UI 8 locale 经独立母语审校。
 - 已落地：合并建议页显示 host view 的 retrieval 布尔事实（本地/部分云端/云端已启用）和静态指路“设置 → 能力进化”；不返回 Key，不出现输入框；
 - 真机验证：lab84 fresh profile（0.60.1 dev pack）最终设置页截图 `D:/dsh/_lab84_settings_final2.png`；假 Key 保存后显示“向量走云端，精排用本地 / 已保存在本机”，清除后回到本地模式（测试 key 已清除）。
 - 待落地：合并页可点击打开设置（需平台公开 openSettings seam）、全量门禁/发布链、真实官方 API Key 端到端。
-- 已知偏差/修正：explicit runtime key 需要 5 个 vendor 凭据传输补丁，DCR-6 已把门禁从字节冻结改为实质冻结；UI 字段使用家族自己的 password 输入而非直接 import 平台 `SettingsSecretField`（编译 face 约束）；凭据写入仍是平台 `remote.credentials`，语义不变。
+- 已知偏差/修正：explicit runtime key 需要 7 个声明式 sourcePatchSet，DCR-6 已把门禁从字节冻结改为实质冻结；UI 字段使用家族自己的 password 输入而非直接 import 平台 `SettingsSecretField`（编译 face 约束）；凭据写入仍是平台 `remote.credentials`，语义不变。
 
 ## 12.1 DCR-6：实质冻结取代字节冻结（用户确认 2026-11-24）
 
 字节冻结的本意是防实质回退，不是禁止为实现逻辑等价变化而改具体函数。为完成 UI 凭据接入，采用 explicit runtime key：
 
-- 5 个 vendor 文件做凭据传输补丁，列入 `sourcePatchSet`，逐文件写 reason；
+- 7 个文件进入 `sourcePatchSet`（凭据传输 + pipeline + 两个上游 prompt-input 补丁），逐文件写 reason；
 - 其余 vendor 文件仍字节冻结；实质面（模型/阈值/prompt/seed/降级/stage 顺序）由未修改文件的 hash 和 parity 测试共同保护；
 - 不再使用 env 投影，不写 `process.env`；
 - 门禁 `verify-upstream` 现在验证“允许的传输补丁 + 其余字节相等”，不是无条件字节相等。
@@ -343,11 +343,11 @@ API Key 只保存在本机，保存后不再显示。
 
 ## 12.2 本轮验证状态（2026-11-24）
 
-- 定向：29 tests 通过（engine explicit-key 2、engine substance 4、host resolver 3、UI card 10、merge settings/status、merge routes、api retrieval、i18n/gates）。
+- 定向：30 tests 通过（engine explicit-key 2、engine substance 4、host resolver 3、UI card 10、merge settings/status、merge routes、api retrieval、i18n/gates）。
 - 本地全量：Node 22 + `D:\dsh-homes\_suite-home` 下 3122 passed / 6 failed；6 个失败全部是 `evolution-host/tests/installer.spec.ts` 与 `installation-matrix.spec.ts` 的本地 installer 环境（EPERM `evolution` mkdir / 60s 超时），无 feature 失败。
 - CI 全量已绿：run `45221992667`（commit `b8be64eb`）9/9 jobs 成功：platform line、pack release bytes、cohort validate、validate released upstream、validate node22、desktop install、cohort evidence；publish 未执行（非发布 tag）。
 - 本地门禁：`run-gates local` pass=62 / fail=0 / cannotDecide=3（gate-05 构建产物、gate-29 缺 plane home、gate-81 health admission；均为未注册 cannot-decide，后续按 gate 语义收口）；已重新生成 `line-manifest.json` / `check-taxonomy.json` 并同步 overlay。
-- engine 实质门禁：`ENGINE SUBSTANCE OK 324 (declared credential patches: 8; substantive fingerprints: 20)`。
+- engine 实质门禁：`ENGINE SUBSTANCE OK 324 (declared credential patches: 7; substantive fingerprints: 19)`。
 - 未发布；最终 fresh npm/web 验收和独立复核待后续轮次。
 
 ## 13. 与审计台账的关系

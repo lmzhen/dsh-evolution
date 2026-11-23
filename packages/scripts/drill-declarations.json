@@ -376,6 +376,9 @@
     },
     "gate-85": {
       "noDrillReason": "retrieval contract generator --check: red when the generated host/client constants drift from packages/scripts/retrieval-contract.json; covered by the generator check itself"
+    },
+    "gate-86": {
+      "noDrillReason": "bundle freshness gate: red when reviewed source or checked-in bundle bytes drift; the manifest intentionally records both"
     }
   }
 }

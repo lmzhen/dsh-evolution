@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "entry": "src/index.js",
   "bundle": "src/index.bundle.js",
-  "bundleSha256": "4d2477afab6c1df4bca41e66fcbd4cd48c3ba4926df8f46e5acc8fa2aaec3b50",
-  "sourceSha256": "3cebae673f9ce2559e5b5bfcd9e96d280d5584c0b0e718dac3c1341e9984e28c",
+  "bundleSha256": "c3c8b909b59f0e5ad6e41b396525938da40ab85fbdad0b7acbbc052c02c02d7b",
+  "sourceSha256": "bed304cfcdd924d93a84eb45f916e2b7e30b8e5ad0a7ae99ab5b97c04e9ed089",
   "sourceFiles": [
     {
       "path": "src/engine.js",
@@ -347,7 +347,7 @@
     },
     {
       "path": "vendor/skill-merge-pipeline/src/stages/semantic.js",
-      "sha256": "92962d2b7e0c9262bb3c7eae6eec77251bd64fa568d7c2cfa5050c4a81320a57"
+      "sha256": "07058ae23f9e8fe7f466d25cc2d16432a9b384d282210d0013ca298e757932dc"
     },
     {
       "path": "vendor/skill-merge-pipeline/src/text/artifact.js",

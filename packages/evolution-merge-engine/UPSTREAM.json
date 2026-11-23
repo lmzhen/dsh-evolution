@@ -1719,12 +1719,6 @@
       "reason": "pass credentials into runPipeline state for remote provider key lookup; no stage/model/seed change"
     },
     {
-      "path": "node/src/stages/semantic.js",
-      "patchedSha256": "92962d2b7e0c9262bb3c7eae6eec77251bd64fa568d7c2cfa5050c4a81320a57",
-      "patchedBytes": 1191,
-      "reason": "read runtime embedding credential from ctx.state; same stage order and args"
-    },
-    {
       "path": "node/src/stages/rerank.js",
       "patchedSha256": "bed8ce4b0c0565d408747f26eed72e16d87c8ed7d28ac336240f9dc7536511db",
       "patchedBytes": 603,
@@ -1804,8 +1798,8 @@
         "path": "vendor/skill-merge-pipeline/src/pipeline/index.js",
         "mode": "normalize",
         "purpose": "semantic stage orchestration, key transport excluded",
-        "sha256": "354818815bb219009bab15768fecf93e2f08e3f72723e14329ae93d15e11c61f",
-        "bytes": 4251
+        "sha256": "67a20ddafced97fdc36092953b66f1566bb8fe62fd289de3016e6046e9f4f521",
+        "bytes": 4235
       },
       {
         "path": "vendor/skill-merge-pipeline/src/embed/registry.js",
@@ -1839,43 +1833,36 @@
         "path": "vendor/skill-merge-pipeline/src/screening/semantic.js",
         "mode": "normalize",
         "purpose": "semantic selection/threshold use, key line excluded",
-        "sha256": "8a09d1234920aa3755e2a1e3bda51411905d86b27d17f6358a8efa90e9a7e444",
-        "bytes": 8404
+        "sha256": "47c6544b620871b3f53ee9620e1d770d19f5d65b343062409d9a214cd7fc3845",
+        "bytes": 8386
       },
       {
         "path": "vendor/skill-merge-pipeline/src/rerank/index.js",
         "mode": "normalize",
         "purpose": "rerank tier/score/prompt, key line excluded",
-        "sha256": "1244dcabcb686013171ae5d846ab878f71d54be25e1feec967f9f3b9b7098007",
-        "bytes": 23320
-      },
-      {
-        "path": "vendor/skill-merge-pipeline/src/stages/semantic.js",
-        "mode": "normalize",
-        "purpose": "semantic stage wiring, key line excluded",
-        "sha256": "afc80cb47972a70d90f94bfb469e9848fc34c8e4689b4ab993e259cb57256c70",
-        "bytes": 1170
+        "sha256": "c92ea942b6b67dba2d9d93d17a47b6f0a1da501cf29d5f4a97fe01cf546ffe92",
+        "bytes": 23254
       },
       {
         "path": "vendor/skill-merge-pipeline/src/stages/rerank.js",
         "mode": "normalize",
         "purpose": "rerank stage wiring, key line excluded",
-        "sha256": "e82a003b45c9d005731256306bd3274977488130fdc6c4d0e7699f7e12b9c120",
-        "bytes": 582
+        "sha256": "c79c9f89c5c898a9fa39cfa95ca3bc30eddeed4896a7f76c5b2d045f9e0e633d",
+        "bytes": 566
       },
       {
         "path": "vendor/skill-merge-pipeline/src/scan.js",
         "mode": "normalize",
         "purpose": "scan orchestration, key line excluded",
-        "sha256": "8e8457fee427cb915a98d9dd04e55d1ba7b47bc7054193489143b0fc27e68c16",
-        "bytes": 5966
+        "sha256": "8373e8e32a3de0086e1f563c1f2f27f629911e6dacd7ccd164ae838b8014c901",
+        "bytes": 5949
       },
       {
         "path": "src/engine.js",
         "mode": "normalize",
         "purpose": "wrapper judge/stage/report wiring, key line excluded",
-        "sha256": "89218da57e5724d4f9ea9438e76ab4d3abc2c2b7586e2ebb21f9f6193adaf937",
-        "bytes": 6560
+        "sha256": "fec70724ade677cf7848e98d00320e57a2624ce476c1793cda9d2fb8c669f3c7",
+        "bytes": 6507
       },
       {
         "path": "src/report-map.js",
