@@ -26,7 +26,7 @@ const files = [
   ...walk(join(root, 'src')).map(rel => 'src/' + rel),
   ...walk(join(root, 'vendor', 'skill-merge-pipeline', 'src')).map(rel => 'vendor/skill-merge-pipeline/src/' + rel),
 ].sort()
-const sourceFiles = files.map(rel => ({ path: rel, sha256: sha(readFileSync(join(root, rel))) }))
+const sourceFiles = files.map(rel => ({ path: rel, sha256: sha(Buffer.from(readFileSync(join(root, rel)).toString('utf8').replace(/\r\n/g, '\n'))) }))
 const sourceSha256 = sha(Buffer.from(sourceFiles.map(file => file.path + '\0' + file.sha256).join('\n')))
 
 const result = spawnSync(esbuild, [
