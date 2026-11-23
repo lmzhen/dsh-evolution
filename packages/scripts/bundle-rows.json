@@ -227,6 +227,20 @@
       "leads": {}
     },
     {
+      "id": "evolution-io-node",
+      "group": "evolution-io",
+      "forms": [
+        "all",
+        "host"
+      ],
+      "lead": [],
+      "body": [
+        "      name: '@deepseek-ai/dsh-evolution-core/io-node'"
+      ],
+      "bodies": {},
+      "leads": {}
+    },
+    {
       "id": "evolution-io-platform",
       "group": "evolution-io",
       "forms": [
