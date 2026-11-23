@@ -178,7 +178,7 @@ runs:
       shell: bash
       working-directory: upstream
       run: |
-        node node_modules/vitest/vitest.mjs run packages/evolution/evolution-host/tests/guard-scripts.spec.ts \
+        node node_modules/vitest/vitest.mjs run packages/evolution/evolution-core/tests/state/domain/compatibility.spec.ts \
           -c packages/evolution/scripts/vitest.family.config.mjs --reporter=json \
           --outputFile="$RUNNER_TEMP/debug-suite.json" || true
         grep -m 3 -A 20 'failureMessage\|Error' "$RUNNER_TEMP/debug-suite.json" || true
