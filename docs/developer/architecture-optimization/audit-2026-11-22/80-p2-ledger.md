@@ -33,6 +33,7 @@
 
 | ID | 状态 | 修复/证据 |
 |---|---|---|
+| D1-STORE-PIN | FIXED | 显式 `provider: store` 现在要求 migration marker 存在并校验完整 store 镜像；缺 marker 时 mount/首次读即报错，不再把空 store 当权威。
 | D1-MARKER-FAIL | FIXED | `migrateDomainToStore` 现在遇到已存在且可解析的 store、但 marker 缺失时，按 store 内容补写 `domain-store-recovered` marker 并返回真实计数；不再拒绝重试。
 | D2-HANDLE | FIXED | `unit-kernel.ts` 的 PreparedMutation 现在由 WeakMap 状态机消费：prepare→committing→released；重复 commit 返回 `unit-handle-consumed`，release 幂等。
 | D2-JOURNAL-FAIL | FIXED | snapshot committed 成为恢复权威；之后的 journal committed 失败只入 warnings，不再触发 target rollback + 已 committed snapshot 的分叉。

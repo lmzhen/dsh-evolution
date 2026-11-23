@@ -123,7 +123,14 @@ export class EvolutionState extends Service {
       }
       return
     }
-    if (this.providerName !== '') return
+    if (this.providerName !== '') {
+      if (this.providerName === PROVIDER_STORE) {
+        const marker = join(this.home, 'state', STATE_MIGRATION_MARKER)
+        if (!existsSync(marker)) throw new Error('evolution-state: provider "' + PROVIDER_STORE + '" is pinned but the migration marker is missing; refusing to read an empty store as authority')
+        this.assertMarkerStore()
+      }
+      return
+    }
     const names = this.ctx.evolutionStateStorage.providerNames()
     if (names.length <= 1) return
     throw new Error(

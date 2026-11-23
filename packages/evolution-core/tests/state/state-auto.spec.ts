@@ -45,6 +45,15 @@ describe('state provider auto', () => {
     expect(await ctx.evolutionState.loadCuratorState()).toBeNull()
   })
 
+  it('refuses an explicit store pin without the migration marker', async () => {
+    const root = await tempRoot('dsh-state-pin-store-')
+    const evolution = join(root, 'evolution')
+    process.env.DSH_HOME = root
+    const ctx = await mountStateStack(evolution)
+    await ctx.plugin(StorePlugin)
+    await expect(ctx.plugin(EvolutionState, { provider: 'store', home: evolution })).rejects.toThrow(/migration marker is missing/)
+  })
+
   it('fails loud when the marker exists but the store is missing', async () => {
     const root = await tempRoot('dsh-state-auto-half-')
     const evolution = join(root, 'evolution')
