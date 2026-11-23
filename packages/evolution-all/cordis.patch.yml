@@ -36,6 +36,11 @@
     # ── IO seam: one registry, one node:fs provider ─────────────────────────
     - id: evolution-io
       name: '@deepseek-ai/dsh-evolution-core/io-registry'
+    # 0.60.1 P1: the node:fs provider is the default the merge state needs on a
+    # fresh home. The profile is not guaranteed to carry it, so the bundle owns
+    # the registration; `io-platform` remains the host-fs observer provider.
+    - id: evolution-io-node
+      name: '@deepseek-ai/dsh-evolution-core/io-node'
     - id: evolution-io-platform
       name: '@deepseek-ai/dsh-evolution-core/io-platform'
     - id: evolution-authority

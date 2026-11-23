@@ -25,10 +25,15 @@
     name: '@lmzhen/dsh-evolution-core/io-node'
   ```
 - 同步 host/all 两处 patch 与 `bundle-mutual-exclusion` 守卫、0.60.1 CHANGELOG/版本；重跑发布链。
-- 发布版本必须是 **0.60.1**（不能覆盖 0.60.0）；按发布纪律需用户明确确认后才 bump / tag / publish。
+- 发布版本必须是 **0.60.1**（不能覆盖 0.60.0）；用户已明确确认。
+
+## 修复验证
+
+- host/all 两处 patch 已加入 `evolution-io-node`；`bundle-mutual-exclusion` 新增守卫（4/4 pass）。
+- 0.60.1 dist 全新安装到 `D:\dsh-homes\lab601`：`diagnostics` 200 / family-version 0.60.1，`merge/view` **200**（不再需要手工补 profile patch）。
+- 发布链在 0.60.1 tag 上重跑。
 
 ## 当前状态
 
-- npm：0.60.0 已发布，**存在新装 P1**；
-- 代码：main 尚未 bump 0.60.1，未提交该修复；
-- 需要用户确认是否发 0.60.1。
+- npm：0.60.0 已发布（存在新装 P1，被 0.60.1 修复）；0.60.1 待发布。
+

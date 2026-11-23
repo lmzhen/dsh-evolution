@@ -1,3 +1,9 @@
+## 0.60.1 (2026-11-23) — 新装 IO provider 修复
+
+- P1：`evolution-all` / `evolution-host` 的 bundle patch 现在注册 `evolution-io-node`（node:fs provider），新 profile 不再因缺少默认 IO provider 卡在 `merge-state-v4-required` / `no evolution IO provider registered`；
+- 回归：`bundle-mutual-exclusion` 断言 host/all 两处 patch 都携带 `evolution-io-node`；
+- 其余 0.60.0 行为不变；已装 0.60.0 的 profile 只缺这一行，升级 0.60.1 后重启即可。
+
 ## 0.60.0 (2026-11-23) — 目标架构收口：StateStore 迁移、UnitKernel、派生端口
 
 - D1：新增文件 StateStore provider、显式 `/evolution migrate state [--dry-run]`、迁移 marker、`provider: auto`；状态操作与迁移共用跨进程 `state.lock`，迁移前刷新 domain provider，迁移后重启自动使用 store；

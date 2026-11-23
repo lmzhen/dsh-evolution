@@ -50,6 +50,14 @@ describe('0.3.54: dsh-evolution-all full bundle (route B)', () => {
     }
   })
 
+  it('0.60.1: the bundle owns the node:fs IO provider (fresh-home merge state)', () => {
+    for (const [label, patch] of [['host', hostPatch], ['all', allPatch]] as const) {
+      expect(patch.get('evolution-io-node')?.name, `${label} evolution-io-node`).toBe(
+        '@deepseek-ai/dsh-evolution-core/io-node',
+      )
+    }
+  })
+
   it('all row set = host infra ∪ 3 model rows ∪ the all-only rows', () => {
     expect(allPatch.size).toBe(hostPatch.size + MODEL_TOOLS.length + ALL_ONLY_ROWS.length + ALL_EXTRA_INFRA.length)
     for (const id of ALL_EXTRA_INFRA) expect(hostPatch.has(id), `${id} must stay all-only`).toBe(false)
