@@ -5,9 +5,15 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-// The published lib is derived from the checked-in bundle. Always rebuild it
-// from src/index.js so reviewed source and shipped bytes cannot diverge.
-execFileSync(process.execPath, [join(root, 'scripts', 'bundle-source.mjs')], { cwd: root, stdio: 'inherit' })
+// The published lib is derived from the checked-in bundle. Rebuild it when
+// esbuild is available; otherwise require the checked-in source fingerprint.
+try {
+  execFileSync(process.execPath, [join(root, 'scripts', 'bundle-source.mjs')], { cwd: root, stdio: 'inherit' })
+} catch (error) {
+  const text = String(error && error.message || error)
+  if (!/esbuild|ENOENT/i.test(text)) throw error
+}
+execFileSync(process.execPath, [join(root, 'scripts', 'verify-bundle-fresh.mjs')], { cwd: root, stdio: 'inherit' })
 const lib = join(root, 'lib')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const version = String(pkg.version)

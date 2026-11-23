@@ -1,0 +1,377 @@
+{
+  "schemaVersion": 1,
+  "entry": "src/index.js",
+  "bundle": "src/index.bundle.js",
+  "bundleSha256": "4d2477afab6c1df4bca41e66fcbd4cd48c3ba4926df8f46e5acc8fa2aaec3b50",
+  "sourceSha256": "3cebae673f9ce2559e5b5bfcd9e96d280d5584c0b0e718dac3c1341e9984e28c",
+  "sourceFiles": [
+    {
+      "path": "src/engine.js",
+      "sha256": "2da8d77c78eda5241df3cbe9671dac87a93ad47f3eb214c2c4c745d9e0579548"
+    },
+    {
+      "path": "src/index.js",
+      "sha256": "c1cef9ec29e4fcb6e02f7d3f63472bc468c29bb7f5547c3979b9f7936f27f4d9"
+    },
+    {
+      "path": "src/report-map.js",
+      "sha256": "d08c36e7e74cc16e6fa927fdfd9d79204d67355a3aaf100c77babdafde31e38a"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/arch-rules.js",
+      "sha256": "089303dc86d6c3fac5d2b30e098d867294412c76475fc2bf876a57ad9d95cf60"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/attempt.js",
+      "sha256": "be39c4a3cd828dfcbdbd29cdf91561431389db777cb1f2fc5fc8e4d088a553b8"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/cli.js",
+      "sha256": "ca26545f4da73c98d03860cce2bc52f8d810050ab8dc43764bdf62c024ffce19"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/cli/plan.js",
+      "sha256": "46ceefd4f30b39c60cb986c72a1f08ceb005363318b9bbb445b9df64ff6e6f35"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/cli/scan.js",
+      "sha256": "cca8f690c5438f521d6eb5580260378165cc9b889abca6ce0fdea11611f2ce91"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/config.js",
+      "sha256": "bbd4efe6caaa0c65c8ad46261ceeb148bfe43f271bc9173596efc043a87e6ee0"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/config/schema.js",
+      "sha256": "c86bfb2db473843d11b667500a7b92b0d9ea0e3653de874a221455ce3721db6f"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/contracts.js",
+      "sha256": "742b05b8fc780b66b700a8ca104742b1b6a61c816bb908b5c06323357af16cee"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/contracts/merge.js",
+      "sha256": "e56c659c587ed678196dd70bd0120ae0ed60b77db1497dd5b3b0f232b707ab84"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/contracts/report.js",
+      "sha256": "6853fcf3fd56fc7b72ad8e8dda1d01cb5551706f3849a43a50c121e0e673db61"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/contracts/stage.js",
+      "sha256": "9d88ea3f61a811c811a3175b558e7260efc59467d4de08629e0601bb374638c7"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/corpus.js",
+      "sha256": "6210baa0439c10d50f4729b38822b0706c6dd0fb742dfdc3063083bc87cfe442"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/data/minhash_params.json",
+      "sha256": "f638ae97a3a02091901b57f63feecdf9494744631c45a2e4525b8793187daca1"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/degrade.js",
+      "sha256": "88e7b35cf5bab2ee370a122f2bc8ca5c11e92a16e6ef77679693b9be3868ab92"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/embed/calibrate.js",
+      "sha256": "24f693d9d853e0b0d60545dbefc27307349993aef2d45bf9bd51b28a3acd1ef7"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/embed/chain.js",
+      "sha256": "392e754d31d01ff3d4480d00d0035631b1b27e10c43c96bff8efadd657c54ee8"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/embed/onnx.js",
+      "sha256": "d10077ad9019f602a2bbcd068d3778d555df8454461f113d0ebaa6feaf4942f4"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/embed/provider.js",
+      "sha256": "2064ed437b31e3ff4704e62d1b44640a072555f57b1e273a760796a681017322"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/embed/registry.js",
+      "sha256": "87c0fba4fc4d3c11c265694ade4ef5174c8ffd4f57ec3e256a66601294fc1242"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/embed/remote.js",
+      "sha256": "3af548f3be6575f3611bee1e3cc7b33c223af0f34abb30c52e0e5218575b5506"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/embed/static_table.js",
+      "sha256": "8743afa1af067156c68a9d0cc6fea80f3bc0c0248071c4e7fe923de623393f33"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/errors.js",
+      "sha256": "4e5fb421149ade9a2a495fcbdd72b9debd8a8f774955c5af52dbc4d50b937c71"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/evidence.js",
+      "sha256": "042028c2a689b748dd4c0f41b2998f7271c6cf6d843d31c2a7972d95ce4759f7"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/extract.js",
+      "sha256": "df90f4d7dd1022f6906329bbb859d91ad3906e2be15dad050ee429e3930d3a96"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/index.js",
+      "sha256": "22232c77c4b98a4d7a6ff2d75b558e6dae88fe9495762df6e5ef3bdb64cea103"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/io/bytes.js",
+      "sha256": "35bdb7b1a9d8bc748181ca0b4ed8f201aa944136b722f9d03aa524ac4aa7af0d"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/io/read.js",
+      "sha256": "fa2eadb8a4ec0daf5993d813ba1015604ec8f924ea9a0582aaadc1422ff0e40d"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/io/write.js",
+      "sha256": "d8059d28c23909045058f40631d0dc8e09862487d46ce7f9c6544c7911811952"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/judge.js",
+      "sha256": "4ab35aa5d7e4e9ec4f1a12e6110d87303d7f30889af5129b44ebff80d512e3d1"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/judge/cache.js",
+      "sha256": "651b56a90913e2f99c7ae0011a3dc96a3cd965a8857a36429d911cea4137a1d5"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/judge/cascade.js",
+      "sha256": "6c079ea78bde1609babe5b4e32410f9f4a855cda0e59ce45c33ea22bd036147c"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/judge/deepseek.js",
+      "sha256": "78d2606462af74a097ca6d9733613d64aa477afa1ba9d6815ae3c017f15029d3"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/judge/prompt.js",
+      "sha256": "4bc96d1ac4ed3e8208c94317932c4047ada72f402188026bd30d8cae01ed9115"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/judge/provider.js",
+      "sha256": "add9aa0001e95ee0a7aa474c346a881bbf4d1fea71eff95ba499a8a2ae631420"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/judge/stub.js",
+      "sha256": "f41ee40b3696ce11098f50033f559348451ee70eb047e22c286883c1febb08ca"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/judge/verdict.js",
+      "sha256": "27280e7f7333f1c64e4e64daf9ae03397c047c17d40a916eb3a75053e3177e43"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/ledger.js",
+      "sha256": "419c15f9c43e33b8f6bce4b0d82907a1b95c222d315ad59b540626dd87da1dab"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/merge/card.js",
+      "sha256": "5dab33589da3507a5933cfb8484ff5203fbc50e31eda166ccff281171053f024"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/merge/classify.js",
+      "sha256": "3499b85eaf36a252decb53c99371406f6d437fba47ab3e299039401e7172ada7"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/merge/index.js",
+      "sha256": "523e22e227394cdfcb8543a7b6fd7e4f334b5ddedcbd6a682285415b8a691d52"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/merge/llm.js",
+      "sha256": "a17c74b3c4db43c136a575adadb79533481d8e416957c83d98ee23bdb2c99dbc"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/merge/plan.js",
+      "sha256": "c35abb969cb51bcb1bbb2733865e2534f2c2da42ede18ea3976c6a8a946f8be2"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/merge/schema.js",
+      "sha256": "d734437af71daf9f1dd0380c899c01d94ec3c6f9a06826bfc52c7868126a942e"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/merge/summary.js",
+      "sha256": "a7356bec3da9e7bf7c203a2af4090fbcd24aa4698b2e3d9022ae5177aaab8a7f"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/minhash/lsh.js",
+      "sha256": "8a858aa6afb2b9c510fb787efb874c2b79a22873465690dd938e2fd86c8e189a"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/minhash/signature.js",
+      "sha256": "12e30d7faf8c1b3187dda372d8978366b5b83296c2a9becdc5b0033dc457b643"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/models/build.js",
+      "sha256": "347e7106098792a3b8a1b3fdf4058c0a8d7adcccfc36f3a4ffeedb2c44bb6e2d"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/models/doctor-cli.js",
+      "sha256": "1ad40479deaed83bff1852e7466f5d4cd465ab5e29bdd981f8f4a005f1035f64"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/models/doctor.js",
+      "sha256": "9ae3954713c39749cf844040f142b04aefdebd36fedfe51e3809260d36db651c"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/models/ensure-cli.js",
+      "sha256": "4fed709291841be4c115ace9a532063426690999058f83313b4879f81115bce6"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/models/firstrun.js",
+      "sha256": "38235384db790a8080901e5d209eeb2f8e857df73a7466e249b930e857c2c292"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/models/provision.js",
+      "sha256": "520107fa28dbcf9cd339100aa8510ff46b249a23c4d7ce9c69d9ce5cdcb6bb7a"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/models/registry.js",
+      "sha256": "7c67fede2955a4917245d0f65a8f67a6678db77e9af1459812e83f4ac65b8906"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/models/safetensors.js",
+      "sha256": "36ede2484169a8fd95cfea78a53174366406d0aaae2a041315f03f144d16781b"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/models/supply.js",
+      "sha256": "ecadb3317b7b0426f9a8eac45bc91b780c1fb123eeed90af3749dd0a8c2ce8fd"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/net/proxy.js",
+      "sha256": "b539cb8bf125f8d24633928acdb6f8039bd61acc514f2f871e5acf725f858bf6"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/net/retry.js",
+      "sha256": "f14905f47bc1170f782d9896c72c82e3959a750cd63fa6904803198a27ae0ca4"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/net/signal.js",
+      "sha256": "a011e61f77a0575e67883207e91e58357199e61b6e1f24d6f73aefdfe235a95d"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/numeric.js",
+      "sha256": "41656ab2c25138a433110f498c5f5f6e72f772ca14d4da6a7a6f239e17028d97"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/pipeline/compose.js",
+      "sha256": "38ef56bb4c0cf86650ab4b4818b00d18770806bd0f5d6882e09fd8992cfeb5a8"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/pipeline/context.js",
+      "sha256": "519dc2883e662de2e45a529b6b9e362044a68aa2d341ca9fb6c37a872741d60e"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/pipeline/index.js",
+      "sha256": "72cb09d3f2252421eb4642279182a09d35c9b236be062de1b861a95880fe4557"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/pipeline/stage.js",
+      "sha256": "960882a642973bb240d6d074c967d1b4131c9dbae2a076d012d273ca5bf7c739"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/pyrandom.js",
+      "sha256": "986e48a1d8932d126672ceb8be3344e0bc208c7c64b4da5417b34905d3d283a2"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/report.js",
+      "sha256": "3054eb1a8a23b802dbf01c9d7a2651d18ce4199664e310fd66e20a2eeb3b9eae"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/rerank/index.js",
+      "sha256": "259b17aafc814c3af34229d1d026ab496ac8f709951dac7518555b348c957808"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/rerank/provider.js",
+      "sha256": "d7a8c5e78e6c89f996f36da0aa7e0abcfe35dc8dd317455d159b52f4598af3ae"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/run.js",
+      "sha256": "32fa4f4e95cb3282477373beded0dd4d55abe0e847aa89ebac528c88d9ff5a18"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/scan.js",
+      "sha256": "224615792c6b5321c799956804b7f626d98bee07075df6dd5480f97b01c5a871"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/screening/candidates.js",
+      "sha256": "5bcc8a6dad3f22a45e325f57007903d244c653a1b896522f48049380754cd204"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/screening/contract.js",
+      "sha256": "0265c09bbd43fb9b5608753a92e56534aa1b528207881831cadac8f1fdd2b1c1"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/screening/index.js",
+      "sha256": "a55d2ca9c77cfeaefaada32934a4894ab24a6365932165211c8fff2dbe6cbdb6"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/screening/lexical.js",
+      "sha256": "34bf6676d27ab88982eedb634af9ff4f082bb20e0701f2d718866cedaee717c2"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/screening/prefilter.js",
+      "sha256": "ecb12948c3912769dccde01a473f5ad74c095560c10953d25dfabfc2b85cee26"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/screening/semantic.js",
+      "sha256": "fc4a81616e3a9afe8a173afd78b5b91e064df02ca28f8ad6b4bfa20267840f3a"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/stages/candidates.js",
+      "sha256": "916e3fa02fd7066d555ba6a1073a5c3fd4ac4103931a77ef078dfa96c523a1c4"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/stages/judge.js",
+      "sha256": "c6c2e777ddd76b001cc8513b53e3ad6804b08748f5c0218b0b74f309d7a99c1c"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/stages/lexical.js",
+      "sha256": "61ac447da23b041c300525394bf058350df11277242159dae496e52ecafd1d29"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/stages/prefilter.js",
+      "sha256": "f0b8b8cfe015be1a0668c7168b860f7d69d5c1a8827625998daf2100b01b88b6"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/stages/provision.js",
+      "sha256": "9144c0aa6391da091b6f44dbc267d045dba71e432a77d10413b250e2f2d9d495"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/stages/rank_plan.js",
+      "sha256": "7cce4ef201d123191581eff2a9f775ffd9f8311f1fd78da2907a377802780d2e"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/stages/rerank.js",
+      "sha256": "bed8ce4b0c0565d408747f26eed72e16d87c8ed7d28ac336240f9dc7536511db"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/stages/semantic.js",
+      "sha256": "92962d2b7e0c9262bb3c7eae6eec77251bd64fa568d7c2cfa5050c4a81320a57"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/text/artifact.js",
+      "sha256": "6ce93b4ac3b0b67d521885e87ba052e3c6635570fe0e5ad620b95ec23fa4ea3c"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/text/tokenizer.js",
+      "sha256": "aebe9d269f2c1cee9f935113d77bc99d0778d718c19d3129b5f4b7716f71c74e"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/text/trie.js",
+      "sha256": "1ea334793de7b00c2749ba4ab7e2b08d275eeae70fca1d002828dd7df0e85f53"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/textutil.js",
+      "sha256": "631ec94c1ca98bfce8220b47e0bc14950877348931044933067091cbe93191be"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/workers/encode_worker.js",
+      "sha256": "2c2a5515154183f33e162ca0d4fe5bda8cd98144a11a93892d243c83796a70fb"
+    },
+    {
+      "path": "vendor/skill-merge-pipeline/src/workers/pool.js",
+      "sha256": "794b220ab87196339c307eba4fbc4a8f4f85f8c549881ae69fd789f833b4c82d"
+    }
+  ]
+}
