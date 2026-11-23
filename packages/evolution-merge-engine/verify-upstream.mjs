@@ -29,6 +29,7 @@ for (const entry of doc.sourcePatchSet ?? []) {
   if (typeof entry.reason !== 'string' || entry.reason.trim() === '') { console.error('SOURCE PATCH WITHOUT REASON', entry.path); bad++ }
 }
 for (const e of doc.files) {
+  if (!SAFE_TREE_PATH(e.path)) { console.error('UNSAFE VENDOR PATH', e.path); bad++ }
   const rel = e.path.replace(/^node\//, '')
   const p = join(root, 'vendor', 'skill-merge-pipeline', rel)
   if (!existsSync(p)) { console.error('MISSING', rel); bad++; continue }
@@ -40,7 +41,7 @@ for (const e of doc.files) {
   }
   if (b.length !== e.bytes || sha(b) !== e.sha256) { console.error('MISMATCH', rel); bad++ }
 }
-const normalizeCredentialLines = b => b.toString('utf8').replace(/retrievalCredentials/g, 'RCRED').replace(/\bcredentials?\b/g, 'CRED')
+const normalizeCredentialLines = b => b.toString('utf8').replace(/retrievalCredentials/g, 'RCRED').replace(/\bcredentials\b/g, 'CREDS').replace(/\bcredential\b/g, 'CRED')
 const substance = doc.substance?.files
 if (!Array.isArray(substance) || substance.length === 0) { console.error('SUBSTANCE MANIFEST MISSING'); bad++ }
 else {

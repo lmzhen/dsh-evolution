@@ -1798,8 +1798,8 @@
         "path": "vendor/skill-merge-pipeline/src/pipeline/index.js",
         "mode": "normalize",
         "purpose": "semantic stage orchestration, key transport excluded",
-        "sha256": "67a20ddafced97fdc36092953b66f1566bb8fe62fd289de3016e6046e9f4f521",
-        "bytes": 4235
+        "sha256": "9d764ca62274f03ab0ba8a83fa7cd147344c79a934e8f8e5606e02898a63c1ff",
+        "bytes": 4236
       },
       {
         "path": "vendor/skill-merge-pipeline/src/embed/registry.js",
@@ -1833,36 +1833,36 @@
         "path": "vendor/skill-merge-pipeline/src/screening/semantic.js",
         "mode": "normalize",
         "purpose": "semantic selection/threshold use, key line excluded",
-        "sha256": "47c6544b620871b3f53ee9620e1d770d19f5d65b343062409d9a214cd7fc3845",
-        "bytes": 8386
+        "sha256": "67bf4fcc0b7f6c78134d7fbd72e979be37818df8e983af1ccdbe7cede03d6a95",
+        "bytes": 8389
       },
       {
         "path": "vendor/skill-merge-pipeline/src/rerank/index.js",
         "mode": "normalize",
         "purpose": "rerank tier/score/prompt, key line excluded",
-        "sha256": "c92ea942b6b67dba2d9d93d17a47b6f0a1da501cf29d5f4a97fe01cf546ffe92",
-        "bytes": 23254
+        "sha256": "c43bf3bef2bc34a099dae5481486f0e11e953af464d96418a5516437159b2e90",
+        "bytes": 23258
       },
       {
         "path": "vendor/skill-merge-pipeline/src/stages/rerank.js",
         "mode": "normalize",
         "purpose": "rerank stage wiring, key line excluded",
-        "sha256": "c79c9f89c5c898a9fa39cfa95ca3bc30eddeed4896a7f76c5b2d045f9e0e633d",
-        "bytes": 566
+        "sha256": "9faba48b07e81cc95a18d34227dda263adae7bb40e6163c0c44493497d265e55",
+        "bytes": 567
       },
       {
         "path": "vendor/skill-merge-pipeline/src/scan.js",
         "mode": "normalize",
         "purpose": "scan orchestration, key line excluded",
-        "sha256": "8373e8e32a3de0086e1f563c1f2f27f629911e6dacd7ccd164ae838b8014c901",
-        "bytes": 5949
+        "sha256": "ac9d865778b1d792f68b5160187d0ad446c1f4eda29a0f85efc986c989411d5c",
+        "bytes": 5951
       },
       {
         "path": "src/engine.js",
         "mode": "normalize",
         "purpose": "wrapper judge/stage/report wiring, key line excluded",
-        "sha256": "fec70724ade677cf7848e98d00320e57a2624ce476c1793cda9d2fb8c669f3c7",
-        "bytes": 6507
+        "sha256": "681f80f697629b1e8fad86121a1825b30379e45758cd8d936f1bdcaa071133fa",
+        "bytes": 6515
       },
       {
         "path": "src/report-map.js",
