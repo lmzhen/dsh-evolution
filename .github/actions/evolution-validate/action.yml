@@ -173,16 +173,6 @@ runs:
         # (W10 M2); no second command list lives here.
         node packages/evolution/scripts/run-gates.mjs ci --lane ci-unit --concurrency 1 --json-out "$RUNNER_TEMP/gates-unit.json"
 
-    - name: DEBUG single-suite parser (temporary)
-      if: always()
-      shell: bash
-      working-directory: upstream
-      run: |
-        node node_modules/vitest/vitest.mjs run packages/evolution \
-          -c packages/evolution/scripts/vitest.family.config.mjs --reporter=json \
-          --outputFile="$RUNNER_TEMP/debug-all.json" || true
-        node -e "const r=require(process.env.RUNNER_TEMP+'/debug-all.json'); const f=r.testResults.filter(t=>t.status==='failed'); console.log('FAILED SUITES',f.length); for(const t of f.slice(0,4)) console.log('---',t.name,'\n'+String(t.message||'').slice(0,1800));"
-
     # G7 (0.17.0): the D-9 test-file typecheck step is GONE with the baseline job — it ran the
     # MIRROR's `tsconfig.host.json` against the pinned dev tree, and that graph is not ours to
     # run on a released tree. The guard itself still runs: the family's own gate does
