@@ -1997,6 +1997,13 @@
             "expiry": "0.61.0",
             "plan": "run after build-lib on the build line",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): smoke-built-entries needs built lib artifacts that a source checkout does not carry"
+          },
+          "gate-15": {
+            "reason": "the dev↔mirror script-sync identity check needs both trees; a CI checkout carries only the mirror",
+            "owner": "scripts/gates",
+            "expiry": "0.61.0",
+            "plan": "keep the row local; gate-75 covers the copied overlay sync in CI",
+            "renewal": "Renewed at 0.60.0 (expiry 0.61.0): the dev↔mirror script-sync identity check needs both trees; a CI checkout carries only the mirror"
           }
         }
       }
