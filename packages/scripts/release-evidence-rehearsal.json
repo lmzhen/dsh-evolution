@@ -1,25 +1,25 @@
 {
-  "note": "0.59.6: single-provider skill write refactor; S1-S4 host-plane spikes carried from the 0.59.5 measured artifact because the release diff is backend-only, with 0.59.6 web host boot smoke on the packed tarballs.",
-  "familyVersion": "0.59.6",
+  "note": "0.60.0: D1 StateStore migration, D2 UnitKernel prepare/commit, D3 generated ports; S1-S3 measured on the final dist in lab60, S4 host-routes lifecycle spec",
+  "familyVersion": "0.60.0",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.6",
-      "startedAt": "2026-11-20T08:00:36.463Z",
-      "artifactSha256": "53cc79ca89d915ab3ee53fef33387f1d9401a635c29d71e39ed70c13ca2b8bda",
-      "inputsSha256": "a84b4cd86df7a4f85132184c5f4f1b4558738e0ca7ee4db07452739666eed863",
-      "commit": "67eb0c3a",
+      "familyVersion": "0.60.0",
+      "startedAt": "2026-11-23T00:55:09.072Z",
+      "artifactSha256": "200514eece4bd19f8dfa2ccddc4c41ce9c6946daa80ec5237ffb7994f0477cf7",
+      "inputsSha256": "d16106b2ce5e37d2e85254276fad35c15f4deebfe71aca6607e374cdc36e6cc2",
+      "commit": "c11f59df",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
-        "skillHistoryRows": 29,
-        "skillHistoryBytes": 22699,
+        "skillHistoryRows": 0,
+        "skillHistoryBytes": 21,
         "threeReadsStable": true,
         "readMs": [
-          135,
-          234,
-          213
+          9,
+          5,
+          3
         ],
         "ownerStatus": 200
       }
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.6",
-      "startedAt": "2026-11-20T08:00:36.463Z",
-      "artifactSha256": "53cc79ca89d915ab3ee53fef33387f1d9401a635c29d71e39ed70c13ca2b8bda",
-      "inputsSha256": "a84b4cd86df7a4f85132184c5f4f1b4558738e0ca7ee4db07452739666eed863",
-      "commit": "67eb0c3a",
+      "familyVersion": "0.60.0",
+      "startedAt": "2026-11-23T00:55:09.072Z",
+      "artifactSha256": "200514eece4bd19f8dfa2ccddc4c41ce9c6946daa80ec5237ffb7994f0477cf7",
+      "inputsSha256": "d16106b2ce5e37d2e85254276fad35c15f4deebfe71aca6607e374cdc36e6cc2",
+      "commit": "c11f59df",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -39,8 +39,8 @@
         "anonymous": 401,
         "anonymousBody": "unauthorized",
         "diagnosticsReadMs": [
-          24,
-          3,
+          9,
+          5,
           3
         ],
         "carrier": "connection.fetch"
@@ -49,34 +49,35 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.6",
-      "startedAt": "2026-11-20T08:00:36.463Z",
-      "artifactSha256": "53cc79ca89d915ab3ee53fef33387f1d9401a635c29d71e39ed70c13ca2b8bda",
-      "inputsSha256": "a84b4cd86df7a4f85132184c5f4f1b4558738e0ca7ee4db07452739666eed863",
-      "commit": "67eb0c3a",
+      "familyVersion": "0.60.0",
+      "startedAt": "2026-11-23T00:55:09.072Z",
+      "artifactSha256": "200514eece4bd19f8dfa2ccddc4c41ce9c6946daa80ec5237ffb7994f0477cf7",
+      "inputsSha256": "d16106b2ce5e37d2e85254276fad35c15f4deebfe71aca6607e374cdc36e6cc2",
+      "commit": "c11f59df",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
-        "familyVersion": "0.59.0"
+        "familyVersion": "0.60.0"
       }
     },
     {
-      "face": "web",
+      "face": "headless",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.59.6",
-      "startedAt": "2026-11-20T08:00:36.463Z",
-      "artifactSha256": "53cc79ca89d915ab3ee53fef33387f1d9401a635c29d71e39ed70c13ca2b8bda",
-      "inputsSha256": "a84b4cd86df7a4f85132184c5f4f1b4558738e0ca7ee4db07452739666eed863",
-      "commit": "67eb0c3a",
+      "familyVersion": "0.60.0",
+      "startedAt": "2026-11-23T00:55:09.072Z",
+      "artifactSha256": "200514eece4bd19f8dfa2ccddc4c41ce9c6946daa80ec5237ffb7994f0477cf7",
+      "inputsSha256": "d16106b2ce5e37d2e85254276fad35c15f4deebfe71aca6607e374cdc36e6cc2",
+      "commit": "c11f59df",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
         "disposeReleasesRoutes": true,
         "reApplyNoDuplicatePath": true,
-        "repeatedPrepareIdempotent": true
+        "repeatedPrepareIdempotent": true,
+        "hostRoutesSpec": "3 tests passed"
       }
     }
   ],
@@ -89,9 +90,9 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on 567020ea (pending tag)"
+    "source": "verify-traceability --strict on c11f59df"
   },
-  "generatedAt": "2026-11-20T08:00:36.463Z",
+  "generatedAt": "2026-11-23T00:55:09.072Z",
   "cohort": {
     "versions": [
       "0.2.2-rc.5"
@@ -101,11 +102,9 @@
         "version": "0.2.2-rc.5",
         "install": "clean",
         "boot": 200,
-        "activeRows": 29,
-        "expectedActiveRows": 29,
-        "disabledRows": [
-          "evolution-skill-health"
-        ],
+        "activeRows": 31,
+        "expectedActiveRows": 31,
+        "disabledRows": [],
         "doctor": "ok",
         "smoke": "pass",
         "source": "rehearsal"
@@ -113,4 +112,3 @@
     ]
   }
 }
-
