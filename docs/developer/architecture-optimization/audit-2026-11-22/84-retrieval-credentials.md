@@ -343,7 +343,7 @@ API Key 只保存在本机，保存后不再显示。
 
 ## 12.2 本轮验证状态（2026-11-24）
 
-- 定向：21 tests 通过（engine explicit-key 2、host resolver 3、UI card 9、merge settings/status、merge routes、i18n/gates）。
+- 定向：24 tests 通过（engine explicit-key 2、engine substance 3、host resolver 3、UI card 9、merge settings/status、merge routes、i18n/gates）。
 - 全量：Node 22 + 干净 DSH_HOME/TEMP 下 3122 passed / 6 failed；6 个失败全部在 `evolution-host/tests/installer.spec.ts` 与 `installation-matrix.spec.ts` 的本地 installer 环境（EPERM `evolution` mkdir / 60s 超时），无 feature 失败；需在 CI/干净 runner 复跑，不能算全绿。
 - 本地门禁：`run-gates local` pass=62 / fail=0 / cannotDecide=3（gate-05 构建产物、gate-29 缺 plane home、gate-81 health admission；均为未注册 cannot-decide，后续按 gate 语义收口）；已重新生成 `line-manifest.json` / `check-taxonomy.json` 并同步 overlay。
 - engine 实质门禁：`ENGINE SUBSTANCE OK 324 (declared credential patches: 5; substantive fingerprints: 18)`。
