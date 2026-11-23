@@ -181,6 +181,11 @@
               "script": "verify-family-types.mjs",
               "reason": "judges the family sources against the overlay platform project graph; when every diagnostic is outside packages/evolution the row is CANNOT DECIDE on this machine (the build line owns the platform graph), which needs the installed overlay",
               "expiry": "release gate: the row can move into the action once the platform project graph typechecks in the released checkout"
+            },
+            {
+              "script": "verify-layout-sync-local.mjs",
+              "reason": "the dev↔mirror script-sync identity check needs both trees; a CI checkout carries only the mirror",
+              "expiry": "0.61.0"
             }
           ],
           "machineLocal": [],
@@ -594,7 +599,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "b79a884dfc3792f3d687656c0a05a4e8ee533b197dc269c2815c0ca207500d33",
+        "sha256": "fe5b9807984399b1b42dbd63c872da3667e2ef9866347119dc7e9b93b3456f46",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -1997,13 +2002,6 @@
             "expiry": "0.61.0",
             "plan": "run after build-lib on the build line",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): smoke-built-entries needs built lib artifacts that a source checkout does not carry"
-          },
-          "gate-15": {
-            "reason": "the dev↔mirror script-sync identity check needs both trees; a CI checkout carries only the mirror",
-            "owner": "scripts/gates",
-            "expiry": "0.61.0",
-            "plan": "keep the row local; gate-75 covers the copied overlay sync in CI",
-            "renewal": "Renewed at 0.60.0 (expiry 0.61.0): the dev↔mirror script-sync identity check needs both trees; a CI checkout carries only the mirror"
           }
         }
       }

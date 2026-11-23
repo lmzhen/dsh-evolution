@@ -280,12 +280,10 @@
       ],
       "tree": "mirror",
       "profiles": [
-        "local",
-        "ci"
+        "local"
       ],
       "lanes": [
-        "local",
-        "ci-static"
+        "local"
       ]
     },
     {

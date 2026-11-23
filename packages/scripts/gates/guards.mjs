@@ -112,7 +112,7 @@ export const guards = [
     tree: "mirror",
     title: "node packages/scripts/verify-layout-sync-local.mjs",
     argv: ["node","packages/scripts/verify-layout-sync-local.mjs"],
-    lanes: ["local","ci-static"],
+    lanes: ["local"],
   }),
 
   gate("gate-17", {
