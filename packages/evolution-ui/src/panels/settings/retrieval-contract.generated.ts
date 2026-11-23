@@ -16,4 +16,7 @@ export const RETRIEVAL_FIXED_MODELS = {
   embedding: 'Qwen/Qwen3-Embedding-8B',
   embeddingFallback: 'BAAI/bge-m3',
   ranker: 'startlux-decision-27b-autothink',
+  embeddingLabel: 'Qwen3-Embedding-8B',
+  embeddingFallbackLabel: 'bge-m3',
+  rankerLabel: 'StartLux-Decision-27B',
 } as const

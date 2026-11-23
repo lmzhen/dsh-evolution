@@ -282,7 +282,8 @@ Key 只保存在本机凭据中，不会回显。
 
 - 已落地：`retrieval-contract.json` + host/client generated contract + `--check` 脚本；host `resolveRetrievalCredentials`；engine `screen(credentials)` wrapper-only env 桥（vendor 324 文件字节校验通过，engine 2 个桥测试）；`evolution-ui` 设置页 `RetrievalCard`（两把可选 Key、来源、保存/清除、不可用/失败状态）；`retrieval-credentials` 单测、`retrieval-card` 5 个组件测试、UI 8 locale key。
 - 已落地：合并建议页高级区静态提示“检索增强在设置 → 自进化配置”（当前面板 props 无 openSettings，不硬编码路由；状态入口待平台公开 seam）；
-- 待落地：合并页可点击状态入口、真实 fresh 验收、全量门禁/发布链。
+- 真机验证：lab84 fresh profile（0.60.1 dev pack）设置页截图；假 Key 保存后显示“向量云端 · 判别本地/来源本机凭据”，清除后回到本地模式（测试 key 已清除）。
+- 待落地：合并页可点击状态入口、8 语言母语审校、全量门禁/发布链。
 - 已知偏差/修正：初始“运行状态透传”改为 wrapper-only env 桥（vendor 冻结）；UI 字段使用家族自己的 password 输入而非直接 import 平台 `SettingsSecretField`（编译 face 约束）；凭据写入仍是平台 `remote.credentials`，语义不变。
 
 ## 13. 与审计台账的关系

@@ -1481,6 +1481,16 @@
       "de": "Aktuell: lokale Embeddings · Cloud-Ranking",
       "pt": "Atual: embeddings locais · ranking na nuvem",
       "ru": "Сейчас: локальные эмбеддинги · облачное ранжирование"
+    },
+    "retrievalRankerHelp": {
+      "zh": "Bamboo 注册后在 API Keys 创建（分组选 default）。",
+      "en": "Create it in Bamboo under API Keys after signing up (group: default).",
+      "ja": "Bamboo に登録し、API Keys で作成します（グループ: default）。",
+      "es": "Créala en Bamboo, en API Keys, después de registrarte (grupo: default).",
+      "fr": "Créez-la dans Bamboo, sous API Keys, après inscription (groupe : default).",
+      "de": "Nach der Anmeldung in Bamboo unter API Keys anlegen (Gruppe: default).",
+      "pt": "Crie no Bamboo, em API Keys, após o cadastro (grupo: default).",
+      "ru": "Создайте ключ в Bamboo в разделе API Keys после регистрации (группа: default)."
     }
   }
 }

@@ -37,6 +37,9 @@ function render(source) {
     `  embedding: '${models.embedding}',`,
     `  embeddingFallback: '${models.embeddingFallback}',`,
     `  ranker: '${models.ranker}',`,
+    `  embeddingLabel: '${models.embeddingLabel}',`,
+    `  embeddingFallbackLabel: '${models.embeddingFallbackLabel}',`,
+    `  rankerLabel: '${models.rankerLabel}',`,
     '} as const',
     '',
   ].join('\n')

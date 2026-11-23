@@ -152,7 +152,8 @@ export const dictionaries = {
     "retrievalSaveFailed": "保存失败：{message}",
     "retrievalClear": "清除",
     "retrievalUnavailable": "当前部署未提供凭据服务，无法在此保存 Key；仍可使用环境变量。",
-    "retrievalCurrentRanker": "当前：向量本地 · 判别云端"
+    "retrievalCurrentRanker": "当前：向量本地 · 判别云端",
+    "retrievalRankerHelp": "Bamboo 注册后在 API Keys 创建（分组选 default）。"
   },
   en: {
     "aboutPurpose": "Capability evolution settings and skill history",
@@ -302,7 +303,8 @@ export const dictionaries = {
     "retrievalSaveFailed": "Save failed: {message}",
     "retrievalClear": "Clear",
     "retrievalUnavailable": "Credential storage is unavailable in this deployment; environment variables still work.",
-    "retrievalCurrentRanker": "Current: local embeddings · cloud ranking"
+    "retrievalCurrentRanker": "Current: local embeddings · cloud ranking",
+    "retrievalRankerHelp": "Create it in Bamboo under API Keys after signing up (group: default)."
   },
   ja: {
     "aboutPurpose": "能力進化の設定とスキル履歴",
@@ -452,7 +454,8 @@ export const dictionaries = {
     "retrievalSaveFailed": "保存に失敗しました: {message}",
     "retrievalClear": "消去",
     "retrievalUnavailable": "この配備では資格情報サービスが提供されていないため、ここではキーを保存できません。環境変数は引き続き使用できます。",
-    "retrievalCurrentRanker": "現在: ベクトルはローカル・判定はクラウド"
+    "retrievalCurrentRanker": "現在: ベクトルはローカル・判定はクラウド",
+    "retrievalRankerHelp": "Bamboo に登録し、API Keys で作成します（グループ: default）。"
   },
   es: {
     "aboutPurpose": "Ajustes de evolución de capacidades e historial de skills",
@@ -602,7 +605,8 @@ export const dictionaries = {
     "retrievalSaveFailed": "Error al guardar: {message}",
     "retrievalClear": "Borrar",
     "retrievalUnavailable": "Este despliegue no ofrece almacenamiento de credenciales; las variables de entorno siguen funcionando.",
-    "retrievalCurrentRanker": "Actual: embeddings locales · ranking en la nube"
+    "retrievalCurrentRanker": "Actual: embeddings locales · ranking en la nube",
+    "retrievalRankerHelp": "Créala en Bamboo, en API Keys, después de registrarte (grupo: default)."
   },
   fr: {
     "aboutPurpose": "Réglages d’évolution des capacités et historique des skills",
@@ -752,7 +756,8 @@ export const dictionaries = {
     "retrievalSaveFailed": "Échec de l’enregistrement : {message}",
     "retrievalClear": "Effacer",
     "retrievalUnavailable": "Ce déploiement ne fournit pas de stockage d’identifiants ; les variables d’environnement restent utilisables.",
-    "retrievalCurrentRanker": "Actuel : embeddings locaux · ranking cloud"
+    "retrievalCurrentRanker": "Actuel : embeddings locaux · ranking cloud",
+    "retrievalRankerHelp": "Créez-la dans Bamboo, sous API Keys, après inscription (groupe : default)."
   },
   de: {
     "aboutPurpose": "Fähigkeitsentwicklung: Einstellungen und Skill-Verlauf",
@@ -902,7 +907,8 @@ export const dictionaries = {
     "retrievalSaveFailed": "Speichern fehlgeschlagen: {message}",
     "retrievalClear": "Löschen",
     "retrievalUnavailable": "Diese Bereitstellung bietet keinen Anmeldedaten-Speicher; Umgebungsvariablen funktionieren weiterhin.",
-    "retrievalCurrentRanker": "Aktuell: lokale Embeddings · Cloud-Ranking"
+    "retrievalCurrentRanker": "Aktuell: lokale Embeddings · Cloud-Ranking",
+    "retrievalRankerHelp": "Nach der Anmeldung in Bamboo unter API Keys anlegen (Gruppe: default)."
   },
   ru: {
     "aboutPurpose": "Настройки развития возможностей и история навыков",
@@ -1052,7 +1058,8 @@ export const dictionaries = {
     "retrievalSaveFailed": "Не удалось сохранить: {message}",
     "retrievalClear": "Удалить",
     "retrievalUnavailable": "В этой установке нет хранилища учётных данных; переменные окружения по-прежнему работают.",
-    "retrievalCurrentRanker": "Сейчас: локальные эмбеддинги · облачное ранжирование"
+    "retrievalCurrentRanker": "Сейчас: локальные эмбеддинги · облачное ранжирование",
+    "retrievalRankerHelp": "Создайте ключ в Bamboo в разделе API Keys после регистрации (группа: default)."
   },
   pt: {
     "aboutPurpose": "Configurações de evolução de capacidades e histórico de skills",
@@ -1202,7 +1209,8 @@ export const dictionaries = {
     "retrievalSaveFailed": "Falha ao salvar: {message}",
     "retrievalClear": "Limpar",
     "retrievalUnavailable": "Esta implantação não oferece armazenamento de credenciais; variáveis de ambiente continuam funcionando.",
-    "retrievalCurrentRanker": "Atual: embeddings locais · ranking na nuvem"
+    "retrievalCurrentRanker": "Atual: embeddings locais · ranking na nuvem",
+    "retrievalRankerHelp": "Crie no Bamboo, em API Keys, após o cadastro (grupo: default)."
   },
 } as const
 
