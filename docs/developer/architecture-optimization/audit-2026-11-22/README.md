@@ -260,3 +260,4 @@
 | [79-d2-d3-consolidation.md](79-d2-d3-consolidation.md) | D2/D3 第一段：UnitKernel 公共名收口、可派生端口生成 |
 | [80-p2-ledger.md](80-p2-ledger.md) | 发布前 P2 台账、已修 P1 与发布阻断项 |
 | [81-lab60-acceptance.md](81-lab60-acceptance.md) | 0.60.0 候选 lab60 真机验收与启动修复 |
+| [82-ci-release-blocker.md](82-ci-release-blocker.md) | 0.60.0 CI Linux 单测解析失败与发布阻断 |
