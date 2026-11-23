@@ -262,3 +262,4 @@
 | [81-lab60-acceptance.md](81-lab60-acceptance.md) | 0.60.0 候选 lab60 真机验收与启动修复 |
 | [82-ci-release-blocker.md](82-ci-release-blocker.md) | 0.60.0 CI Linux 单测解析失败与发布阻断 |
 | [83-published-p1-io-node.md](83-published-p1-io-node.md) | 0.60.0 新装 IO provider P1 与 0.60.1 修复计划 |
+| [84-retrieval-credentials.md](84-retrieval-credentials.md) | 检索增强：固定模型、可选官方 API Key、平台凭据与降级不变设计 |

@@ -56,6 +56,7 @@
 - 平台 `fs-local` 的锁/版本/原子写是唯一文件系统实现；插件侧的 `HomeFS` 是**适配器**，不是第二套实现。
 - 平台 `fs-observation-policy` 是唯一“读后写”授权来源；插件不自建 `SkillObservationStore` 作为第二事实源。
 - 平台 `ui-settings` 的 `ConfigFormSnapshot` 是 UI 表单唯一形状；插件不自造 `stale/reason/readback`。
+- 平台 `credentials` 是唯一秘密来源；插件用 `resolve/describe/set` 消费固定 refs，不自建 secret 存储，不把秘密写入 cfg、report、日志或客户端快照（检索增强见 84）。
 - 平台 `rpc-host` 的 route 注册是唯一 HTTP 入口；插件不从 `body` 字符串推 `decision`。
 - 平台 `llm` 的 finish 终态是唯一取消信号；插件不把 `aborted` 当成功。
 
@@ -272,6 +273,7 @@ host route returns typed snapshot + revision + failure/stale
 ```
 
 - 不猜 `workspaceId`，不手拼 `decision` 路由，不伪造 configForms 字段。
+- 凭据编辑只走平台 `remote.credentials` + `SettingsSecretField`；凭据值不回显，不进入 config 快照（检索增强见 84）。
 
 ## 6. 旧组件去留表
 
