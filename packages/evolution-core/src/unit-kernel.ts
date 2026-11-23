@@ -245,7 +245,6 @@ export interface UnitKernelOptions {
 }
 
 type PreparedState = 'prepared' | 'committing' | 'released'
-const preparedState = new WeakMap<object, PreparedState>()
 
 export interface PreparedMutation {
   readonly kind: 'prepared'
@@ -296,6 +295,7 @@ export class UnitKernel {
   private readonly targetKeyResolver: UnitKernelOptions['targetKeyResolver'] | undefined
   private readonly journal: MutationJournalPort | undefined
   private readonly snapshots: MutationSnapshotPort | undefined
+  private readonly preparedStates = new WeakMap<object, PreparedState>()
   private readonly claim: UnitClaimPort | undefined
   private readonly claimRunId: string | undefined
   private readonly hooks: UnitKernelHooks | undefined
@@ -368,9 +368,9 @@ export class UnitKernel {
     let handle: PreparedMutation
     const release = async (): Promise<void> => {
       if (handle !== undefined) {
-        const current = preparedState.get(handle)
+        const current = this.preparedStates.get(handle)
         if (current === 'released') return
-        preparedState.set(handle, 'released')
+        this.preparedStates.set(handle, 'released')
       }
       await claim?.release().catch(() => {})
       await lease.release()
@@ -425,17 +425,17 @@ export class UnitKernel {
       }
     }
     handle = { kind: 'prepared', unitId, request, primary, validation, snapshots, eventOps, changed, warnings, bestEffort, release }
-    preparedState.set(handle, 'prepared')
+    this.preparedStates.set(handle, 'prepared')
     return handle
   }
 
   /** Phase 2: the only durable write phase. Releases the prepare lease in all paths. */
   async commit(prepared: PreparedMutation): Promise<MutationResult> {
-    const current = preparedState.get(prepared)
+    const current = this.preparedStates.get(prepared)
     if (current !== 'prepared') {
       return { ok: false, unitId: prepared.unitId, dryRun: false, changed: [], errors: [{ code: 'unit-handle-consumed', message: 'prepared mutation is already ' + String(current) }] }
     }
-    preparedState.set(prepared, 'committing')
+    this.preparedStates.set(prepared, 'committing')
     const { unitId, request, primary, validation, snapshots, eventOps, changed, warnings, bestEffort } = prepared
     const cleanup = request.cleanupPaths === undefined ? {} : { cleanup: request.cleanupPaths }
     try {
