@@ -130,8 +130,21 @@ export function resolveEntries(env = process.env) {
       const target = typeof value === 'string' ? value : (value?.default ?? value?.import)
       if (typeof target !== 'string') continue
       const resolved = join(dir, target)
-      if (!existsSync(resolved)) continue
-      add(id + key.slice(1), 'mono-subpath', resolved, 'platform export subpath')
+      if (existsSync(resolved)) {
+        add(id + key.slice(1), 'mono-subpath', resolved, 'platform export subpath')
+        continue
+      }
+      // The released tree resolves built JS; a source-only checkout (CI's
+      // released platform) may not have `lib/` yet. Map the same export key to
+      // its source sibling so a subpath import does not hit the root alias as a
+      // directory prefix (ENOTDIR .../src/index.ts/<subpath>).
+      const source = target
+        .replace(/^\.\/lib\//, './src/')
+        .replace(/\.js$/, '.ts')
+      const sourcePath = join(dir, source)
+      if (existsSync(sourcePath)) {
+        add(id + key.slice(1), 'mono-subpath-src', sourcePath, 'platform source export subpath')
+      }
     }
   }
   const seen = new Set()
