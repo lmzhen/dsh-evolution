@@ -1,7 +1,7 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-23T04:43:32.589Z",
-  "tree": "79034297",
+  "measuredAt": "2026-11-23T04:51:40.027Z",
+  "tree": "1beb2bc8",
   "specDigest": "ee88d0dcd5ca45198958a95ea81b6fcf3e7af57eda257b574e88fcdd1156b4ad",
   "testLines": [
     {
@@ -11,7 +11,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-activity/tests/learning-graph/graph.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-activity"
     },
     {
@@ -21,7 +21,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-activity/tests/threat/threat-guard.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-activity"
     },
     {
@@ -31,7 +31,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-activity/tests/threat/threat-guard.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-activity"
     },
     {
@@ -41,7 +41,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-activity/tests/threat/threat-guard.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-activity"
     },
     {
@@ -51,7 +51,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-agent/tests/agent-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-agent"
     },
     {
@@ -61,7 +61,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-agent/tests/agent-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-agent"
     },
     {
@@ -71,7 +71,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-agent/tests/agent-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-agent"
     },
     {
@@ -81,7 +81,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-agent/tests/row-contract.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-agent"
     },
     {
@@ -91,7 +91,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-all/tests/all.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-all"
     },
     {
@@ -101,7 +101,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-all/tests/all.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-all"
     },
     {
@@ -111,7 +111,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-all/tests/all.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-all"
     },
     {
@@ -121,7 +121,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-commands/tests/doctor-view.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-commands"
     },
     {
@@ -131,7 +131,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-commands/tests/doctor.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-commands"
     },
     {
@@ -141,7 +141,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-commands/tests/doctor.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-commands"
     },
     {
@@ -151,7 +151,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-commands/tests/doctor.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-commands"
     },
     {
@@ -161,7 +161,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-commands/tests/platform-view.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-commands"
     },
     {
@@ -171,7 +171,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/io-platform.domain.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -181,7 +181,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/io-platform.integration.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -191,7 +191,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/opt-in.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -201,7 +201,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/platform-lifecycle.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -211,7 +211,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -221,7 +221,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -231,7 +231,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -241,7 +241,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -251,7 +251,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -261,7 +261,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -271,7 +271,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -281,7 +281,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -291,7 +291,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -301,7 +301,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -311,7 +311,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -321,7 +321,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -331,7 +331,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/preset-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -341,7 +341,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/restricted-preset.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -351,7 +351,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/restricted-preset.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -361,7 +361,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/session-projection.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -371,7 +371,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/session-projection.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -381,7 +381,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/session-projection.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -391,7 +391,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/state/domain/domain-state.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -401,7 +401,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/state/domain/domain-state.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -411,7 +411,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/state/domain/domain-state.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -421,7 +421,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/state/domain/domain.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -431,7 +431,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/state/domain/domain.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -441,7 +441,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/state/domain/domain.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -451,7 +451,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/state/domain/provider-consistency.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -461,7 +461,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/state/domain/provider-consistency.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -471,7 +471,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/state/domain/provider-consistency.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -481,7 +481,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-core/tests/subagent-channel.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-core"
     },
     {
@@ -491,7 +491,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-curator/tests/boundary.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-curator"
     },
     {
@@ -501,7 +501,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-curator/tests/boundary.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-curator"
     },
     {
@@ -511,7 +511,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/bundle-mutual-exclusion.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -521,7 +521,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/dependency-contract.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -531,7 +531,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -541,7 +541,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -551,7 +551,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -561,7 +561,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -571,7 +571,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -581,7 +581,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -591,7 +591,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -601,7 +601,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -611,7 +611,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/guard-scripts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -621,7 +621,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/host-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -631,7 +631,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/inject-paths.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -641,7 +641,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/inject-paths.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -651,7 +651,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/inject-paths.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -661,7 +661,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -671,7 +671,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -681,7 +681,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -691,7 +691,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -701,7 +701,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -711,7 +711,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -721,7 +721,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -731,7 +731,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -741,7 +741,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installation-matrix.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -751,7 +751,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -761,7 +761,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -771,7 +771,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -781,7 +781,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -791,7 +791,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -801,7 +801,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/installer.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -811,7 +811,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/platform-range.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -821,7 +821,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/platform-range.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -831,7 +831,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/profile-override.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -841,7 +841,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-host/tests/row-contract.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-host"
     },
     {
@@ -851,7 +851,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-maintenance/tests/orchestrate.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-maintenance"
     },
     {
@@ -861,7 +861,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-platform/tests/llm.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-platform"
     },
     {
@@ -871,7 +871,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-platform/tests/review-child.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-platform"
     },
     {
@@ -881,7 +881,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-real-tools.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -891,7 +891,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-real-tools.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -901,7 +901,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-real-tools.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -911,7 +911,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-real-tools.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -921,7 +921,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-real-tools.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -931,7 +931,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-skill-write.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -941,7 +941,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-skill-write.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -951,7 +951,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-skill-write.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -961,7 +961,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-skill-write.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -971,7 +971,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor-skill-write.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -981,7 +981,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -991,7 +991,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review-executor.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -1001,7 +1001,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -1011,7 +1011,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-review/tests/review.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-review"
     },
     {
@@ -1021,7 +1021,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/awareness.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1031,7 +1031,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/catalog/catalog-path-consistency.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1041,7 +1041,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/catalog/catalog.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1051,7 +1051,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/catalog/io-preference.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1061,7 +1061,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/catalog/rank-contract.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1071,7 +1071,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/catalog/rank-contract.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1081,7 +1081,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/discovery.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1091,7 +1091,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/domain-generation-coordinator.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1101,7 +1101,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/domain-projection.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1111,7 +1111,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/g-r2-contracts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1121,7 +1121,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/g-r2-contracts.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1131,7 +1131,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/generation-composition.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1141,7 +1141,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1151,7 +1151,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1161,7 +1161,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1171,7 +1171,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/main-entry-host.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1181,7 +1181,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/main-entry.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1191,7 +1191,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/main-entry.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1201,7 +1201,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/main-entry.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1211,7 +1211,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/main-entry.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1221,7 +1221,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/projection-runtime.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1231,7 +1231,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/projection-runtime.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1241,7 +1241,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/projection-runtime.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1251,7 +1251,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/projection.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1261,7 +1261,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/search-behavior.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1271,7 +1271,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/search-eval-real.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1281,7 +1281,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/search-eval.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1291,7 +1291,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/search.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1301,7 +1301,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/tool-host.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1311,7 +1311,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1321,7 +1321,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1331,7 +1331,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1341,7 +1341,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1351,7 +1351,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1361,7 +1361,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/evolution-skill-discovery/tests/usage/skill-usage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "evolution-skill-discovery"
     },
     {
@@ -1371,7 +1371,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/files/memory-budget-surfaces.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1381,7 +1381,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/files/memory-files-clamp.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1391,7 +1391,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/files/provider.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1401,7 +1401,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/tools/boundary.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1411,7 +1411,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/tools/boundary.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1421,7 +1421,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/tools/boundary.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1431,7 +1431,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/tools/boundary.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1441,7 +1441,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/tools/memory-interpolation.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1451,7 +1451,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/tools/memory-interpolation.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1461,7 +1461,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/tools/memory-interpolation.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1471,7 +1471,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/tools/tool-memory.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1481,7 +1481,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/memory/tests/tools/tool-memory.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "memory"
     },
     {
@@ -1491,7 +1491,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/approval-preview.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1501,7 +1501,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/create-tree-reads.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1511,7 +1511,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/create-tree-reads.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1521,7 +1521,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/create-tree-reads.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1531,7 +1531,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/extract-agent.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1541,7 +1541,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/extract-agent.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1551,7 +1551,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/extract-agent.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1561,7 +1561,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/review-channel-origin.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1571,7 +1571,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/review-channel-origin.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1581,7 +1581,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/review-channel-origin.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1591,7 +1591,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-observations.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1601,7 +1601,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-observed-writes.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1611,7 +1611,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-observed-writes.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1621,7 +1621,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-observed-writes.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1631,7 +1631,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-settings.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1641,7 +1641,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-settings.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1651,7 +1651,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-settings.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1661,7 +1661,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-settings.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1671,7 +1671,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-settings.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1681,7 +1681,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/skill-settings.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1691,7 +1691,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/tool-skill-manage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1701,7 +1701,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/tool-skill-manage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1711,7 +1711,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/tool-skill-manage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1721,7 +1721,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/tool-skill-manage.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1731,7 +1731,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1741,7 +1741,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1751,7 +1751,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1761,7 +1761,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1771,7 +1771,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     },
     {
@@ -1781,7 +1781,7 @@
       "expectLine": "both",
       "status": "expected",
       "reasonRef": "packages/tool-skill-manage/tests/write-gates.spec.ts:1",
-      "expiry": "0.60.0",
+      "expiry": "0.61.0",
       "owner": "tool-skill-manage"
     }
   ]
