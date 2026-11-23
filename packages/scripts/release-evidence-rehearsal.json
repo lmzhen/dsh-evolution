@@ -1,15 +1,15 @@
 {
-  "note": "0.60.0: D1 StateStore migration, D2 UnitKernel prepare/commit, D3 generated ports; S1-S3 measured on the final dist in lab60, S4 host-routes lifecycle spec",
-  "familyVersion": "0.60.0",
+  "note": "0.60.1: node:fs IO provider registered in both bundles; S1-S3 measured on the final 0.60.1 dist in lab601, S4 host-routes lifecycle spec",
+  "familyVersion": "0.60.1",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.60.0",
+      "familyVersion": "0.60.1",
       "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "200514eece4bd19f8dfa2ccddc4c41ce9c6946daa80ec5237ffb7994f0477cf7",
-      "inputsSha256": "d16106b2ce5e37d2e85254276fad35c15f4deebfe71aca6607e374cdc36e6cc2",
-      "commit": "5efd2127",
+      "artifactSha256": "38700c44894b104887e85fc132ab888409f0830210b869e9c0ce8b41a7ed3b5e",
+      "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
+      "commit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
@@ -17,9 +17,9 @@
         "skillHistoryBytes": 21,
         "threeReadsStable": true,
         "readMs": [
-          9,
-          5,
-          3
+          8,
+          2,
+          2
         ],
         "ownerStatus": 200
       }
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.60.0",
+      "familyVersion": "0.60.1",
       "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "200514eece4bd19f8dfa2ccddc4c41ce9c6946daa80ec5237ffb7994f0477cf7",
-      "inputsSha256": "d16106b2ce5e37d2e85254276fad35c15f4deebfe71aca6607e374cdc36e6cc2",
-      "commit": "5efd2127",
+      "artifactSha256": "38700c44894b104887e85fc132ab888409f0830210b869e9c0ce8b41a7ed3b5e",
+      "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
+      "commit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -39,9 +39,9 @@
         "anonymous": 401,
         "anonymousBody": "unauthorized",
         "diagnosticsReadMs": [
-          9,
-          5,
-          3
+          8,
+          2,
+          2
         ],
         "carrier": "connection.fetch"
       }
@@ -49,28 +49,28 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.60.0",
+      "familyVersion": "0.60.1",
       "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "200514eece4bd19f8dfa2ccddc4c41ce9c6946daa80ec5237ffb7994f0477cf7",
-      "inputsSha256": "d16106b2ce5e37d2e85254276fad35c15f4deebfe71aca6607e374cdc36e6cc2",
-      "commit": "5efd2127",
+      "artifactSha256": "38700c44894b104887e85fc132ab888409f0830210b869e9c0ce8b41a7ed3b5e",
+      "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
+      "commit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
         "diagnosticsSchemaVersion": 2,
         "facts": 7,
         "runtime": 8,
-        "familyVersion": "0.60.0"
+        "familyVersion": "0.60.1"
       }
     },
     {
       "face": "headless",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.60.0",
+      "familyVersion": "0.60.1",
       "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "200514eece4bd19f8dfa2ccddc4c41ce9c6946daa80ec5237ffb7994f0477cf7",
-      "inputsSha256": "d16106b2ce5e37d2e85254276fad35c15f4deebfe71aca6607e374cdc36e6cc2",
-      "commit": "5efd2127",
+      "artifactSha256": "38700c44894b104887e85fc132ab888409f0830210b869e9c0ce8b41a7ed3b5e",
+      "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
+      "commit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -90,8 +90,8 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on c11f59df",
-    "measuredCommit": "5efd2127029e55d5bc3bba19521b64e5e06af7ab"
+    "source": "verify-traceability --strict on 727ba17d",
+    "measuredCommit": "727ba17d6cad08301aca09bbdad4dccdfd763f0b"
   },
   "generatedAt": "2026-11-23T00:55:09.072Z",
   "cohort": {
