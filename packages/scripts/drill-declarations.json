@@ -373,6 +373,9 @@
     },
     "ci-only-26": {
       "noDrillReason": "overlay-only CI row: the mutation prover applies its fixture in the mirror, so this row cannot see the patch by design; CI static lane runs the real check"
+    },
+    "gate-85": {
+      "noDrillReason": "retrieval contract generator --check: red when the generated host/client constants drift from packages/scripts/retrieval-contract.json; covered by the generator check itself"
     }
   }
 }
