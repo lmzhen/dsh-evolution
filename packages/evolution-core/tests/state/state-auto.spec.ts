@@ -54,6 +54,18 @@ describe('state provider auto', () => {
     await expect(ctx.plugin(EvolutionState, { provider: 'store', home: evolution })).rejects.toThrow(/migration marker is missing/)
   })
 
+  it('rejects a marker whose store has a corrupt nested record', async () => {
+    const root = await tempRoot('dsh-state-marker-depth-')
+    const evolution = join(root, 'evolution')
+    process.env.DSH_HOME = root
+    const ctx = await mountStateStack(evolution)
+    await ctx.evolutionIo.provider().writeText(join(evolution, 'state', 'store.json'), JSON.stringify({ version: 1, review: { s1: {} }, pending: {}, curator: null }))
+    await ctx.evolutionIo.provider().writeText(join(evolution, 'state', STATE_MIGRATION_MARKER), JSON.stringify({ target: 'store' }))
+    await ctx.plugin(StorePlugin)
+    await ctx.plugin(EvolutionState, { provider: 'auto', home: evolution })
+    expect(() => ctx.evolutionState.loadCuratorState()).toThrow(/marker\/store is missing or unreadable/)
+  })
+
   it('fails loud when the marker exists but the store is missing', async () => {
     const root = await tempRoot('dsh-state-auto-half-')
     const evolution = join(root, 'evolution')

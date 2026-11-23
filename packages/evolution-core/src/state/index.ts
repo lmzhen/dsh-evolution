@@ -23,6 +23,7 @@ import type {
   ReviewStateRecord,
 } from './storage.ts'
 import { PROVIDER_DOMAIN, PROVIDER_STORE, STATE_MIGRATION_MARKER } from './storage.ts'
+import { parseStateStoreImage } from './store.ts'
 
 export * from './storage.ts'
 
@@ -95,21 +96,16 @@ export class EvolutionState extends Service {
     if (!existsSync(marker)) return
     const storePath = join(this.home, 'state', 'store.json')
     let markerBody: unknown
-    let storeBody: unknown
     try {
       markerBody = JSON.parse(readFileSync(marker, 'utf8'))
-      storeBody = JSON.parse(readFileSync(storePath, 'utf8'))
+      const storeText = readFileSync(storePath, 'utf8')
+      if (storeText.trim() === '') throw new Error('store image is empty')
+      parseStateStoreImage(storeText)
     } catch (error) {
       throw new Error('evolution-state: the migration marker/store is missing or unreadable: ' + (error instanceof Error ? error.message : String(error)))
     }
     if (typeof markerBody !== 'object' || markerBody === null || (markerBody as { target?: unknown }).target !== 'store') {
       throw new Error('evolution-state: the migration marker is invalid (target != store): ' + marker)
-    }
-    const image = storeBody as { version?: unknown; review?: unknown; pending?: unknown; curator?: unknown }
-    if (typeof image !== 'object' || image === null || image.version !== 1
-      || typeof image.review !== 'object' || image.review === null || Array.isArray(image.review)
-      || typeof image.pending !== 'object' || image.pending === null || Array.isArray(image.pending)) {
-      throw new Error('evolution-state: the migration marker points at an invalid/empty store image: ' + storePath)
     }
   }
 
