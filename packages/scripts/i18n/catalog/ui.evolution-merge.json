@@ -1971,6 +1971,36 @@
       "de": "Suche verbessern (optional) stellst du unter Einstellungen → Fähigkeitsentwicklung ein; dort siehst du auch den aktuellen Status.",
       "ru": "Улучшение поиска (необязательно) настраивается в разделе «Настройки → Развитие возможностей»; там же виден текущий статус.",
       "pt": "A melhoria de busca (opcional) fica em Configurações → Evolução de capacidades; lá também aparece o estado atual."
+    },
+    "settings.retrievalStatusLocal": {
+      "zh": "检索增强：本地模式",
+      "en": "Retrieval enhancement: local",
+      "ja": "検索強化：ローカル",
+      "es": "Mejora de búsqueda: local",
+      "fr": "Amélioration de la recherche : local",
+      "de": "Suche verbessern: lokal",
+      "pt": "Melhoria de busca: local",
+      "ru": "Улучшение поиска: локально"
+    },
+    "settings.retrievalStatusCloud": {
+      "zh": "检索增强：云端已启用",
+      "en": "Retrieval enhancement: cloud enabled",
+      "ja": "検索強化：クラウド有効",
+      "es": "Mejora de búsqueda: nube activada",
+      "fr": "Amélioration de la recherche : cloud activé",
+      "de": "Suche verbessern: Cloud aktiv",
+      "pt": "Melhoria de busca: nuvem ativada",
+      "ru": "Улучшение поиска: облако включено"
+    },
+    "settings.retrievalStatusPartial": {
+      "zh": "检索增强：部分云端",
+      "en": "Retrieval enhancement: partly cloud",
+      "ja": "検索強化：一部クラウド",
+      "es": "Mejora de búsqueda: nube parcial",
+      "fr": "Amélioration de la recherche : cloud partiel",
+      "de": "Suche verbessern: teilweise Cloud",
+      "pt": "Melhoria de busca: nuvem parcial",
+      "ru": "Улучшение поиска: частично облако"
     }
   }
 }

@@ -40,6 +40,7 @@ export interface MergeRouteSource {
 export function makeMergeRoutes(
   deps: {
     getSource: () => MergeRouteSource | undefined
+    retrievalStatus?: () => Promise<{ readonly embedding: boolean; readonly ranker: boolean }>
     decide?: (request: MergeDecisionRequest, audit: DecisionAudit) => Promise<MergeDecisionResult>
   },
   _audit: DecisionAudit,
@@ -66,7 +67,8 @@ export function makeMergeRoutes(
         const snapshot = await snapshotOf()
         const notReady = unavailable(snapshot)
         if (notReady !== null) return notReady
-        return json(200, buildSnapshotFacts(snapshot as MergeSnapshot))
+        const retrieval = deps.retrievalStatus === undefined ? undefined : await deps.retrievalStatus().catch(() => undefined)
+        return json(200, buildSnapshotFacts(snapshot as MergeSnapshot, retrieval))
       },
     },
     {

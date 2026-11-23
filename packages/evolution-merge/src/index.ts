@@ -4,7 +4,7 @@ import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = Omit<CordisContext, 'logger'> & HostContext
-import { clearRetrievalCredentials, screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
+import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
 import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
@@ -167,7 +167,6 @@ function formatUnreadyError(): string {
 export const inject: string[] = []
 
 export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): void {
-  ctx.effect(() => () => { clearRetrievalCredentials() }, 'evolution-merge: clear retrieval credentials')
 
   configureMergePresentation(ctx as unknown as MergePresentationContext)
   const startupParams = resolveMergeParams(rawConfig)
@@ -191,6 +190,10 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
   }
   registerHostRoutes(ctx, audit => makeMergeRoutes({
     getSource: () => source,
+    retrievalStatus: async () => {
+      const credentials = await resolveRetrievalCredentials(ctx as unknown as { get(name: string): unknown })
+      return { embedding: credentials.embedding !== undefined, ranker: credentials.ranker !== undefined }
+    },
     decide: async (request, _audit) => {
       if (decide === undefined) return { ok: false, code: 'E-305', message: '合并服务尚未完成挂载' }
       return await decide(request)

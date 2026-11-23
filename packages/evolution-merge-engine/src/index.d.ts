@@ -30,7 +30,6 @@ export declare function buildScanStages(): unknown[]
 export declare function makeConfig(overrides?: Record<string, unknown>): Record<string, unknown>
 export declare function runScan(input: Record<string, unknown>): Promise<unknown>
 export declare function screen(input: ScreenInput): Promise<ScreenResult>
-export declare function clearRetrievalCredentials(): void
 export declare function probe(cfg?: EngineCfg): {
   models: 'ok' | 'missing' | 'partial'
   judge: string

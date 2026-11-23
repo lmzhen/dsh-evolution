@@ -2279,7 +2279,7 @@ function localEmbedder(cfg, modelDir) {
   throw new InvalidDataError("\u672A\u77E5 embedder provider: " + String(cfg.embedder) + "\uFF08\u53EF\u9009: model2vec-stream/tfidf/tfidf-svd/model2vec/sentence-transformers\uFF09", { where: "embed-provider" });
 }
 function buildTier(tier, cfg, opts) {
-  if (tier.kind === "remote") return new RemoteEmbedder(tier.effectiveModel, cfg, { priceKey: tier.modelId, signal: opts && opts.signal });
+  if (tier.kind === "remote") return new RemoteEmbedder(tier.effectiveModel, cfg, { priceKey: tier.modelId, signal: opts && opts.signal, ...opts && opts.credentials && opts.credentials.embedding ? { key: opts.credentials.embedding } : {} });
   const dir = cfg[tier.overrideField] || resolveConfiguredDir(cfg, tier.overrideField) || cfg.embedder_model;
   return localEmbedder(cfg, dir);
 }
@@ -2382,7 +2382,7 @@ var semanticStage = defineStage({
   id: "semantic",
   requires: ["passed", "byPath"],
   async run(ctx, env) {
-    const { selected, scored, stats } = await runSemantic(env.passed, env.byPath, ctx.cfg, { signal: ctx.signal });
+    const { selected, scored, stats } = await runSemantic(env.passed, env.byPath, ctx.cfg, { signal: ctx.signal, ...ctx.state.retrievalCredentials === void 0 ? {} : { credentials: ctx.state.retrievalCredentials } });
     return {
       data: { selected, scored },
       stats,
@@ -3412,7 +3412,8 @@ var Checkpoint = class {
 function cmpStr(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
-function apiKeyConfigured(cfg) {
+function apiKeyConfigured(cfg, credential) {
+  if (typeof credential === "string" && credential !== "") return true;
   const envName = String(cfg.rank_api_key_env || "BAMBOO_API_KEY").trim() || "BAMBOO_API_KEY";
   return Boolean(process.env[envName]);
 }
@@ -3568,10 +3569,10 @@ async function scoreLocal(rows, byPath, cfg, ckpt, concurrencyOverride, signal, 
   }
   return [scored, failures, retries];
 }
-async function scoreRemote(rows, byPath, cfg, signal) {
+async function scoreRemote(rows, byPath, cfg, signal, credential) {
   const url = String(cfg.rank_api_url || "").trim();
   const envName = String(cfg.rank_api_key_env || "BAMBOO_API_KEY").trim() || "BAMBOO_API_KEY";
-  const key = process.env[envName] || "";
+  const key = (typeof credential === "string" && credential !== "" ? credential : process.env[envName]) || "";
   if (!url) return [[], rows.map((r) => ({ a: r.a, b: r.b, error: "rank_api_url \u672A\u914D\u7F6E" })), "rank_api_url \u672A\u914D\u7F6E"];
   if (!key) return [[], rows.map((r) => ({ a: r.a, b: r.b, error: "\u73AF\u5883\u53D8\u91CF " + envName + " \u672A\u8BBE\u7F6E" })), "\u73AF\u5883\u53D8\u91CF " + envName + " \u672A\u8BBE\u7F6E"];
   const cap = Number(cfg.rank_cap || 5e3);
@@ -3664,10 +3665,10 @@ async function rerank(rows, byPath, cfg, opts) {
     stats.secs = (Date.now() - t0) / 1e3;
     return [[], stats];
   }
-  if (requested === "api" || requested === "auto" && apiKeyConfigured(cfg)) {
+  if (requested === "api" || requested === "auto" && apiKeyConfigured(cfg, opts && opts.credentials && opts.credentials.ranker)) {
     const apiModelId = String(cfg.rank_api_model || "startlux-decision-27b-autothink");
     const apiProvider = makeRankerProvider({ id: "api:" + apiModelId, modelId: apiModelId, scoreRange: RANKER_SCORE_RANGE, score: async (rs, bp, o) => {
-      const [scored, failures, reason, retries] = await scoreRemote(rs, bp, cfg, o && o.signal);
+      const [scored, failures, reason, retries] = await scoreRemote(rs, bp, cfg, o && o.signal, opts && opts.credentials && opts.credentials.ranker);
       return { scored, failures, reason, retries };
     } });
     stats.api_ranker = { id: apiProvider.id, modelId: apiProvider.modelId, scoreRange: apiProvider.scoreRange };
@@ -3801,7 +3802,7 @@ var rerankStage = defineStage({
   id: "rerank",
   requires: ["semantic"],
   async run(ctx, env) {
-    const [ranked, stats] = await rerank(env.semantic.selected, env.semantic.byPath, ctx.cfg, { signal: ctx.signal });
+    const [ranked, stats] = await rerank(env.semantic.selected, env.semantic.byPath, ctx.cfg, { signal: ctx.signal, ...ctx.state.retrievalCredentials === void 0 ? {} : { credentials: ctx.state.retrievalCredentials } });
     return { data: { ranked }, stats, counters: { n_in: stats.n_in, n_out: stats.n_out }, degraded: stats.degraded === true };
   }
 });
@@ -5546,7 +5547,8 @@ async function runScan(opts) {
     stages: buildScanStages(),
     input: { skills },
     signal: o.signal,
-    onProgress: typeof o.onProgress === "function" ? o.onProgress : void 0
+    onProgress: typeof o.onProgress === "function" ? o.onProgress : void 0,
+    ...o.credentials === void 0 ? {} : { state: { retrievalCredentials: o.credentials } }
   });
   if (!res.ok) return { ok: false, res, cfg, skills, bp, error: res.error, exitCode: res.exitCode };
   const degradation = assessDegradation({ res, cfg });
@@ -5655,7 +5657,7 @@ function wrapJudgeStage(stage, runner) {
     }
   });
 }
-async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner }) {
+async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner, credentials }) {
   const o = { cfg, corpus: [corpusDir], out: outDir, signal, onProgress };
   ensureDir(outDir);
   const [skills] = loadCorpus(o.corpus);
@@ -5663,7 +5665,7 @@ async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runne
   cfg.rank_checkpoint = path22.join(outDir, "rank_scores.json");
   if (cfg.judge_cache && !cfg.judge_cache_path) cfg.judge_cache_path = path22.join(outDir, "judge_cache.json");
   const stages = buildScanStages().map((s) => s.id === "judge" ? wrapJudgeStage(s, runner) : s);
-  const res = await runPipeline({ cfg, out: outDir, stages, input: { skills }, signal, onProgress });
+  const res = await runPipeline({ cfg, out: outDir, stages, input: { skills }, signal, onProgress, ...credentials === void 0 ? {} : { state: { retrievalCredentials: credentials } } });
   if (!res.ok) return { ok: false, error: res.error, exitCode: res.exitCode };
   const degradation = assessDegradation({ res, cfg });
   const pairs = res.stages.find((s) => s.id === "candidates")?.data?.pairs;
@@ -5677,52 +5679,24 @@ async function runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runne
   writeArtifacts(outDir, { cfg, config: cfg, report: built.reportDoc, markdown: candidatesMarkdown({ rows: built.verdicts, rerankStats: built.rerankStats, rankPlan: built.rankPlan, judgeFallback: built.judgeFallback }), candidatesRows: candidatesCsvRows(built.verdicts), pairsRows: pairsCsvRows(built.verdicts) });
   return { ok: true, reportDoc: built.reportDoc, sections: built.sections, degradation, strictFail: cfg.strict === true && degradation.degraded };
 }
-var CREDENTIAL_ENV = Object.freeze({
-  embedding: "SILICONFLOW_API_KEY",
-  ranker: "BAMBOO_API_KEY"
-});
-var appliedCredentials = /* @__PURE__ */ new Map();
-function applyRetrievalCredentials(credentials) {
-  for (const [field, envName] of Object.entries(CREDENTIAL_ENV)) {
-    const value = credentials === void 0 ? void 0 : credentials[field];
-    const applied = appliedCredentials.get(envName);
-    if (typeof value === "string" && value !== "") {
-      if (applied === void 0) appliedCredentials.set(envName, { previous: process.env[envName] });
-      process.env[envName] = value;
-      continue;
-    }
-    if (applied !== void 0) {
-      if (applied.previous === void 0) delete process.env[envName];
-      else process.env[envName] = applied.previous;
-      appliedCredentials.delete(envName);
-    }
-  }
-}
-function clearRetrievalCredentials() {
-  applyRetrievalCredentials(void 0);
-}
-async function screenOnce(input) {
-  const { corpusDir, outDir, signal, onProgress, runner } = input;
+async function screen(input) {
+  const { corpusDir, outDir, signal, onProgress, runner, credentials } = input;
   if (!corpusDir || !outDir) return { ok: false, error: { code: "BAD_INPUT", detail: "corpusDir/outDir required" } };
   const cfg = makeConfig(input.cfg ?? {});
   try {
     const resolvedJudge = resolveJudge(cfg, process.env);
     if (resolvedJudge.mode === "deepseek") {
       if (!runner) return { ok: false, error: { code: "RUNNER_REQUIRED", stage: "judge", retryable: false } };
-      const scan2 = await runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner });
+      const scan2 = await runWithRunner({ corpusDir, outDir, cfg, signal, onProgress, runner, ...credentials === void 0 ? {} : { credentials } });
       if (!scan2.ok) return { ok: false, error: { code: "SCAN_FAILED", stage: "pipeline", detail: String(scan2.error ?? ""), exitCode: scan2.exitCode } };
       return { ok: true, report: { ...scan2, envelope: envelope(corpusDir, outDir) } };
     }
-    const scan = await runScan({ corpus: [corpusDir], out: outDir, cfg, signal, onProgress });
+    const scan = await runScan({ corpus: [corpusDir], out: outDir, cfg, signal, onProgress, ...credentials === void 0 ? {} : { credentials } });
     if (!scan.ok) return { ok: false, error: { code: "SCAN_FAILED", stage: "pipeline", detail: String(scan.error ?? ""), exitCode: scan.exitCode } };
     return { ok: true, report: { reportDoc: scan.reportDoc, sections: scan.sections, degradation: scan.degradation, strictFail: scan.strictFail, envelope: envelope(corpusDir, outDir) } };
   } catch (err) {
     return { ok: false, error: { code: "ENGINE_ERROR", detail: String(err && err.stack || err) } };
   }
-}
-async function screen(input) {
-  applyRetrievalCredentials(input.credentials);
-  return await screenOnce(input);
 }
 function probe(cfgInput) {
   const cfg = makeConfig(cfgInput ?? {});
@@ -5830,7 +5804,6 @@ function selectCandidates(report) {
 }
 export {
   buildScanStages,
-  clearRetrievalCredentials,
   ensureModels2 as ensureModels,
   formatScanSummary,
   makeConfig,

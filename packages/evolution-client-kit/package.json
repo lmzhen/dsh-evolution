@@ -64,7 +64,11 @@
       "types": "./lib/types/generated/i18n/evolution-skill-health.d.ts",
       "default": "./lib/generated/i18n/evolution-skill-health.js"
     },
-    "./locale/*.json": "./locale/*.json"
+    "./locale/*.json": "./locale/*.json",
+    "./generated/retrieval": {
+      "types": "./lib/types/generated/retrieval.generated.d.ts",
+      "default": "./lib/generated/retrieval.generated.js"
+    }
   },
   "files": [
     "locale/*.json",

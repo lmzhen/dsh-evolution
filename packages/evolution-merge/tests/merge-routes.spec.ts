@@ -99,3 +99,14 @@ it('decides through the injected real-agent callback', async () => {
   const bad = await route.fetch(new Request('http://local' + MERGE_ROUTES.decision, { method: 'POST', body: JSON.stringify({ rowId: 'mr_x', verb: 'drop', sessionId: 's1' }) }))
   expect(bad.status).toBe(400)
 })
+
+it('projects retrieval availability without the key values', async () => {
+  const routes = makeMergeRoutes({
+    getSource: () => ({ snapshot: emptySnapshot }),
+    retrievalStatus: async () => ({ embedding: true, ranker: false }),
+  }, audit)
+  const response = await fetchFrom(routes, MERGE_ROUTES.view)
+  expect(response.status).toBe(200)
+  const body = await response.json() as { retrieval?: { embedding: boolean; ranker: boolean } }
+  expect(body.retrieval).toEqual({ embedding: true, ranker: false })
+})

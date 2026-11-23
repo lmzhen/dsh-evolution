@@ -6,7 +6,7 @@
  */
 import { createElement, useEffect, useState, type ReactNode } from 'react'
 import type { MessageKey } from './messages.ts'
-import { RETRIEVAL_CREDENTIAL_REFS, RETRIEVAL_FIXED_MODELS, RETRIEVAL_HELP_LINKS } from './retrieval-contract.generated.ts'
+import { RETRIEVAL_CREDENTIAL_REFS, RETRIEVAL_FIXED_MODELS, RETRIEVAL_HELP_LINKS } from '@lmzhen/dsh-evolution-client-kit/generated/retrieval'
 
 /** The credential facts the Host exposes for one reference; never the value. */
 export interface RetrievalCredentialInfo {

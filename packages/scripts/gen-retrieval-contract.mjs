@@ -10,7 +10,7 @@ const ROOT = resolve(HERE, '..', '..')
 const SOURCE = join(HERE, 'retrieval-contract.json')
 const TARGETS = [
   'packages/evolution-merge/src/domain/retrieval-contract.generated.ts',
-  'packages/evolution-ui/src/panels/settings/retrieval-contract.generated.ts',
+  'packages/evolution-client-kit/src/generated/retrieval.generated.ts',
 ]
 const check = process.argv.includes('--check')
 

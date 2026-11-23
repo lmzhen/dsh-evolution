@@ -1058,7 +1058,7 @@
     {
       "id": "gate-58",
       "kind": "script",
-      "human": "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 发布 parity：UPSTREAM.json 的逐文件 bytes/sha256 与 testPatchSet 的 patchedBytes/patchedSha256 必须全等；缺文件/不匹配→exit 1。GAP-P0-05 的发布门禁）",
+      "human": "`node packages/evolution-merge-engine/verify-upstream.mjs`（engine 实质冻结：仅允许声明的 5 个凭据传输 sourcePatchSet；其余 vendor 文件 bytes/sha256 必须与 upstream 全等；实质面由未改文件 hash + parity 保护）",
       "argv": [
         "node",
         "packages/evolution-merge-engine/verify-upstream.mjs"

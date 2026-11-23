@@ -8,8 +8,10 @@ The entry exports the vendored `runPipeline`, `runScan`, stage composition and c
 
 Model directories and registry files are resolved from the configured model root. Missing required models are reported by default; `ensureModels` is the explicit resolution/provisioning path and honors the engine auto-provision and offline settings.
 
-## Screening pipeline freeze
+## Screening pipeline substantive freeze
 
-Stages ①–⑤ are specially tuned and frozen. Do not fork their substantive behavior, prompts, scoring, thresholds, or stage semantics in this package. Update the vendored upstream as a unit and require parity; changes outside that frozen pipeline must remain wrapper-only and must not alter screening results.
+Stages ①–⑤ are specially tuned and frozen: do not change their substantive behavior, prompts, scoring, thresholds, seed selection, degradation order, or stage semantics. `verify-upstream.mjs` protects those surfaces by byte hash of every file except a declared `sourcePatchSet`.
+
+The only allowed source patch set is the credential transport (`scan.js`, `stages/semantic.js`, `stages/rerank.js`, `screening/semantic.js`, `rerank/index.js`): it passes an explicit API key to the existing provider construction and must not change tier order, floors, prompts, seed, or fallback behavior. Every patch entry names its reason in `UPSTREAM.json`; add parity tests with the patch.
 
 Vendor documentation, fixtures, golden reports, and generated parity output are upstream/test material, not this package's user documentation.

@@ -66,7 +66,7 @@ function localEmbedder(cfg, modelDir) {
   throw new InvalidDataError("未知 embedder provider: " + String(cfg.embedder) + "（可选: model2vec-stream/tfidf/tfidf-svd/model2vec/sentence-transformers）", { where: "embed-provider" });
 }
 function buildTier(tier, cfg, opts) {
-  if (tier.kind === "remote") return new RemoteEmbedder(tier.effectiveModel, cfg, { priceKey: tier.modelId, signal: opts && opts.signal });
+  if (tier.kind === "remote") return new RemoteEmbedder(tier.effectiveModel, cfg, { priceKey: tier.modelId, signal: opts && opts.signal, ...(opts && opts.credentials && opts.credentials.embedding ? { key: opts.credentials.embedding } : {}) });
   const dir = cfg[tier.overrideField] || resolveConfiguredDir(cfg, tier.overrideField) || cfg.embedder_model;
   return localEmbedder(cfg, dir);
 }

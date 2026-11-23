@@ -1722,5 +1722,37 @@
     }
   ],
   "manifestReconciledAt": "2026-11-12",
-  "manifestReconcileNote": "parity fixtures regenerated after vendoring; their recorded bytes now describe the committed tree (see the per-file note)"
+  "manifestReconcileNote": "parity fixtures regenerated after vendoring; their recorded bytes now describe the committed tree (see the per-file note)",
+  "sourcePatchSet": [
+    {
+      "path": "node/src/scan.js",
+      "patchedSha256": "c44376fe3a93dabd1a5af1f69cc29d6db03e8d3fd011e12294fb3d68499a28af",
+      "patchedBytes": 6075,
+      "reason": "pass credentials into runPipeline state for remote provider key lookup; no stage/model/seed change"
+    },
+    {
+      "path": "node/src/stages/semantic.js",
+      "patchedSha256": "4f84dabaa5d46d759f4ae0ed11f3de08558e4d8ff684c216ffe33e2eafad2c90",
+      "patchedBytes": 1220,
+      "reason": "read runtime embedding credential from ctx.state; same stage order and args"
+    },
+    {
+      "path": "node/src/stages/rerank.js",
+      "patchedSha256": "3d171055ae0c6341ad97c7500b09af5aab96a6b9dfbe1253dc9a197361a96c33",
+      "patchedBytes": 615,
+      "reason": "read runtime ranker credential from ctx.state; same stage order and args"
+    },
+    {
+      "path": "node/src/screening/semantic.js",
+      "patchedSha256": "995cba023c2e0bc4402eea713b898fad94e04461ec28fe87efb33e59894497b1",
+      "patchedBytes": 8550,
+      "reason": "pass explicit key to the existing RemoteEmbedder tier; tier order and floors unchanged"
+    },
+    {
+      "path": "node/src/rerank/index.js",
+      "patchedSha256": "7406e3288281e370217795ef49861dfb6cb98ef0da77c879ae48c4d014d48b89",
+      "patchedBytes": 23741,
+      "reason": "use explicit ranker key in the same API tier; local fallback order unchanged"
+    }
+  ]
 }

@@ -103,7 +103,8 @@ class Checkpoint {
 
 function cmpStr(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
 
-function apiKeyConfigured(cfg) {
+function apiKeyConfigured(cfg, credential) {
+  if (typeof credential === "string" && credential !== "") return true;
   const envName = String(cfg.rank_api_key_env || "BAMBOO_API_KEY").trim() || "BAMBOO_API_KEY";
   return Boolean(process.env[envName]);
 }
@@ -230,10 +231,10 @@ async function scoreLocal(rows, byPath, cfg, ckpt, concurrencyOverride, signal, 
   return [scored, failures, retries];
 }
 
-async function scoreRemote(rows, byPath, cfg, signal) {
+async function scoreRemote(rows, byPath, cfg, signal, credential) {
   const url = String(cfg.rank_api_url || "").trim();
   const envName = String(cfg.rank_api_key_env || "BAMBOO_API_KEY").trim() || "BAMBOO_API_KEY";
-  const key = process.env[envName] || "";
+  const key = (typeof credential === "string" && credential !== "" ? credential : process.env[envName]) || "";
   if (!url) return [[], rows.map(r => ({ a: r.a, b: r.b, error: "rank_api_url 未配置" })), "rank_api_url 未配置"];
   if (!key) return [[], rows.map(r => ({ a: r.a, b: r.b, error: "环境变量 " + envName + " 未设置" })), "环境变量 " + envName + " 未设置"];
   const cap = Number(cfg.rank_cap || 5000);
@@ -298,9 +299,9 @@ async function rerank(rows, byPath, cfg, opts) {
   };
   let apiPartial = null;
   if (!rows.length) { stats.mode_used = "none"; stats.reason = "无候选"; stats.secs = (Date.now() - t0) / 1000; return [[], stats]; }
-  if (requested === "api" || (requested === "auto" && apiKeyConfigured(cfg))) {
+  if (requested === "api" || (requested === "auto" && apiKeyConfigured(cfg, opts && opts.credentials && opts.credentials.ranker))) {
     const apiModelId = String(cfg.rank_api_model || "startlux-decision-27b-autothink");
-    const apiProvider = makeRankerProvider({ id: "api:" + apiModelId, modelId: apiModelId, scoreRange: RANKER_SCORE_RANGE, score: async (rs, bp, o) => { const [scored, failures, reason, retries] = await scoreRemote(rs, bp, cfg, o && o.signal); return { scored, failures, reason, retries }; } });
+    const apiProvider = makeRankerProvider({ id: "api:" + apiModelId, modelId: apiModelId, scoreRange: RANKER_SCORE_RANGE, score: async (rs, bp, o) => { const [scored, failures, reason, retries] = await scoreRemote(rs, bp, cfg, o && o.signal, opts && opts.credentials && opts.credentials.ranker); return { scored, failures, reason, retries }; } });
     stats.api_ranker = { id: apiProvider.id, modelId: apiProvider.modelId, scoreRange: apiProvider.scoreRange };
     const apiRes = await apiProvider.score(rows, byPath, { signal });
     const apiScored = apiRes.scored || [];

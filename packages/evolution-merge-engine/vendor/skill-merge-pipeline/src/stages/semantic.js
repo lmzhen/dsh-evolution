@@ -16,7 +16,7 @@ const semanticStage = defineStage({
   id: "semantic",
   requires: ["passed", "byPath"],
   async run(ctx, env) {
-    const { selected, scored, stats } = await runSemantic(env.passed, env.byPath, ctx.cfg, { signal: ctx.signal });
+    const { selected, scored, stats } = await runSemantic(env.passed, env.byPath, ctx.cfg, { signal: ctx.signal, ...(ctx.state.retrievalCredentials === undefined ? {} : { credentials: ctx.state.retrievalCredentials }) });
     return {
       data: { selected, scored },
       stats,

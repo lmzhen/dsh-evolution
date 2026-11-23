@@ -74,6 +74,7 @@ export interface Facts {
   readonly fallback: readonly CommandRef[]
   readonly notes: readonly string[]
   readonly degraded: boolean
+  readonly retrieval?: { readonly embedding: boolean; readonly ranker: boolean }
 }
 export interface QueuePage {
   readonly wireVersion: 1

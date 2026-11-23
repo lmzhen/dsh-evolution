@@ -75,7 +75,7 @@ packages/
   evolution-memory/       # memory
   evolution-web/          # host routes + client-kit + UI；host/client 分区
   evolution-composition/  # host/all/agent 组合行
-  evolution-merge-engine/ # vendored 引擎，继续字节冻结
+  evolution-merge-engine/ # vendored 引擎，实质冻结；仅声明式凭据传输补丁
 ```
 
 删除/吸收：

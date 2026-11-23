@@ -17,7 +17,7 @@ export interface MergeRunView {
 export interface MergeViewPayload {
   counts: MergeCounts; expired: number; tabs: { queue: MergeQueue; count: number }[]
   commands: string[]; startCommands: { scan: string; pair: string }
-  notes: string[]; degraded: boolean; activeRun?: MergeRunView; lastRun?: MergeRunView; approval: MergeApproval
+  notes: string[]; degraded: boolean; activeRun?: MergeRunView; lastRun?: MergeRunView; approval: MergeApproval; retrieval?: { embedding: boolean; ranker: boolean }
 }
 export interface RowActionView { id: string; command: string; confirm: boolean; enabled: boolean; disabledReason?: string }
 export interface MergeStageView { state: StageState; expiresAt?: number }
