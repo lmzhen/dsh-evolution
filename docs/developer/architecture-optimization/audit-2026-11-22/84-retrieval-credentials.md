@@ -318,6 +318,14 @@ API Key 只保存在本机，保存后不再显示。
 
 这取代 DCR-5 的 wrapper env 方案。
 
+## 12.2 本轮验证状态（2026-11-24）
+
+- 定向：21 tests 通过（engine explicit-key 2、host resolver 3、UI card 9、merge settings/status、merge routes、i18n/gates）。
+- 全量：Node 22 + 干净 DSH_HOME/TEMP 下 3122 passed / 6 failed；6 个失败全部在 `evolution-host/tests/installer.spec.ts` 与 `installation-matrix.spec.ts` 的本地 installer 环境（EPERM `evolution` mkdir / 60s 超时），无 feature 失败；需在 CI/干净 runner 复跑，不能算全绿。
+- 本地门禁：除需要 overlay 同步的布局检查外全过；已重新生成 `line-manifest.json` / `check-taxonomy.json` 并同步 overlay。
+- engine 实质门禁：`ENGINE SUBSTANCE OK 324 (declared credential patches: 5)`。
+- 未发布；最终 fresh npm/web 验收和独立复核待后续轮次。
+
 ## 13. 与审计台账的关系
 
 - 完成 80-p2-ledger 中可随本组收口的 P2；其余按 owner/reason/expiry/判据保留或 DEFERRED。

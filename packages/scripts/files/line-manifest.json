@@ -1,5 +1,5 @@
 {
-  "pin": "ba669717",
+  "pin": "eb0a71f4",
   "bed": {
     "mono": "overlay"
   },
@@ -333,6 +333,11 @@
       "id": "@lmzhen/dsh-evolution-client-kit/generated/i18n/evolution-skill-health",
       "kind": "evo-src-subpath",
       "relPath": "packages/evolution/evolution-client-kit/src/generated/i18n/evolution-skill-health.ts"
+    },
+    {
+      "id": "@lmzhen/dsh-evolution-client-kit/generated/retrieval",
+      "kind": "evo-src-subpath",
+      "relPath": "packages/evolution/evolution-client-kit/src/generated/retrieval.generated.ts"
     },
     {
       "id": "@deepseek-ai/schemastery",

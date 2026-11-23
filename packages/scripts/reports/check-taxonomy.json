@@ -75,7 +75,8 @@
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82"
+        "gate-82",
+        "gate-85"
       ],
       "specs": [
         "evolution-client-kit::tests/data-table.spec.ts",
@@ -167,6 +168,7 @@
         "evolution-merge-ui::tests/lifecycle.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/merge-presentation.spec.ts",
+        "evolution-merge-ui::tests/merge-settings-retrieval.client.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
         "evolution-merge-ui::tests/platform-menu.client.spec.ts",
         "evolution-merge-ui::tests/previous-ui.client.spec.ts",
@@ -283,7 +285,8 @@
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82"
+        "gate-82",
+        "gate-85"
       ]
     },
     "pre-tag": {
@@ -355,7 +358,8 @@
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82"
+        "gate-82",
+        "gate-85"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -583,6 +587,7 @@
         "evolution-merge-ui::tests/lifecycle.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/merge-presentation.spec.ts",
+        "evolution-merge-ui::tests/merge-settings-retrieval.client.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
         "evolution-merge-ui::tests/platform-menu.client.spec.ts",
         "evolution-merge-ui::tests/previous-ui.client.spec.ts",
@@ -609,6 +614,7 @@
         "evolution-merge::tests/doctor.spec.ts",
         "evolution-merge::tests/domain-state.spec.ts",
         "evolution-merge::tests/engine-config.spec.ts",
+        "evolution-merge::tests/engine-credentials.spec.ts",
         "evolution-merge::tests/engine-probe.spec.ts",
         "evolution-merge::tests/errors-redaction.spec.ts",
         "evolution-merge::tests/errors.spec.ts",
@@ -697,6 +703,7 @@
         "evolution-merge::tests/reconcile.spec.ts",
         "evolution-merge::tests/recovery-settle.spec.ts",
         "evolution-merge::tests/report.spec.ts",
+        "evolution-merge::tests/retrieval-credentials.spec.ts",
         "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/row-fact-reason.spec.ts",
         "evolution-merge::tests/row-tx-transact.spec.ts",
@@ -777,6 +784,7 @@
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
         "evolution-ui::tests/history-unit-undoable.spec.ts",
         "evolution-ui::tests/history-workbench.client.spec.ts",
+        "evolution-ui::tests/retrieval-card.client.spec.ts",
         "evolution-ui::tests/s4-hmr-double-apply.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
@@ -871,7 +879,8 @@
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82"
+        "gate-82",
+        "gate-85"
       ]
     },
     "ci-only": {
@@ -1034,7 +1043,8 @@
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82"
+        "gate-82",
+        "gate-85"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -1262,6 +1272,7 @@
         "evolution-merge-ui::tests/lifecycle.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/merge-presentation.spec.ts",
+        "evolution-merge-ui::tests/merge-settings-retrieval.client.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
         "evolution-merge-ui::tests/platform-menu.client.spec.ts",
         "evolution-merge-ui::tests/previous-ui.client.spec.ts",
@@ -1288,6 +1299,7 @@
         "evolution-merge::tests/doctor.spec.ts",
         "evolution-merge::tests/domain-state.spec.ts",
         "evolution-merge::tests/engine-config.spec.ts",
+        "evolution-merge::tests/engine-credentials.spec.ts",
         "evolution-merge::tests/engine-probe.spec.ts",
         "evolution-merge::tests/errors-redaction.spec.ts",
         "evolution-merge::tests/errors.spec.ts",
@@ -1376,6 +1388,7 @@
         "evolution-merge::tests/reconcile.spec.ts",
         "evolution-merge::tests/recovery-settle.spec.ts",
         "evolution-merge::tests/report.spec.ts",
+        "evolution-merge::tests/retrieval-credentials.spec.ts",
         "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/row-fact-reason.spec.ts",
         "evolution-merge::tests/row-tx-transact.spec.ts",
@@ -1456,6 +1469,7 @@
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
         "evolution-ui::tests/history-unit-undoable.spec.ts",
         "evolution-ui::tests/history-workbench.client.spec.ts",
+        "evolution-ui::tests/retrieval-card.client.spec.ts",
         "evolution-ui::tests/s4-hmr-double-apply.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
@@ -1550,7 +1564,8 @@
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82"
+        "gate-82",
+        "gate-85"
       ]
     },
     "full(ci=on)": {
@@ -1633,7 +1648,8 @@
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82"
+        "gate-82",
+        "gate-85"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -1889,6 +1905,7 @@
         "evolution-merge-ui::tests/lifecycle.client.spec.ts",
         "evolution-merge-ui::tests/locale.client.spec.ts",
         "evolution-merge-ui::tests/merge-presentation.spec.ts",
+        "evolution-merge-ui::tests/merge-settings-retrieval.client.spec.ts",
         "evolution-merge-ui::tests/panel.client.spec.ts",
         "evolution-merge-ui::tests/platform-menu.client.spec.ts",
         "evolution-merge-ui::tests/previous-ui.client.spec.ts",
@@ -1915,6 +1932,7 @@
         "evolution-merge::tests/doctor.spec.ts",
         "evolution-merge::tests/domain-state.spec.ts",
         "evolution-merge::tests/engine-config.spec.ts",
+        "evolution-merge::tests/engine-credentials.spec.ts",
         "evolution-merge::tests/engine-probe.spec.ts",
         "evolution-merge::tests/errors-redaction.spec.ts",
         "evolution-merge::tests/errors.spec.ts",
@@ -2003,6 +2021,7 @@
         "evolution-merge::tests/reconcile.spec.ts",
         "evolution-merge::tests/recovery-settle.spec.ts",
         "evolution-merge::tests/report.spec.ts",
+        "evolution-merge::tests/retrieval-credentials.spec.ts",
         "evolution-merge::tests/revision.spec.ts",
         "evolution-merge::tests/row-fact-reason.spec.ts",
         "evolution-merge::tests/row-tx-transact.spec.ts",
@@ -2113,6 +2132,7 @@
         "evolution-ui::tests/history-row-cells-dictionary.spec.ts",
         "evolution-ui::tests/history-unit-undoable.spec.ts",
         "evolution-ui::tests/history-workbench.client.spec.ts",
+        "evolution-ui::tests/retrieval-card.client.spec.ts",
         "evolution-ui::tests/s4-hmr-double-apply.spec.ts",
         "evolution-ui::tests/settings-PendingCard.client.spec.ts",
         "evolution-ui::tests/settings-diagnostics-card.client.spec.ts",
@@ -2220,35 +2240,36 @@
         "gate-79",
         "gate-80",
         "gate-81",
-        "gate-82"
+        "gate-82",
+        "gate-85"
       ]
     }
   },
   "counts": {
     "fast": {
-      "gates": 64,
-      "specs": 140
+      "gates": 65,
+      "specs": 141
     },
     "pre-tag": {
-      "gates": 64,
-      "specs": 448
+      "gates": 65,
+      "specs": 452
     },
     "ci-only": {
       "gates": 10,
       "specs": 71
     },
     "full(ci=off)": {
-      "gates": 64,
-      "specs": 448
+      "gates": 65,
+      "specs": 452
     },
     "full(ci=on)": {
-      "gates": 74,
-      "specs": 519
+      "gates": 75,
+      "specs": 523
     }
   },
   "specs": {
-    "total": 519,
-    "marked": 519,
+    "total": 523,
+    "marked": 523,
     "unmarked": 0
   }
 }
