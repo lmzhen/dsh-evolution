@@ -21,15 +21,6 @@
         "restrict"
       ],
       "extra": " & {\n  /** The visible tool under this scope, or undefined; the opt-in probe reads this. */\n  get(name: string, scope?: unknown): unknown\n  /** Resolve the step admission for one review child agent. */\n  resolve?(context: unknown): Promise<unknown>\n  /** Raw execute for callers that own the platform call shape (review aux path). */\n  execute?<T = unknown>(input: unknown): Promise<T>\n}"
-    },
-    {
-      "name": "WorkingDirectoryPort",
-      "module": "@deepseek-ai/dsh-working-directory",
-      "service": "WorkingDirectoryService",
-      "members": [
-        "ensure"
-      ],
-      "extra": ""
     }
   ]
 }

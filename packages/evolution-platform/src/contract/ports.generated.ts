@@ -4,7 +4,6 @@
  */
 import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
 import type { ToolsService } from '@deepseek-ai/dsh-tools'
-import type { WorkingDirectoryService } from '@deepseek-ai/dsh-working-directory'
 
 export type CommandsPort = Pick<CommandRuntime, 'register'>
 
@@ -16,5 +15,3 @@ export type ToolsPort = Pick<ToolsService, 'register' | 'guard' | 'restrict'> & 
   /** Raw execute for callers that own the platform call shape (review aux path). */
   execute?<T = unknown>(input: unknown): Promise<T>
 }
-
-export type WorkingDirectoryPort = Pick<WorkingDirectoryService, 'ensure'>
