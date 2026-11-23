@@ -155,7 +155,7 @@ export async function resolveRetrievalCredentials(
 主编辑入口：**设置 → 自进化 → 检索增强（可选）**，放在家族设置页标题之后、现有参数组之前。
 
 - 为什么不是合并页：Key 是全局服务凭据，不是单次运行参数；设置页已有家族参数和诊断，符合“全局配置在设置”。
-- 合并建议页只放一行状态/入口：`检索增强：本地模式 [去设置]` / `检索增强：云端已启用 [去设置]`；不出现 Key 输入。
+- 合并建议页只放状态与静态指路：`检索增强：本地模式/部分云端/云端已启用` + “检索增强在设置 → 能力进化配置”；不出现 Key 输入。状态由 host view 返回布尔事实，不返回 Key。
 - 点击“去设置”使用平台 `openSettings('evolution')`；若当前面板 props 不可达，只显示静态提示，不硬编码 URL/路由。
 
 ### 5.2 卡片文案（中文源，母语审校后）
@@ -304,7 +304,8 @@ API Key 只保存在本机，保存后不再显示。
 - 已落地：`retrieval-contract.json` + host/client generated contract + `--check` 脚本；host `resolveRetrievalCredentials`；engine `screen(credentials)` explicit runtime key（5 个声明式传输补丁；其余 vendor 字节与实质面校验通过；engine 2 个测试）；`evolution-ui` 设置页 `RetrievalCard`（两把可选 Key、来源、保存/清除、不可用/失败状态）；`retrieval-credentials` 单测、`retrieval-card` 9 个组件测试、`MergeSettings` 1 个指路测试、UI 8 locale 经独立母语审校。
 - 已落地：合并建议页高级区静态提示“检索增强在设置 → 自进化配置”（当前面板 props 无 openSettings，不硬编码路由；状态入口待平台公开 seam）；
 - 真机验证：lab84 fresh profile（0.60.1 dev pack）最终设置页截图 `D:/dsh/_lab84_settings_final2.png`；假 Key 保存后显示“向量走云端，精排用本地 / 已保存在本机”，清除后回到本地模式（测试 key 已清除）。
-- 待落地：合并页可点击状态入口（当前为静态指路）、全量门禁/发布链、真实官方 API Key 端到端。
+- 已落地：合并页状态（host view 的 retrieval 布尔事实，键值不出现）和静态指路；
+- 待落地：合并页可点击打开设置（需平台公开 openSettings seam）、全量门禁/发布链、真实官方 API Key 端到端。
 - 已知偏差/修正：explicit runtime key 需要 5 个 vendor 凭据传输补丁，DCR-6 已把门禁从字节冻结改为实质冻结；UI 字段使用家族自己的 password 输入而非直接 import 平台 `SettingsSecretField`（编译 face 约束）；凭据写入仍是平台 `remote.credentials`，语义不变。
 
 ## 12.1 DCR-6：实质冻结取代字节冻结（用户确认 2026-11-24）
