@@ -124,6 +124,42 @@ describe('UnitKernel executor', () => {
     expect(io.files.get('source/SKILL.md')).toBe('old')
   })
 
+  it('consumes a prepared handle once and keeps release idempotent', async () => {
+    const io = new MemoryIo()
+    io.files.set('source/SKILL.md', 'old')
+    const unitKernel = unit(io, { snapshots: new MemorySnapshots() })
+    const prepared = await unitKernel.prepare(request())
+    expect((await unitKernel.commit(prepared as PreparedMutation)).ok).toBe(true)
+    const second = await unitKernel.commit(prepared as PreparedMutation)
+    expect(second.ok).toBe(false)
+    expect(second.errors[0]?.code).toBe('unit-handle-consumed')
+    await (prepared as PreparedMutation).release()
+    await (prepared as PreparedMutation).release()
+    expect(io.files.get('source/SKILL.md')).toBe('new')
+  })
+
+  it('treats a journal committed failure as a warning, never as a rollback after the snapshot committed', async () => {
+    const io = new MemoryIo()
+    io.files.set('source/SKILL.md', 'old')
+    const snapshots = new MemorySnapshots()
+    const journal = { async write(record: MutationJournalRecord) { if (record.phase === 'committed') throw new Error('journal disk full') } }
+    const result = await unit(io, { snapshots, journal }).apply(request())
+    expect(result.ok).toBe(true)
+    expect(result.warnings?.join(' ')).toContain('journal committed write failed')
+    expect(io.files.get('source/SKILL.md')).toBe('new')
+    expect([...snapshots.items.values()][0]).toMatchObject({ state: 'committed' })
+  })
+
+  it('keeps the structured failure when the journal failed record also throws', async () => {
+    const io = new MemoryIo()
+    io.files.set('source/SKILL.md', 'old')
+    io.failWrite = 'source/SKILL.md'
+    const journal = { async write(record: MutationJournalRecord) { if (record.phase === 'failed') throw new Error('journal unavailable') } }
+    const result = await unit(io, { journal }).apply(request({ ops: [{ kind: 'write', target: 'source/SKILL.md', content: 'new', expected: 'old' }] }))
+    expect(result.ok).toBe(false)
+    expect(result.errors[0]?.code).toBe('write-failed')
+  })
+
   it('derives recovery lock keys from the snapshot', async () => {
     const io = new MemoryIo(); io.files.set('source/SKILL.md', 'new')
     const seen: Array<readonly string[] | undefined> = []

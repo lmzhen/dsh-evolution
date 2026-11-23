@@ -29,6 +29,17 @@
 | D3-OTHER-PORTS | 其余 family-facing ports 仍手写 | `docs/79` | D3 | 只有 3 个端口可机械派生 | Phase E | 逐个判定可生成性 |
 | D2-TARGET-WRITER | 低层 `TargetWriter` 不在 `write.ts` 公共导出 | `write.ts`、`verify-core-surface.mjs` | D2 | 公共面收窄，内部实现 | next minor | 更新 gate/文档，决定是否公共导出 |
 
+## 2026-11-24 收口
+
+| ID | 状态 | 修复/证据 |
+|---|---|---|
+| D2-HANDLE | FIXED | `unit-kernel.ts` 的 PreparedMutation 现在由 WeakMap 状态机消费：prepare→committing→released；重复 commit 返回 `unit-handle-consumed`，release 幂等。
+| D2-JOURNAL-FAIL | FIXED | snapshot committed 成为恢复权威；之后的 journal committed 失败只入 warnings，不再触发 target rollback + 已 committed snapshot 的分叉。
+| D2-JOURNAL-ERR | FIXED | commit catch 的 journal failed 写入失败被捕获为 warning，提交失败仍返回结构化结果。
+| D2-HANDLE/JOURNAL 测试 | EVIDENCE | `unit-kernel.spec.ts` 33 tests；新增 double commit/release、journal committed failure、journal failed failure 三例。
+
+其余 D1/D2/D3 行仍按上表 DEFERRED（owner/reason/expiry/判据）。
+
 ## 发布阻断项（不是 P2）
 
 1. **release evidence 仍是旧数据**：`packages/scripts/release-evidence-rehearsal.json` 的 `measuredCommit`、traceability source 都是 0.59.6 旧值；发布前必须重新 build、pack、复算 dist sha256，并重测 S1–S4。

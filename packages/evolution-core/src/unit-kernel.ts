@@ -244,6 +244,9 @@ export interface UnitKernelOptions {
   now?: () => number
 }
 
+type PreparedState = 'prepared' | 'committing' | 'released'
+const preparedState = new WeakMap<object, PreparedState>()
+
 export interface PreparedMutation {
   readonly kind: 'prepared'
   readonly unitId: string
@@ -362,7 +365,13 @@ export class UnitKernel {
       return { ok: false, unitId, dryRun: false, changed: [], errors: [{ code, message: error instanceof Error ? error.message : String(error) }] }
     }
     let claim: { release(): Promise<void> } | undefined
+    let handle: PreparedMutation
     const release = async (): Promise<void> => {
+      if (handle !== undefined) {
+        const current = preparedState.get(handle)
+        if (current === 'released') return
+        preparedState.set(handle, 'released')
+      }
       await claim?.release().catch(() => {})
       await lease.release()
     }
@@ -415,11 +424,18 @@ export class UnitKernel {
         warnings.push(error instanceof Error ? error.message : String(error))
       }
     }
-    return { kind: 'prepared', unitId, request, primary, validation, snapshots, eventOps, changed, warnings, bestEffort, release }
+    handle = { kind: 'prepared', unitId, request, primary, validation, snapshots, eventOps, changed, warnings, bestEffort, release }
+    preparedState.set(handle, 'prepared')
+    return handle
   }
 
   /** Phase 2: the only durable write phase. Releases the prepare lease in all paths. */
   async commit(prepared: PreparedMutation): Promise<MutationResult> {
+    const current = preparedState.get(prepared)
+    if (current !== 'prepared') {
+      return { ok: false, unitId: prepared.unitId, dryRun: false, changed: [], errors: [{ code: 'unit-handle-consumed', message: 'prepared mutation is already ' + String(current) }] }
+    }
+    preparedState.set(prepared, 'committing')
     const { unitId, request, primary, validation, snapshots, eventOps, changed, warnings, bestEffort } = prepared
     const cleanup = request.cleanupPaths === undefined ? {} : { cleanup: request.cleanupPaths }
     try {
@@ -439,8 +455,16 @@ export class UnitKernel {
         }
       }
       await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'unit-written', changed, target: primary, roots: validation.roots.map(root => root.name) }))
-      if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, journalId: this.journalId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
-      await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) }))
+      // The snapshot is the recovery authority: only a failed snapshot write may
+      // roll the unit back. A journal write after this point is diagnostic; a
+      // missing journal record must not turn a committed snapshot into a
+      // rollback plus a committed snapshot.
+      if (this.snapshots !== undefined) await this.snapshots!.write({ unitId, journalId: this.journalId, state: 'committed', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() })
+      try {
+        await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'committed', changed, target: primary, roots: validation.roots.map(root => root.name) })
+      } catch (error) {
+        warnings.push('journal committed write failed: ' + (error instanceof Error ? error.message : String(error)))
+      }
       try {
         await this.hooks?.committed?.({ unitId, changed, ops: eventOps, roots: validation.roots.map(root => root.name) })
       } catch {
@@ -457,7 +481,11 @@ export class UnitKernel {
       }
       const detail = rollbackFailure === '' ? message : message + '; rollback failed: ' + rollbackFailure
       const failureCode = (error as { code?: string } | undefined)?.code === 'transact-not-invoked' ? 'transact-not-invoked' : 'write-failed'
-      await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'failed', changed, error: detail })
+      try {
+        await this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'failed', changed, error: detail })
+      } catch (journalError) {
+        warnings.push('journal failed write failed: ' + (journalError instanceof Error ? journalError.message : String(journalError)))
+      }
       try {
         await this.hooks?.rolledBack?.({
           unitId,
