@@ -139,6 +139,12 @@ if (members.size === 0) {
 
 export default {
   resolve: { alias: aliasList },
+  // The resolver maps some platform packages to their source (.ts). Those
+  // sources use legacy method decorators (`@Remote`); without this tsconfigRaw
+  // esbuild leaves the decorator in the SSR module and Node reports
+  // "Invalid or unexpected token". The family tree itself compiles with the
+  // same flag, so this only restores the platform transform.
+  esbuild: { tsconfigRaw: { compilerOptions: { experimentalDecorators: true } } },
   test: {
     root: familyTree,
     testTimeout: specTimeoutMs,
