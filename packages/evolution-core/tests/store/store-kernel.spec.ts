@@ -169,6 +169,40 @@ describe('home MVCC store kernel', () => {
     expect((await kernel.query(['state'])).domains.state).toEqual({ n: 0 })
   })
 
+  it('retries a transiently missing head instead of reporting an empty store', async () => {
+    const { io, root } = await seeded()
+    const kernel = new StoreKernel({ io, home: root, fence: openFence() })
+    await kernel.bootstrap({ state: { turns: 1 } })
+    let misses = 0
+    const flaky = {
+      ...io,
+      readText: async (path: string): Promise<string | null> => {
+        if (path.endsWith('head.json') && misses++ === 0) return null
+        return await io.readText(path)
+      },
+    }
+    const reader = new StoreKernel({ io: flaky, home: root, fence: openFence() })
+    expect((await reader.query(['state'])).domains.state).toEqual({ turns: 1 })
+  })
+
+  it('keeps the old head readable when a publish crashes before the head write', async () => {
+    const { io, root } = await seeded()
+    const kernel = new StoreKernel({ io, home: root, fence: openFence() })
+    await kernel.bootstrap({ state: { turns: 1 } })
+    const crashing = {
+      ...io,
+      writeText: async (path: string, text: string): Promise<void> => {
+        if (path.endsWith('head.json')) throw new Error('simulated crash before head')
+        return await io.writeText(path, text)
+      },
+    }
+    const writer = new StoreKernel({ io: crashing, home: root, fence: openFence() })
+    await expect(writer.mutate({ domains: ['state'], source: 'command', change: () => ({ state: { turns: 2 } }) })).rejects.toThrow(/simulated crash/)
+    expect((await kernel.query(['state'])).domains.state).toEqual({ turns: 1 })
+    await kernel.mutate({ domains: ['state'], source: 'command', change: () => ({ state: { turns: 3 } }) })
+    expect((await kernel.query(['state'])).domains.state).toEqual({ turns: 3 })
+  })
+
   it('garbage-collects unreachable commits but keeps the head readable', async () => {    const { io, root } = await seeded()
     const kernel = new StoreKernel({ io, home: root, fence: openFence(), now: () => 1_700_000_000_000 })
     await kernel.bootstrap({ state: { n: 0 } })

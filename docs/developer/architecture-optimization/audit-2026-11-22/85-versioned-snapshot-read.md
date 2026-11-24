@@ -220,9 +220,9 @@ HomeFence.run(tree)
 - 写入：`HomeFence.run` → 写 content object → 写 commit → 原子写 `head.json`；
 - 读取：`readHead → readCommit → readObject`，全程不调用 fence；
 - 对象/commit 使用 IO seam 的 `createTextIfAbsent`/`writeText`；没有 `commit.lock` 文件；
-- 已覆盖：bootstrap、旧快照不可变、expectedHead CAS、同字节 no-op、head 缺失/对象篡改 fail-closed、重复 bootstrap 拒绝、GC 保留 head 链、读在 HomeFence 被持有时仍完成（真实平台锁）、嵌套 commit 检测、tree 归一化、非 plain JSON 拒绝、GC retain 非法值；
+- 已覆盖：bootstrap、旧快照不可变、expectedHead CAS、同字节 no-op、head 缺失/对象篡改 fail-closed、重复 bootstrap 拒绝、GC 保留 head 链、读在 HomeFence 被持有时仍完成（真实平台锁）、嵌套 commit 检测、tree 归一化、非 plain JSON 拒绝、GC retain 非法值、head 瞬时缺失重试、publish 在 head 前崩溃后旧 head 可读；
 - 独立复核后修复：P0-1 发布前用 `parseCommit` 自检（source/tree 归一化，非法对象不再锁死 head）；P0-2 `change` 后重新读 head，嵌套/并发 commit 抛 `StoreConflictError` 而不是被覆盖；P1-1 GC `retain` 校验并 best-effort 记录失败；P1-2 head 短暂缺失 bounded retry 且区分“未初始化/commit 存在但 head 丢失”；P1-3 Date/class/Map 等非 plain JSON 值拒绝；
-- 验证：`store-kernel.spec.ts` 11 tests passed；`tsc -b packages/evolution/evolution-core/tsconfig.json` exit 0；现有 `state/store-provider.spec.ts` 5 tests 隔离运行通过；
+- 验证：`store-kernel.spec.ts` 13 tests passed；`tsc -b packages/evolution/evolution-core/tsconfig.json` exit 0；现有 `state/store-provider.spec.ts` 5 tests 隔离运行通过；
 - 新静态门禁：`verify-store-kernel.mjs`（gate-87）检查 query 无写锁、写入只用一个 HomeFence + IO seam、head/commit/object 已登记 `persisted-write-inventory`；已通过；
 - 仍未完成（R2 前补齐）：真实两进程 writer、publish 各阶段 crash、read-during-write、GC/reader race、legacy bootstrap 迁移测试；见复核清单。
 - 下一步 R2 才接 `EvolutionState`/state provider；R1 不改变 0.61.0 的运行路径。
