@@ -104,6 +104,18 @@ it('newSkillLibrary auto-detects evolutionMutationAuthority from ctx', async () 
   expect(acquired).toBeGreaterThan(0)
 })
 
+it('resolves the authority lock at write time so a late provide heals the session', async () => {
+  const root = await tempRoot('dsh-skill-authority-late-')
+  let acquired = 0
+  let authority: { mutationLock: { acquire(): Promise<{ release(): Promise<void> }> } } | undefined
+  const ctx = { emit() {}, get(name: string) { return name === 'evolutionMutationAuthority' ? authority : undefined } }
+  const lib = newSkillLibrary({ config: { root }, io: nodeEvolutionIo(), ctx, authority: authorityFrom({ origin: 'foreground' }) })
+  authority = { mutationLock: { async acquire() { acquired += 1; return { async release() {} } } } }
+  const created = await lib.create('late-lock', skill('late-lock'), 'foreground')
+  expect(created.ok, created.message).toBe(true)
+  expect(acquired).toBeGreaterThan(0)
+})
+
 it('fails closed when the authority lock cannot be acquired', async () => {
   const root = await tempRoot('dsh-skill-authority-fail-closed-')
   const lock = { async acquire() { throw new Error('skill-store: no authority mutationLock was supplied; refusing an unfenced production write') } }

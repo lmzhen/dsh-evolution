@@ -903,6 +903,7 @@ export class SkillLibrary {
   private readonly authority: WriteAuthority
   /** When supplied by the family MutationAuthority, replaces the per-directory file lock. */
   private readonly mutationLock: MutationLockPort | undefined
+  private readonly mutationLockResolver: (() => MutationLockPort | undefined) | undefined
   private readonly fence: HistoryFence | undefined
   /** skill-history.ts: the content history is best-effort, so a failure must not be SILENT —
    * but it is a deployment condition, not a per-write event, so it warns once per instance. */
@@ -918,6 +919,7 @@ export class SkillLibrary {
     authority: WriteAuthority = CLASS_DEFAULT_AUTHORITY,
     mutationLock?: MutationLockPort,
     fence?: HistoryFence,
+    mutationLockResolver?: () => MutationLockPort | undefined,
   ) {
     this.root = root
     this.targetLocks = targetLocksFor(root)
@@ -928,6 +930,7 @@ export class SkillLibrary {
     this.threatExemptLabels = threatExemptLabels ?? []
     this.authority = authority
     this.mutationLock = mutationLock
+    this.mutationLockResolver = mutationLockResolver
     this.fence = fence
     // V4-20: bind the ONE transaction seam by default. Explicit injection stays
     // first; a backend without transact keeps the plain read→write (the
@@ -1122,8 +1125,14 @@ export class SkillLibrary {
   }
 
   /** True when the injected lock port is per-target rather than the home fence. */
+  /** Resolve at use time: the authority row may provide its lock after this library mounts. */
+  private currentMutationLock(): MutationLockPort | undefined {
+    return this.mutationLock ?? this.mutationLockResolver?.()
+  }
+
   private keyedTargetLocks(): boolean {
-    if (this.mutationLock !== undefined) return this.mutationLock.keyed === true
+    const lock = this.currentMutationLock()
+    if (lock !== undefined) return lock.keyed === true
     // A test library may have no injected lock (fileMutationLock fallback). A
     // production library without one must still fail closed, never silently
     // bypass the fence because the keyed probe swallowed the assembly error.
@@ -1132,7 +1141,8 @@ export class SkillLibrary {
   }
 
   private lockPort(): MutationLockPort {
-    if (this.mutationLock !== undefined) return this.mutationLock
+    const lock = this.currentMutationLock()
+    if (lock !== undefined) return lock
     // Fail loud outside tests: production skill writes must use the family authority fence.
     if (process.env['VITEST'] === 'true' || process.env['NODE_ENV'] === 'test') return fileMutationLock(this.io, this.root)
     throw new Error('skill-store: no authority mutationLock was supplied; refusing an unfenced production write')
@@ -5092,6 +5102,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     authority,
     options.mutationLock ?? mutationLockFrom(ctx),
     options.fence ?? (ctx?.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence,
+    options.mutationLock === undefined && ctx !== undefined ? () => mutationLockFrom(ctx) : undefined,
   )
 }
 
