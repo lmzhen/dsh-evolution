@@ -167,6 +167,7 @@
         "evolution-core::tests/store/store-service.spec.ts",
         "evolution-core::tests/store/tree-manifest-boundary.spec.ts",
         "evolution-core::tests/store/tree-manifest.spec.ts",
+        "evolution-core::tests/store/usage-sidecar-v2.spec.ts",
         "evolution-core::tests/target-writer.spec.ts",
         "evolution-core::tests/text-budgets.spec.ts",
         "evolution-core::tests/text-metrics.spec.ts",
@@ -551,6 +552,7 @@
         "evolution-core::tests/store/store-service.spec.ts",
         "evolution-core::tests/store/tree-manifest-boundary.spec.ts",
         "evolution-core::tests/store/tree-manifest.spec.ts",
+        "evolution-core::tests/store/usage-sidecar-v2.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
@@ -1256,6 +1258,7 @@
         "evolution-core::tests/store/store-service.spec.ts",
         "evolution-core::tests/store/tree-manifest-boundary.spec.ts",
         "evolution-core::tests/store/tree-manifest.spec.ts",
+        "evolution-core::tests/store/usage-sidecar-v2.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
@@ -1899,6 +1902,7 @@
         "evolution-core::tests/store/store-service.spec.ts",
         "evolution-core::tests/store/tree-manifest-boundary.spec.ts",
         "evolution-core::tests/store/tree-manifest.spec.ts",
+        "evolution-core::tests/store/usage-sidecar-v2.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
@@ -2328,11 +2332,11 @@
   "counts": {
     "fast": {
       "gates": 67,
-      "specs": 157
+      "specs": 158
     },
     "pre-tag": {
       "gates": 67,
-      "specs": 468
+      "specs": 469
     },
     "ci-only": {
       "gates": 10,
@@ -2340,16 +2344,16 @@
     },
     "full(ci=off)": {
       "gates": 67,
-      "specs": 468
+      "specs": 469
     },
     "full(ci=on)": {
       "gates": 77,
-      "specs": 539
+      "specs": 540
     }
   },
   "specs": {
-    "total": 539,
-    "marked": 539,
+    "total": 540,
+    "marked": 540,
     "unmarked": 0
   }
 }
