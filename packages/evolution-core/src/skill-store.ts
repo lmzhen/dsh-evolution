@@ -905,6 +905,7 @@ export class SkillLibrary {
   private readonly mutationLock: MutationLockPort | undefined
   private readonly mutationLockResolver: (() => MutationLockPort | undefined) | undefined
   private readonly fence: HistoryFence | undefined
+  private readonly fenceResolver: (() => HistoryFence | undefined) | undefined
   /** skill-history.ts: the content history is best-effort, so a failure must not be SILENT —
    * but it is a deployment condition, not a per-write event, so it warns once per instance. */
   private historyWarned = false
@@ -920,6 +921,7 @@ export class SkillLibrary {
     mutationLock?: MutationLockPort,
     fence?: HistoryFence,
     mutationLockResolver?: () => MutationLockPort | undefined,
+    fenceResolver?: () => HistoryFence | undefined,
   ) {
     this.root = root
     this.targetLocks = targetLocksFor(root)
@@ -932,6 +934,7 @@ export class SkillLibrary {
     this.mutationLock = mutationLock
     this.mutationLockResolver = mutationLockResolver
     this.fence = fence
+    this.fenceResolver = fenceResolver
     // V4-20: bind the ONE transaction seam by default. Explicit injection stays
     // first; a backend without transact keeps the plain read→write (the
     // in-process serial chain is the second layer). transactIo owns the backend
@@ -1125,6 +1128,11 @@ export class SkillLibrary {
   }
 
   /** True when the injected lock port is per-target rather than the home fence. */
+  /** Resolve the home fence at use time too: it arrives with the same late service. */
+  private currentFence(): HistoryFence | undefined {
+    return this.fence ?? this.fenceResolver?.()
+  }
+
   /** Resolve at use time: the authority row may provide its lock after this library mounts. */
   private currentMutationLock(): MutationLockPort | undefined {
     return this.mutationLock ?? this.mutationLockResolver?.()
@@ -1788,7 +1796,7 @@ export class SkillLibrary {
         supportFiles,
         restructureRounds: 0,
         source,
-      }, undefined, fenceHeld ? undefined : this.fence)
+      }, undefined, fenceHeld ? undefined : this.currentFence())
     } catch (error) {
       console.warn('skill-store: hard-cap event not recorded for "' + name + '": ' + (error instanceof Error ? error.message : String(error)))
     }
@@ -1832,7 +1840,7 @@ export class SkillLibrary {
   ): Promise<void> {
     // A committed hook or outer tree operation already holds the home fence.
     // Keep per-file transactions, but do not queue behind our own lease.
-    const fence = fenceHeld ? undefined : this.fence
+    const fence = fenceHeld ? undefined : this.currentFence()
     const at = new Date().toISOString()
     const planSummary = PLAN_SUMMARY.getStore()
     const finalSummary = planSummary !== undefined
@@ -5103,6 +5111,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     options.mutationLock ?? mutationLockFrom(ctx),
     options.fence ?? (ctx?.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence,
     options.mutationLock === undefined && ctx !== undefined ? () => mutationLockFrom(ctx) : undefined,
+    options.fence === undefined && ctx !== undefined ? () => (ctx.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence : undefined,
   )
 }
 
