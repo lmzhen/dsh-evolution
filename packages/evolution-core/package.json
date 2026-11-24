@@ -110,10 +110,6 @@
     "./state/store-plugin": {
       "types": "./lib/types/state/store-plugin.d.ts",
       "default": "./lib/state/store-plugin.js"
-    },
-    "./state/v2-provider": {
-      "types": "./lib/types/state/v2-provider.d.ts",
-      "default": "./lib/state/v2-provider.js"
     }
   },
   "files": [
