@@ -76,7 +76,6 @@
   head.json                     # 唯一可变指针（原子替换）
   commits/<commitId>.json       # 不可变 commit manifest
   objects/<sha256>.json         # 不可变内容对象
-  locks/commit.lock             # 跨进程 writer lock
   logs/activity/<segment>.jsonl  # 追加日志（非 MVCC）
   tmp/                          # 原子写临时文件（平台写实现）
 ```
@@ -126,7 +125,7 @@
 
 ```text
 command(input, {expectedHead?})
-  -> acquire commit.lock (withFileLock, bounded wait)
+  -> acquire the ONE HomeFence writer scope (existing single home lock; nested callers use runNested)
   -> read head + commit（若不存在则从 legacy bootstrap）
   -> validate expectedHead（可选 CAS）
   -> run domain mutator on immutable previous values
@@ -143,7 +142,7 @@ command(input, {expectedHead?})
 - **对象先写，head 后写**：head 不指向半成品；
 - `createTextIfAbsent` 保证内容对象不被覆盖；
 - `head.json` 用平台原子写（临时文件 + rename）；
-- `commit.lock` 只包住“读 head → 写 head”，不覆盖长时间模型调用/文件扫描；
+- writer 临界区由唯一的 `HomeFence`（`HomeAuthority` 的 tree scope，内部是平台 `withFileLock`）承担；不新增 `commit.lock` 文件，也不新增第二套跨进程锁。commit 临界区只包住“读 head → 写 head”，不覆盖长时间模型调用/文件扫描；
 - 长任务（scan、review、maintain）把“准备阶段”放在锁外，只把最终提交放在锁内；
 - 需要多文件技能树的命令先 `UnitKernel.prepare`，再提交 tree unit，最后发布 head；tree unit 的 journal 是恢复权威；
 - 一个 commit 失败：只要 head 未替换，旧 commit 完整可读；孤儿对象由 GC 清理；
@@ -161,7 +160,7 @@ query({domains?})
   -> return {commitId, values, tree}
 ```
 
-- **不取 commit.lock，不取 HomeFence，不做 state.lock**。
+- **不取 HomeFence，不做 state.lock，也不存在要取的 commit.lock 文件**。
 - head 在查询中途变化不影响结果：读者已拿到一个完整 commit；
 - 下一次查询自然看到新 head；
 - 如果 head/commit/object 读失败：有限重试（读取 head 后重读 head，最多 3 次），仍失败则 **fail closed**，绝不把空对象当默认值；
@@ -179,29 +178,52 @@ commit 保存的是 **一个完整 domain map**，而不是增量。
 
 这是本设计相对“每域 current 文件”的关键简化：**一个 head，天然多域一致**。
 
-### 5.5 锁顺序
+### 5.5 写者互斥：一个 HomeFence，不是第二把锁
 
-固定顺序，不允许反向：
+写者只使用现有的 `HomeFence`：
 
 ```text
-HomeFence (tree/unit writes, when needed)
-  -> store-v2/commit.lock
+HomeFence.run(tree)
+  -> 读 head -> 写 objects -> 写 commit -> 原子写 head
 ```
 
-- 只写 metadata 的命令只取 `commit.lock`；
-- 写技能树的命令先 `HomeFence` 再 `commit.lock`；
-- 读不取任何锁；
-- 禁止在 `commit.lock` 内调用模型、review 子代理、长时间扫描；
-- 禁止在 `HomeFence` 内反过来取另一个 home 的 store lock。
+- `HomeFence` 已经封装 `HomeAuthority` 的 tree scope：进程内 FIFO + 跨进程平台 `withFileLock`；这就是“唯一 writer lock”。
+- 写技能树的命令先由 `HomeFence` 持有 tree scope；本次 commit 在同一 `fence.run` 内 `runNested`，不重新抢占锁，也不引入反向顺序。
+- metadata commit 与技能树写者共享同一 fence：两个写者本来就应串行；读者不受影响。
+- 文档里“commit.lock”只是 commit 临界区的逻辑名，**磁盘上没有 `commit.lock` 文件**；新增任何独立跨进程锁都会被门禁判红。
+- 读不取任何锁；禁止为读增加共享读锁、读超时或 reader registry。
+- 禁止在 fence 内调用模型、review 子代理、长时间扫描；长任务在锁外完成，只把最后提交放进锁内。
+- 禁止在 fence 内取另一个 home 的 fence/store。
 
 ### 5.6 GC
 
 - 保留最近 `N=64` 个 commit，或 7 天，取较大者；
 - 从 head 沿 parent 链保留引用；
 - 不再被任何保留 commit 引用的 object 才删除；
-- GC 在 commit.lock 内只做“候选计算”，删除可以 best-effort；删除失败只告警；
+- GC 在 writer fence 内只做“候选计算”，删除可以 best-effort；删除失败只告警；
 - GC 永远不删除当前 head 或其直接 parent；
 - 崩溃留下孤儿 object 是安全的，只会占空间。
+
+### 5.7 R1 落地修订（代码证据）
+
+读完 `state/index.ts`、`state/store.ts`、`state/store-plugin.ts`、`io.ts`、`home-fence.ts`、`authority.ts`、平台 `atomic-write` 后，对初版 DCR-85 作两处收敛，后续实现以此为准：
+
+1. **不新增 `store-v2/commit.lock`**。`HomeFence` 已经是唯一 home 级 writer 锁（`HomeAuthority` tree scope + 平台 `withFileLock`），metadata commit 直接在该 fence 内完成；独立锁文件会变成 DCR-85 所禁止的第二套跨进程锁。
+2. **v2 读路径不经过 `withFileLock`，也不经过 `EvolutionState.withStateLock`**。0.61.0 的 `EvolutionState` 仍把所有读包在 `home/state.lock` 里，这是 R2 要删除的过渡机制；v2 kernel 的 query 只做 `readText`。
+3. **对象/commit 的原子性来自 `EvolutionIoLike` 的 tmp+rename/`createTextIfAbsent`，不用 `writeFileAtomic` 直接写路径**。`nodeEvolutionIo.writeText` 已是原子替换；跨后端由 seam 保证。平台 `writeFileAtomic` 只在直接构造 kernel 的单测可注入；生产不绕过 IO seam。
+4. **第一版 kernel 只做通用对象层**：domain schema、state/merge 的适配器在 R2 接入；R1 不改变 `EvolutionStateStorage` 的现有行为，也不删除 domain provider。
+
+### 5.8 R1 已落地证据
+
+- 代码：`packages/evolution-core/src/store/{types.ts,store-kernel.ts,index.ts}`；
+- 公开面：`StoreKernel.query/mutate/bootstrap/collectGarbage`，根导出；
+- 写入：`HomeFence.run` → 写 content object → 写 commit → 原子写 `head.json`；
+- 读取：`readHead → readCommit → readObject`，全程不调用 fence；
+- 对象/commit 使用 IO seam 的 `createTextIfAbsent`/`writeText`；没有 `commit.lock` 文件；
+- 已覆盖：bootstrap、旧快照不可变、expectedHead CAS、同字节 no-op、head 缺失/对象篡改 fail-closed、重复 bootstrap 拒绝、GC 保留 head 链、读在 HomeFence 被持有时仍完成（真实平台锁）；
+- 验证：`store-kernel.spec.ts` 8 tests passed；`tsc -b packages/evolution/evolution-core/tsconfig.json` exit 0；现有 `state/store-provider.spec.ts` 5 tests 隔离运行通过。
+- 下一步 R2 才接 `EvolutionState`/state provider；R1 不改变 0.61.0 的运行路径。
+
 
 ## 6. 域与读写分类
 
@@ -426,7 +448,7 @@ maintain status/report/handoff/cancel, offload, condense, replay
 
 使用现有公开 seam：
 
-- `@deepseek-ai/dsh-atomic-write` 的 `withFileLock`（writer lock）和 `writeFileAtomic`（object/head）；
+- `@deepseek-ai/dsh-atomic-write` 的 `withFileLock`（由现有 `HomeFence` 持有，不为 store 另建锁文件）和 `writeFileAtomic`（object/head）；
 - `ctx.fs`/`EvolutionIoLike` 的 read/create/rename；
 - `ctx.settings` / `remote.credentials`：平台自己的域，不复制、不缓存 secret；
 - `ctx.tools` / `ctx.commands`：只作为 transport，handler 调 store command bus；
@@ -537,7 +559,7 @@ maintain status/report/handoff/cancel, offload, condense, replay
 7. **fail closed**：head/commit/object 损坏 → 报错，不返回空默认。
 8. **secret 不落 store**：credentials/settings 只在平台域；store 快照不得包含 Key。
 9. **迁移不双写**：迁移期 legacy 只读；新写只写 store；切换“已经发生”由 commitId 证明。
-10. **锁顺序**：HomeFence → commit.lock；禁止反向。
+10. **唯一写锁**：只有 `HomeFence` 一个写者临界区；不存在第二个跨进程锁文件；commit 锁是它的逻辑名，不是磁盘文件。
 11. **UI/tool/command 同源**：同一 command id 的读写实现只有一份。
 
 ## 14. 测试与门禁

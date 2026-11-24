@@ -4,6 +4,8 @@
 依据：[10-system-framework.md](10-system-framework.md)、[README.md](README.md) 与 8 份分报告。
 约束：插件侧重写；平台侧只消费公开 service/事件，不 fork 平台。允许删除/合并包、破坏旧内部 API、重写核心路径；不保留“先双写再迁移”的长期兼容层。
 
+> DCR-85 修订（2026-11）：4.1 HomeFS 仍是 Phase B 的最终文件边界；过渡期 store-v2 直接消费 `ctx.evolutionIo`（单文件原子写）而不等待 HomeFS。4.4 StateStore 的具体读写语义改为 **Home MVCC Store**：写入串行提交不可变 `head/commit/objects`，读者无锁；`StateStore.transact` 仍保留为写入口，但不再以读锁作为一致性手段。详见 [85-versioned-snapshot-read.md](85-versioned-snapshot-read.md)。
+
 ## 1. 目标
 
 把当前“23 个包 + 5 层锁 + 2 套 CAS + 3 套路由/状态机”的家族，收敛为：
