@@ -19,6 +19,8 @@ export const STORE_DOMAIN_IDS = [
   'suppressed',
   'feedback',
   'memory',
+  'memoryFile',
+  'userFile',
   'discovery',
   'domainMap',
   'projectionJournal',

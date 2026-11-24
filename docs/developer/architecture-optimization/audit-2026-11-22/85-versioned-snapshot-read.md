@@ -339,6 +339,13 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：v2 state/migration 7 tests 覆盖三域迁移；`tsc` core/discovery 0。
 - 尚未做：memory 正文树（R4c）与 activity append 分段（R5）。
 
+#### R4c 已落地（memory 正文）
+
+- `MEMORY.md` / `USER.md` 在 v2 marker 下映射到 `memoryFile` / `userFile` 域；`memoryIoIfV2` 包在 memory-files 的 store IO 上，`MemoryStore` 的读写/归档/回滚代码不变。
+- `--to v2` 首 commit 同时迁移默认 `<dshHome>/memories` 下的两个文件；迁移选项可覆盖 memoryRoot。
+- 测试：v2 state/migration 8 tests 覆盖 memory 迁移；`tsc` core/memory 0。
+- 尚未做：memory 新增大正文的 blob 分层（当前单文本域，符合 DCR-85 的“大正文用 blob”后续项）。
+
 
 ## 6. 域与读写分类
 

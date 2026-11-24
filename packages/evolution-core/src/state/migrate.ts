@@ -15,6 +15,7 @@ import type { Domain } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { storageDomainPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values/fs'
 import { evolutionHome, evolutionRoot } from '../state-store.ts'
+import { memoryRoot } from '../memory-store.ts'
 import { suppressedFile, usageFile } from '../usage.ts'
 import type { EvolutionIoLike } from '../io.ts'
 import { readStateStoreSnapshot, writeStateStoreSnapshot, type StateStoreSnapshot, type StoredReviewState } from './store.ts'
@@ -43,6 +44,8 @@ export interface StateMigrationOptions {
   readonly dryRun?: boolean
   /** Skill tree root; defaults to `<dshHome>/skills` through evolutionRoot(). */
   readonly skillsRoot?: string
+  /** Memory root; defaults to `<dshHome>/memories`. */
+  readonly memoryRoot?: string
   readonly now?: () => number
 }
 
@@ -273,6 +276,9 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
     const domainMapText = await discoveryText(discoveryPaths.domainMap)
     const projectionJournalText = await discoveryText(discoveryPaths.projectionJournal)
     const viewSnapshotsText = await discoveryText(discoveryPaths.viewSnapshots)
+    const memRoot = options.memoryRoot ?? memoryRoot()
+    const memoryText = await discoveryText(join(memRoot, 'MEMORY.md'))
+    const userText = await discoveryText(join(memRoot, 'USER.md'))
     return await kernel.bootstrap({
       state: document,
       ...(runs === undefined ? {} : { runs }),
@@ -285,6 +291,8 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
       ...(domainMapText === null ? {} : { domainMap: { text: domainMapText } }),
       ...(projectionJournalText === null ? {} : { projectionJournal: { text: projectionJournalText } }),
       ...(viewSnapshotsText === null ? {} : { viewSnapshots: { text: viewSnapshotsText } }),
+      ...(memoryText === null ? {} : { memoryFile: { text: memoryText } }),
+      ...(userText === null ? {} : { userFile: { text: userText } }),
     }, 'bootstrap')
   })
   await writeMarker(source, result.commitId, snapshot)

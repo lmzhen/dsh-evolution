@@ -142,6 +142,21 @@ describe('MVCC state provider', () => {
     expect(snapshot.domains.viewSnapshots).toEqual({ text: '{"schemaVersion":1,"sessions":{}}\n' })
   })
 
+  it('migrates memory documents into the same first commit', async () => {
+    const root = await tempRoot('dsh-state-v2-memory-')
+    const ctx = await mountStateStack(root)
+    const io = ctx.evolutionIo.provider()
+    const memoryRoot = join(root, 'memories')
+    await mkdir(memoryRoot, { recursive: true })
+    await writeFile(join(memoryRoot, 'MEMORY.md'), '- one\n')
+    await writeFile(join(memoryRoot, 'USER.md'), '- me\n')
+    await migrateStateToV2(ctx, { io, home: root, memoryRoot })
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    const snapshot = await kernel.query(['memoryFile', 'userFile'])
+    expect(snapshot.domains.memoryFile).toEqual({ text: '- one\n' })
+    expect(snapshot.domains.userFile).toEqual({ text: '- me\n' })
+  })
+
   it('reads while the legacy state.lock is held because locking is internal', async () => {
     const { root, io, fence } = await seeded()
     const ctx = await mountStateStack(root)

@@ -172,6 +172,22 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
   return adapter
 }
 
+/** Map the two memory documents into their own domains under the v2 marker. */
+export function memoryIoIfV2(
+  ctx: { get?(name: string): unknown } | undefined,
+  base: EvolutionIoLike,
+  home: string,
+  memoryRootPath: string,
+  fence?: StoreWriterFence | undefined,
+): EvolutionIoLike | undefined {
+  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
+  const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
+  return scopedTextIO(
+    scopedTextIO(base, { path: join(memoryRootPath, 'MEMORY.md'), domain: 'memoryFile', kernel }),
+    { path: join(memoryRootPath, 'USER.md'), domain: 'userFile', kernel },
+  )
+}
+
 /** Select the merge-state bridge after the explicit v2 marker; otherwise the file stays. */export function mergeStateIoIfV2(
   ctx: { get?(name: string): unknown } | undefined,
   base: EvolutionIoLike,
