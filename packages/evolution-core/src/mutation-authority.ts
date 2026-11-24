@@ -1,4 +1,5 @@
-import { HomeFence } from './home-fence.ts'
+import { HomeFence, type HomeFenceLease } from './home-fence.ts'
+import type { TreeLock } from './authority.ts'
 import { LeaseStore } from './lease-store.ts'
 import type { EvolutionIoLike } from './io.ts'
 import type { MutationLockLease, MutationLockPort } from './unit-kernel.ts'
@@ -99,8 +100,42 @@ export class HybridMutationLock implements MutationLockPort {
   }
 }
 
-export function mutationLockFrom(ctx: { get?(name: string): unknown } | undefined): MutationLockPort | undefined {
+/** The authority surface as it exists at call time. */
+export interface MutationAuthorityPort {
+  readonly mutationLock?: MutationLockPort
+  readonly homeFence?: HomeFence
+}
+
+/** Resolve the authority now; callers that live past one apply must re-read this. */
+export function mutationAuthorityFrom(ctx: { get?(name: string): unknown } | undefined): MutationAuthorityPort | undefined {
   if (ctx?.get === undefined) return undefined
-  const authority = ctx.get('evolutionMutationAuthority') as { readonly mutationLock?: MutationLockPort } | undefined
-  return authority?.mutationLock
+  return ctx.get('evolutionMutationAuthority') as MutationAuthorityPort | undefined
+}
+
+export function mutationLockFrom(ctx: { get?(name: string): unknown } | undefined): MutationLockPort | undefined {
+  return mutationAuthorityFrom(ctx)?.mutationLock
+}
+
+export function homeFenceFrom(ctx: { get?(name: string): unknown } | undefined): HomeFence | undefined {
+  return mutationAuthorityFrom(ctx)?.homeFence
+}
+
+/** A stable HomeFence whose target is re-resolved on every use; HMR/late provide heal. */
+class LiveHomeFence extends HomeFence {
+  private fallback: HomeFence | undefined
+  constructor(private readonly liveCtx: { get?(name: string): unknown }, private readonly homePath: string) {
+    super({ home: homePath })
+  }
+  private current(): HomeFence {
+    return homeFenceFrom(this.liveCtx) ?? (this.fallback ??= new HomeFence({ home: this.homePath }))
+  }
+  override get releaseFailure() { return this.current().releaseFailure }
+  override holdsTree(): boolean { return this.current().holdsTree() }
+  override async run<T>(body: (lock: TreeLock) => Promise<T>): Promise<T> { return await this.current().run(body) }
+  override async acquire(): Promise<HomeFenceLease> { return await this.current().acquire() }
+}
+
+/** A stable HomeFence whose target is re-resolved on every use; HMR/late provide heal. */
+export function liveHomeFence(ctx: { get?(name: string): unknown }, home: string): HomeFence {
+  return new LiveHomeFence(ctx, home)
 }

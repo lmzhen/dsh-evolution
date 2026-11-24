@@ -10,7 +10,7 @@ import { settingsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 // by `vendor/hmr/src/index.ts`. The probes are capability checks — absence degrades a feature and
 // `/evolution doctor` reports it.
 import type { Context, Volatile } from '@deepseek-ai/cordis'
-import { createSubagentChannel, authorityFrom, mutationLockFrom, GOVERNANCE_PROMPT_TEMPLATE, withReviewContext } from '@deepseek-ai/dsh-evolution-core'
+import { createSubagentChannel, authorityFrom, homeFenceFrom, mutationLockFrom, GOVERNANCE_PROMPT_TEMPLATE, withReviewContext } from '@deepseek-ai/dsh-evolution-core'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { assembleDoctorInputs } from './doctor-view.ts'
 import { makeDiagnosticsRoutes } from './diagnostics-route.ts'
@@ -329,7 +329,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
       io: ioRegistry.provider(),
       home: evolutionHome(),
       warn: (message) => { ctx.logger.warn(message) },
-      ...((ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence === undefined ? {} : { fence: (ctx.get('evolutionMutationAuthority') as { readonly homeFence: { run<T>(body: () => Promise<T>): Promise<T> } }).homeFence }),
+      resolveFence: () => homeFenceFrom(ioCtx),
     })
     runs = registry
     void registry.load().then((loaded) => {
@@ -1158,7 +1158,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 startedAt: handle.startedAt,
                 endedAt,
                 text: outcome.text ?? '',
-              }, (message) => { ctx.logger.warn(message) }, runHome, (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence)
+              }, (message) => { ctx.logger.warn(message) }, runHome, homeFenceFrom(ctx))
               // W5 G3-S4: a settle that names a resultRef must be readable NOW — otherwise the
               // terminal record points at a file a reader/replay cannot open (write/io race).
               if (resultRef !== undefined) {

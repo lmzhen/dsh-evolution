@@ -167,6 +167,8 @@ export interface RunRegistryOptions {
   warn?: (message: string) => void
   /** Optional family fence; when set, every index RMW runs inside it. */
   fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
+  /** Resolve the fence at operation time; preferred over the construction-time snapshot. */
+  resolveFence?: () => { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   /** Clock seam for tests. */
   now?: () => number
   /** Retained records (N3-clamped). */
@@ -254,7 +256,8 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
   const path = runsFile(options.home)
   const writeIndex = async (task: (current: string | null) => string | null | Promise<string | null>): Promise<void> => {
     const run = async (): Promise<void> => { await transactIo(options.io, path, task) }
-    if (options.fence !== undefined) await options.fence.run(run)
+    const fence = options.resolveFence?.() ?? options.fence
+  if (fence !== undefined) await fence.run(run)
     else await run()
   }
 

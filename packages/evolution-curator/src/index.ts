@@ -6,7 +6,7 @@ import { settingsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 
 import type {} from '@deepseek-ai/dsh-evolution-core/io-registry'
 import { Context, Service } from '@deepseek-ai/cordis'
-import { authorityFrom, withTreeWrite, type SnapshotView } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, homeFenceFrom, withTreeWrite, type SnapshotView } from '@deepseek-ai/dsh-evolution-core'
 import type { Fiber, Volatile } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
@@ -345,7 +345,6 @@ export class EvolutionCurator extends Service {
     return gates.isBlocked(name)
   }
   private readonly io: EvolutionIoLike
-  private readonly homeFenceSnapshot: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   private readonly enabled: boolean
   /** This row's live config (G1 §8.3): its volatile fields are resolved at USE time. */
   private readonly config: Config
@@ -417,7 +416,6 @@ export class EvolutionCurator extends Service {
     // G2 S3: prefer the platform backend when the deployment mounts it (this covers the reads AND the
     // CAS-backed RMW transact); fall back to the default backend otherwise — contract C2 degradation.
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-    this.homeFenceSnapshot = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
     // 0.5.0 (§16.7): the curator's writes (consolidate/archive) and its snapshots
     // honour the same deployment-selected stages as every other writer.
     this.skills = newSkillLibrary({ authority: authorityFrom({ origin: 'background_review' }),
@@ -1111,8 +1109,8 @@ export class EvolutionCurator extends Service {
   private mutexTail: Promise<void> = Promise.resolve()
 
   /** Resolve the live authority fence at use time; the constructor snapshot is only a fallback. */
-  private currentHomeFence(): { run<T>(body: () => Promise<T>): Promise<T> } | undefined {
-    return (this.ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence ?? this.homeFenceSnapshot
+  private currentHomeFence(): ReturnType<typeof homeFenceFrom> {
+    return homeFenceFrom(this.ctx)
   }
 
   /** Cross-process tree lock shared with merge runs; curator mutations take it only around apply. */

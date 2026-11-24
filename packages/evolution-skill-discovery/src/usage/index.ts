@@ -8,7 +8,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 
-import { evolutionIoAdapter, evolutionRoot, makeSerialQueue } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionIoAdapter, evolutionRoot, homeFenceFrom, makeSerialQueue } from '@deepseek-ai/dsh-evolution-core'
 import { resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core/skills'
 import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_SUPPORT_READ_TOOL_NAMES, ToolDispatchNormalizer, classifySessionEvent, isReviewChannelSession, sessionAudited, skillReadNameOf, supportFileReadOf } from '@deepseek-ai/dsh-evolution-core'
@@ -74,7 +74,6 @@ export class SkillUsageRegistry extends Service {
   readonly root: string
   private readonly eventsHome: string
   private readonly io: EvolutionIoLike
-  private readonly homeFence: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   private readonly supportReadToolNames: readonly string[]
   /** Process-local RMW queue (v34 B14 / v35 R6: the same factory the other sidecars use). */
   private readonly serial = makeSerialQueue()
@@ -96,7 +95,6 @@ export class SkillUsageRegistry extends Service {
     // value is truthy and used to become a CWD-relative path.
     this.eventsHome = config.eventsHome?.trim() || evolutionRoot()
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-    this.homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
     // A2 observation: `session/event` DISPATCH records are the read-side
     // signal, on the same bus seam evolution-review already listens to. This
     // makes the sidecar's view counters live; names without a usage record are
@@ -261,6 +259,10 @@ export class SkillUsageRegistry extends Service {
    * it in the reverse direction. Two writers taking the two locks in opposite
    * order would deadlock, so the one-way order is a binding invariant.
    */
+  private currentHomeFence(): ReturnType<typeof homeFenceFrom> {
+    return homeFenceFrom(this.ctx)
+  }
+
   private mutate<T>(task: (map: UsageMap) => T | Promise<T>): Promise<T> {
     return this.serial(async () => {
       let outcome = undefined as T | undefined
@@ -269,7 +271,7 @@ export class SkillUsageRegistry extends Service {
       }, {
         // P2-9 (v19): a quarantined sidecar keeps working but must be visible.
         onQuarantine: (message) => { this.ctx.logger.warn(`skill-usage: ${message}`) },
-        ...(this.homeFence === undefined ? {} : { fence: this.homeFence }),
+        ...(this.currentHomeFence() === undefined ? {} : { fence: this.currentHomeFence() }),
       })
       return outcome as T
     })

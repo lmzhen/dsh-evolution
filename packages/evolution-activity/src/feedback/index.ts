@@ -20,7 +20,7 @@
  * @module @deepseek-ai/dsh-evolution-feedback
  */
 
-import { isRecord } from '@deepseek-ai/dsh-evolution-core'
+import { liveHomeFence, isRecord } from '@deepseek-ai/dsh-evolution-core'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
@@ -923,7 +923,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     (message) => {
       ctx.logger.warn(message)
     },
-    (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence,
+    liveHomeFence(ctx as unknown as { get(name: string): unknown }, evolutionRoot()),
   )
   // Make the service available first; restoration settles in the background.
   ctx.provide('evolutionFeedback', feedback)

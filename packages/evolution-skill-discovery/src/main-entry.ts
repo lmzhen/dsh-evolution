@@ -8,7 +8,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 // platform-declaration anchor: this composition probes skills/workingDirectory/tools/evolutionIo/systemPrompt; all are declared in core PLATFORM_SERVICE_PROBES.
-import { authorityFrom, evolutionIoAdapter, evolutionRoot, type EvolutionIoLike, type EvolutionProjectionHistoryState } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, evolutionIoAdapter, evolutionRoot, liveHomeFence, type EvolutionIoLike, type EvolutionProjectionHistoryState } from '@deepseek-ai/dsh-evolution-core'
 import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { LlmTextService } from './domain-generation-llm.ts'
@@ -141,7 +141,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('evolution/skill-mutated', () => { searchCache.clear() })
   if (mode === 'off') return
 
-  const fence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
+  const fence = liveHomeFence(ctx as unknown as { get(name: string): unknown }, join(root, 'evolution'))
   const map = new DomainMapFileStore(io, config.domainMapPath ?? join(root, 'evolution', 'domain-map.json'), undefined, fence)
   const descriptionStaleAfterHours = config.descriptionStaleAfterHours ?? 24 * 7
   const journal = new ProjectionJournal(io, config.projectionJournalPath ?? join(root, 'evolution', 'projection-journal.json'), { ...(fence === undefined ? {} : { fence }) })

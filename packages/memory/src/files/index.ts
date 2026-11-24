@@ -4,6 +4,7 @@
  */
 
 import { settingsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
+import { evolutionHome, liveHomeFence } from '@deepseek-ai/dsh-evolution-core'
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
@@ -187,7 +188,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   // The IO provider is resolved lazily so `memory-files` does not depend on
   // row order: the first write happens only after the preset has fully mounted.
   const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-  const authority = (ctx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
   // In-process write serialization: applyBatch is read-modify-write, so two
   // concurrent callers (multi-session host) can otherwise compute on the same
   // old entries and the last rename wins, silently dropping the other's ops.
@@ -232,13 +232,14 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     }
     const key = JSON.stringify(options)
     if (store !== undefined && key === storeKey) return store
+    const fence = liveHomeFence(ctx as unknown as { get(name: string): unknown }, evolutionHome())
     store = new MemoryStore({
       ...options,
       // F-2 (v18): the memory store's own exemption list, now configurable.
       ...rawConfig.threatExemptLabels !== undefined ? { threatExemptLabels: rawConfig.threatExemptLabels } : {},
       ...resolvedRoot !== '' ? { root: resolvedRoot } : {},
       io,
-      ...(authority?.homeFence === undefined ? {} : { fence: authority.homeFence }),
+      ...(fence === undefined ? {} : { fence }),
     })
     storeKey = key
     return store

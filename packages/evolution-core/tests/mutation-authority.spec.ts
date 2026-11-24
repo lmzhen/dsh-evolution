@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { nodeEvolutionIo } from '../src/io.ts'
-import { MutationAuthority } from '../src/mutation-authority.ts'
+import { MutationAuthority, liveHomeFence } from '../src/mutation-authority.ts'
 
 const roots: string[] = []
 async function root(): Promise<string> {
@@ -42,4 +42,15 @@ describe('MutationAuthority', () => {
     expect(again.ok).toBe(true)
     if (again.ok) await authority.lease.release(again.token)
   })
+})
+
+it('liveHomeFence re-resolves the authority after a late provide', async () => {
+  const home = await root()
+  let authority: { homeFence: { run<T>(body: () => Promise<T>): Promise<T>; acquire(): never } } | undefined
+  const fence = liveHomeFence({ get: (name) => name === 'evolutionMutationAuthority' ? authority : undefined }, home)
+  await fence.run(async () => {})
+  let used = 0
+  authority = { homeFence: { async run<T>(body: () => Promise<T>): Promise<T> { used += 1; return await body() }, acquire: undefined as never } }
+  await fence.run(async () => {})
+  expect(used).toBe(1)
 })

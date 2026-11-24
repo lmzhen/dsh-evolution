@@ -10,9 +10,8 @@ import { createEngineScreening, type EngineScreenPort } from './adapters/engine-
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
 import { resolveRetrievalCredentials } from './domain/retrieval-credentials.ts'
 import { commandsPort, settingsPort, toolsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
-import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, newRunRegistry, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields, type HomeFence } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, homeFenceFrom, liveHomeFence, newRunRegistry, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
-import { type MutationLockPort } from '@deepseek-ai/dsh-evolution-core/write'
 import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { loadMergeState } from './state.ts'
@@ -204,8 +203,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     if (registry === undefined) return
     const io = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
-    const getAuthority = (): { readonly homeFence?: HomeFence; readonly mutationLock?: MutationLockPort } | undefined => (ctx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: HomeFence; readonly mutationLock?: MutationLockPort } | undefined
-    const homeFence = getAuthority()?.homeFence
+    const homeFence = liveHomeFence(ctx as unknown as { get(name: string): unknown }, home)
     const ready = (async () => {
       const migration = await migrateMergeStateToV4(io, home, homeFence)
       if (!migration.ok) return migration
@@ -233,7 +231,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     })
     void ready.then(value => {
       if (!value.ok) { ctx.logger.warn('merge state is not ready: ' + value.code + ': ' + value.message); return }
-      const unit = new MergeUnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now(), isActive: async runId => await runs.hasOwner(runId), serial: async task => await skills.runSerial(task), resolveFence: () => getAuthority()?.homeFence })
+      const unit = new MergeUnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now(), isActive: async runId => await runs.hasOwner(runId), serial: async task => await skills.runSerial(task), resolveFence: () => homeFenceFrom(ctx as unknown as { get(name: string): unknown }) })
       const cards = async () => await readSkillCards(skills)
       void (async () => {
         // NFR-05: load the shared run index BEFORE recovery. Recovery settles through the
@@ -349,10 +347,9 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     }
     const commands = commandsPort(scope)
     if (commands === undefined) return
-    const runtimeFence = getAuthority()?.homeFence
     const runtime = createMergeRuntime({
       io, home, registry: runs, skills, now: () => Date.now(), getParams, getPlatformWrite,
-      ...(runtimeFence === undefined ? {} : { fence: runtimeFence }),
+      fence: homeFence,
       ...(defaultModel === undefined ? {} : { model: defaultModel.currentSelection().model }),
       channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: startupParams.mergeRunTimeoutMinutes,
       hostCapabilities,
