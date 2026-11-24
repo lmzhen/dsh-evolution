@@ -1,5 +1,5 @@
 {
-  "pin": "e1a84d2f",
+  "pin": "6fd8f509",
   "bed": {
     "mono": "overlay"
   },
@@ -163,11 +163,6 @@
       "id": "@deepseek-ai/dsh-evolution-core/state/store-plugin",
       "kind": "evo-src-subpath",
       "relPath": "packages/evolution/evolution-core/src/state/store-plugin.ts"
-    },
-    {
-      "id": "@deepseek-ai/dsh-evolution-core/state/v2-provider",
-      "kind": "evo-src-subpath",
-      "relPath": "packages/evolution/evolution-core/src/state/v2-provider.ts"
     },
     {
       "id": "@deepseek-ai/dsh-evolution-curator",
