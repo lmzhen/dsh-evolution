@@ -345,7 +345,7 @@ export class EvolutionCurator extends Service {
     return gates.isBlocked(name)
   }
   private readonly io: EvolutionIoLike
-  private readonly homeFence: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
+  private readonly homeFenceSnapshot: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   private readonly enabled: boolean
   /** This row's live config (G1 §8.3): its volatile fields are resolved at USE time. */
   private readonly config: Config
@@ -417,7 +417,7 @@ export class EvolutionCurator extends Service {
     // G2 S3: prefer the platform backend when the deployment mounts it (this covers the reads AND the
     // CAS-backed RMW transact); fall back to the default backend otherwise — contract C2 degradation.
     this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
-    this.homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
+    this.homeFenceSnapshot = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
     // 0.5.0 (§16.7): the curator's writes (consolidate/archive) and its snapshots
     // honour the same deployment-selected stages as every other writer.
     this.skills = newSkillLibrary({ authority: authorityFrom({ origin: 'background_review' }),
@@ -1110,9 +1110,15 @@ export class EvolutionCurator extends Service {
   private mutexDepth = 0
   private mutexTail: Promise<void> = Promise.resolve()
 
+  /** Resolve the live authority fence at use time; the constructor snapshot is only a fallback. */
+  private currentHomeFence(): { run<T>(body: () => Promise<T>): Promise<T> } | undefined {
+    return (this.ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence ?? this.homeFenceSnapshot
+  }
+
   /** Cross-process tree lock shared with merge runs; curator mutations take it only around apply. */
   private async withMergeTreeLock<T>(body: () => Promise<T>): Promise<T> {
-    if (this.homeFence !== undefined) return await this.homeFence.run(body)
+    const fence = this.currentHomeFence()
+    if (fence !== undefined) return await fence.run(body)
     const authority = new HomeAuthority({ home: evolutionHome() })
     return await authority.runExclusive('tree', body)
   }
@@ -1365,7 +1371,7 @@ export class EvolutionCurator extends Service {
             for (const [name, record] of usage) {
               if (!map.has(name)) map.set(name, { ...record })
             }
-          }, { ...(this.homeFence === undefined ? {} : { fence: this.homeFence }) })
+          }, { ...(this.currentHomeFence() === undefined ? {} : { fence: this.currentHomeFence() }) })
         } catch (error) {
           this.ctx.logger.warn(`evolution-curator: failed to persist the seeded usage baseline on a session-blocked run (${error instanceof Error ? error.message : String(error)})`)
         }
@@ -1394,7 +1400,7 @@ export class EvolutionCurator extends Service {
             for (const [name, record] of usage) {
               if (!map.has(name)) map.set(name, { ...record })
             }
-          }, { ...(this.homeFence === undefined ? {} : { fence: this.homeFence }) })
+          }, { ...(this.currentHomeFence() === undefined ? {} : { fence: this.currentHomeFence() }) })
         } catch (error) {
           this.ctx.logger.warn(`evolution-curator: failed to persist the seeded usage baseline on a session-blocked run (${error instanceof Error ? error.message : String(error)})`)
         }
@@ -1959,7 +1965,7 @@ export class EvolutionCurator extends Service {
       }, {
         // P2-9 (v19): a quarantined sidecar keeps folding but must be visible.
         onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) },
-        ...(this.homeFence === undefined ? {} : { fence: this.homeFence }),
+        ...(this.currentHomeFence() === undefined ? {} : { fence: this.currentHomeFence() }),
       })
       if (skipped.length > 0) {
         this.ctx.logger.warn(`evolution-curator: lifecycle fold skipped ${skipped.length} name(s) whose on-disk state moved during the run (a concurrent curator/tool won): ${skipped.join(', ')}`)
@@ -2042,7 +2048,8 @@ export class EvolutionCurator extends Service {
         return null
       })
     }
-    if (this.homeFence !== undefined) await this.homeFence.run(sweep)
+    const fence = this.currentHomeFence()
+    if (fence !== undefined) await fence.run(sweep)
     else await sweep()
   }
 
@@ -2319,7 +2326,7 @@ export class EvolutionCurator extends Service {
             record.archived_at = new Date().toISOString()
           }
         }
-      }, { onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) }, ...(this.homeFence === undefined ? {} : { fence: this.homeFence }) })
+      }, { onQuarantine: (message) => { this.ctx.logger.warn(`evolution-curator: ${message}`) }, ...(this.currentHomeFence() === undefined ? {} : { fence: this.currentHomeFence() }) })
     } catch (error) {
       this.ctx.logger.warn(`evolution-curator: failed to persist consolidate usage state: ${error instanceof Error ? error.message : String(error)}`)
     }

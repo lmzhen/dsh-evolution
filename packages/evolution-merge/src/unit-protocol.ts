@@ -88,6 +88,8 @@ export interface UnitTransactionOptions {
   readonly onLock?: (lock: "tree" | "claim") => void;
   /** One home fence owned by authority; when set, MergeUnitTransactions must not acquire tree-lock itself. */
   readonly fence?: HomeFence;
+  /** Resolve the live authority fence at commit time; preferred over the construction-time snapshot. */
+  readonly resolveFence?: () => HomeFence | undefined;
   /** Writer queue acquired BEFORE the fence, so merge and ordinary store writes share one lock order. */
   readonly serial?: <T>(task: () => Promise<T>) => Promise<T>;
   /** Optional run liveness gate: false means the run is terminal and must not commit. */
@@ -424,8 +426,9 @@ export class MergeUnitTransactions implements UnitTransaction {
   /** Acquire the one tree fence (or a HomeAuthority fallback) and prove it is held. */
   private async acquireTreeFence(): Promise<{ fenceLease: HomeFenceLease; lock: TreeLock }> {
     let fenceLease: HomeFenceLease;
-    if (this.options.fence !== undefined) {
-      fenceLease = await this.options.fence.acquire();
+    const liveFence = this.options.resolveFence?.() ?? this.options.fence
+    if (liveFence !== undefined) {
+      fenceLease = await liveFence.acquire();
     } else {
       const fallback = new HomeAuthority({ home: this.options.home, waitMs: this.options.waitMs ?? 5000 });
       const fallbackLease: AuthorityLease | undefined = await fallback.lease("tree").catch(() => undefined);

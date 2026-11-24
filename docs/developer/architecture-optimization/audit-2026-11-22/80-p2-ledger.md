@@ -39,6 +39,7 @@
 | D1-STORE-PIN | FIXED | 显式 `provider: store` 现在要求 migration marker 存在并校验完整 store 镜像；缺 marker 时 mount/首次读即报错，不再把空 store 当权威。
 | D3-SETTINGS | FIXED | `SettingsPort.configure` 的 owner 统一为平台 `Fiber`，`settingsPort` 适配器不再 `unknown` cast；`gen-contract-ports --check` 仍只生成可机械派生端口。
 | D3-OTHER-PORTS | DECIDED | 其余 family-facing 端口是平台 service 的收窄子集，不能机械 `Pick`；保留手写并在 79 文档逐个说明，不为了生成器扩大平台依赖。
+| P1-AUTHORITY-NEST | FIXED | 复核发现 curator/merge 仍在构造时冻结 fence，并在缺 fence 时新建第二个 HomeAuthority，与 SkillLibrary 的 live authority 自锁超时。curator 改为 `currentHomeFence()` 每次读 ctx；`MergeUnitTransactions` 增加 `resolveFence`，merge 在 commit 时解析 live fence；skills library 移除显式 lock 快照。
 | ISSUE-23 (P1-candidate) | FIXED | `SkillLibrary` 不再把 `mutationLock`/`homeFence` 冻结在构造函数：`newSkillLibrary` 注入 resolver，`lockPort()`/`keyedTargetLocks()`/`currentFence()` 在写时重新读 `ctx.evolutionMutationAuthority`；factory 不再在构造时 snapshot 默认值，晚挂载/晚 provide 的 authority 可自愈。新增 late-provide 测试。
 | D2-TARGET-WRITER | FIXED (DECIDED) | 低层 `TargetWriter` 保持内部；`verify-core-surface` 新增“不得泄漏到 write.ts 公共面”的硬检查，79 文档同步。
 | D1-ROLLBACK | FIXED | marker 缺失但 store 已存在时，auto 拒绝静默回退 domain，并提示显式 pin `provider: domain`；store 保留。78/测试同步更新。

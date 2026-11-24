@@ -204,7 +204,8 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     if (registry === undefined) return
     const io = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
-    const homeFence = (ctx.get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined)?.homeFence
+    const getAuthority = (): { readonly homeFence?: HomeFence; readonly mutationLock?: MutationLockPort } | undefined => (ctx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: HomeFence; readonly mutationLock?: MutationLockPort } | undefined
+    const homeFence = getAuthority()?.homeFence
     const ready = (async () => {
       const migration = await migrateMergeStateToV4(io, home, homeFence)
       if (!migration.ok) return migration
@@ -226,15 +227,13 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       return typeof hostApproval?.platformWrite === 'boolean' ? hostApproval.platformWrite : (resolveMergeParams(rawConfig).platformWrite ?? false)
     }
     const getParams = () => ({ ...resolveMergeParams(rawConfig), limitsSnapshot, platformWrite: getPlatformWrite() })
-    const mutationAuthority = (ctx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: HomeFence; readonly mutationLock?: MutationLockPort } | undefined
     const skills = newSkillLibrary({
       io, ctx, authority: authorityFrom({ origin: 'subagent' }),
       limits: limitsSnapshot.skillLimits,
-      ...(mutationAuthority?.mutationLock === undefined ? {} : { mutationLock: mutationAuthority.mutationLock }),
     })
     void ready.then(value => {
       if (!value.ok) { ctx.logger.warn('merge state is not ready: ' + value.code + ': ' + value.message); return }
-      const unit = new MergeUnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now(), isActive: async runId => await runs.hasOwner(runId), serial: async task => await skills.runSerial(task), ...(mutationAuthority?.homeFence === undefined ? {} : { fence: mutationAuthority.homeFence }) })
+      const unit = new MergeUnitTransactions({ io, home, backend: skillLibraryUnitBackend(skills), claim: targetClaimUnitPort(io, home, () => Date.now()), now: () => Date.now(), isActive: async runId => await runs.hasOwner(runId), serial: async task => await skills.runSerial(task), resolveFence: () => getAuthority()?.homeFence })
       const cards = async () => await readSkillCards(skills)
       void (async () => {
         // NFR-05: load the shared run index BEFORE recovery. Recovery settles through the
@@ -350,9 +349,10 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     }
     const commands = commandsPort(scope)
     if (commands === undefined) return
+    const runtimeFence = getAuthority()?.homeFence
     const runtime = createMergeRuntime({
       io, home, registry: runs, skills, now: () => Date.now(), getParams, getPlatformWrite,
-      ...(mutationAuthority?.homeFence === undefined ? {} : { fence: mutationAuthority.homeFence }),
+      ...(runtimeFence === undefined ? {} : { fence: runtimeFence }),
       ...(defaultModel === undefined ? {} : { model: defaultModel.currentSelection().model }),
       channel, parent: undefined, allow: ['merge_stage'], timeoutMinutes: startupParams.mergeRunTimeoutMinutes,
       hostCapabilities,
