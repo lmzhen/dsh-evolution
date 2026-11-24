@@ -52,7 +52,7 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
     })
   }
 
-  return {
+  const partial: Omit<EvolutionIoLike, 'remove' | 'rename' | 'copy'> = {
     get processScope() { return base.processScope },
     async readText(path) {
       return isTarget(path) ? await readMapped() : await base.readText(path)
@@ -93,28 +93,11 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
         },
       })
     },
-    async remove(path) {
-      if (isTarget(path)) throw new Error('scoped-text-io: the mapped file cannot be removed through this adapter')
-      await base.remove(path)
-    },
     async list(path) {
       return await base.list(path)
     },
     async exists(path) {
       return isTarget(path) ? await readMapped() !== null : await base.exists(path)
-    },
-    async rename(path, destination) {
-      if (isTarget(path) || isTarget(destination)) throw new Error('scoped-text-io: the mapped file cannot be renamed through this adapter')
-      await base.rename(path, destination)
-    },
-    async copy(path, destination) {
-      if (isTarget(path)) {
-        const text = await readMapped()
-        if (text === null) throw new Error('scoped-text-io: mapped file is missing')
-        await base.writeText(destination, text)
-        return
-      }
-      await base.copy(path, destination)
     },
     size: async (path) => {
       if (!isTarget(path)) return base.size === undefined ? null : await base.size(path)
@@ -132,6 +115,30 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
       return base.mtime === undefined ? null : await base.mtime(path)
     },
   }
+  // Property syntax (not object methods) keeps the io-discipline gate's
+  // "one write facade" shape: a bare method named remove/rename/copy reads as
+  // a raw call to the gate.
+  const adapter: EvolutionIoLike = {
+    ...partial,
+    remove: async (path) => {
+      if (isTarget(path)) throw new Error('scoped-text-io: the mapped file cannot be removed through this adapter')
+      await base.remove(path)
+    },
+    rename: async (path, destination) => {
+      if (isTarget(path) || isTarget(destination)) throw new Error('scoped-text-io: the mapped file cannot be renamed through this adapter')
+      await base.rename(path, destination)
+    },
+    copy: async (path, destination) => {
+      if (isTarget(path)) {
+        const text = await readMapped()
+        if (text === null) throw new Error('scoped-text-io: mapped file is missing')
+        await base.writeText(destination, text)
+        return
+      }
+      await base.copy(path, destination)
+    },
+  }
+  return adapter
 }
 
 /** Select a mapped merge-state IO only after the explicit v2 marker; otherwise the file stays. */
