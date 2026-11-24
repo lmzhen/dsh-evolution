@@ -12,6 +12,7 @@ import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform/contract
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
 import { migrateDomainToStore, migrateStateToV2 } from '@deepseek-ai/dsh-evolution-core/state/migrate'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { join } from 'node:path'
 import { hostCommandText } from '../host-locale.ts'
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
 
@@ -45,8 +46,29 @@ export function runMigrateStateCommand(context: MigrateStateContext): CommandRes
       void (async (): Promise<void> => {
         try {
           const io = (scoped as unknown as { evolutionIo: { provider(): EvolutionIoLike } }).evolutionIo.provider()
+          const valueFlag = (name: string): string | undefined => {
+            const value = context.command.flags.get(name)
+            return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined
+          }
+          const skillsRoot = valueFlag('skills-root')
+          const memoryRoot = valueFlag('memory-root')
+          const discoveryRoot = valueFlag('discovery-root')
+          const feedbackPath = valueFlag('feedback-path')
+          const discoveryPaths = discoveryRoot === undefined ? undefined : {
+            domainMap: join(discoveryRoot, 'domain-map.json'),
+            projectionJournal: join(discoveryRoot, 'projection-journal.json'),
+            viewSnapshots: join(discoveryRoot, 'view-snapshots.json'),
+          }
           const result = to === 'v2'
-            ? await migrateStateToV2(scoped, { io, home: evolutionHome(), dryRun })
+            ? await migrateStateToV2(scoped, {
+              io,
+              home: evolutionHome(),
+              dryRun,
+              ...(skillsRoot === undefined ? {} : { skillsRoot }),
+              ...(memoryRoot === undefined ? {} : { memoryRoot }),
+              ...(discoveryPaths === undefined ? {} : { discoveryPaths }),
+              ...(feedbackPath === undefined ? {} : { feedbackPath }),
+            })
             : await migrateDomainToStore(scoped, { io, home: evolutionHome(), dryRun })
           const values = { review: result.reviewSessions, pending: result.pending, curator: result.curator ? 'yes' : 'no', path: result.path }
           let text = hostCommandText(context.locale, dryRun ? 'command.migrate state.dry' : 'command.migrate state.done', values)

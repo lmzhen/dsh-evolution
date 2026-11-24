@@ -46,6 +46,10 @@ export interface StateMigrationOptions {
   readonly skillsRoot?: string
   /** Memory root; defaults to `<dshHome>/memories`. */
   readonly memoryRoot?: string
+  /** Override the three discovery documents' paths (custom config roots). */
+  readonly discoveryPaths?: { readonly domainMap: string; readonly projectionJournal: string; readonly viewSnapshots: string }
+  /** Override the feedback rebuild-cache path. */
+  readonly feedbackPath?: string
   readonly now?: () => number
 }
 
@@ -282,9 +286,9 @@ async function migrateStateToV2Unlocked(ctx: Context, options: StateMigrationOpt
     const usageText = await io.exists(usagePath) ? await io.readText(usagePath) : null
     const suppressedPath = suppressedFile(skillsRoot)
     const suppressedText = await io.exists(suppressedPath) ? await io.readText(suppressedPath) : null
-    const feedbackPath = join(home, 'feedback.json')
+    const feedbackPath = options.feedbackPath ?? join(home, 'feedback.json')
     const feedbackText = await io.exists(feedbackPath) ? await io.readText(feedbackPath) : null
-    const discoveryPaths = {
+    const discoveryPaths = options.discoveryPaths ?? {
       domainMap: join(home, 'domain-map.json'),
       projectionJournal: join(home, 'projection-journal.json'),
       viewSnapshots: join(home, 'view-snapshots.json'),

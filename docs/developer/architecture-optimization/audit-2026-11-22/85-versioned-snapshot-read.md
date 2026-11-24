@@ -440,8 +440,9 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - P1-4：`migrateStateToV2` 整体在 `state.lock` 内执行（源读取、head bootstrap、marker 写入），与 v1 写者使用同一把锁。
 - P1-5：head 已存在但 marker 丢失时，恢复路径重读 legacy source 并与 head 文档逐字节比较；不一致直接拒绝恢复，避免崩溃窗口内的 v1 写被静默作废。
 - P1-2：`usageSidecarIoIfV2` 统一包 usage/suppressed；`SkillUsageRegistry` 与 curator 的私有 `this.io` 都改用它，`mutateUsage`/`loadSuppressedNames` 不再写第二份文件；测试 `usage-sidecar-v2.spec` 证明 domain 有值且 base 文件不存在。
-- 测试：marker 恢复成功/拒绝两例通过；restructure manifest 通过；usage-sidecar-v2 通过；`tsc` core/curator/discovery 0。
-- 未修：迁移命令未传配置根（P1-3）、跨进程 drill 未注册门禁（P1-6）、缺 4 个静态门禁（P1-7）、surface 清单不完整（P1-8），继续按复核清单处理。
+- P1-3：`migrate state` 新增 `--skills-root` / `--memory-root` / `--discovery-root` / `--feedback-path`，把自定义根/路径传给 `migrateStateToV2`；默认路径不变，未传时仍按 `<home>` 约定。
+- 测试：marker 恢复成功/拒绝两例通过；restructure manifest 通过；usage-sidecar-v2 通过；`tsc` core/curator/discovery/commands 0。
+- 未修：跨进程 drill 未注册门禁（P1-6）、缺 4 个静态门禁（P1-7）、surface 清单不完整（P1-8），继续按复核清单处理。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
