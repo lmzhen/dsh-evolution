@@ -354,6 +354,14 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：evolution-events **24 tests**（含分页）通过；`tsc` core 0。
 - 尚未做：offset 读在 UI 历史的接线、活动分段跨进程压力测试（属 R8 证据）。
 
+#### R6a 已落地（tree manifest 基础）
+
+- `store/tree-manifest.ts`：`buildTreeManifest(unitId, ops)` 纯函数，按 path 排序、去重（同 target 最后一次写胜出），write 记录 `sha256`/size，delete 记录 `kind:'deleted'`；
+- `publishTreeManifest` 把 manifest 写成普通内容对象，返回 `StoreTreeRef`；`readTreeManifest` 通过 `getObject` 取回并校验；
+- `StoreKernel` 新增 `putObject` / `getObject`（内容寻址、读时校验 sha），commit 的 `tree` ref 已在 `query` 返回；
+- 测试：tree manifest 1 test；`tsc` core 0。
+- 尚未做：把 `publishTreeManifest` 接到 UnitKernel 的每次 tree unit（包括失败/回滚/并发顺序），以及 materialized tree 的迁移期兼容；属 R6b。
+
 
 ## 6. 域与读写分类
 

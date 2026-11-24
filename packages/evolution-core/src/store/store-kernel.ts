@@ -367,6 +367,17 @@ export class StoreKernel {
     return parseCommit(text, path)
   }
 
+  /** Publish an immutable content object and return its sha256. */
+  async putObject(value: unknown): Promise<string> {
+    return await this.writeObject(value)
+  }
+
+  /** Read one content object, verifying its content address. */
+  async getObject(objectId: string): Promise<unknown> {
+    if (!/^[0-9a-f]{64}$/.test(objectId)) throw new StoreError('store-invalid-object', 'object id must be a sha256')
+    return await this.readObject(objectId)
+  }
+
   private async resolveDomains(commit: StoreCommit, domains: readonly StoreDomainId[]): Promise<StoreSnapshot> {
     const values: StoreDomainValues = {}
     for (const domain of domains) {
