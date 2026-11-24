@@ -116,6 +116,25 @@ it('resolves the authority lock at write time so a late provide heals the sessio
   expect(acquired).toBeGreaterThan(0)
 })
 
+it('resolves the home fence at write time so a late provide fences the history', async () => {
+  const root = await tempRoot('dsh-skill-fence-late-')
+  let fenceReads = 0
+  let fenced = 0
+  let authority: { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
+  const ctx = { emit() {}, get(name: string) { return name === 'evolutionMutationAuthority' ? authority : undefined } }
+  const lib = newSkillLibrary({ config: { root }, io: nodeEvolutionIo(), ctx, authority: authorityFrom({ origin: 'foreground' }) })
+  authority = {
+    get homeFence() {
+      fenceReads += 1
+      return { async run<T>(body: () => Promise<T>) { fenced += 1; return await body() } }
+    },
+  }
+  const created = await lib.create('late-fence', skill('late-fence'), 'foreground')
+  expect(created.ok, created.message).toBe(true)
+  expect(fenceReads).toBeGreaterThan(0)
+  expect(fenced).toBeGreaterThan(0)
+})
+
 it('fails closed when the authority lock cannot be acquired', async () => {
   const root = await tempRoot('dsh-skill-authority-fail-closed-')
   const lock = { async acquire() { throw new Error('skill-store: no authority mutationLock was supplied; refusing an unfenced production write') } }
