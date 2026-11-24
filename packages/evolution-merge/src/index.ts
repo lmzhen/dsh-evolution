@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
-import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import type { Context as CordisContext, Fiber } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = Omit<CordisContext, 'logger'> & HostContext
@@ -98,14 +98,14 @@ export function engineConfigFromRoot(configuredRoot?: string): EngineModelConfig
 
 export interface MergePresentationContext {
   inject(names: string[], run: (scope: MergePresentationScope) => void): void
-  readonly fiber?: unknown
+  readonly fiber?: Fiber
 }
 
 /** Suppress the platform auto form; the registry renders the merge card instead. */
 export function configureMergePresentation(ctx: MergePresentationContext): void {
   ctx.inject(['settings'], (scope) => {
     const settings = settingsPort(scope as unknown as Context)
-    if (settings?.configure === undefined) return
+    if (settings?.configure === undefined || ctx.fiber === undefined) return
     const disposer = settings.configure({ auto: false }, ctx.fiber)
     if (typeof disposer === 'function') scope.effect(() => disposer as () => void, 'evolution-merge: settings presentation')
   })
