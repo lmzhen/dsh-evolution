@@ -426,8 +426,8 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 
 #### R8 证据（跨进程无锁读）
 
-- `double-process-read.spec.ts`：父进程在 `HomeFence.run` 内持有 writer fence，子进程用构建后的 `lib/index.js` 打开同一 home 并 `StoreKernel.query(['state'])`，返回 bootstrap 快照；
-- 这证明读路径不依赖 writer lock，且子进程只读同一 commit；测试在 CI 的 build-lib 之后运行。
+- `packages/scripts/verify-cross-process-read.mjs`：父进程在 `HomeFence.run` 内持有 writer fence，子进程用构建后的 `lib/index.js` 打开同一 home 并 `StoreKernel.query(['state'])`，返回 bootstrap 快照；
+- 这证明读路径不依赖 writer lock，且子进程只读同一 commit；脚本在 build 线运行（`EVOLUTION_OVERLAY_ROOT=... node packages/scripts/verify-cross-process-read.mjs`），不放进 unit lane 以避免 CI 无 lib 时的假失败。
 - 尚未做：子进程读与崩溃恢复的组合、HMR 重挂载、fresh npm profile 真机验收。
 
 补充：`v2-provider.spec` 新增“head 已提交但 marker 写入丢失”的恢复测试——`migrateStateToV2` 从 head 重建 marker 并返回 `store-v2-recovered`，commitId 不变；证明迁移的 commit point 是 head，不是 marker。
