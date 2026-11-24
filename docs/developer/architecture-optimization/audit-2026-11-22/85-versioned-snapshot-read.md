@@ -324,6 +324,14 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：tree IO 1 test、v2 state/migration 7 tests（含 run-meta/report 迁移）通过；`tsc` core/merge 0；io-discipline gate 通过。
 - 这仍是过渡桥；R7 删除 path adapter，改为显式 report/meta 查询/命令端口。
 
+#### R4 已落地（usage / suppressed / feedback 快照）
+
+- `state/config` 新增 `usage` / `suppressed` / `feedback` 域；`newSkillLibrary` 在 v2 marker 下把 `.usage.json`、`.curator-suppressed.json` 包成 scoped text IO，SkillLibrary 的现有读写代码不变；skill 文件路径仍委托 base。
+- `EvolutionFeedback` 在 v2 marker 下把 `feedback.json`（可重建缓存）映射到 `feedback` 域；events log 仍是 append-only，不进快照。
+- `--to v2` 首 commit 同时迁移 usage/suppressed/feedback 文件；默认 skillsRoot 可由迁移选项覆盖。
+- 测试：v2 sidecar 迁移 7 tests、feedback bridge 1 test、scoped text/tree 3 tests 通过；`tsc` core/activity/merge 0。
+- 尚未做：discovery projection 与 memory 正文树、usage 事件化；R4b/R5 继续。
+
 
 ## 6. 域与读写分类
 

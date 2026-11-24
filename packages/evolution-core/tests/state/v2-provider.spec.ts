@@ -110,6 +110,23 @@ describe('MVCC state provider', () => {
     expect(snapshot.domains.reports).toEqual({ 'reports/maintain-1.json': '{"ok":true}\n' })
   })
 
+  it('migrates usage, suppressed and feedback sidecars into the same first commit', async () => {
+    const root = await tempRoot('dsh-state-v2-sidecars-')
+    const ctx = await mountStateStack(root)
+    const io = ctx.evolutionIo.provider()
+    const skillsRoot = join(root, 'skills')
+    await mkdir(skillsRoot, { recursive: true })
+    await writeFile(join(skillsRoot, '.usage.json'), '{"version":1,"skills":{}}\n')
+    await writeFile(join(skillsRoot, '.curator-suppressed.json'), '{"version":1,"names":[]}\n')
+    await writeFile(join(root, 'feedback.json'), '{"version":2,"lastSeq":0,"skills":{},"sessions":{}}\n')
+    await migrateStateToV2(ctx, { io, home: root, skillsRoot })
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    const snapshot = await kernel.query(['usage', 'suppressed', 'feedback'])
+    expect(snapshot.domains.usage).toEqual({ text: '{"version":1,"skills":{}}\n' })
+    expect(snapshot.domains.suppressed).toEqual({ text: '{"version":1,"names":[]}\n' })
+    expect(snapshot.domains.feedback).toEqual({ text: '{"version":2,"lastSeq":0,"skills":{},"sessions":{}}\n' })
+  })
+
   it('reads while the legacy state.lock is held because locking is internal', async () => {
     const { root, io, fence } = await seeded()
     const ctx = await mountStateStack(root)

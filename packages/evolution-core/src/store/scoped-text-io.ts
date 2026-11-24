@@ -51,6 +51,13 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
       change: () => ({ [options.domain]: { text } }),
     })
   }
+  const clearMapped = async (): Promise<void> => {
+    await options.kernel.mutate({
+      domains: [options.domain],
+      source: 'command',
+      change: () => ({ [options.domain]: null }),
+    })
+  }
 
   const partial: Omit<EvolutionIoLike, 'remove' | 'rename' | 'copy'> = {
     get processScope() { return base.processScope },
@@ -85,10 +92,7 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
         change: async (current) => {
           const previous = textOf(current.domains[options.domain])
           const next = await task(previous)
-          if (next === null) {
-            if (previous === null) return {}
-            throw new Error('scoped-text-io: the mapped file cannot be deleted through this adapter')
-          }
+          if (next === null) return { [options.domain]: null }
           return { [options.domain]: { text: next } }
         },
       })
@@ -121,18 +125,45 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
   const adapter: EvolutionIoLike = {
     ...partial,
     remove: async (path) => {
-      if (isTarget(path)) throw new Error('scoped-text-io: the mapped file cannot be removed through this adapter')
+      if (isTarget(path)) {
+        await clearMapped()
+        return
+      }
       await base.remove(path)
     },
     rename: async (path, destination) => {
-      if (isTarget(path) || isTarget(destination)) throw new Error('scoped-text-io: the mapped file cannot be renamed through this adapter')
+      if (isTarget(path) || isTarget(destination)) {
+        if (isTarget(path) && isTarget(destination)) {
+          const text = await readMapped()
+          if (text === null) throw new Error('scoped-text-io: mapped file is missing')
+          await writeMapped(text)
+          return
+        }
+        if (isTarget(path)) {
+          throw new Error('scoped-text-io: the mapped file cannot be renamed away through this adapter')
+        }
+        const text = await base.readText(path)
+        if (text === null) throw new Error('scoped-text-io: source is missing')
+        await writeMapped(text)
+        return
+      }
       await base.rename(path, destination)
     },
     copy: async (path, destination) => {
       if (isTarget(path)) {
         const text = await readMapped()
         if (text === null) throw new Error('scoped-text-io: mapped file is missing')
+        if (isTarget(destination)) {
+          await writeMapped(text)
+          return
+        }
         await base.writeText(destination, text)
+        return
+      }
+      if (isTarget(destination)) {
+        const text = await base.readText(path)
+        if (text === null) throw new Error('scoped-text-io: source is missing')
+        await writeMapped(text)
         return
       }
       await base.copy(path, destination)

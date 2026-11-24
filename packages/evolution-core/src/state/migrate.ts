@@ -14,7 +14,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Domain } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { storageDomainPort } from '@deepseek-ai/dsh-evolution-platform/ports'
 import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values/fs'
-import { evolutionHome } from '../state-store.ts'
+import { evolutionHome, evolutionRoot } from '../state-store.ts'
+import { suppressedFile, usageFile } from '../usage.ts'
 import type { EvolutionIoLike } from '../io.ts'
 import { readStateStoreSnapshot, writeStateStoreSnapshot, type StateStoreSnapshot, type StoredReviewState } from './store.ts'
 import { emptyStateDocument, parseStateDocument, serializeStateDocument, type StateDocument } from './document.ts'
@@ -40,6 +41,8 @@ export interface StateMigrationOptions {
   readonly home?: string
   /** Count and validate only; write neither store nor marker. */
   readonly dryRun?: boolean
+  /** Skill tree root; defaults to `<dshHome>/skills` through evolutionRoot(). */
+  readonly skillsRoot?: string
   readonly now?: () => number
 }
 
@@ -254,12 +257,22 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
     }
     const mergeMeta = await readDirMap('merge/run-meta')
     const reports = await readDirMap('reports')
+    const skillsRoot = options.skillsRoot ?? join(evolutionRoot(), 'skills')
+    const usagePath = usageFile(skillsRoot)
+    const usageText = await io.exists(usagePath) ? await io.readText(usagePath) : null
+    const suppressedPath = suppressedFile(skillsRoot)
+    const suppressedText = await io.exists(suppressedPath) ? await io.readText(suppressedPath) : null
+    const feedbackPath = join(home, 'feedback.json')
+    const feedbackText = await io.exists(feedbackPath) ? await io.readText(feedbackPath) : null
     return await kernel.bootstrap({
       state: document,
       ...(runs === undefined ? {} : { runs }),
       ...(mergeText === null ? {} : { merge: { text: mergeText } }),
       ...(mergeMeta === undefined ? {} : { mergeMeta }),
       ...(reports === undefined ? {} : { reports }),
+      ...(usageText === null ? {} : { usage: { text: usageText } }),
+      ...(suppressedText === null ? {} : { suppressed: { text: suppressedText } }),
+      ...(feedbackText === null ? {} : { feedback: { text: feedbackText } }),
     }, 'bootstrap')
   })
   await writeMarker(source, result.commitId, snapshot)

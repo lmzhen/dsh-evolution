@@ -20,11 +20,13 @@
  * @module @deepseek-ai/dsh-evolution-feedback
  */
 
-import { liveHomeFence, isRecord } from '@deepseek-ai/dsh-evolution-core'
+import { liveHomeFence, HomeFence, isRecord, scopedTextIO, StoreKernel } from '@deepseek-ai/dsh-evolution-core'
+import { STATE_V2_MIGRATION_MARKER } from '@deepseek-ai/dsh-evolution-core/state/storage'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
+import { existsSync } from 'node:fs'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-skill-discovery/usage'
 import { appendEvolutionEvent, eventsFile, evolutionEventPayloadIssue, evolutionHome, evolutionIoAdapter, evolutionRoot, isPresent, isUnknown, listEventArchives, parseEvolutionEvents, probeText, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -137,22 +139,36 @@ export class EvolutionFeedback {
   onRollback?: (target: string, kind: 'skill' | 'session') => void
 
   private readonly fence: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
+  private readonly home: string
 
   constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}, fence?: { run<T>(body: () => Promise<T>): Promise<T> }) {
     // rc.68 + K-6: BOTH paths derive from the constructor surface only —
     // record() takes no backend io, so path and io backend can never disagree.
     // They derive unconditionally so a late `attachIo` (S6.4) does not need to
     // repopulate them; methods no-op on `this.io` being absent.
+    this.home = home
     this.path = pathOverride ?? join(home, 'evolution', 'feedback.json')
     this.eventsPath = eventsFile(home)
-    this.io = io
     this.warn = warn
     this.fence = fence
+    this.io = this.bindIo(io)
+  }
+
+  /** R4: under the explicit v2 marker the rebuild cache is a domain, while the
+   * events log stays append-only on the base IO. */
+  private bindIo(io: IoLike | undefined): IoLike | undefined {
+    if (io === undefined) return undefined
+    const home = join(this.home, 'evolution')
+    if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return io
+    const path = this.path
+    if (path === undefined) return io
+    const kernel = new StoreKernel({ io, home, fence: this.fence ?? new HomeFence({ home }) })
+    return scopedTextIO(io, { path, domain: 'feedback', kernel })
   }
 
   /** Bind the evolution IO backend after construction (S6.4 deferred binding). */
   attachIo(io: IoLike): void {
-    this.io = io
+    this.io = this.bindIo(io)
   }
 
   /** PLAN S4.6 (2026-09-16): whether a durable backend is attached — the

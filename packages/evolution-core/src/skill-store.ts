@@ -34,7 +34,7 @@
  */
 
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
-import { realpathSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { authorityFrom, type WriteAuthority } from './write-authority.ts'
@@ -45,7 +45,7 @@ import { currentReviewContext } from './review-context.ts'
 import { isCommittedWarning, nodeEvolutionIo, TransactionNotInvokedError, transactIo, type EvolutionIoLike } from './io.ts'
 import { appendEvolutionEvent, eventsFile } from './evolution-events.ts'
 import { isAbsent, isPresent, isUnknown, probeAbsent, probeList, probeMtime, probePresent, probeReason, probeText, probeUnknown, type Probe } from './probe.ts'
-import { evolutionRoot } from './state-store.ts'
+import { evolutionHome, evolutionRoot } from './state-store.ts'
 import { DEFAULT_ARCHIVE_RETENTION_POLICY, DEFAULT_CITATION_POLICY, DEFAULT_REFERENCE_REWRITE_POLICY, DEFAULT_SKILL_LIMITS, DEFAULT_SUPPORT_FILE_CHAR_POLICY } from './limits.ts'
 import type { SkillLimits } from './limits.ts'
 import { applyReferenceRewrite, describeReferenceRewrite, planReferenceRewrite, planRehoming } from './reference-rewrite.ts'
@@ -56,7 +56,10 @@ import { makeSerialQueue } from './serial.ts'
 import { supportRefs } from './support-refs.ts'
 import { selectSections } from './section-selection.ts'
 import { UnitKernel, fileMutationLock, type MutationLockPort, type MutationResult, type UnitKernelHooks, type UnitKernelOptions } from './unit-kernel.ts'
-import { mutationLockFrom } from './mutation-authority.ts'
+import { mutationLockFrom, liveHomeFence } from './mutation-authority.ts'
+import { StoreKernel } from './store/store-kernel.ts'
+import { scopedTextIO } from './store/scoped-text-io.ts'
+import { STATE_V2_MIGRATION_MARKER } from './state/constants.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
 import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
@@ -5098,9 +5101,22 @@ export interface NewSkillLibraryOptions {
 
 export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
   const { config, io, limits, ctx, transact, threatExemptLabels, authority } = options
+  const root = resolveSkillsRoot(config ?? {})
+  let effectiveIo = io
+  // R4: the usage and curator-suppressed sidecars live beside the skill tree.
+  // Under the explicit v2 marker they are one domain each; the wrapper delegates
+  // every real skill path to the base seam, so the library code is unchanged.
+  const home = evolutionHome()
+  if (ctx !== undefined && existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
+    const kernel = new StoreKernel({ io, home, fence: liveHomeFence(ctx, home) })
+    effectiveIo = scopedTextIO(
+      scopedTextIO(io, { path: usageFile(root), domain: 'usage', kernel }),
+      { path: suppressedFile(root), domain: 'suppressed', kernel },
+    )
+  }
   return new SkillLibrary(
-    resolveSkillsRoot(config ?? {}),
-    io,
+    root,
+    effectiveIo,
     limits,
     ctx ? (event) => { ctx.emit('evolution/skill-mutated', event) } : undefined,
     transact,
