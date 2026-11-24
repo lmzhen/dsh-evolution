@@ -400,6 +400,7 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - `doctor --json` 在 `ctx.get('evolutionStore')` 存在时调用 `query('doctor')`，报告新增 `store: { commitId, treeUnit }`；
 - 文本报告保持原样（没有新 locale key），未迁移 home 或 service 不可用时字段不出现；
 - 查询失败只省略该字段，不让诊断整体失败；
+- 测试：doctor-store 1 test；`tsc` commands 0；
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
