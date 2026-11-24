@@ -89,6 +89,7 @@
         "evolution-commands::tests/command-catalog.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
+        "evolution-commands::tests/doctor-store.spec.ts",
         "evolution-commands::tests/help-locale.spec.ts",
         "evolution-commands::tests/host-locale.spec.ts",
         "evolution-commands::tests/migrate-state.spec.ts",
@@ -399,6 +400,7 @@
         "evolution-commands::tests/command-catalog.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
+        "evolution-commands::tests/doctor-store.spec.ts",
         "evolution-commands::tests/doctor-view.spec.ts",
         "evolution-commands::tests/help-locale.spec.ts",
         "evolution-commands::tests/host-locale.spec.ts",
@@ -1102,6 +1104,7 @@
         "evolution-commands::tests/command-catalog.spec.ts",
         "evolution-commands::tests/command-fallback.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
+        "evolution-commands::tests/doctor-store.spec.ts",
         "evolution-commands::tests/doctor-view.spec.ts",
         "evolution-commands::tests/help-locale.spec.ts",
         "evolution-commands::tests/host-locale.spec.ts",
@@ -1734,6 +1737,7 @@
         "evolution-commands::tests/commands.spec.ts",
         "evolution-commands::tests/diagnostics-route.spec.ts",
         "evolution-commands::tests/doctor-merge.spec.ts",
+        "evolution-commands::tests/doctor-store.spec.ts",
         "evolution-commands::tests/doctor-view.spec.ts",
         "evolution-commands::tests/doctor.spec.ts",
         "evolution-commands::tests/help-locale.spec.ts",
@@ -2320,11 +2324,11 @@
   "counts": {
     "fast": {
       "gates": 67,
-      "specs": 155
+      "specs": 156
     },
     "pre-tag": {
       "gates": 67,
-      "specs": 466
+      "specs": 467
     },
     "ci-only": {
       "gates": 10,
@@ -2332,16 +2336,16 @@
     },
     "full(ci=off)": {
       "gates": 67,
-      "specs": 466
+      "specs": 467
     },
     "full(ci=on)": {
       "gates": 77,
-      "specs": 537
+      "specs": 538
     }
   },
   "specs": {
-    "total": 537,
-    "marked": 537,
+    "total": 538,
+    "marked": 538,
     "unmarked": 0
   }
 }
