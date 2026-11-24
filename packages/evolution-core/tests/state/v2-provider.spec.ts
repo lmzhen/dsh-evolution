@@ -157,6 +157,18 @@ describe('MVCC state provider', () => {
     expect(snapshot.domains.userFile).toEqual({ text: '- me\n' })
   })
 
+  it('recovers the migration marker when the head committed but the marker write was lost', async () => {
+    const root = await tempRoot('dsh-state-v2-recover-')
+    const ctx = await mountStateStack(root)
+    const io = ctx.evolutionIo.provider()
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    const bootstrapped = await kernel.bootstrap({ state: emptyStateDocument() })
+    const recovered = await migrateStateToV2(ctx, { io, home: root })
+    expect(recovered.source).toBe('store-v2-recovered')
+    expect(recovered.commitId).toBe(bootstrapped.commitId)
+    expect(await io.exists(join(root, 'state', STATE_V2_MIGRATION_MARKER))).toBe(true)
+  })
+
   it('reads while the legacy state.lock is held because locking is internal', async () => {
     const { root, io, fence } = await seeded()
     const ctx = await mountStateStack(root)
