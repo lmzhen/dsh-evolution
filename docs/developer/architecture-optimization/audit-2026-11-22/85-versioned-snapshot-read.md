@@ -197,10 +197,10 @@ HomeFence.run(tree)
 
 ### 5.6 GC
 
-- 保留最近 `N=64` 个 commit，或 7 天，取较大者；
+- 保留最近 `N=64` 个 commit；R1 只做 count-based retention，7 天年龄保留延后到有真实 mtime/GC 验收后再加，避免把未验证的时间规则写进权威路径；
 - 从 head 沿 parent 链保留引用；
 - 不再被任何保留 commit 引用的 object 才删除；
-- GC 在 writer fence 内只做“候选计算”，删除可以 best-effort；删除失败只告警；
+- GC 在 writer fence 内只做“候选计算”，删除 best-effort：失败只记录到 `failures`，不抛、不破坏 head；
 - GC 永远不删除当前 head 或其直接 parent；
 - 崩溃留下孤儿 object 是安全的，只会占空间。
 
@@ -220,9 +220,72 @@ HomeFence.run(tree)
 - 写入：`HomeFence.run` → 写 content object → 写 commit → 原子写 `head.json`；
 - 读取：`readHead → readCommit → readObject`，全程不调用 fence；
 - 对象/commit 使用 IO seam 的 `createTextIfAbsent`/`writeText`；没有 `commit.lock` 文件；
-- 已覆盖：bootstrap、旧快照不可变、expectedHead CAS、同字节 no-op、head 缺失/对象篡改 fail-closed、重复 bootstrap 拒绝、GC 保留 head 链、读在 HomeFence 被持有时仍完成（真实平台锁）；
-- 验证：`store-kernel.spec.ts` 8 tests passed；`tsc -b packages/evolution/evolution-core/tsconfig.json` exit 0；现有 `state/store-provider.spec.ts` 5 tests 隔离运行通过。
+- 已覆盖：bootstrap、旧快照不可变、expectedHead CAS、同字节 no-op、head 缺失/对象篡改 fail-closed、重复 bootstrap 拒绝、GC 保留 head 链、读在 HomeFence 被持有时仍完成（真实平台锁）、嵌套 commit 检测、tree 归一化、非 plain JSON 拒绝、GC retain 非法值；
+- 独立复核后修复：P0-1 发布前用 `parseCommit` 自检（source/tree 归一化，非法对象不再锁死 head）；P0-2 `change` 后重新读 head，嵌套/并发 commit 抛 `StoreConflictError` 而不是被覆盖；P1-1 GC `retain` 校验并 best-effort 记录失败；P1-2 head 短暂缺失 bounded retry 且区分“未初始化/commit 存在但 head 丢失”；P1-3 Date/class/Map 等非 plain JSON 值拒绝；
+- 验证：`store-kernel.spec.ts` 11 tests passed；`tsc -b packages/evolution/evolution-core/tsconfig.json` exit 0；现有 `state/store-provider.spec.ts` 5 tests 隔离运行通过；
+- 新静态门禁：`verify-store-kernel.mjs`（gate-87）检查 query 无写锁、写入只用一个 HomeFence + IO seam、head/commit/object 已登记 `persisted-write-inventory`；已通过；
+- 仍未完成（R2 前补齐）：真实两进程 writer、publish 各阶段 crash、read-during-write、GC/reader race、legacy bootstrap 迁移测试；见复核清单。
 - 下一步 R2 才接 `EvolutionState`/state provider；R1 不改变 0.61.0 的运行路径。
+- 下一步 R2 才接 `EvolutionState`/state provider；R1 不改变 0.61.0 的运行路径。
+
+### 5.9 R2 设计：State 接入 MVCC（先设计，后改代码）
+
+R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接到它上面，并且**不改变 0.61.0 默认行为**，直到显式迁移。
+
+#### provider 与切换
+
+- 新增 provider 名 `store-v2`，实现现有 `EvolutionStateStorage` 接口；`locking: 'internal'`。
+- `EvolutionStateStorage` 增加可选 `locking?: 'consumer' | 'internal'`；缺省 `consumer`（v1 store/domain 仍由 `EvolutionState` 的旧 `state.lock` 保护）。v2 的每个方法内部通过 kernel 的 writer fence 串行，消费者不得再套 `state.lock`。
+- `EvolutionState.run()` 先解析当前 provider：`internal` 直接执行；`consumer` 才走旧 `withStateLock`。这一改动让 v2 读彻底无锁，同时 v1/domain 迁移窗口保持原语义。
+- **Phase-1 exit gate**：在把 state 写入路由到 `store.mutate` 的同一个改动里，v2 路径必须不再获取 `state.lock`；禁止“v2 写 kernel + 外层仍持 state.lock”的双锁组合（会反转 HomeFence→state 的顺序）。测试必须证明：持 v2 写 fence 时 v2 读完成，持 v1 `state.lock` 时 v1 读仍等待。
+- `auto` 规则保持向后兼容：
+  1. v2 marker 存在 ⇒ `store-v2`；
+  2. v1 marker 存在 ⇒ `store`；
+  3. 无 marker、domain provider 存在 ⇒ `domain`；
+  4. 都无法判定 ⇒ fail loud。
+- 不在 R2 把默认改成 v2。升级用户必须显式运行 `/evolution migrate state --to v2`；fresh 安装也走同一命令（或后续安装器写入 v2 marker 后再切换默认）。这避免“v2 空 store 掩盖 domain/v1 数据”的静默丢状态。
+- R7 再删除 v1/domain provider，并把默认切到 `store-v2`。
+
+#### 文档与纯 reducer
+
+- 把 v1 `state/store.ts` 里的 `StoreFile` 形状、parse/serialize、review/pending/curator 变更规则抽到 `state/document.ts`：
+  - `StateDocument`：`{ version: 1, review, curator, pending }`（沿用现有磁盘 schema，v2 不改字段）；
+  - `emptyStateDocument()` / `parseStateDocument()` / `serializeStateDocument()`；
+  - 纯 reducer：`saveReview`、`saveCurator`、`transactCurator`、`savePending`、`claimPending`、`releasePending`、`resolvePending`、`listPending`、overflow/cap 规则。
+- v1 file provider 与 v2 provider 共用同一 reducer；禁止复制 claim/resolve/overflow 规则（当前 store.ts 已有一份，复制会成为第二个缺陷源）。
+- v2 provider 的每个写方法：
+  1. `kernel.mutate({domains:['state'], change: current => ({state: reducer(current.state, input)})})`；
+  2. return value 由 reducer 内部产出，不依赖写后重读。
+- v2 provider 的每个读方法：`kernel.query(['state'])` 一次，取同一 commit 的 state；不读 head 多个文件，不取 fence。
+- `state` 域值为完整 `StateDocument`；R2 仍然一个 JSON 对象，不把 review/pending 拆成多个对象，避免多域指针。
+
+#### 迁移
+
+`migrateStateToV2(ctx, {io,home})`：
+
+1. 源选择：优先当前已挂载的 v1 `store`（读 `state/store.json`）；否则读 domain（复用现有 `migrateDomainToStoreUnlocked` 的读取逻辑，抽成 `readLegacyStateDocument`）；
+2. 在 `HomeFence` 内 `kernel.bootstrap({state: document})`；已有 v2 head ⇒ 拒绝覆盖；
+3. 写 `.migrated-to-store-v2.json`，记录 `commitId`、source（`domain|store`）、counts；
+4. v1/domain 数据不删除，回退是显式把 `provider` pin 回旧名并保留 marker；
+5. `--dry-run` 只读源、不写 head/marker；
+6. 失败矩阵：源损坏、v2 head 已存在、marker 写失败但 head 已发布 ⇒ 明确恢复指引（head 是权威，补 marker 可重试），不静默回退。
+
+#### 迁移窗口与失败模型
+
+- v2 marker + head 缺失/损坏 ⇒ fail closed（不把空 document 当默认）。
+- v1/v2 同时存在但无 v2 marker ⇒ `auto` 继续 v1；v2 provider 被显式 pin 时不得读 v1 数据，报“先 migrate”错误。
+- v2 写成功后 v1 不双写；回退会丢 v2-era 新写，因此回退必须 pin 旧 provider，不能只删 marker（沿用 0.61 的 D1-ROLLBACK 判定）。
+- v2 的 read 不调用 `withFileLock`/`state.lock`；`EvolutionState` 的 `locking` 分支是唯一的消费者级开关。
+- HMR：provider 每次 apply 都新建，fence 用 `liveHomeFence(ctx, home)`；不在构造期冻结 authority。
+- 多进程：两个进程同时 migrate，只有 HomeFence 内的 `bootstrap` 成功；第二个 fail loud。
+
+#### R2 验收
+
+- v2 provider 通过 `runStateProviderConsistency` 全套；
+- v2 读在 HomeFence 被持有时完成；v1 读仍按旧 state.lock 等待（证明迁移窗口没有偷偷改语义）；
+- `domain→v1→v2` 与 `domain→v2` 迁移用例、v1 新写后禁止静默回退、marker 写失败恢复、v2 head 损坏 fail closed；
+- 所有 state 命令/工具/UI 不需要改调用签名；只由 `EvolutionState` 内部选择 provider；
+- 更新 77/78/80：D1-LOCK-READ 的 v2 部分通过 locking 分支实现，v1 过渡未删除。
 
 
 ## 6. 域与读写分类

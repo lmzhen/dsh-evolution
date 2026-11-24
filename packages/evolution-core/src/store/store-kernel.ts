@@ -14,6 +14,7 @@ import { join } from 'node:path'
 import { isRecord } from '../guards.ts'
 import type { EvolutionIoLike } from '../io.ts'
 import {
+  STORE_COMMIT_SOURCES,
   STORE_DOMAIN_IDS,
   StoreConflictError,
   StoreCorruptError,
@@ -25,6 +26,7 @@ import {
   type StoreCommitSource,
   type StoreDomainId,
   type StoreDomainValues,
+  type StoreGarbageCollectionResult,
   type StoreHead,
   type StoreKernelOptions,
   type StoreMutation,
@@ -55,6 +57,10 @@ function stableStringify(value: unknown): string {
     return '[' + value.map(item => item === undefined ? 'null' : stableStringify(item)).join(',') + ']'
   }
   if (isRecord(value)) {
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new StoreError('store-invalid-value', 'store values must be plain JSON objects; class instances and maps are not supported')
+    }
     const entries: string[] = []
     for (const key of Object.keys(value).sort()) {
       const entry = value[key]
@@ -91,9 +97,11 @@ function parseHead(text: string, path: string): StoreHead {
   if (raw.schemaVersion !== SCHEMA_VERSION) throw new StoreCorruptError(`${path}: unsupported head schemaVersion ${String(raw.schemaVersion)}`)
   const commitId = requireString(raw, 'commitId', path)
   const commitSha256 = requireString(raw, 'commitSha256', path)
+  const updatedAt = requireString(raw, 'updatedAt', path)
   if (!/^[0-9a-f]{64}$/.test(commitId)) throw new StoreCorruptError(`${path}: commitId is not a sha256`)
   if (!/^[0-9a-f]{64}$/.test(commitSha256)) throw new StoreCorruptError(`${path}: commitSha256 is not a sha256`)
-  return { schemaVersion: SCHEMA_VERSION, commitId, commitSha256 }
+  if (Number.isNaN(Date.parse(updatedAt))) throw new StoreCorruptError(`${path}: updatedAt is not a date`)
+  return { schemaVersion: SCHEMA_VERSION, commitId, commitSha256, updatedAt }
 }
 
 function parseTree(value: unknown, where: string): StoreTreeRef | null {
@@ -136,7 +144,7 @@ function parseCommit(text: string, path: string): StoreCommit {
   const createdAt = requireString(raw, 'createdAt', path)
   if (Number.isNaN(Date.parse(createdAt))) throw new StoreCorruptError(`${path}: createdAt is not a date`)
   const source = requireString(raw, 'source', path)
-  if (!['tool', 'command', 'ui', 'background', 'bootstrap'].includes(source)) {
+  if (!(STORE_COMMIT_SOURCES as readonly string[]).includes(source)) {
     throw new StoreCorruptError(`${path}: unknown source "${source}"`)
   }
   const commit: StoreCommit = {
@@ -182,8 +190,15 @@ export class StoreKernel {
 
   /** Read one consistent commit. This method never acquires the writer fence. */
   async query(domains: readonly StoreDomainId[] = STORE_DOMAIN_IDS): Promise<StoreSnapshot> {
-    let head = await this.readHead()
-    if (head === null) throw new StoreNotInitializedError(this.root)
+    for (const domain of domains) {
+      if (!isDomainId(domain)) throw new StoreError('store-invalid-domain', `unknown store domain "${String(domain)}"`)
+    }
+    let head = await this.readHeadForQuery()
+    if (head === null) {
+      const commits = await this.io.list(join(this.root, COMMITS_DIR))
+      if (commits.length === 0) throw new StoreNotInitializedError(this.root)
+      throw new StoreCorruptError(`${this.root}: commits exist but head.json is missing`)
+    }
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const commit = await this.readCommit(head)
@@ -219,6 +234,12 @@ export class StoreKernel {
       const previous = await this.readCommit(head)
       const current = await this.resolveDomains(previous, Object.keys(previous.domains) as StoreDomainId[])
       const changed = await request.change(deepFreeze(current))
+      // `change` may be async and HomeFence permits a nested commit (runNested).
+      // If anything advanced the head while the mutator ran, this commit would
+      // silently clobber it; refuse instead of overwriting.
+      const after = await this.readHead()
+      if (after === null) throw new StoreCorruptError(`${this.root}: head disappeared during mutation`)
+      if (after.commitId !== head.commitId) throw new StoreConflictError(head.commitId, after.commitId)
       for (const domain of Object.keys(changed)) {
         if (!isDomainId(domain)) throw new StoreError('store-invalid-domain', `mutator returned unknown domain "${domain}"`)
         if (!request.domains.includes(domain)) {
@@ -269,17 +290,18 @@ export class StoreKernel {
 
   /**
    * Delete commit/object files no longer reachable from the retained head
-   * chain. Best-effort: a failed unlink only leaves garbage, never a broken
-   * reachable snapshot. The head and its direct parent are always retained.
+   * chain. Deletion failures are reported, never thrown: an orphan file only
+   * wastes space; a reachable snapshot is never broken by this pass.
    */
-  async collectGarbage(retain = 64): Promise<{ commits: string[]; objects: string[] }> {
+  async collectGarbage(retain = 64): Promise<StoreGarbageCollectionResult> {
+    const limit = Number.isInteger(retain) && retain >= 2 ? retain : 64
     return await this.fence.run(async () => {
       const head = await this.readHead()
-      if (head === null) return { commits: [], objects: [] }
+      if (head === null) return { commits: [], objects: [], failures: [] }
       const keepCommits = new Set<string>()
       const keepObjects = new Set<string>()
       let cursor: string | null = head.commitId
-      while (cursor !== null && keepCommits.size < Math.max(2, retain)) {
+      while (cursor !== null && keepCommits.size < limit) {
         keepCommits.add(cursor)
         const commit = await this.readCommitById(cursor)
         for (const hash of Object.values(commit.domains)) if (hash !== undefined) keepObjects.add(hash)
@@ -288,19 +310,29 @@ export class StoreKernel {
       }
       const removedCommits: string[] = []
       const removedObjects: string[] = []
+      const failures: Array<{ path: string; error: Error }> = []
+      const remove = async (path: string): Promise<boolean> => {
+        try {
+          await this.io.remove(path)
+          return true
+        } catch (error) {
+          failures.push({ path, error: error instanceof Error ? error : new Error(String(error)) })
+          return false
+        }
+      }
       for (const name of await this.io.list(join(this.root, COMMITS_DIR))) {
         const id = name.endsWith('.json') ? name.slice(0, -5) : ''
         if (!/^[0-9a-f]{64}$/.test(id) || keepCommits.has(id)) continue
-        await this.io.remove(join(this.root, COMMITS_DIR, name))
-        removedCommits.push(id)
+        const path = join(this.root, COMMITS_DIR, name)
+        if (await remove(path)) removedCommits.push(id)
       }
       for (const name of await this.io.list(join(this.root, OBJECTS_DIR))) {
         const id = name.endsWith('.json') ? name.slice(0, -5) : ''
         if (!/^[0-9a-f]{64}$/.test(id) || keepObjects.has(id)) continue
-        await this.io.remove(join(this.root, OBJECTS_DIR, name))
-        removedObjects.push(id)
+        const path = join(this.root, OBJECTS_DIR, name)
+        if (await remove(path)) removedObjects.push(id)
       }
-      return { commits: removedCommits, objects: removedObjects }
+      return { commits: removedCommits, objects: removedObjects, failures }
     })
   }
 
@@ -308,6 +340,16 @@ export class StoreKernel {
     const path = join(this.root, HEAD_FILE)
     const text = await this.io.readText(path)
     return text === null ? null : parseHead(text, path)
+  }
+
+  /** A lock-free reader can transiently miss a just-replaced file on Windows; retry a bounded few times. */
+  private async readHeadForQuery(): Promise<StoreHead | null> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const head = await this.readHead()
+      if (head !== null) return head
+      if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 10 * (attempt + 1)))
+    }
+    return null
   }
 
   private async readCommit(head: StoreHead): Promise<StoreCommit> {
@@ -382,6 +424,7 @@ export class StoreKernel {
       schemaVersion: SCHEMA_VERSION,
       commitId: commit.commitId,
       commitSha256: sha256(stableStringify(commit)),
+      updatedAt: new Date(this.now()).toISOString(),
     }
     await this.io.writeText(join(this.root, HEAD_FILE), stableStringify(head))
   }
@@ -391,6 +434,7 @@ export class StoreKernel {
       schemaVersion: SCHEMA_VERSION,
       commitId: commit.commitId,
       commitSha256: sha256(stableStringify(commit)),
+      updatedAt: new Date(this.now()).toISOString(),
     }
     const path = join(this.root, HEAD_FILE)
     if (this.io.createTextIfAbsent !== undefined) {
@@ -406,17 +450,38 @@ export class StoreKernel {
   }
 
   private buildCommit(parent: string | null, domains: Partial<Record<StoreDomainId, string>>, tree: StoreTreeRef | null, source: StoreCommitSource): StoreCommit {
+    const normalizedTree = normalizeTree(tree)
+    if (!(STORE_COMMIT_SOURCES as readonly string[]).includes(source)) {
+      throw new StoreError('store-invalid-source', `unknown commit source "${String(source)}"`)
+    }
     const draft = {
       schemaVersion: SCHEMA_VERSION,
       parent,
       createdAt: new Date(this.now()).toISOString(),
       domains,
-      tree,
+      tree: normalizedTree,
       source,
     }
     const commitId = sha256(stableStringify(draft))
-    return { ...draft, commitId }
+    const commit: StoreCommit = { ...draft, commitId }
+    // A commit that this kernel publishes must be readable by the same schema;
+    // normalize/validate BEFORE the head points at it, otherwise a wider
+    // runtime object could permanently lock the head out of every reader.
+    parseCommit(stableStringify(commit), '<built commit>')
+    return commit
   }
+}
+
+/** Reject/normalize a tree reference at the write boundary; extra runtime keys never reach disk. */
+function normalizeTree(tree: StoreTreeRef | null): StoreTreeRef | null {
+  if (tree === null) return null
+  if (typeof tree.unitId !== 'string' || tree.unitId.trim() === '') {
+    throw new StoreError('store-invalid-tree', 'tree.unitId must be a non-empty string')
+  }
+  if (tree.manifest !== undefined && !/^[0-9a-f]{64}$/.test(tree.manifest)) {
+    throw new StoreError('store-invalid-tree', 'tree.manifest must be a sha256 when present')
+  }
+  return tree.manifest === undefined ? { unitId: tree.unitId } : { unitId: tree.unitId, manifest: tree.manifest }
 }
 
 const sameTree = (left: StoreTreeRef | null, right: StoreTreeRef | null): boolean => {

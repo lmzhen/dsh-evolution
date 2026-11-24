@@ -1516,6 +1516,25 @@
       ]
     },
     {
+      "id": "gate-87",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-store-kernel.mjs packages`（DCR-85：query 无写锁、写入单一 HomeFence + IO seam、MVCC 路径已入 inventory）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-store-kernel.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
+    },
+    {
       "id": "gate-03",
       "kind": "toolchain",
       "human": "`node node_modules/vitest/vitest.mjs run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2`",

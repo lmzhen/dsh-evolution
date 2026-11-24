@@ -28,7 +28,17 @@ export type StoreDomainId = (typeof STORE_DOMAIN_IDS)[number]
 export type StoreDomainValues = Partial<Record<StoreDomainId, unknown>>
 
 /** Why a commit was published. Diagnostics only; never used for authority. */
-export type StoreCommitSource = 'tool' | 'command' | 'ui' | 'background' | 'bootstrap'
+export type StoreCommitSource = 'foreground' | 'background_review' | 'command' | 'ui' | 'tool' | 'bootstrap'
+
+/** The durable source values a published commit may carry. */
+export const STORE_COMMIT_SOURCES: readonly StoreCommitSource[] = [
+  'foreground',
+  'background_review',
+  'command',
+  'ui',
+  'tool',
+  'bootstrap',
+]
 
 /** A skill-tree unit published together with this commit. */
 export interface StoreTreeRef {
@@ -42,6 +52,7 @@ export interface StoreHead {
   readonly schemaVersion: number
   readonly commitId: string
   readonly commitSha256: string
+  readonly updatedAt: string
 }
 
 /** The immutable commit manifest stored at `commits/<commitId>.json`. */
@@ -92,6 +103,13 @@ export interface StoreMutation {
   readonly change: (current: StoreSnapshot) => StoreDomainValues | Promise<StoreDomainValues>
   /** Attach a tree unit to the commit (the unit itself is committed by UnitKernel). */
   readonly tree?: StoreTreeRef | null | undefined
+}
+
+/** The result of a garbage-collection pass; failures are reported, never thrown after the head is safe. */
+export interface StoreGarbageCollectionResult {
+  readonly commits: string[]
+  readonly objects: string[]
+  readonly failures: Array<{ readonly path: string; readonly error: Error }>
 }
 
 /** Options for {@link StoreKernel}. */

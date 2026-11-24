@@ -77,7 +77,8 @@
         "gate-81",
         "gate-82",
         "gate-85",
-        "gate-86"
+        "gate-86",
+        "gate-87"
       ],
       "specs": [
         "evolution-client-kit::tests/data-table.spec.ts",
@@ -291,7 +292,8 @@
         "gate-81",
         "gate-82",
         "gate-85",
-        "gate-86"
+        "gate-86",
+        "gate-87"
       ]
     },
     "pre-tag": {
@@ -365,7 +367,8 @@
         "gate-81",
         "gate-82",
         "gate-85",
-        "gate-86"
+        "gate-86",
+        "gate-87"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -890,7 +893,8 @@
         "gate-81",
         "gate-82",
         "gate-85",
-        "gate-86"
+        "gate-86",
+        "gate-87"
       ]
     },
     "ci-only": {
@@ -1055,7 +1059,8 @@
         "gate-81",
         "gate-82",
         "gate-85",
-        "gate-86"
+        "gate-86",
+        "gate-87"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -1580,7 +1585,8 @@
         "gate-81",
         "gate-82",
         "gate-85",
-        "gate-86"
+        "gate-86",
+        "gate-87"
       ]
     },
     "full(ci=on)": {
@@ -1665,7 +1671,8 @@
         "gate-81",
         "gate-82",
         "gate-85",
-        "gate-86"
+        "gate-86",
+        "gate-87"
       ],
       "specs": [
         "evolution-activity::tests/activity-store.spec.ts",
@@ -2261,17 +2268,18 @@
         "gate-81",
         "gate-82",
         "gate-85",
-        "gate-86"
+        "gate-86",
+        "gate-87"
       ]
     }
   },
   "counts": {
     "fast": {
-      "gates": 66,
+      "gates": 67,
       "specs": 144
     },
     "pre-tag": {
-      "gates": 66,
+      "gates": 67,
       "specs": 455
     },
     "ci-only": {
@@ -2279,11 +2287,11 @@
       "specs": 71
     },
     "full(ci=off)": {
-      "gates": 66,
+      "gates": 67,
       "specs": 455
     },
     "full(ci=on)": {
-      "gates": 76,
+      "gates": 77,
       "specs": 526
     }
   },

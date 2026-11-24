@@ -121,6 +121,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 84 | node packages/evolution/scripts/verify-cohort-host.mjs --dist packages/evolution/dist --version <cohort-member> --source ci | overlay |
 | 85 | `node packages/scripts/gen-retrieval-contract.mjs --check` | mirror |
 | 86 | `node packages/evolution-merge-engine/scripts/verify-bundle-fresh.mjs`（审过的 src/vendor 源码与入库 index.bundle.js/manifest 必须同源） | mirror |
+| 87 | `node packages/scripts/verify-store-kernel.mjs packages`（DCR-85：query 无写锁、写入单一 HomeFence + IO seam、MVCC 路径已入 inventory） | mirror |
 
 ## Pull request checklist
 

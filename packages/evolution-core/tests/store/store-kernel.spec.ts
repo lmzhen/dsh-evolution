@@ -125,8 +125,51 @@ describe('home MVCC store kernel', () => {
     }
   })
 
-  it('garbage-collects unreachable commits but keeps the head readable', async () => {
+  it('rejects a nested commit that advanced the head during the mutator', async () => {
     const { io, root } = await seeded()
+    const kernel = new StoreKernel({ io, home: root, fence: openFence() })
+    await kernel.bootstrap({ state: { turns: 1 } })
+    await expect(kernel.mutate({
+      domains: ['state'],
+      source: 'command',
+      change: async () => {
+        await kernel.mutate({ domains: ['runs'], source: 'command', change: () => ({ runs: { ids: ['nested'] } }) })
+        return { state: { turns: 2 } }
+      },
+    })).rejects.toBeInstanceOf(StoreConflictError)
+    const snapshot = await kernel.query(['state', 'runs'])
+    expect(snapshot.domains.runs).toEqual({ ids: ['nested'] })
+  })
+
+  it('normalizes tree refs on publish and rejects a non-plain JSON value', async () => {
+    const { io, root } = await seeded()
+    const kernel = new StoreKernel({ io, home: root, fence: openFence() })
+    await kernel.bootstrap({ state: { turns: 1 } })
+    await kernel.mutate({
+      domains: ['state'],
+      source: 'foreground',
+      tree: { unitId: 'u1', manifest: '0'.repeat(64), extra: 7 } as never,
+      change: () => ({ state: { turns: 2 } }),
+    })
+    const snapshot = await kernel.query(['state'])
+    expect(snapshot.tree).toEqual({ unitId: 'u1', manifest: '0'.repeat(64) })
+    await expect(kernel.mutate({
+      domains: ['state'],
+      source: 'command',
+      change: () => ({ state: { when: new Date(0) } }),
+    })).rejects.toThrow(/plain JSON/)
+  })
+
+  it('keeps the head when GC receives an invalid retain value', async () => {
+    const { io, root } = await seeded()
+    const kernel = new StoreKernel({ io, home: root, fence: openFence() })
+    await kernel.bootstrap({ state: { n: 0 } })
+    const result = await kernel.collectGarbage(Number.NaN)
+    expect(result.failures).toEqual([])
+    expect((await kernel.query(['state'])).domains.state).toEqual({ n: 0 })
+  })
+
+  it('garbage-collects unreachable commits but keeps the head readable', async () => {    const { io, root } = await seeded()
     const kernel = new StoreKernel({ io, home: root, fence: openFence(), now: () => 1_700_000_000_000 })
     await kernel.bootstrap({ state: { n: 0 } })
     for (let n = 1; n <= 3; n += 1) {

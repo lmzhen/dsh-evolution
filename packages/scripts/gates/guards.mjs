@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Static and local guards: the tree-reading checks, toolchains, machine-local rows and the named specials. No build, no pack.
  *
  * Data only: ids are FROZEN (see W10 §16.3) — never renumber, never derive from position.
@@ -633,6 +633,14 @@ export const guards = [
     lanes: ["ci-static"],
     reason: "CI-only gate with no table row yet — local slot pending (G0-1)",
 
+  }),
+
+  gate("gate-87", {
+    kind: "script",
+    tree: "mirror",
+    title: "`node packages/scripts/verify-store-kernel.mjs packages`（DCR-85：query 无写锁、写入单一 HomeFence + IO seam、MVCC 路径已入 inventory）",
+    argv: ["node","packages/scripts/verify-store-kernel.mjs","packages"],
+    lanes: ["local","ci-static"],
   }),
 
 ]
