@@ -33,6 +33,7 @@
 
 | ID | 状态 | 修复/证据 |
 |---|---|---|
+| D1-HMR | FIXED | `store-plugin` 不再缓存模块级 provider Map；每次 apply 都用当前 `ctx.evolutionIo.provider()` 构造 provider，由 `ctx.effect` 清理旧注册，HMR 替换 IO 后不会读旧 IO。
 | D1-MARKER-DEPTH | FIXED | marker 校验现在调用 `parseStateStoreImage` 做嵌套 record/curator 全量校验，空 store 也拒绝；损坏记录不再延迟到首次读。
 | D1-STORE-PIN | FIXED | 显式 `provider: store` 现在要求 migration marker 存在并校验完整 store 镜像；缺 marker 时 mount/首次读即报错，不再把空 store 当权威。
 | D1-MARKER-FAIL | FIXED | `migrateDomainToStore` 现在遇到已存在且可解析的 store、但 marker 缺失时，按 store 内容补写 `domain-store-recovered` marker 并返回真实计数；不再拒绝重试。

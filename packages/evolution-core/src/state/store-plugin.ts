@@ -16,17 +16,12 @@ import { createStateStoreProvider } from './store.ts'
 export const name = 'evolution-state-store'
 export const inject = ['evolutionStateStorage', 'evolutionIo']
 
-/** HMR re-applies the row in the same ctx; the registry only treats the SAME object as
- * idempotent, so keep one provider per home instead of constructing a new registrant. */
-const providers = new Map<string, ReturnType<typeof createStateStoreProvider>>()
-
 export async function apply(ctx: Context): Promise<void> {
   await ctx.evolutionIo.whenReady()
   const home = evolutionHome()
-  let provider = providers.get(home)
-  if (provider === undefined) {
-    provider = createStateStoreProvider({ io: ctx.evolutionIo.provider(), home })
-    providers.set(home, provider)
-  }
+  // A fresh provider per apply: HMR may replace the IO provider, and a cached
+  // provider would keep reading through the disposed one. The effect cleanup
+  // unregisters this exact object before the next apply registers its own.
+  const provider = createStateStoreProvider({ io: ctx.evolutionIo.provider(), home })
   ctx.effect(() => ctx.evolutionStateStorage.registerProvider(provider), 'evolution-state-store.provider')
 }
