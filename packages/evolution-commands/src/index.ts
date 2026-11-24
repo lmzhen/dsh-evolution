@@ -327,7 +327,8 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     if (!ioRegistry) return
     const home = evolutionHome()
     const io = ioRegistry.provider()
-    const store = runStorePortIfV2(ioCtx, io, home)
+    const fence = homeFenceFrom(ioCtx)
+    const store = runStorePortIfV2(ioCtx, io, home, fence)
     const registry = newRunRegistry({
       io,
       home,

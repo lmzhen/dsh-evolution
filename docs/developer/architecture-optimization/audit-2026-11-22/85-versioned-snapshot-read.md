@@ -307,6 +307,15 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：run-registry-v2 2 tests、legacy run-registry 21 tests、v2 state 6 tests 通过；`tsc` core/commands/merge/ui exit 0。
 - 下一段：merge rows/reports 的 commit 适配，以及 v2 下 `runs` 域与 merge 域的同一 commit 关系。
 
+#### R3b 已落地（merge state 桥）
+
+- `store/scoped-text-io.ts`：把**恰好一个**旧文本路径映射到 MVCC 域（`merge` 域值 `{text}`），其他路径全部委托 base IO；`transact` 走 kernel，不再写原文件；`copy` 支持 pre-1b 备份复制，`exists/size/read` 从域读。
+- 这是过渡适配器，不是第二存储：同一路径只写域，不双写；R7 用显式 query/command 替换调用方后删除。
+- `merge-state.json` 只在 v2 marker 存在时启用桥；未迁移仍走原文件。
+- `migrateStateToV2` 首 commit 同时携带 `merge` 文本、`runs` 文档与 `state` 文档；v2 merge 读取/写入与 runs/state 同一 commit。
+- 测试：scoped-text-io 2 tests、v2 state/migration 7 tests 通过；`tsc` core/commands/merge/ui exit 0。
+- 下一段：merge run-meta/report 引用、pre-1b 迁移与 v2 下的 `merge-state` 读写回归。
+
 
 ## 6. 域与读写分类
 

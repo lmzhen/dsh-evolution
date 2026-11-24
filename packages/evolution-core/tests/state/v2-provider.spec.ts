@@ -84,6 +84,17 @@ describe('MVCC state provider', () => {
     })
   })
 
+  it('migrates the legacy merge state into the same first commit', async () => {
+    const root = await tempRoot('dsh-state-v2-merge-')
+    const ctx = await mountStateStack(root)
+    const io = ctx.evolutionIo.provider()
+    await mkdir(join(root, 'merge'), { recursive: true })
+    await writeFile(join(root, 'merge', 'merge-state.json'), JSON.stringify({ schemaVersion: 3, rows: [] }) + '\n')
+    await migrateStateToV2(ctx, { io, home: root })
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    expect((await kernel.query(['merge'])).domains.merge).toEqual({ text: JSON.stringify({ schemaVersion: 3, rows: [] }) + '\n' })
+  })
+
   it('reads while the legacy state.lock is held because locking is internal', async () => {
     const { root, io, fence } = await seeded()
     const ctx = await mountStateStack(root)

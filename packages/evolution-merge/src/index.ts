@@ -10,7 +10,7 @@ import { createEngineScreening, type EngineScreenPort } from './adapters/engine-
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
 import { resolveRetrievalCredentials } from './domain/retrieval-credentials.ts'
 import { commandsPort, settingsPort, toolsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
-import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, homeFenceFrom, liveHomeFence, newRunRegistry, reportsSweepLockTarget, runStorePortIfV2, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, homeFenceFrom, liveHomeFence, mergeStateIoIfV2, newRunRegistry, reportsSweepLockTarget, runStorePortIfV2, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
@@ -201,16 +201,17 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
   ctx.inject(['commands', 'evolutionIo'], (scope) => {
     const registry = scope.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
     if (registry === undefined) return
-    const io = evolutionIoAdapter(() => registry.provider())
+    const baseIo = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
     const homeFence = liveHomeFence(ctx as unknown as { get(name: string): unknown }, home)
+    const io = mergeStateIoIfV2(ctx, baseIo, home, homeFence) ?? baseIo
     const ready = (async () => {
       const migration = await migrateMergeStateToV4(io, home, homeFence)
       if (!migration.ok) return migration
       const loaded = await loadMergeState(io, home)
       return { ok: true as const, schema: 3 as const, migrated: migration.migrated, state: { schemaVersion: 3 as const, rows: loaded.state.rows.map(legacyToV3).filter((row): row is NonNullable<typeof row> => row !== null) }, quarantine: [], report: null }
     })().catch(error => ({ ok: false as const, code: 'merge-state-migration-blocked' as const, message: error instanceof Error ? error.message : String(error) }))
-    const runStore = runStorePortIfV2(ctx, io, home)
+    const runStore = runStorePortIfV2(ctx, io, home, homeFence)
     const runs = newRunRegistry({ io, home, ...(runStore === undefined ? {} : { store: runStore }), warn: (message) => { ctx.logger.warn(message) }, ...(homeFence === undefined ? {} : { fence: homeFence }) })
     ctx.effect(() => {
       const host = ctx as unknown as { on(name: string, listener: (event: { action?: string }) => void): () => void }

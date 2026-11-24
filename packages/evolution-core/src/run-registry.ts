@@ -213,9 +213,10 @@ export function runStorePortIfV2(
   ctx: { get?(name: string): unknown } | undefined,
   io: EvolutionIoLike,
   home: string,
+  fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined,
 ): RunStorePort | undefined {
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
-  return createRunStorePort(new StoreKernel({ io, home, fence: liveHomeFence(ctx ?? {}, home) }))
+  return createRunStorePort(new StoreKernel({ io, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) }))
 }
 
 /** Options for {@link newRunRegistry}. */

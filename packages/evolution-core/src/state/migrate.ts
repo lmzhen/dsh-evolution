@@ -238,7 +238,13 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
     const runsPath = join(home, 'runs.json')
     let runs: RunIndexDocument | undefined
     if (await io.exists(runsPath)) runs = parseRunIndexDocument(await io.readText(runsPath))
-    return await kernel.bootstrap({ state: document, ...(runs === undefined ? {} : { runs }) }, 'bootstrap')
+    const mergePath = join(home, 'merge', 'merge-state.json')
+    const mergeText = await io.exists(mergePath) ? await io.readText(mergePath) : null
+    return await kernel.bootstrap({
+      state: document,
+      ...(runs === undefined ? {} : { runs }),
+      ...(mergeText === null ? {} : { merge: { text: mergeText } }),
+    }, 'bootstrap')
   })
   await writeMarker(source, result.commitId, snapshot)
   return {
