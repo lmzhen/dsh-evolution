@@ -42,7 +42,14 @@ export async function mountStateStack(
   await ctx.plugin(NodeIo)
   if (options.authority === true) ctx.provide('evolutionMutationAuthority', new MutationAuthority({ io: ctx.evolutionIo.provider(), home: root }))
   await ctx.plugin(DomainState)
-  if (options.evolution) await ctx.plugin(EvolutionState, { provider: 'domain', home: root })
+  if (options.evolution) {
+    const previous = process.env.DSH_EVOLUTION_HOME
+    process.env.DSH_EVOLUTION_HOME = root
+    try { await ctx.plugin(EvolutionState, { provider: 'domain' }) } finally {
+      if (previous === undefined) delete process.env.DSH_EVOLUTION_HOME
+      else process.env.DSH_EVOLUTION_HOME = previous
+    }
+  }
   if (options.approval) await ctx.plugin(EvolutionApproval, { enabled: true, stageForeground: true })
   return ctx
 }

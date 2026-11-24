@@ -62,18 +62,18 @@ describe('domain → StateStore migration', () => {
       await domain.savePending({ id: 'p1', kind: 'memory', summary: 'pending', args: { a: 1 }, createdAt: '2026-01-01T00:00:00.000Z', status: 'pending' })
       await domain.saveCuratorState({ lastRunAt: 10, runCount: 1, lastSummary: 'seed', paused: false })
       const io = ctx.evolutionIo.provider()
-      await migrateDomainToStore(ctx, { io, home: evolution })
+      await migrateDomainToStore(ctx, { io })
       // A fresh process-like context: provider row, then auto.
       const restarted = await mountStateStack(evolution)
       await restarted.plugin(StorePlugin)
-      await restarted.plugin(EvolutionState, { provider: 'auto', home: evolution })
+      await restarted.plugin(EvolutionState, { provider: 'auto' })
       expect(await restarted.evolutionState.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
       expect((await restarted.evolutionState.listPending('pending')).map(row => row.id)).toEqual(['p1'])
       // Deleting the marker while a store exists is refused: store-era writes
       // may be newer than the domain, so rollback must be an explicit pin.
       await io.remove(join(evolution, 'state', STATE_MIGRATION_MARKER))
       await expect(restarted.evolutionState.loadReviewState('s1')).rejects.toThrow(/refusing to silently fall back/)
-      expect(await createStateStoreProvider({ io, home: evolution }).loadReviewState('s1')).toMatchObject({ turnsSinceMemory: 1 })
+      expect(await createStateStoreProvider({ io }).loadReviewState('s1')).toMatchObject({ turnsSinceMemory: 1 })
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous

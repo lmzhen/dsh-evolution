@@ -36,6 +36,7 @@
 | D1-OLD-PIN | FIXED | `migrate state` 通过 `EvolutionState.providerSelection()` 检测 effective provider；仍是 domain 时在结果后追加 `command.migrate state.pin` 提示（8 locale），提示改 auto/store 并重启。
 | D1-HMR | FIXED | `store-plugin` 不再缓存模块级 provider Map；每次 apply 都用当前 `ctx.evolutionIo.provider()` 构造 provider，由 `ctx.effect` 清理旧注册，HMR 替换 IO 后不会读旧 IO。
 | D1-MARKER-DEPTH | FIXED | marker 校验现在调用 `parseStateStoreImage` 做嵌套 record/curator 全量校验，空 store 也拒绝；损坏记录不再延迟到首次读。
+| D1-HOME | FIXED | `EvolutionState` 删除自定义 `home` 配置；所有生产路径统一读 `evolutionHome()`；测试专用 `DSH_EVOLUTION_HOME` 覆盖同一函数，state/domain/migration/命令不再有第二 home 源。
 | D1-STORE-PIN | FIXED | 显式 `provider: store` 现在要求 migration marker 存在并校验完整 store 镜像；缺 marker 时 mount/首次读即报错，不再把空 store 当权威。
 | D3-SETTINGS | FIXED | `SettingsPort.configure` 的 owner 统一为平台 `Fiber`，`settingsPort` 适配器不再 `unknown` cast；`gen-contract-ports --check` 仍只生成可机械派生端口。
 | D3-OTHER-PORTS | DECIDED | 其余 family-facing 端口是平台 service 的收窄子集，不能机械 `Pick`；保留手写并在 79 文档逐个说明，不为了生成器扩大平台依赖。

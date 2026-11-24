@@ -58,5 +58,7 @@ export function evolutionRoot(env: NodeJS.ProcessEnv = process.env): string {
 /** Evolution home path helper: `$DSH_HOME/evolution` for plugin-owned sidecar
  * state (reports, activity store, feedback file, state-domain data). */
 export function evolutionHome(env: NodeJS.ProcessEnv = process.env): string {
+  const override = env.DSH_EVOLUTION_HOME
+  if (override !== undefined && override.trim() !== '') return resolve(override.trim())
   return join(evolutionRoot(env), 'evolution')
 }

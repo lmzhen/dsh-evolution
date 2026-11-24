@@ -49,16 +49,13 @@ declare module '@deepseek-ai/cordis' {
 export interface Config {
   /** Pin a provider by name; `auto` picks store after the migration marker, else domain. */
   provider?: string
-  /** Evolution home override (tests/migration); defaults to `evolutionHome()`. */
-  home?: string
 }
 
 export class EvolutionState extends Service {
   static inject = ['evolutionStateStorage']
   static Config: Schema<Config> = z.object({
     provider: z.string().default(''),
-    home: z.string().default(''),
-  })
+    })
 
   private readonly providerName: string
   private readonly home: string
@@ -66,7 +63,7 @@ export class EvolutionState extends Service {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionState')
     this.providerName = config.provider ?? ''
-    this.home = config.home !== undefined && config.home !== '' ? config.home : evolutionHome()
+    this.home = evolutionHome()
     // S-07: a PINNED provider name is verified at mount when any
     // provider is already registered — a config typo used to explode only at
     // the first state access, far away from the mistake (the registry's

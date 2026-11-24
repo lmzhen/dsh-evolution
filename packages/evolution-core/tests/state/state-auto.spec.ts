@@ -21,7 +21,7 @@ describe('state provider auto', () => {
     process.env.DSH_HOME = root
     const ctx = await mountStateStack(evolution)
     await ctx.plugin(StorePlugin)
-    await ctx.plugin(EvolutionState, { provider: 'auto', home: evolution })
+    await ctx.plugin(EvolutionState, { provider: 'auto' })
     const domain = ctx.evolutionStateStorage.provider('domain')
     await domain.saveCuratorState({ lastRunAt: 1, runCount: 2, lastSummary: 'on-domain', paused: false })
     expect(await ctx.evolutionState.loadCuratorState()).toMatchObject({ lastSummary: 'on-domain' })
@@ -40,7 +40,7 @@ describe('state provider auto', () => {
     await writeStateStoreSnapshot(ctx.evolutionIo.provider(), join(evolution, 'state', 'store.json'), { review: {}, curator: null, pending: {} })
     await ctx.evolutionIo.provider().writeText(join(evolution, 'state', STATE_MIGRATION_MARKER), JSON.stringify({ target: 'store' }))
     // The state row mounts before the store provider row; it must not throw here.
-    await ctx.plugin(EvolutionState, { provider: 'auto', home: evolution })
+    await ctx.plugin(EvolutionState, { provider: 'auto' })
     await ctx.plugin(StorePlugin)
     expect(await ctx.evolutionState.loadCuratorState()).toBeNull()
   })
@@ -51,7 +51,7 @@ describe('state provider auto', () => {
     process.env.DSH_HOME = root
     const ctx = await mountStateStack(evolution)
     await ctx.plugin(StorePlugin)
-    await expect(ctx.plugin(EvolutionState, { provider: 'store', home: evolution })).rejects.toThrow(/migration marker is missing/)
+    await expect(ctx.plugin(EvolutionState, { provider: 'store' })).rejects.toThrow(/migration marker is missing/)
   })
 
   it('rejects a marker whose store has a corrupt nested record', async () => {
@@ -62,7 +62,7 @@ describe('state provider auto', () => {
     await ctx.evolutionIo.provider().writeText(join(evolution, 'state', 'store.json'), JSON.stringify({ version: 1, review: { s1: {} }, pending: {}, curator: null }))
     await ctx.evolutionIo.provider().writeText(join(evolution, 'state', STATE_MIGRATION_MARKER), JSON.stringify({ target: 'store' }))
     await ctx.plugin(StorePlugin)
-    await ctx.plugin(EvolutionState, { provider: 'auto', home: evolution })
+    await ctx.plugin(EvolutionState, { provider: 'auto' })
     expect(() => ctx.evolutionState.loadCuratorState()).toThrow(/marker\/store is missing or unreadable/)
   })
 
@@ -72,7 +72,7 @@ describe('state provider auto', () => {
     process.env.DSH_HOME = root
     const ctx = await mountStateStack(evolution)
     await ctx.plugin(StorePlugin)
-    await ctx.plugin(EvolutionState, { provider: 'auto', home: evolution })
+    await ctx.plugin(EvolutionState, { provider: 'auto' })
     await ctx.evolutionIo.provider().writeText(join(evolution, 'state', STATE_MIGRATION_MARKER), JSON.stringify({ target: 'store' }))
     expect(() => ctx.evolutionState.loadCuratorState()).toThrow(/unreadable|missing|invalid/)
     await ctx.evolutionIo.provider().writeText(join(evolution, 'state', 'store.json'), '   \n')
