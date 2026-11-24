@@ -81,6 +81,7 @@
         "gate-87"
       ],
       "specs": [
+        "evolution-activity::tests/v2-feedback.spec.ts",
         "evolution-client-kit::tests/data-table.spec.ts",
         "evolution-client-kit::tests/format.spec.ts",
         "evolution-client-kit::tests/merge-count.spec.ts",
@@ -380,6 +381,7 @@
         "evolution-activity::tests/activity-version-gate.spec.ts",
         "evolution-activity::tests/learning-graph/graph-write-gate.spec.ts",
         "evolution-activity::tests/replay/replay.spec.ts",
+        "evolution-activity::tests/v2-feedback.spec.ts",
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
@@ -1077,6 +1079,7 @@
         "evolution-activity::tests/activity-version-gate.spec.ts",
         "evolution-activity::tests/learning-graph/graph-write-gate.spec.ts",
         "evolution-activity::tests/replay/replay.spec.ts",
+        "evolution-activity::tests/v2-feedback.spec.ts",
         "evolution-approval::tests/approval.spec.ts",
         "evolution-approval::tests/expiry.spec.ts",
         "evolution-approval::tests/routes.spec.ts",
@@ -1698,6 +1701,7 @@
         "evolution-activity::tests/learning-graph/graph.spec.ts",
         "evolution-activity::tests/replay/replay.spec.ts",
         "evolution-activity::tests/threat/threat-guard.spec.ts",
+        "evolution-activity::tests/v2-feedback.spec.ts",
         "evolution-agent::tests/agent-composition.spec.ts",
         "evolution-agent::tests/row-contract.spec.ts",
         "evolution-all::tests/all.spec.ts",
@@ -2296,11 +2300,11 @@
   "counts": {
     "fast": {
       "gates": 67,
-      "specs": 149
+      "specs": 150
     },
     "pre-tag": {
       "gates": 67,
-      "specs": 460
+      "specs": 461
     },
     "ci-only": {
       "gates": 10,
@@ -2308,16 +2312,16 @@
     },
     "full(ci=off)": {
       "gates": 67,
-      "specs": 460
+      "specs": 461
     },
     "full(ci=on)": {
       "gates": 77,
-      "specs": 531
+      "specs": 532
     }
   },
   "specs": {
-    "total": 531,
-    "marked": 531,
+    "total": 532,
+    "marked": 532,
     "unmarked": 0
   }
 }
