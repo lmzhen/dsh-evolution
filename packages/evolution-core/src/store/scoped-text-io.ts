@@ -19,6 +19,7 @@ import { liveHomeFence } from '../mutation-authority.ts'
 import { StoreKernel } from './store-kernel.ts'
 import type { StoreDomainId, StoreWriterFence } from './types.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../state/constants.ts'
+import { suppressedFile, usageFile } from '../usage.ts'
 
 export interface ScopedTextIOOptions {
   /** Absolute path of the single mapped file. */
@@ -185,6 +186,22 @@ export function memoryIoIfV2(
   return scopedTextIO(
     scopedTextIO(base, { path: join(memoryRootPath, 'MEMORY.md'), domain: 'memoryFile', kernel }),
     { path: join(memoryRootPath, 'USER.md'), domain: 'userFile', kernel },
+  )
+}
+
+/** Map usage + curator-suppressed sidecars into their domains under the v2 marker. */
+export function usageSidecarIoIfV2(
+  ctx: { get?(name: string): unknown } | undefined,
+  base: EvolutionIoLike,
+  skillsRoot: string,
+  options: { readonly home?: string | undefined; readonly fence?: StoreWriterFence | undefined } = {},
+): EvolutionIoLike | undefined {
+  const home = options.home ?? join(skillsRoot, '..', 'evolution')
+  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
+  const kernel = new StoreKernel({ io: base, home, fence: options.fence ?? liveHomeFence(ctx ?? {}, home) })
+  return scopedTextIO(
+    scopedTextIO(base, { path: usageFile(skillsRoot), domain: 'usage', kernel }),
+    { path: suppressedFile(skillsRoot), domain: 'suppressed', kernel },
   )
 }
 

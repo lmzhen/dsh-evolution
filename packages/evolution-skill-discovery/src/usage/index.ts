@@ -8,7 +8,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 
-import { evolutionIoAdapter, evolutionRoot, homeFenceFrom, makeSerialQueue } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, evolutionIoAdapter, evolutionRoot, homeFenceFrom, makeSerialQueue, usageSidecarIoIfV2 } from '@deepseek-ai/dsh-evolution-core'
 import { resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core/skills'
 import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_SUPPORT_READ_TOOL_NAMES, ToolDispatchNormalizer, classifySessionEvent, isReviewChannelSession, sessionAudited, skillReadNameOf, supportFileReadOf } from '@deepseek-ai/dsh-evolution-core'
@@ -94,7 +94,11 @@ export class SkillUsageRegistry extends Service {
     // P3-17 (v14): trim like resolveSkillsRoot/evolutionRoot — a whitespace-only
     // value is truthy and used to become a CWD-relative path.
     this.eventsHome = config.eventsHome?.trim() || evolutionRoot()
-    this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+    const baseIo = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+    // R3/P1-2: under the explicit v2 marker this registry's own RMW must write
+    // the usage/suppressed domains, not a second copy of the files. The
+    // SkillLibrary wrapper alone covered only its private reads/writes.
+    this.io = usageSidecarIoIfV2(ctx, baseIo, this.root, { home: evolutionHome(), fence: homeFenceFrom(ctx) }) ?? baseIo
     // A2 observation: `session/event` DISPATCH records are the read-side
     // signal, on the same bus seam evolution-review already listens to. This
     // makes the sidecar's view counters live; names without a usage record are

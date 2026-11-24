@@ -21,7 +21,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import z from '@deepseek-ai/schemastery'
-import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, SKILL_NAME_RE, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, AUTHORING_SPLIT_LINE_CHARS } from '@deepseek-ai/dsh-evolution-core'
+import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, SKILL_NAME_RE, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, AUTHORING_SPLIT_LINE_CHARS, usageSidecarIoIfV2 } from '@deepseek-ai/dsh-evolution-core'
 import { relatedSkillNames } from '@deepseek-ai/dsh-evolution-core/skills'
 import { SystemSkillWriter, skillBodyTarget, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -415,18 +415,21 @@ export class EvolutionCurator extends Service {
     }
     // G2 S3: prefer the platform backend when the deployment mounts it (this covers the reads AND the
     // CAS-backed RMW transact); fall back to the default backend otherwise — contract C2 degradation.
-    this.io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
+    const baseIo = evolutionIoAdapter(() => ctx.evolutionIo.provider())
     // 0.5.0 (§16.7): the curator's writes (consolidate/archive) and its snapshots
     // honour the same deployment-selected stages as every other writer.
     this.skills = newSkillLibrary({ authority: authorityFrom({ origin: 'background_review' }),
       config,
-      io: this.io,
+      io: baseIo,
       ctx: this.ctx,
       limits: {
         ...DEFAULT_SKILL_LIMITS,
         ...policyStageLimits((this.ctx.get('evolutionPolicy') as { get?(): PolicyStageFields } | undefined)?.get?.()),
       },
     })
+    // P1-2: the curator's own usage/suppressed RMW must see the v2 domains; the
+    // library wrapper only covered the library's private reads/writes.
+    this.io = usageSidecarIoIfV2(ctx, baseIo, this.skills.root, { home: evolutionHome(), fence: homeFenceFrom(ctx) }) ?? baseIo
     this.config = config
     this.enabled = config.enabled ?? true
     // G3.1 (0.3.23): numeric config is clamped at assembly so a 0/negative/NaN/
