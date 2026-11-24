@@ -989,7 +989,11 @@ export class SkillLibrary {
 
   /** Transitional: serialize one target even while the root serial remains. */
   private async withTarget<T>(targetKey: string, task: () => Promise<T>): Promise<T> {
-    return await this.targetLocks.withLock(await this.canonicalTargetKey(targetKey), task)
+    try {
+      return await this.targetLocks.withLock(await this.canonicalTargetKey(targetKey), task)
+    } finally {
+      await this.flushTreeUnits()
+    }
   }
 
   /** Canonicalize several logical target keys for one lock acquisition. */

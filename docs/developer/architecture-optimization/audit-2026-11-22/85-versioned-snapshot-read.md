@@ -365,7 +365,8 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 #### R6b 已落地（方法边界发布）
 
 - `UnitKernel` 新增 `afterCommit`：只在 unit lease 释放后调用，且不把 hook 失败变成回滚（结果带 warning）。
-- `SkillLibrary` 用 `afterCommit` **只记录** `(unitId, snapshot ops)`，不立刻写 store；`withMutationLock` 在 `lease.release()` 之后再 `flushTreeUnits`，由 `publishTreeManifestFiles` 写内容对象并提交 metadata commit。
+- `SkillLibrary` 用 `afterCommit` **只记录** `(unitId, snapshot ops)`，不立刻写 store；`withMutationLock` / `withTarget` 在锁释放之后再 `flushTreeUnits`，由 `publishTreeManifestFiles` 写内容对象并提交 metadata commit。
+- 更新（`update` 等只走 `withTarget` 的路径）同样在目标锁释放后 flush；`create` 与 `update` 的端到端测试都能拿到新的 commit/tree ref。
 - 这避开了两层锁：tree unit 内层 lease 已释放、公开方法的外层 `withMutationLock` 也已释放；`create` 的端到端测试在 0.65s 内拿到 query `tree.manifest`，manifest 含 `SKILL.md`。
 - 若显式外层 HomeFence 仍被调用方持有（merge/undo/consolidate），flush 会保留队列并跳过，等下一个方法边界再发布；不自我死锁。
 - 失败模型：metadata commit 失败只 `console.warn`，树内容以 UnitKernel 快照为准；materialized tree 仍是迁移期 fallback。
