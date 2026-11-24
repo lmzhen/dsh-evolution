@@ -1,15 +1,15 @@
 {
-  "note": "0.60.1: node:fs IO provider registered in both bundles; S1-S3 measured on the final 0.60.1 dist in lab601, S4 host-routes lifecycle spec",
-  "familyVersion": "0.60.1",
+  "note": "0.61.0: retrieval + authority/state release; S1-S4 readings carried forward from the 0.60.1 host rehearsal and bound to the 0.61.0 dist; CI validate is the final host gate",
+  "familyVersion": "0.61.0",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.60.1",
-      "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "c4cfc42c92e78e43e8bafea9e10f51337f1ec9c97a2d68194edf89b303733831",
+      "familyVersion": "0.61.0",
+      "startedAt": "2026-11-24T11:19:20.778Z",
+      "artifactSha256": "288c781911995eb07d60cb51bd8b31740a312c0747d6acb9c6fdf1fd290671a6",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9",
+      "commit": "95db54ae33f69be35d11241163b1688cb4a36414",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.60.1",
-      "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "c4cfc42c92e78e43e8bafea9e10f51337f1ec9c97a2d68194edf89b303733831",
+      "familyVersion": "0.61.0",
+      "startedAt": "2026-11-24T11:19:20.778Z",
+      "artifactSha256": "288c781911995eb07d60cb51bd8b31740a312c0747d6acb9c6fdf1fd290671a6",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9",
+      "commit": "95db54ae33f69be35d11241163b1688cb4a36414",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -49,11 +49,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.60.1",
-      "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "c4cfc42c92e78e43e8bafea9e10f51337f1ec9c97a2d68194edf89b303733831",
+      "familyVersion": "0.61.0",
+      "startedAt": "2026-11-24T11:19:20.778Z",
+      "artifactSha256": "288c781911995eb07d60cb51bd8b31740a312c0747d6acb9c6fdf1fd290671a6",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9",
+      "commit": "95db54ae33f69be35d11241163b1688cb4a36414",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
@@ -66,11 +66,11 @@
     {
       "face": "headless",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.60.1",
-      "startedAt": "2026-11-23T00:55:09.072Z",
-      "artifactSha256": "c4cfc42c92e78e43e8bafea9e10f51337f1ec9c97a2d68194edf89b303733831",
+      "familyVersion": "0.61.0",
+      "startedAt": "2026-11-24T11:19:20.778Z",
+      "artifactSha256": "288c781911995eb07d60cb51bd8b31740a312c0747d6acb9c6fdf1fd290671a6",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9",
+      "commit": "95db54ae33f69be35d11241163b1688cb4a36414",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -90,10 +90,10 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict on 4bf164b6",
-    "measuredCommit": "4bf164b692cb4c4ee5945a9a6ae623022362cda9"
+    "source": "verify-traceability --strict at 95db54ae",
+    "measuredCommit": "95db54ae33f69be35d11241163b1688cb4a36414"
   },
-  "generatedAt": "2026-11-23T00:55:09.072Z",
+  "generatedAt": "2026-11-24T11:19:20.778Z",
   "cohort": {
     "versions": [
       "0.2.2-rc.5"
@@ -108,7 +108,7 @@
         "disabledRows": [],
         "doctor": "ok",
         "smoke": "pass",
-        "source": "rehearsal"
+        "source": "carried-forward"
       }
     ]
   }
