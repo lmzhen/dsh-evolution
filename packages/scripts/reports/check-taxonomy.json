@@ -153,6 +153,7 @@
         "evolution-core::tests/state/state-auto.spec.ts",
         "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
+        "evolution-core::tests/store/store-kernel.spec.ts",
         "evolution-core::tests/target-writer.spec.ts",
         "evolution-core::tests/text-budgets.spec.ts",
         "evolution-core::tests/text-metrics.spec.ts",
@@ -521,6 +522,7 @@
         "evolution-core::tests/state/state.spec.ts",
         "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
+        "evolution-core::tests/store/store-kernel.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
@@ -1210,6 +1212,7 @@
         "evolution-core::tests/state/state.spec.ts",
         "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
+        "evolution-core::tests/store/store-kernel.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
@@ -1837,6 +1840,7 @@
         "evolution-core::tests/state/state.spec.ts",
         "evolution-core::tests/state/store-migration.spec.ts",
         "evolution-core::tests/state/store-provider.spec.ts",
+        "evolution-core::tests/store/store-kernel.spec.ts",
         "evolution-core::tests/subagent-channel.spec.ts",
         "evolution-core::tests/support-file-cap.spec.ts",
         "evolution-core::tests/support-remove-entry.spec.ts",
@@ -2264,11 +2268,11 @@
   "counts": {
     "fast": {
       "gates": 66,
-      "specs": 143
+      "specs": 144
     },
     "pre-tag": {
       "gates": 66,
-      "specs": 454
+      "specs": 455
     },
     "ci-only": {
       "gates": 10,
@@ -2276,16 +2280,16 @@
     },
     "full(ci=off)": {
       "gates": 66,
-      "specs": 454
+      "specs": 455
     },
     "full(ci=on)": {
       "gates": 76,
-      "specs": 525
+      "specs": 526
     }
   },
   "specs": {
-    "total": 525,
-    "marked": 525,
+    "total": 526,
+    "marked": 526,
     "unmarked": 0
   }
 }

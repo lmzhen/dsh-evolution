@@ -11,6 +11,7 @@
 
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
+import { isRecord } from '../guards.ts'
 import type { EvolutionIoLike } from '../io.ts'
 import {
   STORE_DOMAIN_IDS,
@@ -37,9 +38,6 @@ const COMMITS_DIR = 'commits'
 const OBJECTS_DIR = 'objects'
 
 const DOMAIN_IDS: ReadonlySet<string> = new Set(STORE_DOMAIN_IDS)
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const isDomainId = (value: string): value is StoreDomainId => DOMAIN_IDS.has(value)
 
