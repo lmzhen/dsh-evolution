@@ -264,6 +264,15 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
     const suppressedText = await io.exists(suppressedPath) ? await io.readText(suppressedPath) : null
     const feedbackPath = join(home, 'feedback.json')
     const feedbackText = await io.exists(feedbackPath) ? await io.readText(feedbackPath) : null
+    const discoveryPaths = {
+      domainMap: join(home, 'domain-map.json'),
+      projectionJournal: join(home, 'projection-journal.json'),
+      viewSnapshots: join(home, 'view-snapshots.json'),
+    } as const
+    const discoveryText = async (path: string): Promise<string | null> => await io.exists(path) ? await io.readText(path) : null
+    const domainMapText = await discoveryText(discoveryPaths.domainMap)
+    const projectionJournalText = await discoveryText(discoveryPaths.projectionJournal)
+    const viewSnapshotsText = await discoveryText(discoveryPaths.viewSnapshots)
     return await kernel.bootstrap({
       state: document,
       ...(runs === undefined ? {} : { runs }),
@@ -273,6 +282,9 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
       ...(usageText === null ? {} : { usage: { text: usageText } }),
       ...(suppressedText === null ? {} : { suppressed: { text: suppressedText } }),
       ...(feedbackText === null ? {} : { feedback: { text: feedbackText } }),
+      ...(domainMapText === null ? {} : { domainMap: { text: domainMapText } }),
+      ...(projectionJournalText === null ? {} : { projectionJournal: { text: projectionJournalText } }),
+      ...(viewSnapshotsText === null ? {} : { viewSnapshots: { text: viewSnapshotsText } }),
     }, 'bootstrap')
   })
   await writeMarker(source, result.commitId, snapshot)

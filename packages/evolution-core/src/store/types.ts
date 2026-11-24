@@ -20,6 +20,9 @@ export const STORE_DOMAIN_IDS = [
   'feedback',
   'memory',
   'discovery',
+  'domainMap',
+  'projectionJournal',
+  'viewSnapshots',
   'reports',
 ] as const
 

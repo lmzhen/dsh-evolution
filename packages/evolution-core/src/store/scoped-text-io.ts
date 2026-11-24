@@ -172,8 +172,7 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
   return adapter
 }
 
-/** Select a mapped merge-state IO only after the explicit v2 marker; otherwise the file stays. */
-export function mergeStateIoIfV2(
+/** Select the merge-state bridge after the explicit v2 marker; otherwise the file stays. */export function mergeStateIoIfV2(
   ctx: { get?(name: string): unknown } | undefined,
   base: EvolutionIoLike,
   home: string,
@@ -186,4 +185,29 @@ export function mergeStateIoIfV2(
     fence: fence ?? liveHomeFence(ctx ?? {}, home),
   })
   return scopedTextIO(base, { path: join(home, 'merge', 'merge-state.json'), domain: 'merge', kernel })
+}
+
+export interface DiscoveryPaths {
+  readonly domainMap: string
+  readonly projectionJournal: string
+  readonly viewSnapshots: string
+}
+
+/** Map the three discovery JSON documents into their own domains under the v2 marker. */
+export function discoveryIoIfV2(
+  ctx: { get?(name: string): unknown } | undefined,
+  base: EvolutionIoLike,
+  home: string,
+  paths: DiscoveryPaths,
+  fence?: StoreWriterFence | undefined,
+): EvolutionIoLike | undefined {
+  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
+  const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
+  return scopedTextIO(
+    scopedTextIO(
+      scopedTextIO(base, { path: paths.domainMap, domain: 'domainMap', kernel }),
+      { path: paths.projectionJournal, domain: 'projectionJournal', kernel },
+    ),
+    { path: paths.viewSnapshots, domain: 'viewSnapshots', kernel },
+  )
 }

@@ -127,6 +127,21 @@ describe('MVCC state provider', () => {
     expect(snapshot.domains.feedback).toEqual({ text: '{"version":2,"lastSeq":0,"skills":{},"sessions":{}}\n' })
   })
 
+  it('migrates discovery documents into the same first commit', async () => {
+    const root = await tempRoot('dsh-state-v2-discovery-')
+    const ctx = await mountStateStack(root)
+    const io = ctx.evolutionIo.provider()
+    await writeFile(join(root, 'domain-map.json'), '{"schemaVersion":1,"mapVersion":"1","updatedAt":1,"domains":[],"edges":[]}\n')
+    await writeFile(join(root, 'projection-journal.json'), '{"schemaVersion":1,"records":{}}\n')
+    await writeFile(join(root, 'view-snapshots.json'), '{"schemaVersion":1,"sessions":{}}\n')
+    await migrateStateToV2(ctx, { io, home: root })
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    const snapshot = await kernel.query(['domainMap', 'projectionJournal', 'viewSnapshots'])
+    expect(snapshot.domains.domainMap).toEqual({ text: '{"schemaVersion":1,"mapVersion":"1","updatedAt":1,"domains":[],"edges":[]}\n' })
+    expect(snapshot.domains.projectionJournal).toEqual({ text: '{"schemaVersion":1,"records":{}}\n' })
+    expect(snapshot.domains.viewSnapshots).toEqual({ text: '{"schemaVersion":1,"sessions":{}}\n' })
+  })
+
   it('reads while the legacy state.lock is held because locking is internal', async () => {
     const { root, io, fence } = await seeded()
     const ctx = await mountStateStack(root)

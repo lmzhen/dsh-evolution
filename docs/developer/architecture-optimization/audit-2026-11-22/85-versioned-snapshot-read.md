@@ -332,6 +332,13 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：v2 sidecar 迁移 7 tests、feedback bridge 1 test、scoped text/tree 3 tests 通过；`tsc` core/activity/merge 0。
 - 尚未做：discovery projection 与 memory 正文树、usage 事件化；R4b/R5 继续。
 
+#### R4b 已落地（discovery 文档）
+
+- `domain-map.json`、`projection-journal.json`、`view-snapshots.json` 在 v2 marker 下分别映射到 `domainMap`、`projectionJournal`、`viewSnapshots` 域；`discoveryIoIfV2` 在 main-entry 包住 IO，三个 Store 的代码不改。
+- `--to v2` 首 commit 同时迁移这三个默认路径的文件；自定义路径仍由各自 adapter 按 v2 域读写。
+- 测试：v2 state/migration 7 tests 覆盖三域迁移；`tsc` core/discovery 0。
+- 尚未做：memory 正文树（R4c）与 activity append 分段（R5）。
+
 
 ## 6. 域与读写分类
 

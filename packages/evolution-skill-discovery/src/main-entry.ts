@@ -8,7 +8,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 // platform-declaration anchor: this composition probes skills/workingDirectory/tools/evolutionIo/systemPrompt; all are declared in core PLATFORM_SERVICE_PROBES.
-import { authorityFrom, evolutionIoAdapter, evolutionRoot, liveHomeFence, type EvolutionIoLike, type EvolutionProjectionHistoryState } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, discoveryIoIfV2, evolutionIoAdapter, evolutionRoot, liveHomeFence, type EvolutionIoLike, type EvolutionProjectionHistoryState } from '@deepseek-ai/dsh-evolution-core'
 import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { LlmTextService } from './domain-generation-llm.ts'
@@ -142,10 +142,18 @@ export function apply(ctx: Context, config: Config): void {
   if (mode === 'off') return
 
   const fence = liveHomeFence(ctx as unknown as { get(name: string): unknown }, join(root, 'evolution'))
-  const map = new DomainMapFileStore(io, config.domainMapPath ?? join(root, 'evolution', 'domain-map.json'), undefined, fence)
+  const domainMapPath = config.domainMapPath ?? join(root, 'evolution', 'domain-map.json')
+  const projectionJournalPath = config.projectionJournalPath ?? join(root, 'evolution', 'projection-journal.json')
+  const viewSnapshotPath = config.viewSnapshotPath ?? join(root, 'evolution', 'view-snapshots.json')
+  const storeIo = discoveryIoIfV2(ctx, io, join(root, 'evolution'), {
+    domainMap: domainMapPath,
+    projectionJournal: projectionJournalPath,
+    viewSnapshots: viewSnapshotPath,
+  }, fence) ?? io
+  const map = new DomainMapFileStore(storeIo, domainMapPath, undefined, fence)
   const descriptionStaleAfterHours = config.descriptionStaleAfterHours ?? 24 * 7
-  const journal = new ProjectionJournal(io, config.projectionJournalPath ?? join(root, 'evolution', 'projection-journal.json'), { ...(fence === undefined ? {} : { fence }) })
-  const snapshots = new ViewSnapshotStore(io, config.viewSnapshotPath ?? join(root, 'evolution', 'view-snapshots.json'), fence)
+  const journal = new ProjectionJournal(storeIo, projectionJournalPath, { ...(fence === undefined ? {} : { fence }) })
+  const snapshots = new ViewSnapshotStore(storeIo, viewSnapshotPath, fence)
   const globalPolicy: DomainPolicyLayer = { mode, pinDomains: config.pinDomains, disableDomains: config.disableDomains }
   const policy = new DomainPolicyStore({ global: globalPolicy, ...config.workspacePolicy === undefined ? {} : { workspace: config.workspacePolicy }, ...config.scopePolicy === undefined ? {} : { scope: config.scopePolicy } })
   const readLayer = async (cwd: string, path: string | undefined): Promise<DomainPolicyLayer | undefined> => {
