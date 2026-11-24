@@ -476,7 +476,9 @@ rewriteScopedScripts(staged, familyNames)
         // A code-split chunk may also be named after the SOURCE BASENAME only
         // (`ensure-DEWwc877.js` for `src/composition/ensure.ts`). Resolve a unique basename match;
         // an ambiguous or missing basename stays an orphan (never silently accepted).
-        const stem = module.slice(0, module.indexOf('-') > 0 ? module.indexOf('-') : undefined)
+        // Use the LAST hyphen as the hash separator: `scoped-text-io-<hash>` has
+        // hyphens inside the basename, and the first-hyphen form cut it to `scoped`.
+        const stem = module.includes('-') ? module.slice(0, module.lastIndexOf('-')) : module
         const basenameMatches = [...sourceModules].filter((candidate) => candidate === stem || candidate.endsWith('/' + stem))
         if (basenameMatches.length === 1) continue
         orphans.push(`lib/${raw}`)
