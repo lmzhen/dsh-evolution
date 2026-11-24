@@ -732,6 +732,16 @@ export const HOST_COMMANDS = {
       "de": "Migration fehlgeschlagen: {message}",
       "ru": "Миграция не удалась: {message}",
       "pt": "A migração falhou: {message}"
+    },
+    "command.migrate state.pin": {
+      "zh": "迁移已完成，但当前仍固定使用 domain；请把 evolution-state.provider 改为 auto 或 store，重启后才会使用 store。",
+      "en": "Migration is complete, but the provider is still pinned to domain. Set evolution-state.provider to auto or store and restart to use the store.",
+      "ja": "移行は完了しましたが、provider はまだ domain に固定されています。evolution-state.provider を auto または store に変更し、再起動すると store が使われます。",
+      "es": "La migración terminó, pero el provider sigue fijado en domain. Cambia evolution-state.provider a auto o store y reinicia para usar el store.",
+      "fr": "La migration est terminée, mais le provider reste fixé sur domain. Passez evolution-state.provider à auto ou store, puis redémarrez pour utiliser le store.",
+      "de": "Die Migration ist abgeschlossen, aber der Provider ist weiterhin auf domain festgelegt. Setze evolution-state.provider auf auto oder store und starte neu, um den Store zu verwenden.",
+      "ru": "Миграция завершена, но provider по-прежнему закреплён за domain. Установите evolution-state.provider в auto или store и перезапустите, чтобы использовать store.",
+      "pt": "A migração terminou, mas o provider continua fixo em domain. Altere evolution-state.provider para auto ou store e reinicie para usar o store."
     }
   } as const
 

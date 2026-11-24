@@ -177,6 +177,13 @@ export class EvolutionState extends Service {
     return this.ctx.evolutionStateStorage.provider(name || undefined)
   }
 
+  /** Effective provider after `auto` resolves, for operator diagnostics. */
+  providerSelection(): { configured: string; effective: string } {
+    const configured = this.providerName === '' ? 'auto' : this.providerName
+    this.assertResolvable()
+    return { configured, effective: this.providerName === 'auto' ? this.autoProviderName() : this.providerName }
+  }
+
   /** A2: refresh the mounted provider before a decision reads pending state. */
   reload(): Promise<void> {
     return this.run(async () => this.storage().reload?.() ?? Promise.resolve())
