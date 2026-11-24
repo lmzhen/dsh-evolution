@@ -6,7 +6,7 @@ D1b 后 `evolution-state` 使用 `provider: auto`：
 
 - 没有迁移 marker ⇒ `domain`；
 - 执行 `/evolution migrate state` 写 marker ⇒ 重启后 `store`；
-- 旧 domain 数据从未删除，回退是删 marker + 重启。
+- 旧 domain 数据从未删除；回退是显式 pin `domain` + 重启，不能只删 marker。
 
 ## 为什么本版不能删 domain
 
@@ -19,7 +19,7 @@ D1b 后 `evolution-state` 使用 `provider: auto`：
 - 11-target 要求删除 domain-cache authority；本版只做到“迁移完成后不再是 authority”，**代码/row 仍在**；
 - 触发删除：迁移命令有实际使用证据（marker/运行记录）后；
 - 删除动作：移除 `evolution-state-domain` row、domain provider 模块、storage-domain family 依赖，并把 `auto` 简化为 `store`（或保留 auto 兼容已迁移用户）；
-- 回退：删除前一个版本仍可切回 domain，数据未被修改。
+- 回退：显式把 `evolution-state.provider` 设为 `domain`；**不要通过删除 marker 回退**——store 可能已有迁移后新写，删除 marker 会让 auto 拒绝启动（防止静默丢 store-era 写）。
 
 ## 对最终发布门的影响
 

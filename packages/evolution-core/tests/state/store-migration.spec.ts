@@ -69,9 +69,10 @@ describe('domain → StateStore migration', () => {
       await restarted.plugin(EvolutionState, { provider: 'auto', home: evolution })
       expect(await restarted.evolutionState.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
       expect((await restarted.evolutionState.listPending('pending')).map(row => row.id)).toEqual(['p1'])
-      // Rollback is removing the marker: the domain data was never touched.
+      // Deleting the marker while a store exists is refused: store-era writes
+      // may be newer than the domain, so rollback must be an explicit pin.
       await io.remove(join(evolution, 'state', STATE_MIGRATION_MARKER))
-      expect(await restarted.evolutionState.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
+      await expect(restarted.evolutionState.loadReviewState('s1')).rejects.toThrow(/refusing to silently fall back/)
       expect(await createStateStoreProvider({ io, home: evolution }).loadReviewState('s1')).toMatchObject({ turnsSinceMemory: 1 })
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME

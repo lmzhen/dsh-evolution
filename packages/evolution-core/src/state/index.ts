@@ -145,6 +145,10 @@ export class EvolutionState extends Service {
       this.assertMarkerStore()
       return PROVIDER_STORE
     }
+    const storePath = join(this.home, 'state', 'store.json')
+    if (existsSync(storePath)) {
+      throw new Error('evolution-state: store exists but the migration marker is missing; refusing to silently fall back to domain and lose store-era writes. Pin provider: domain explicitly to roll back.')
+    }
     if (names.includes(PROVIDER_DOMAIN)) return PROVIDER_DOMAIN
     throw new Error('evolution-state: auto has no migration marker and no "' + PROVIDER_DOMAIN + '" provider; refusing to guess a state authority')
   }
