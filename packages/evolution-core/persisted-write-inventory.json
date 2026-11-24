@@ -41,7 +41,7 @@
       "id": "store-v2-head",
       "path": "<evolutionHome>/store-v2/head.json",
       "writer": "evolution-core/src/store/store-kernel.ts",
-      "serializedBy": "HomeFence + atomic replace",
+      "serializedBy": "platform-file-lock",
       "marker": "join(this.root, HEAD_FILE)",
       "state": [],
       "note": "The single mutable MVCC head pointer. Writers hold the one HomeFence; readers never take it. Atomic replace exposes either the old or the new complete head."
@@ -50,7 +50,7 @@
       "id": "store-v2-commits",
       "path": "<evolutionHome>/store-v2/commits/<sha256>.json",
       "writer": "evolution-core/src/store/store-kernel.ts",
-      "serializedBy": "HomeFence + immutable create",
+      "serializedBy": "platform-file-lock",
       "marker": "join(this.root, COMMITS_DIR, commit.commitId + '.json')",
       "state": [],
       "note": "Immutable commit manifests. Written before head; never overwritten."
@@ -59,7 +59,7 @@
       "id": "store-v2-objects",
       "path": "<evolutionHome>/store-v2/objects/<sha256>.json",
       "writer": "evolution-core/src/store/store-kernel.ts",
-      "serializedBy": "HomeFence + content-addressed create",
+      "serializedBy": "platform-file-lock",
       "marker": "join(this.root, OBJECTS_DIR, objectId + '.json')",
       "state": [],
       "note": "Immutable content objects addressed by sha256; readers resolve them from one commit without a lock."
