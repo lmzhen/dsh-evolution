@@ -1,18 +1,14 @@
 // @tier pre-tag
 import { describe, expect, it } from 'vitest'
 import { spawn } from 'node:child_process'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { join } from 'node:path'
 import { HomeFence } from '../../src/home-fence.ts'
 import { nodeEvolutionIo } from '../../src/io.ts'
 import { StoreKernel } from '../../src/store/store-kernel.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 
-const libUrl = (file: string): string => pathToFileURL(fileURLToPath(new URL('../../lib/' + file, import.meta.url))).href
-
 function readInChild(home: string): Promise<string> {
   const script = [
-    'import { StoreKernel, nodeEvolutionIo } from ' + JSON.stringify(libUrl('index.js')) + ';',
+    'import { StoreKernel, nodeEvolutionIo } from "@deepseek-ai/dsh-evolution-core";',
     'const kernel = new StoreKernel({ io: nodeEvolutionIo(), home: process.argv[1] });',
     'const snapshot = await kernel.query(["state"]);',
     'process.stdout.write(JSON.stringify(snapshot.domains.state));',
