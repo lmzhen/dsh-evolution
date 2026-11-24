@@ -1,0 +1,585 @@
+# 85 版本化快照无锁读与统一读写内核
+
+状态：设计基线（DCR-85）。本文取代 80-p2-ledger §D1-LOCK-READ 的“只读独占锁”过渡决策，作为下一阶段 HomeFS/StateStore/Projection 的落地设计。本文不改已发布的 0.61.0；实施从 0.62.0 开始，按阶段迁移。
+
+## 1. 结论
+
+不要再给 `state.lock` 加共享读锁，也不要在每个 plugin 里继续手写“读文件 + 自己加锁 + 自己拼快照”。
+
+目标模型只有一个：
+
+> **Home MVCC Store：写入串行、提交不可变、读取无锁。**
+
+- 每个持久域（review/pending/curator、merge、runs、usage、feedback、memory、discovery、reports）是一组不可变对象；
+- 所有对象由内容哈希寻址；
+- 一次逻辑写入生成一个不可变 `commit`；
+- `head.json` 是唯一的可变指针，原子替换；
+- 读只读 `head -> commit -> objects`，从不获取跨进程读锁；
+- 写只获取一个短 writer lock，提交完成前旧 `head` 始终可读；
+- 多文件技能树仍由 `UnitKernel + HomeFence` 保证事务；其 tree unit 作为 commit 的 `tree` 摘要进入同一快照；
+- 大模型工具、host 命令、UI 按钮、内部事件全部走同一对 `query / command` 端口，不再直接读写文件。
+
+这样读写只有一个机制，而不是“state 一种锁、merge 一种 fence、usage 一种队列、UI 一种 fetch”。
+
+## 2. 范围
+
+本设计覆盖插件全量提供读写行为的表面：
+
+1. 模型工具：`skill_manage`、`memory`、`skill_search`、`merge_stage`、maintenance probe；
+2. host 命令：`/evolution` 全部子命令、`/evolution merge` 全部子命令、learning-graph 命令；
+3. UI/按钮：设置页、合并建议页、审批页、技能历史、技能健康、诊断；
+4. 内部副作用：usage 记录、activity、feedback、review/curator/approval、projection、报告和 run registry；
+5. 平台侧：`ctx.fs`、`@deepseek-ai/dsh-atomic-write`、`ctx.evolutionIo`、`ctx.credentials`、`ctx.settings`、`remote`、tools/commands 注册与 UI slot。
+
+不覆盖：平台会话日志、平台 settings/credentials 的内部存储、模型 provider、MCP 自身。
+
+## 3. 现状证据
+
+### 3.1 平台侧
+
+- `@deepseek-ai/dsh-atomic-write` 的 `withFileLock` 是 `wx` 独占 lock 文件；没有共享读锁。它只适合 writer lock，不能作为“无锁读”的基础。
+- `packages/fs/fs-local` 有 per-targetKey promise 队列和 `writeFileAtomic`，适用于单文件/多目标文件的原子发布；它没有跨文件快照和 home 级事务。
+- `ctx.fs` 的 `readText` 不加锁；写入由 `fs-local.writeText` 在 target 锁内完成。平台自身的 `tool-fs` 在每次调用时解析 `ctx.fs`，不冻结服务。
+- 平台 `skills`/`skill-filesystem` 是只读 provider registry；没有 `skill_manage` 写路径。
+- 平台 settings/credentials 是独立服务，UI 只通过 remote 调用；不应被 family store 复制。
+
+### 3.2 插件侧
+
+- `EvolutionState`：`state/store.json` 是完整镜像，`withFileLock(state/state.lock)`；所有读也走锁。domain provider 保留迁移窗口。
+- `SkillLibrary`：写走 `UnitKernel` + `HomeFence`/`MutationAuthority`；读走 `readText`/目录树。authority 已改为写时解析（0.61.0）。
+- `MergeUnitTransactions`：tree fence + target claim + journal/snapshot；状态和 journal、runs、reports 是多个文件。
+- `evolution-commands`：run registry、report、maintain 状态、handoff 走多个文件与 `transactIo`。
+- `evolution-activity`/`feedback`/`usage`：分别有 JSONL/侧车/RMW 队列，读路径不统一。
+- `evolution-skill-discovery`：domain map/projection/journal/snapshot 各有自己的 fence。
+- UI 通过 `host routes` 读取这些文件派生出的 view；按钮通过 command/remote 写入。
+- 多处长生命周期对象以前构造时冻结 authority/fence（0.61.0 已改为 use-time accessor）；说明“在构造函数里捕获运行时服务”本身是结构性风险。
+
+## 4. 问题本质
+
+不是某一把锁不够快，而是：
+
+1. **读路径需要一致性**，但平台没有共享读锁；
+2. **写路径是分散的**，每个包自己决定文件、锁、fence、serial、journal；
+3. **读和写没有共同提交点**，读者可能看到 state、merge、runs 的混合版本；
+4. **UI、命令、工具各自实现读取**，同一状态的语义容易漂移；
+5. **长迁移/长写会阻塞所有读**，因为没有“旧快照继续可读”的概念；
+6. **故障恢复靠各文件各自处理**，没有统一的“最后一个完整 commit”。
+
+因此局部优化（共享读锁、读超时、缓存、readTextOrNull）都只能减少症状，不能减少机制数量。
+
+## 5. 目标模型：Home MVCC Store
+
+### 5.1 目录
+
+```text
+<evolutionHome>/store-v2/
+  head.json                     # 唯一可变指针（原子替换）
+  commits/<commitId>.json       # 不可变 commit manifest
+  objects/<sha256>.json         # 不可变内容对象
+  locks/commit.lock             # 跨进程 writer lock
+  logs/activity/<segment>.jsonl  # 追加日志（非 MVCC）
+  tmp/                          # 原子写临时文件（平台写实现）
+```
+
+`head.json`：
+
+```json
+{
+  "schemaVersion": 1,
+  "commitId": "01J...",
+  "commitSha256": "…",
+  "updatedAt": "2026-…"
+}
+```
+
+`commits/<commitId>.json`：
+
+```json
+{
+  "schemaVersion": 1,
+  "commitId": "01J...",
+  "parent": "01H...",
+  "createdAt": "2026-…",
+  "domains": {
+    "state": "sha256:…",
+    "merge": "sha256:…",
+    "runs": "sha256:…",
+    "usage": "sha256:…",
+    "feedback": "sha256:…",
+    "memory": "sha256:…",
+    "discovery": "sha256:…",
+    "reports": "sha256:…"
+  },
+  "tree": {
+    "unitId": "…",
+    "manifest": "sha256:…"
+  },
+  "source": "foreground|background_review|command|ui|tool"
+}
+```
+
+`objects/<sha>.json` 是纯内容；同一内容只写一次。`tree` 可为空；有 tree 的提交表示这次提交同时发布了一个技能树 unit。
+
+### 5.2 写入算法
+
+所有写命令只有一个入口：
+
+```text
+command(input, {expectedHead?})
+  -> acquire commit.lock (withFileLock, bounded wait)
+  -> read head + commit（若不存在则从 legacy bootstrap）
+  -> validate expectedHead（可选 CAS）
+  -> run domain mutator on immutable previous values
+  -> write changed objects with createTextIfAbsent(objects/<sha>)
+  -> build full domain map = previous domains + changed
+  -> write commits/<newCommitId>.json (immutable)
+  -> atomically replace head.json
+  -> release lock
+  -> return {commitId, values}
+```
+
+规则：
+
+- **对象先写，head 后写**：head 不指向半成品；
+- `createTextIfAbsent` 保证内容对象不被覆盖；
+- `head.json` 用平台原子写（临时文件 + rename）；
+- `commit.lock` 只包住“读 head → 写 head”，不覆盖长时间模型调用/文件扫描；
+- 长任务（scan、review、maintain）把“准备阶段”放在锁外，只把最终提交放在锁内；
+- 需要多文件技能树的命令先 `UnitKernel.prepare`，再提交 tree unit，最后发布 head；tree unit 的 journal 是恢复权威；
+- 一个 commit 失败：只要 head 未替换，旧 commit 完整可读；孤儿对象由 GC 清理；
+- 不必写 temp 再 rename 整个目录；平台 `writeFileAtomic` 负责单文件原子发布。
+
+### 5.3 读取算法
+
+```text
+query({domains?})
+  -> read head.json
+  -> read commits/<head.commitId>.json
+  -> validate commitSha256
+  -> for each requested domain: read objects/<sha>
+  -> validate sha
+  -> return {commitId, values, tree}
+```
+
+- **不取 commit.lock，不取 HomeFence，不做 state.lock**。
+- head 在查询中途变化不影响结果：读者已拿到一个完整 commit；
+- 下一次查询自然看到新 head；
+- 如果 head/commit/object 读失败：有限重试（读取 head 后重读 head，最多 3 次），仍失败则 **fail closed**，绝不把空对象当默认值；
+- 进程内可以按 `sha` 缓存已解析对象；对象不可变，缓存无需失效；
+- 读自己的写：command 返回 `commitId`；同一进程立即 query 能看到该 head（因为 head 在 command 返回前已更新）。
+
+### 5.4 多域一致性
+
+commit 保存的是 **一个完整 domain map**，而不是增量。
+
+- 一次命令修改 state + merge + runs，读者在同一个 commitId 下看到三者同版本；
+- 不需要每个域各有一个 current 指针，也不需要读者拼三个指针；
+- 未变化域复用上一个 commit 的 object sha；不会重复写；
+- 代价是一个 commit 最多写一个 manifest，可接受。
+
+这是本设计相对“每域 current 文件”的关键简化：**一个 head，天然多域一致**。
+
+### 5.5 锁顺序
+
+固定顺序，不允许反向：
+
+```text
+HomeFence (tree/unit writes, when needed)
+  -> store-v2/commit.lock
+```
+
+- 只写 metadata 的命令只取 `commit.lock`；
+- 写技能树的命令先 `HomeFence` 再 `commit.lock`；
+- 读不取任何锁；
+- 禁止在 `commit.lock` 内调用模型、review 子代理、长时间扫描；
+- 禁止在 `HomeFence` 内反过来取另一个 home 的 store lock。
+
+### 5.6 GC
+
+- 保留最近 `N=64` 个 commit，或 7 天，取较大者；
+- 从 head 沿 parent 链保留引用；
+- 不再被任何保留 commit 引用的 object 才删除；
+- GC 在 commit.lock 内只做“候选计算”，删除可以 best-effort；删除失败只告警；
+- GC 永远不删除当前 head 或其直接 parent；
+- 崩溃留下孤儿 object 是安全的，只会占空间。
+
+## 6. 域与读写分类
+
+并不是所有东西都塞进 MVCC。按语义分三类，避免过度设计。
+
+### 6.1 快照域（MVCC）
+
+- `state`：review sessions、pending、curator state；
+- `merge`：merge rows、schema state、staging index 摘要；
+- `runs`：run registry 快照；
+- `usage`：usage map；
+- `feedback`：feedback store；
+- `discovery`：domain map/projection/journal/snapshot 的合并视图；
+- `memory`：memory 索引/元数据（正文大文件可继续按 target 原子写）；
+- `reports`：报告引用（报告正文可放 object 或保持文件，commit 存 digest）。
+
+这些域由同一 commit 发布。
+
+### 6.2 追加域（append-only）
+
+- `activity`、event log、usage observation 事件。
+
+保留 JSONL/segment，不进入 commit：
+
+- 追加写由单 writer serial queue 完成；
+- 读按“读到 EOF 的不可变前缀”返回；
+- 轮转产生新 segment，旧 segment 不可变；
+- commit 只引用当前 segment 的 id/offset（可选），不复制日志；
+- 读日志不需要锁，不需要 MVCC。
+
+### 6.3 大对象域
+
+- 技能正文、support file、报告正文、历史版本 blob。
+
+继续用内容寻址 object 或平台/文件系统原子写：
+
+- 写入前先写 blob（`objects/<sha>` 或 `.archive`）；
+- commit 只引用 sha；
+- 读按 sha 读，无锁；
+- 删除由 GC 做引用计数。
+
+## 7. 技能树与 UnitKernel
+
+技能树不是简单的 JSON，不能强行塞进 store。
+
+保留：
+
+- `UnitKernel` 的 lock/claim/journal/snapshot/recover；
+- `HomeFence` 的跨进程树锁；
+- `SkillLibrary` 的 `prepare/commit` 两阶段；
+- 写时 authority accessor（0.61.0 已落地）。
+
+新增：
+
+- 每次成功的 tree unit 产生一个 **tree manifest object**：`{unitId, entries:[{path, blobSha, mode}], digest}`；
+- commit 的 `tree` 字段引用该 manifest；
+- query 返回 `tree`；模型/UI 读技能时先读 manifest 再读 blob；
+- 迁移期仍可读 materialized 文件；manifest 是长期权威；
+- tree unit 的 journal 是恢复权威，commit 不替代它；
+- tree unit 与 metadata commit 的先后：tree unit 提交成功 → metadata commit；若 metadata commit 失败，tree unit 已是可见写，必须由 recovery 标记/重试，不静默丢失。
+
+## 8. 统一端口
+
+### 8.1 插件内部
+
+```ts
+interface EvolutionStore {
+  query<T>(request: StoreQuery): Promise<StoreSnapshot<T>>
+  mutate<T>(request: StoreMutation<T>): Promise<StoreCommitResult<T>>
+  watch?(listener: (commitId: string) => void): () => void
+}
+
+type DomainId =
+  | 'state' | 'merge' | 'runs' | 'usage'
+  | 'feedback' | 'memory' | 'discovery' | 'reports'
+
+interface StoreSnapshot<T = Record<DomainId, unknown>> {
+  readonly commitId: string
+  readonly domains: T
+  readonly tree: TreeRef | null
+}
+
+interface StoreMutation<T> {
+  readonly domains: readonly DomainId[]
+  readonly expectedHead?: string
+  readonly source: 'tool' | 'command' | 'ui' | 'background'
+  readonly mutate: (previous: T) => T | Promise<T>
+  readonly tree?: TreeUnitRef
+}
+```
+
+实现骨架（`evolution-core/src/store/store-kernel.ts`）：
+
+```ts
+async query<T>(domains: readonly DomainId[]): Promise<StoreSnapshot<T>> {
+  const head = await this.readHead()                 // no lock
+  const commit = await this.readCommit(head.commitId)
+  const values = await Promise.all(domains.map(id =>
+    this.readObject(commit.domains[id])))
+  return { commitId: commit.commitId, domains: zip(domains, values), tree: commit.tree }
+}
+
+async mutate<T>(request: StoreMutation<T>): Promise<StoreCommitResult<T>> {
+  return this.writer.runExclusive(async () => {       // one writer, cross-process
+    const previous = await this.readHeadCommit()
+    if (request.expectedHead && previous.commitId !== request.expectedHead) {
+      throw new StoreConflict(previous.commitId)
+    }
+    const values = await request.mutate(previous.values)
+    const domains = await this.writeChangedObjects(previous.domains, values)
+    const commitId = this.nextCommitId(previous.commitId)
+    const commit = { commitId, parent: previous.commitId, domains, tree: request.tree }
+    await this.writeCommit(commit)
+    await this.writeHead({ commitId, commitSha256: sha(commit) })  // atomic
+    return { commitId, values }
+  })
+}
+```
+
+
+- `query` 只读，不锁；
+- `mutate` 是唯一写入口，内部取 writer lock；
+- `StoreMutation` 声明 domains、mutation、expectedHead、source；
+- 不在 `commands.ts`/tool handler/UI route 里直接调用 `io.readText/writeText`。
+
+### 8.2 命令/工具/UI 同源
+
+每个用户意图只定义一次：
+
+```ts
+type CommandSpec = {
+  id: string
+  readOnly: boolean
+  query?: (snapshot) => View
+  mutate?: (snapshot, input) => StoreMutation
+  tool?: ToolDefinition
+  uiRoute?: string
+}
+```
+
+- 模型工具调用 `commands.run(spec, input)`；
+- host 命令调用同一个 `commands.run`；
+- UI 按钮调用同一个 remote command；
+- read-only 页面调用 `commands.query(spec, input)`；
+- 禁止 UI route 自己拼 `readText`，禁止 tool handler 自己写 sidecar。
+
+### 8.3 Remote/UI
+
+- `GET` 只返回 query 结果 + `commitId`；
+- `POST` 只接受 command id、input、可选 `expectedCommit`；
+- 所有 UI 按钮都映射到 command id，不直接访问路径；
+- 前端收到 `commitId` 后可用它做 stale 检测；提交冲突返回结构化 `store-conflict`，UI 刷新后重试；
+- Settings/credentials 按钮例外：继续走平台 `remote.credentials` / `settings`，不进入 family store（secrets 永不进快照）。
+
+## 9. 全量读写表面矩阵
+
+### 9.1 模型工具
+
+| 工具 | 读 | 写 | 目标域 | 迁移方式 |
+|---|---|---|---|---|
+| `skill_manage` | list/read/history/review | create/update/patch/delete/archive/restore/pin/unpin/write_file/remove_file/restructure | tree + state（pending/history） | tree 走 UnitKernel + manifest；pending 走 store commit |
+| `memory` | recall/read/list | remember/forget/write | memory | memory 索引进 store；正文 blob |
+| `skill_search` | search/catalog/domain view | — | discovery | query 只读 |
+| `merge_stage` | cards/plan | stage/commit | merge | 子代理只 prepare；commit 在 host |
+| maintenance probe | facts/scan | — | state/merge 摘要 | query |
+| review child tools | proposal/read | 只读提案 | state | query |
+| usage observation | — | 事件记录 | activity/log | append log |
+
+### 9.2 host 命令
+
+| 命令 | 读/写 | 域 | 迁移 |
+|---|---|---|---|
+| `pending` / `params` / `doctor` / `mutations` / `skill history` / `skills health` / `maintain status/report` / `replay` | R | state/merge/runs/reports | query |
+| `approve` / `reject` / `release` | W | state + tree unit | command mutation |
+| `migrate state` | W（一次性） | store head + legacy marker | 迁移命令单独 writer |
+| `curator run/pause/resume/scope` | W | state | command mutation |
+| `restore` / `skill restore/undo/pin/unpin` | W | tree + state | UnitKernel + commit |
+| `learn` / `review` / `propose` | W | run/report/state | command mutation + tree |
+| `skills refresh` | W | discovery | command |
+| `maintain` / `maintain handoff/cancel` | W | runs/reports/state | command |
+| `offload` / `condense` | W | tree/history | UnitKernel |
+| `merge ...` 全部 | R/W | merge/runs/reports | merge command bus |
+| learning-graph | W | activity/learning graph | append + snapshot |
+
+`/evolution merge` 的完整命令面同样逐条登记，不允许“全部”这种模糊项：
+
+```text
+scan | pair <a> <b> [--force] | status [id] | report [id] | cancel [id]
+runs | doctor | reconcile | pending [--expired] | candidates [--retry] [id]
+approve <id> | reject <id> | resume [id] [--clear <reason>] [--retry]
+skipped [--restore <id>] | discard <id> | undo <target> <run>
+```
+
+`/evolution` 的 host 命令面：
+
+```text
+merge, pending, approve, reject, release, doctor, curator, mutations,
+migrate state, restore, skill restore/history/undo/pin/unpin,
+propose, skills refresh/health, learn, review, maintain,
+maintain status/report/handoff/cancel, offload, condense, replay
+```
+
+
+### 9.3 UI/按钮
+
+| 界面/按钮 | 读 | 写 | 端口 |
+|---|---|---|---|
+| 设置 → 检索增强 Key | describe | set/unset | 平台 `remote.credentials`，不进 store |
+| 设置 → 参数/行 | describe | save | 平台 settings，不进 family store |
+| 合并建议页 | view/rows/body/history/runs | approve/reject/retry/undo/restore/discard/skipped/scan/pair | merge command bus |
+| 审批页 | pending/preview | approve/reject/release | state command |
+| 技能历史 | skills/versions/diff/body/health | undo/restore | tree + state |
+| 技能健康 | rows | refresh | discovery/query + command |
+| 诊断 | diagnostics | — | query |
+| 设置导航 | openSettings | — | 平台 slot |
+
+所有按钮通过 `command id`，不直接读 `.json`。
+
+## 10. 平台侧改动
+
+不需要改平台内核，也不需要新增跨进程共享读锁。
+
+使用现有公开 seam：
+
+- `@deepseek-ai/dsh-atomic-write` 的 `withFileLock`（writer lock）和 `writeFileAtomic`（object/head）；
+- `ctx.fs`/`EvolutionIoLike` 的 read/create/rename；
+- `ctx.settings` / `remote.credentials`：平台自己的域，不复制、不缓存 secret；
+- `ctx.tools` / `ctx.commands`：只作为 transport，handler 调 store command bus；
+- `ctx.fs` 的 target 锁只用于对象文件发布，不用于读者；reader 直接读完整对象；
+- 不在平台侧新增 “snapshot service”；`Home MVCC Store` 是 family 内聚于 `evolution-core` 的机制，避免平台为单一插件扩大 API。
+
+如果未来平台提供 `ctx.fs.watch`/版本化读取，可作为 store 的底层优化；当前设计不依赖它。
+
+## 11. 插件侧改动清单
+
+### `evolution-core`
+- 新增 `store/store-kernel.ts`：head/commit/object 读写、writer lock、CRC/幂等、GC、legacy bootstrap；
+- 新增 `store/domains.ts`：域 schema、版本、迁移函数；
+- `EvolutionIoLike` 增加 `writeTextAtomic?` / `createTextIfAbsent` 使用约定（不改变后端接口，优先平台原子写）；
+- 删除 `EvolutionState.withStateLock` 的读侧使用；state provider 保留为 legacy adapter；
+- `SkillLibrary` 的 tree manifest 生成接入 store；
+- `mutation-authority`/`home-fence` 只服务 writer/tree，不进入 query。
+
+### `evolution-state` / domain
+- 读 path 改为 `store.query('state')`；
+- 删除读锁；domain provider 只作为迁移读 adapter；
+- 一次 migration 生成第一个 commit；
+- marker 绑定 commitId；回退 pin legacy provider，不删 head。
+
+### `evolution-merge`
+- merge state、runs、报告引用进 store；
+- `MergeUnitTransactions` 的 fence 只用于 tree unit；metadata commit 在 unit 后；
+- recovery 使用 commitId + unit journal；
+- 所有 view 从 `store.query` 派生。
+
+### `evolution-commands`
+- run registry、report index、maintain 状态改 store 域；
+- 所有 command 走 `commands.run` 统一入口；
+- 删除 `ctx.get` authority 构造时快照（已做 use-time accessor，保留）。
+
+### `evolution-usage` / `evolution-activity` / `evolution-feedback`
+- usage/feedback：快照域；
+- activity：append segment + 可选 commit 引用；
+- 删除各自的 `withMergeTreeLock`/自定义 state 文件读写，统一到 kernel；
+- 事件仍然 best-effort，不因 store 失败阻塞用户主路径（写日志 + fail loud on critical）。
+
+### `evolution-skill-discovery`
+- domain map/projection/snapshot 合并为一个 `discovery` 域；
+- 读走 snapshot，写由 command 提交；
+- 删除 manifest 的多个 fence。
+
+### `evolution-curator` / `evolution-review` / `evolution-approval`
+- 只通过 state/merge/store 读写；
+- curator 的 `homeFence` 只用于 tree unit；
+- review/approval 的 lease 仍是 run-level，不影响 reader。
+
+### `evolution-host` / UI
+- host routes 全改为 query/command；
+- merge/settings/history/health 面板只消费 `{commitId, values}`；
+- 设置 Key 走平台 credentials；
+- 删除 UI 直接读文件的路径。
+
+## 12. 迁移阶段
+
+### Phase 0：内核与影子读
+- 实现 store kernel + `verify-store-kernel`；
+- 不替换读路径，只在测试/诊断中影子写 commit；
+- 双读对比旧 state；差异 fail closed。
+
+### Phase 1：state + runs
+- 首个 commit 从现有 `state/store.json` bootstrap；
+- read path 切到 store；
+- 删除读锁；
+- 旧文件保留只读；写路径切换；
+- 回归：迁移/回退/双进程/崩溃。
+
+### Phase 2：merge + reports
+- merge state/run/report 引用迁入；
+- unit journal 仍是恢复权威；
+- 所有 merge 命令/工具/按钮切 query/command；
+- 回归：merge scan/approve/undo/rebase/restart。
+
+### Phase 3：usage/feedback/discovery/memory
+- 侧车改为 store 域；
+- memory 大正文 blob；
+- 读路径统一；
+- 删除各包私有 fence/serial。
+
+### Phase 4：activity 日志
+- 追加段格式、轮转、offset 读；
+- UI/诊断读同一日志前缀；
+- 保留 best-effort。
+
+### Phase 5：tree manifest
+- UnitKernel 提交生成 manifest；
+- query 返回 tree，UI/模型读 manifest；
+- 迁移期 materialized tree 兼容；
+- 最终删除 legacy state/domain provider。
+
+### Phase 6：删除过渡
+- 删除 `withStateLock` 读侧、legacy store adapter、重复 reader；
+- store-v2 成为唯一权威；
+- 更新 10/11、77/78、84 和 80 台账。
+
+## 13. 失败模型与不变量
+
+1. **提交原子性**：head 未变 → 旧快照完整；head 已变 → 新快照完整。
+2. **读者无锁**：query 不调用 `withFileLock`/`HomeFence`/`state.lock`。
+3. **写者唯一**：同一 home 同一时刻只有一个 commit writer（跨进程 lock）。
+4. **对象不可变**：object sha 一旦写入永不覆盖；冲突即错误。
+5. **多域一致**：一个 commit 的 domain map 是完整版本；不存在“state 新、merge 旧”的混合指针。
+6. **tree 先于 metadata**：tree unit 提交后才发布引用它的 metadata commit；失败可恢复。
+7. **fail closed**：head/commit/object 损坏 → 报错，不返回空默认。
+8. **secret 不落 store**：credentials/settings 只在平台域；store 快照不得包含 Key。
+9. **迁移不双写**：迁移期 legacy 只读；新写只写 store；切换“已经发生”由 commitId 证明。
+10. **锁顺序**：HomeFence → commit.lock；禁止反向。
+11. **UI/tool/command 同源**：同一 command id 的读写实现只有一份。
+
+## 14. 测试与门禁
+
+### 单元/集成
+- `store-kernel.spec`：writer crash at object/commit/head；corrupt head/object；GC；CAS；two-process writer；read during long write。
+- `store-migration.spec`：legacy v1/domain/store -> commit；marker；rollback pin；fresh home。
+- `store-tree.spec`：UnitKernel + tree manifest；crash between tree/commit。
+- `store-surface.spec`：每个 command/tool/UI action 只调用 query/command，无 `readText/writeText`。
+- `store-read-lock.spec`：长写期间 reader 在固定预算内完成且读到旧 commit。
+
+### 静态门禁
+- `verify-store-single-source`：禁止 `evolution-commands`/`evolution-merge`/`evolution-ui`/tool handlers 直接 `readText`/`writeText` 业务文件；只允许 kernel、migration adapter、平台 settings/credentials。
+- `verify-store-read-lock`：query 实现不得出现 `withFileLock`/`state.lock`/`HomeFence`。
+- `verify-store-head`：head/commit/object schema 与 sha 校验。
+- `verify-store-surface`：command id 与 tool id、UI route 的映射闭包。
+- 旧 gate `verify-state-store` 改为只检查 legacy migration；不再作为主读路径。
+
+### 真机验收
+- fresh profile：安装、诊断、合并建议、设置 Key 空/有/错误/清除、降级可见；
+- 双进程：一个进程长写，另一个进程读旧 commit 不阻塞；
+- 崩溃：kill -9 在 head 前后，重启恢复；
+- HMR：替换 IO/authority，reader/writer 均继续工作；
+- UI：按钮和工具对同一状态看到同一 commitId。
+
+## 15. 被否方案
+
+| 方案 | 为什么否 |
+|---|---|
+| 共享 read lock | 平台没有共享锁；自建 reader registry 要处理 stale reader、Windows 文件、迁移死锁；仍然是全局锁 |
+| 每域 current 指针 | 多域读取需要拼指针；读者可能看到混合版本；GC/迁移复杂 |
+| 只加 read timeout | 掩盖阻塞，不减少机制 |
+| 每包继续自建 fence | 机制数量继续增长，无法统一 UI/工具/命令 |
+| 把技能树也直接 JSON 化 | 技能是文件系统对象，会破坏外部可编辑/provider 语义；保留 UnitKernel |
+| 平台新增 snapshot service | 平台不为单一家族扩大 API；family kernel 足以复用平台 atomic-write/fs |
+
+## 16. 验收与落地顺序
+
+1. 先做 `store-kernel` + 影子读 + 失败/崩溃测试；
+2. Phase 1 完成后，D1-LOCK-READ 的独占读锁从 store 读路径移除；
+3. 每迁移一个域，删除该域旧的 reader/writer，不留双写；
+4. 全部表面迁移后，再删 legacy state provider 和旧 gate；
+5. 只有第 1-4 步全绿、fresh web 与双进程验收通过，才进入下一版本发布。
+
+本文是 DCR-85。实施前若发现平台 seam 不足，先补平台公开 seam 或调整本文；不得在插件里自建第二套跨进程锁。

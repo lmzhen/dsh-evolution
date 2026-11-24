@@ -36,7 +36,7 @@
 | D1-OLD-PIN | FIXED | `migrate state` 通过 `EvolutionState.providerSelection()` 检测 effective provider；仍是 domain 时在结果后追加 `command.migrate state.pin` 提示（8 locale），提示改 auto/store 并重启。
 | D1-HMR | FIXED | `store-plugin` 不再缓存模块级 provider Map；每次 apply 都用当前 `ctx.evolutionIo.provider()` 构造 provider，由 `ctx.effect` 清理旧注册，HMR 替换 IO 后不会读旧 IO。
 | D1-MARKER-DEPTH | FIXED | marker 校验现在调用 `parseStateStoreImage` 做嵌套 record/curator 全量校验，空 store 也拒绝；损坏记录不再延迟到首次读。
-| D1-LOCK-READ | DECIDED | 读一致性优先：read 与 migration/write 共用同一 cross-process `state.lock`，长迁移会显式阻塞读；新增 `store-migration.spec` 用例证明读确实等待锁，而不是死锁。改读锁需要改变一致性契约，不纳入本次发布。
+| D1-LOCK-READ | SUPERSEDED by DCR-85 | 0.61.0 保持读一致性过渡（read 与 migration/write 共用同一 cross-process `state.lock`，长迁移会显式阻塞读；`store-migration.spec` 证明读等待锁而非死锁）。DCR-85 改为写入串行提交不可变 commit、读者按 head→commit→objects 无锁读，从 0.62.0 分阶段迁移；见 `85-versioned-snapshot-read.md`。
 | D1-HOME | FIXED | `EvolutionState` 删除自定义 `home` 配置；所有生产路径统一读 `evolutionHome()`；测试专用 `DSH_EVOLUTION_HOME` 覆盖同一函数，state/domain/migration/命令不再有第二 home 源。
 | D1-STORE-PIN | FIXED | 显式 `provider: store` 现在要求 migration marker 存在并校验完整 store 镜像；缺 marker 时 mount/首次读即报错，不再把空 store 当权威。
 | D3-SETTINGS | FIXED | `SettingsPort.configure` 的 owner 统一为平台 `Fiber`，`settingsPort` 适配器不再 `unknown` cast；`gen-contract-ports --check` 仍只生成可机械派生端口。

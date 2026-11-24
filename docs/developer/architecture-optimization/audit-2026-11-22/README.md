@@ -263,3 +263,4 @@
 | [82-ci-release-blocker.md](82-ci-release-blocker.md) | 0.60.0 CI Linux 单测解析失败与发布阻断 |
 | [83-published-p1-io-node.md](83-published-p1-io-node.md) | 0.60.0 新装 IO provider P1 与 0.60.1 修复计划 |
 | [84-retrieval-credentials.md](84-retrieval-credentials.md) | 检索增强：固定模型、可选官方 API Key、平台凭据与降级不变设计 |
+| [85-versioned-snapshot-read.md](85-versioned-snapshot-read.md) | DCR-85：Home MVCC Store、版本化快照无锁读、全量工具/命令/按钮读写统一 |
