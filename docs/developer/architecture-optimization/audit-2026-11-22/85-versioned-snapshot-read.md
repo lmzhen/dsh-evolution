@@ -378,6 +378,14 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - `requireStoreSurfaceCommand(id)` 对新 surface 失败关闭；`store-surface.spec.ts` 校验每个 `HOST_COMMAND_DEFS` id 都在 registry 中、registry 的 command 都是真实 host 命令、id 唯一。
 - 测试：store-surface 3 tests；`tsc` core/commands 0。
 - 尚未做：把 dispatch/route 实际改为只调用 query/command；该 registry 是 R7b 的闭包检查基线。
+
+#### R7b 已落地（query/command 服务）
+
+- `store/service.ts`：`StoreService.query(commandId, domains)` 与 `StoreService.command({commandId, domains, expectedCommit, change, tree})`；
+- 读：只允许 `command.reads ∪ command.writes` 声明的域；写：只允许 `command.writes`；未知 command id 直接失败；
+- 写通过 `StoreKernel.mutate`，`expectedCommit` 映射为 `expectedHead`，tree ref 原样透传；service 不新增锁，也不绕过 kernel；
+- 测试：store-service 1 test（读/写域越界、未知 id、正常 approve 写）通过；`tsc` core 0；
+- 尚未做：host command/tool/UI route 实际调用该 service；当前只是把闭包与写入口收成一个可注入对象。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
 
