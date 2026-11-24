@@ -37,6 +37,7 @@
 | D1-HMR | FIXED | `store-plugin` 不再缓存模块级 provider Map；每次 apply 都用当前 `ctx.evolutionIo.provider()` 构造 provider，由 `ctx.effect` 清理旧注册，HMR 替换 IO 后不会读旧 IO。
 | D1-MARKER-DEPTH | FIXED | marker 校验现在调用 `parseStateStoreImage` 做嵌套 record/curator 全量校验，空 store 也拒绝；损坏记录不再延迟到首次读。
 | D1-STORE-PIN | FIXED | 显式 `provider: store` 现在要求 migration marker 存在并校验完整 store 镜像；缺 marker 时 mount/首次读即报错，不再把空 store 当权威。
+| D2-TARGET-WRITER | FIXED (DECIDED) | 低层 `TargetWriter` 保持内部；`verify-core-surface` 新增“不得泄漏到 write.ts 公共面”的硬检查，79 文档同步。
 | D1-ROLLBACK | FIXED | marker 缺失但 store 已存在时，auto 拒绝静默回退 domain，并提示显式 pin `provider: domain`；store 保留。78/测试同步更新。
 | D1-MARKER-FAIL | FIXED | `migrateDomainToStore` 现在遇到已存在且可解析的 store、但 marker 缺失时，按 store 内容补写 `domain-store-recovered` marker 并返回真实计数；不再拒绝重试。
 | D2-HANDLE | FIXED | `unit-kernel.ts` 的 PreparedMutation 现在由 WeakMap 状态机消费：prepare→committing→released；重复 commit 返回 `unit-handle-consumed`，release 幂等。

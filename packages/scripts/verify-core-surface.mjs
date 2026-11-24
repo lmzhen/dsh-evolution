@@ -29,4 +29,8 @@ for (const path of writeOwned) if (!write.includes("'./" + path.slice(2) + "'"))
   console.error('verify-core-surface: ./write does not export ' + path)
   process.exit(1)
 }
-console.log('verify-core-surface: root star exports ' + String(stars.length) + ' (<=75); write modules are subpath-only')
+if (write.includes("target-writer.ts")) {
+  console.error('verify-core-surface: TargetWriter leaked into the public write surface; it is an internal single-target primitive')
+  process.exit(1)
+}
+console.log('verify-core-surface: root star exports ' + String(stars.length) + ' (<=75); write modules are subpath-only; TargetWriter stays internal')

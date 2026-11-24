@@ -64,7 +64,7 @@ run-gates local: 61 pass / 0 fail / 3 cannot-decide
 
 ## 结论
 
-- D2：完成（窄口径）——唯一公共多文件事务入口是 UnitKernel；低层 TargetWriter 只做单 target 原语。
+- D2：完成（窄口径）——唯一公共多文件事务入口是 UnitKernel；低层 TargetWriter 只做单 target 原语，**不进入 write.ts 公共面**；`verify-core-surface` 现在把这条作为硬门禁。
 - D3：完成（窄口径）——可机械派生的 3 个端口由生成器产出并有 `--check`；不兼容端口保留 family-facing 手写，逐项在本文记录原因。
 
 下一步进入最终验收/发布门，剩余 P2 统一登记。
