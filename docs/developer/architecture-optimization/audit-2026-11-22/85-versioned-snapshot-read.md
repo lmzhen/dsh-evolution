@@ -386,6 +386,14 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 写通过 `StoreKernel.mutate`，`expectedCommit` 映射为 `expectedHead`，tree ref 原样透传；service 不新增锁，也不绕过 kernel；
 - 测试：store-service 1 test（读/写域越界、未知 id、正常 approve 写）通过；`tsc` core 0；
 - 尚未做：host command/tool/UI route 实际调用该 service；当前只是把闭包与写入口收成一个可注入对象。
+
+#### R7c 已落地（service 注入）
+
+- `evolution-state-store` 在 v2 marker 存在时 `ctx.provide('evolutionStore', StoreService)`；service 与 v2 provider 共用 `/state` 下的同一 kernel、同一 `liveHomeFence`，无新锁、无第二存储。
+- 未迁移时 service 不存在，调用方继续 legacy provider；这保证默认仍走 v1/domain，不改变用户安装。
+- HMR 语义：store-plugin 重新 apply 时重新创建 kernel/service；旧 service 随旧 ctx 失效，不缓存 IO/fence。
+- 测试：store-service-plugin 2 tests（无 marker 不提供、有 marker 提供）；`tsc` core 0。
+- 尚未做：host command/tool/UI 的实际 dispatch 仍未改为 `ctx.get('evolutionStore')`；这是 R7d。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
 

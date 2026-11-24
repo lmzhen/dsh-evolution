@@ -8,12 +8,17 @@
  * @module @deepseek-ai/dsh-evolution-core/state/store-plugin
  */
 import type { Context } from '@deepseek-ai/cordis'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { evolutionHome } from '../state-store.ts'
 import type {} from '../io-registry.ts'
 import type {} from './storage.ts'
 import { createStateStoreProvider } from './store.ts'
 import { createStateV2Provider } from './v2-provider.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
+import { StoreKernel } from '../store/store-kernel.ts'
+import { createStoreService } from '../store/service.ts'
+import { STATE_V2_MIGRATION_MARKER } from './constants.ts'
 
 export const name = 'evolution-state-store'
 export const inject = ['evolutionStateStorage', 'evolutionIo']
@@ -35,4 +40,11 @@ export async function apply(ctx: Context): Promise<void> {
     fence: liveHomeFence(ctx, home),
   })
   ctx.effect(() => ctx.evolutionStateStorage.registerProvider(v2Provider), 'evolution-state-store-v2.provider')
+  // The unified surface service exists only after the explicit v2 marker; until
+  // then consumers must use their legacy ports. The service is stateless around
+  // the same live fence, so HMR can re-provide it on the next apply.
+  if (existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
+    const kernel = new StoreKernel({ io: ctx.evolutionIo.provider(), home, fence: liveHomeFence(ctx, home) })
+    ctx.provide('evolutionStore', createStoreService(kernel))
+  }
 }
