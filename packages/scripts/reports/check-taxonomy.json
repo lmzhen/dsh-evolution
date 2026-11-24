@@ -545,6 +545,7 @@
         "evolution-core::tests/state/store-provider.spec.ts",
         "evolution-core::tests/state/store-service-plugin.spec.ts",
         "evolution-core::tests/state/v2-provider.spec.ts",
+        "evolution-core::tests/store/double-process-read.spec.ts",
         "evolution-core::tests/store/scoped-text-io.spec.ts",
         "evolution-core::tests/store/scoped-tree-io.spec.ts",
         "evolution-core::tests/store/store-kernel.spec.ts",
@@ -1250,6 +1251,7 @@
         "evolution-core::tests/state/store-provider.spec.ts",
         "evolution-core::tests/state/store-service-plugin.spec.ts",
         "evolution-core::tests/state/v2-provider.spec.ts",
+        "evolution-core::tests/store/double-process-read.spec.ts",
         "evolution-core::tests/store/scoped-text-io.spec.ts",
         "evolution-core::tests/store/scoped-tree-io.spec.ts",
         "evolution-core::tests/store/store-kernel.spec.ts",
@@ -1893,6 +1895,7 @@
         "evolution-core::tests/state/store-provider.spec.ts",
         "evolution-core::tests/state/store-service-plugin.spec.ts",
         "evolution-core::tests/state/v2-provider.spec.ts",
+        "evolution-core::tests/store/double-process-read.spec.ts",
         "evolution-core::tests/store/scoped-text-io.spec.ts",
         "evolution-core::tests/store/scoped-tree-io.spec.ts",
         "evolution-core::tests/store/store-kernel.spec.ts",
@@ -2332,7 +2335,7 @@
     },
     "pre-tag": {
       "gates": 67,
-      "specs": 468
+      "specs": 469
     },
     "ci-only": {
       "gates": 10,
@@ -2340,16 +2343,16 @@
     },
     "full(ci=off)": {
       "gates": 67,
-      "specs": 468
+      "specs": 469
     },
     "full(ci=on)": {
       "gates": 77,
-      "specs": 539
+      "specs": 540
     }
   },
   "specs": {
-    "total": 539,
-    "marked": 539,
+    "total": 540,
+    "marked": 540,
     "unmarked": 0
   }
 }
