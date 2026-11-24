@@ -401,6 +401,15 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 文本报告保持原样（没有新 locale key），未迁移 home 或 service 不可用时字段不出现；
 - 查询失败只省略该字段，不让诊断整体失败；
 - 测试：doctor-store 1 test；`tsc` commands 0；
+
+#### R7e 已落地（run registry 走 service）
+
+- `runStorePortIfV2` 在 `ctx.get('evolutionStore')` 存在时不再新建 kernel：
+  - 读走 `query('maintain.status', ['runs'])`；
+  - 写走 `command('maintain.handoff', { domains: ['runs'] })`；
+- service 不在时仍回退到独立 kernel（兼容旧 composition）；
+- 这消除了 run registry 在 v2 下的重复 kernel，同时保持同一 `runs` 域与同一 HomeFence；
+- 测试：run-registry-service 1 test（断言 query/command id 与委托）；`tsc` core 0。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 

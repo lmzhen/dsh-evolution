@@ -216,6 +216,30 @@ export function runStorePortIfV2(
   fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined,
 ): RunStorePort | undefined {
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
+  // R7e: when the composition mounted the one surface service, the run index
+  // uses its declared maintain.* commands instead of opening a second kernel.
+  const service = ctx?.get?.('evolutionStore') as {
+    query?(commandId: string, domains?: readonly string[]): Promise<{ snapshot: { domains: { runs?: unknown } } }>
+    command?(request: { commandId: string; domains: readonly string[]; change: (current: { domains: { runs?: unknown } }) => Record<string, unknown> | Promise<Record<string, unknown>> }): Promise<unknown>
+  } | undefined
+  if (service?.query !== undefined && service.command !== undefined) {
+    return {
+      async read() {
+        const result = await service.query!('maintain.status', ['runs'])
+        return result.snapshot.domains.runs === undefined ? null : result.snapshot.domains.runs as RunIndexDocument
+      },
+      async write(task) {
+        await service.command!({
+          commandId: 'maintain.handoff',
+          domains: ['runs'],
+          change: async (current) => {
+            const next = await task(current.domains.runs === undefined ? null : current.domains.runs as RunIndexDocument)
+            return next === null ? {} : { runs: next }
+          },
+        })
+      },
+    }
+  }
   return createRunStorePort(new StoreKernel({ io, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) }))
 }
 
