@@ -5108,8 +5108,8 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     // not alias a config object the caller still owns.
     [...(threatExemptLabels ?? [])],
     authority,
-    options.mutationLock ?? mutationLockFrom(ctx),
-    options.fence ?? (ctx?.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence,
+    options.mutationLock,
+    options.fence,
     options.mutationLock === undefined && ctx !== undefined ? () => mutationLockFrom(ctx) : undefined,
     options.fence === undefined && ctx !== undefined ? () => (ctx.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence : undefined,
   )
