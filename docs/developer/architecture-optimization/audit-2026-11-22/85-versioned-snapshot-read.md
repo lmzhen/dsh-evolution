@@ -362,6 +362,12 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：tree manifest 1 test；`tsc` core 0。
 - 尚未做：把 `publishTreeManifest` 接到 UnitKernel 的每次 tree unit（包括失败/回滚/并发顺序），以及 materialized tree 的迁移期兼容；属 R6b。
 
+#### R6b 设计结论（未接线）
+
+- 直接挂在 `UnitKernelHooks.committed` 或 `unit.apply` 返回前的 publisher 会死锁：tree unit 的 `MutationLock` 仍持有 HomeFence 租约，publisher 的 `StoreKernel.mutate` 再取同一把 fence，形成自等待。实测在 `create` 的 tree unit 上 30s 超时，故本轮回退了该接线，没有把风险代码合入。
+- 安全顺序：树 unit 先完成并释放 HomeFence；由**命令/run 边界**在 `await unit.apply()` 返回后调用 `publishTreeManifest(kernel, unitId, ops)` 和 metadata commit。若 metadata commit 失败，manifest 对象成为可 GC 的孤儿，树内容仍以 UnitKernel 快照为准；下一次 writer 可重试，materialized tree 继续作为迁移期 fallback。
+- 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
+
 
 ## 6. 域与读写分类
 
