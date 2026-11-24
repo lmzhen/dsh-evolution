@@ -346,6 +346,14 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：v2 state/migration 8 tests 覆盖 memory 迁移；`tsc` core/memory 0。
 - 尚未做：memory 新增大正文的 blob 分层（当前单文本域，符合 DCR-85 的“大正文用 blob”后续项）。
 
+#### R5 已落地（activity 事件分段）
+
+- 既有边界保持不变：active `events.json` 到 `EVENT_LOG_ROTATE_AT=4000` 轮转为 `events-<lastArchivedSeq>.json`，保留 10 个 archive；append 在同一事务内写 archive 再写 active，archive 失败则整个 append 失败，active 不截断。
+- `readEvolutionTimeline` 新增 `afterSeq` / `limit` 分页：按 archive 名（最后归档 seq）跳过整段旧 band，只读候选 archive + active，按 seq 升序返回，`hasMore` 表示分页未取完；`malformed` 语义不变。
+- 日志仍是 append-only 的 base IO，不进入 MVCC；分段/轮转/offset 都不改变 best-effort 归档失败模型。
+- 测试：evolution-events **24 tests**（含分页）通过；`tsc` core 0。
+- 尚未做：offset 读在 UI 历史的接线、活动分段跨进程压力测试（属 R8 证据）。
+
 
 ## 6. 域与读写分类
 

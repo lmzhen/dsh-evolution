@@ -20,6 +20,21 @@ describe('evolution event log (rc.68)', () => {
     expect(events.filter(event => event.type === 'feedback')).toHaveLength(8)
   })
 
+  it('pages the timeline by seq without reloading archived bands', async () => {
+    const root = await tempRoot('dsh-evo-events-page-')
+    const io = nodeEvolutionIo()
+    const path = eventsFile(root)
+    for (let index = 0; index < 5; index += 1) {
+      await appendEvolutionEvent(io, path, { type: 'feedback', target: `t${index}`, kind: 'skill', rating: 'positive' })
+    }
+    const first = await readEvolutionTimeline(io, path, undefined, { afterSeq: 1, limit: 2 })
+    expect(first.events.map(event => event.seq)).toEqual([2, 3])
+    expect(first.hasMore).toBe(true)
+    const last = await readEvolutionTimeline(io, path, undefined, { afterSeq: 3, limit: 2 })
+    expect(last.events.map(event => event.seq)).toEqual([4, 5])
+    expect(last.hasMore).toBe(false)
+  })
+
   it('a malformed log is never overwritten by an append (rc.65 posture)', async () => {
     const root = await tempRoot('dsh-evo-events-bad-')
     const io = nodeEvolutionIo()

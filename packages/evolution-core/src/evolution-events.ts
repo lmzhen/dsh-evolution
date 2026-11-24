@@ -462,6 +462,9 @@ interface EventLogRead {
    * stays UNflagged — REPLACEABLE garbage that reads as empty and is rewritten
    * at the next append (rc.70 F-1: read and append agree on the same boundary). */
   malformed: boolean
+  /** Pagination only: true when a numeric `limit` cut off later events. A
+   * caller that omitted the limit never sees this field. */
+  hasMore?: boolean
 }
 
 /** Read the event log; a missing/whitespace-only file reads as empty, corrupt
@@ -514,6 +517,7 @@ export async function readEvolutionTimeline(
   io: EvolutionIoLike,
   path: string,
   archives?: readonly string[],
+  options?: { readonly afterSeq?: number | undefined; readonly limit?: number | undefined },
 ): Promise<EventLogRead> {
   const dir = dirname(path)
   let malformed = false
@@ -521,6 +525,10 @@ export async function readEvolutionTimeline(
   // C2 (v35): a caller that already listed the archives (the boot restore does)
   // passes them in instead of paying a second directory scan.
   for (const name of archives ?? await listEventArchives(io, path)) {
+    // An archive name is its last archived seq; when that is at or below the
+    // page cursor, the whole band is before the requested offset.
+    const archivedThrough = Number.parseInt(name.slice(EVENT_ARCHIVE_PREFIX.length, name.length - '.json'.length), 10)
+    if (options?.afterSeq !== undefined && Number.isFinite(archivedThrough) && archivedThrough <= options.afterSeq) continue
     const read = await readEvolutionEvents(io, join(dir, name))
     if (read.malformed) malformed = true
     for (const event of read.events) bySeq.set(event.seq, event)
@@ -528,5 +536,13 @@ export async function readEvolutionTimeline(
   const active = await readEvolutionEvents(io, path)
   if (active.malformed) malformed = true
   for (const event of active.events) bySeq.set(event.seq, event)
-  return { events: [...bySeq.values()].sort((a, b) => a.seq - b.seq), malformed }
+  const after = options?.afterSeq ?? -Infinity
+  const all = [...bySeq.values()].filter(event => event.seq > after).sort((a, b) => a.seq - b.seq)
+  const limit = options?.limit === undefined ? undefined : Math.max(0, Math.floor(options.limit))
+  const events = limit === undefined ? all : all.slice(0, limit)
+  return {
+    events,
+    malformed,
+    ...(limit === undefined ? {} : { hasMore: events.length < all.length }),
+  }
 }
