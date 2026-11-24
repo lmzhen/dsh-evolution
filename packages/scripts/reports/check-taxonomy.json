@@ -221,6 +221,7 @@
         "evolution-ui::tests/skill-stats-parity.spec.ts",
         "evolution-ui::tests/workbench-store.spec.ts",
         "tool-skill-manage::tests/action-table.spec.ts",
+        "tool-skill-manage::tests/inject-authority.spec.ts",
         "tool-skill-manage::tests/skill-observations.spec.ts",
         "tool-skill-manage::tests/skill-observed-writes.spec.ts"
       ],
@@ -819,6 +820,7 @@
         "memory::tests/memory.spec.ts",
         "memory::tests/tools/memory-interpolation-contract.spec.ts",
         "tool-skill-manage::tests/action-table.spec.ts",
+        "tool-skill-manage::tests/inject-authority.spec.ts",
         "tool-skill-manage::tests/skill-observations.spec.ts",
         "tool-skill-manage::tests/skill-observed-writes.spec.ts"
       ],
@@ -1508,6 +1510,7 @@
         "memory::tests/memory.spec.ts",
         "memory::tests/tools/memory-interpolation-contract.spec.ts",
         "tool-skill-manage::tests/action-table.spec.ts",
+        "tool-skill-manage::tests/inject-authority.spec.ts",
         "tool-skill-manage::tests/skill-observations.spec.ts",
         "tool-skill-manage::tests/skill-observed-writes.spec.ts"
       ],
@@ -2184,6 +2187,7 @@
         "tool-skill-manage::tests/approval-preview.spec.ts",
         "tool-skill-manage::tests/create-tree-reads.spec.ts",
         "tool-skill-manage::tests/extract-agent.spec.ts",
+        "tool-skill-manage::tests/inject-authority.spec.ts",
         "tool-skill-manage::tests/review-channel-origin.spec.ts",
         "tool-skill-manage::tests/skill-observations.spec.ts",
         "tool-skill-manage::tests/skill-observed-writes.spec.ts",
@@ -2264,11 +2268,11 @@
   "counts": {
     "fast": {
       "gates": 66,
-      "specs": 143
+      "specs": 144
     },
     "pre-tag": {
       "gates": 66,
-      "specs": 454
+      "specs": 455
     },
     "ci-only": {
       "gates": 10,
@@ -2276,16 +2280,16 @@
     },
     "full(ci=off)": {
       "gates": 66,
-      "specs": 454
+      "specs": 455
     },
     "full(ci=on)": {
       "gates": 76,
-      "specs": 525
+      "specs": 526
     }
   },
   "specs": {
-    "total": 525,
-    "marked": 525,
+    "total": 526,
+    "marked": 526,
     "unmarked": 0
   }
 }
