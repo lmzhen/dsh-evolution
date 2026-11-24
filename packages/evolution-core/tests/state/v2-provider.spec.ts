@@ -67,6 +67,23 @@ describe('MVCC state provider', () => {
     }
   })
 
+  it('migrates the legacy run index into the same first commit', async () => {
+    const root = await tempRoot('dsh-state-v2-runs-')
+    const ctx = await mountStateStack(root)
+    const io = ctx.evolutionIo.provider()
+    await writeFile(join(root, 'runs.json'), JSON.stringify({
+      schemaVersion: 2,
+      runs: [{ id: 'run-1', kind: 'maintain', state: 'succeeded', startedAt: 1, endedAt: 2 }],
+      foreign: [],
+    }) + '\n')
+    await migrateStateToV2(ctx, { io, home: root })
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    expect((await kernel.query(['runs'])).domains.runs).toMatchObject({
+      schemaVersion: 2,
+      runs: [{ id: 'run-1', state: 'succeeded' }],
+    })
+  })
+
   it('reads while the legacy state.lock is held because locking is internal', async () => {
     const { root, io, fence } = await seeded()
     const ctx = await mountStateStack(root)

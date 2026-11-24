@@ -38,12 +38,16 @@
  * @module
  */
 
+import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { clampedNumber } from './numeric.ts'
 import { isProcessAlive, transactIo } from './io.ts'
 import type { EvolutionIoLike } from './io.ts'
 import type { RunOutcome } from './contract.ts'
+import { StoreKernel } from './store/store-kernel.ts'
+import { liveHomeFence } from './mutation-authority.ts'
+import { STATE_V2_MIGRATION_MARKER } from './state/constants.ts'
 export type { RunOutcome } from './contract.ts'
 
 /** The kinds of long-running work the registry tracks. */
@@ -158,6 +162,62 @@ export interface RunRegistry {
   cancelAll(): number
 }
 
+/** One complete run-index document, shared by the file and MVCC media. */
+export interface RunIndexDocument {
+  schemaVersion: number
+  runs: RunRecord[]
+  foreign: unknown[]
+}
+
+/** The optional MVCC port for the run index; absent means the legacy runs.json medium. */
+export interface RunStorePort {
+  read(): Promise<RunIndexDocument | null>
+  write(task: (current: RunIndexDocument | null) => RunIndexDocument | null | Promise<RunIndexDocument | null>): Promise<void>
+}
+
+/** Empty index document; every field explicit so the first commit is complete. */
+export function emptyRunIndex(): RunIndexDocument {
+  return { schemaVersion: RUNS_SCHEMA_VERSION, runs: [], foreign: [] }
+}
+
+/** Adapt one MVCC kernel to the run-index port. */
+export function createRunStorePort(kernel: StoreKernel): RunStorePort {
+  return {
+    async read() {
+      const snapshot = await kernel.query(['runs'])
+      const value = snapshot.domains.runs
+      return value === undefined ? null : value as RunIndexDocument
+    },
+    async write(task) {
+      await kernel.mutate({
+        domains: ['runs'],
+        source: 'command',
+        change: async (current) => {
+          const next = await task(current.domains.runs === undefined ? null : current.domains.runs as RunIndexDocument)
+          return next === null ? {} : { runs: next }
+        },
+      })
+    },
+  }
+}
+
+/** Parse an index document from its file bytes; null text is an empty index. */
+export function parseRunIndexDocument(text: string | null): RunIndexDocument {
+  const parsed = parseIndex(text)
+  if (!parsed.ok) throw new Error('run-registry: index is not a run document')
+  return { schemaVersion: RUNS_SCHEMA_VERSION, runs: parsed.records, foreign: parsed.foreign }
+}
+
+/** Select the MVCC run port only after the explicit v2 marker exists; otherwise the file stays the medium. */
+export function runStorePortIfV2(
+  ctx: { get?(name: string): unknown } | undefined,
+  io: EvolutionIoLike,
+  home: string,
+): RunStorePort | undefined {
+  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
+  return createRunStorePort(new StoreKernel({ io, home, fence: liveHomeFence(ctx ?? {}, home) }))
+}
+
 /** Options for {@link newRunRegistry}. */
 export interface RunRegistryOptions {
   io: EvolutionIoLike
@@ -169,6 +229,8 @@ export interface RunRegistryOptions {
   fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   /** Resolve the fence at operation time; preferred over the construction-time snapshot. */
   resolveFence?: () => { run<T>(body: () => Promise<T>): Promise<T> } | undefined
+  /** Optional MVCC port; absent keeps the legacy runs.json medium. */
+  store?: RunStorePort | undefined
   /** Clock seam for tests. */
   now?: () => number
   /** Retained records (N3-clamped). */
@@ -254,7 +316,21 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
   const maxRecords = clampedNumber(options.maxRecords ?? DEFAULT_RUN_RECORDS, DEFAULT_RUN_RECORDS, { min: 1 })
   const warn = options.warn ?? (() => {})
   const path = runsFile(options.home)
+  const readIndexText = async (): Promise<string | null> => {
+    if (options.store === undefined) return await options.io.readText(path)
+    const document = await options.store.read()
+    return document === null ? null : JSON.stringify(document)
+  }
   const writeIndex = async (task: (current: string | null) => string | null | Promise<string | null>): Promise<void> => {
+    if (options.store !== undefined) {
+      await options.store.write(async (current) => {
+        const raw = current === null ? null : JSON.stringify(current)
+        const next = await task(raw)
+        if (next === null) return null
+        return JSON.parse(next) as RunIndexDocument
+      })
+      return
+    }
     const run = async (): Promise<void> => { await transactIo(options.io, path, task) }
     const fence = options.resolveFence?.() ?? options.fence
   if (fence !== undefined) await fence.run(run)
@@ -368,7 +444,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
     async load() {
       let raw: string | null
       try {
-        raw = await options.io.readText(path)
+        raw = await readIndexText()
       } catch (error) {
         // A read FAILURE is not "no runs": say so instead of presenting an empty
         // registry as a clean history (the same three-state rule the probe files use).

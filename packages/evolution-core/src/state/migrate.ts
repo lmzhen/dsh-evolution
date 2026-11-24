@@ -20,6 +20,7 @@ import { emptyStateDocument, parseStateDocument, serializeStateDocument, type St
 import { StoreKernel } from '../store/store-kernel.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { STATE_V2_MIGRATION_MARKER, PROVIDER_STORE_V2 } from './constants.ts'
+import { parseRunIndexDocument, type RunIndexDocument } from '../run-registry.ts'
 import { EVOLUTION_DOMAIN } from './domain/index.ts'
 import {
   CURATOR_STATE_KEY,
@@ -182,7 +183,8 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
   const io = options.io
   const headPath = join(home, 'store-v2', 'head.json')
   const markerPath = join(home, 'state', STATE_V2_MIGRATION_MARKER)
-  const kernel = new StoreKernel({ io, home, fence: liveHomeFence(ctx, home), ...(options.now === undefined ? {} : { now: options.now }) })
+  const fence = liveHomeFence(ctx, home)
+  const kernel = new StoreKernel({ io, home, fence, ...(options.now === undefined ? {} : { now: options.now }) })
   const writeMarker = async (source: StateV2MigrationResult['source'], commitId: string, snapshot: StateStoreSnapshot): Promise<void> => {
     await io.writeText(markerPath, JSON.stringify({
       migratedAt: new Date(options.now?.() ?? Date.now()).toISOString(),
@@ -230,7 +232,14 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
     }
   }
   const document = { ...emptyStateDocument(), ...snapshot }
-  const result = await kernel.bootstrap({ state: document }, 'bootstrap')
+  // The run index is a separate legacy medium; migrate it in the same first
+  // commit so a v2 run registry never hides pre-migration run history.
+  const result = await fence.run(async () => {
+    const runsPath = join(home, 'runs.json')
+    let runs: RunIndexDocument | undefined
+    if (await io.exists(runsPath)) runs = parseRunIndexDocument(await io.readText(runsPath))
+    return await kernel.bootstrap({ state: document, ...(runs === undefined ? {} : { runs }) }, 'bootstrap')
+  })
   await writeMarker(source, result.commitId, snapshot)
   return {
     reviewSessions: Object.keys(snapshot.review).length,

@@ -298,6 +298,15 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：v2 provider conformance 3 tests、migrate command 6 tests、state provider/auto 11 tests（含 `state.lock` 持有时 v2 读完成）；`tsc` core/commands exit 0。
 - 尚未切默认：`auto` 仍走 v1/domain，只有显式 v2 marker 才用 v2；R7 才删 v1/domain 并切默认。
 
+#### R3 已落地（run registry 第一段）
+
+- `run-registry.ts` 增加可选 `RunStorePort`、`createRunStorePort`、`runStorePortIfV2`；没有 v2 marker 时仍走 `runs.json`，不改变旧行为。
+- `emptyRunIndex` / `parseRunIndexDocument` 是文件与 MVCC 共用的文档形状；run registry 的 begin/stage/settle/load/supersede 全部走同一 `writeIndex`/`readIndexText`。
+- `--to v2` 首次 commit 同时迁移 `runs.json` 到 `runs` 域；v2 下 `runs.json` 不再被写。
+- `evolution-commands`、`evolution-merge`、UI history 在 v2 marker 存在时注入 store port；否则继续 legacy。
+- 测试：run-registry-v2 2 tests、legacy run-registry 21 tests、v2 state 6 tests 通过；`tsc` core/commands/merge/ui exit 0。
+- 下一段：merge rows/reports 的 commit 适配，以及 v2 下 `runs` 域与 merge 域的同一 commit 关系。
+
 
 ## 6. 域与读写分类
 

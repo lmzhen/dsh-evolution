@@ -28,7 +28,7 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-commands': { kind: 'evolution-commands' } & ContextFormed
   }
 }
-import { appendEvolutionEvent, buildLearnPrompt, reviewPrompt, markReviewChannel, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, reviewPrompt, markReviewChannel, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, runStorePortIfV2, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
@@ -325,9 +325,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   ctx.inject(['evolutionIo'], (ioCtx) => {
     const ioRegistry = ioCtx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
     if (!ioRegistry) return
+    const home = evolutionHome()
+    const io = ioRegistry.provider()
+    const store = runStorePortIfV2(ioCtx, io, home)
     const registry = newRunRegistry({
-      io: ioRegistry.provider(),
-      home: evolutionHome(),
+      io,
+      home,
+      ...(store === undefined ? {} : { store }),
       warn: (message) => { ctx.logger.warn(message) },
       resolveFence: () => homeFenceFrom(ioCtx),
     })

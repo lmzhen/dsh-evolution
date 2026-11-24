@@ -14,7 +14,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 // Activates the Context merges this row reads. Type-only: the platform packages stay dev-time edges.
 import type {} from '@deepseek-ai/dsh-evolution-curator'
-import { newRunRegistry, evolutionHome, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { newRunRegistry, evolutionHome, runStorePortIfV2, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
 import { makeSkillHistoryRoutes } from './routes.ts'
@@ -61,7 +61,9 @@ export function apply(ctx: Context): void {
       const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
       if (ioRegistry === undefined) return null
       const io = ioRegistry.provider()
-      const registry = newRunRegistry({ io, home: evolutionHome() })
+      const home = evolutionHome()
+      const store = runStorePortIfV2(ctx, io, home)
+      const registry = newRunRegistry({ io, home, ...(store === undefined ? {} : { store }) })
       const loaded = await registry.load()
       if (!loaded.ok) return null
       const recent = registry.runs('governance').slice(0, 5)
@@ -105,7 +107,9 @@ export function apply(ctx: Context): void {
       const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
       if (ioRegistry === undefined) return null
       const io = ioRegistry.provider()
-      const registry = newRunRegistry({ io, home: evolutionHome() })
+      const home = evolutionHome()
+      const store = runStorePortIfV2(ctx, io, home)
+      const registry = newRunRegistry({ io, home, ...(store === undefined ? {} : { store }) })
       const loaded = await registry.load()
       if (!loaded.ok) return null
       const counts = { offload: 0, condense: 0, extract: 0 }
