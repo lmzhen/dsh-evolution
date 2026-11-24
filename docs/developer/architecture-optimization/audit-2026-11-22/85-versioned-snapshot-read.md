@@ -423,6 +423,12 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 删除未被生产引用的 `mergeStateIoIfV2` / `mergeAuxIoIfV2`，只保留一个 `mergeIoIfV2` 复合入口；
 - 测试改用复合入口，避免两套路径再次漂移；
 - 这是 R7 清理“重复适配器/兼容 shim”的第一项。
+
+#### R8 证据（跨进程无锁读）
+
+- `double-process-read.spec.ts`：父进程在 `HomeFence.run` 内持有 writer fence，子进程用构建后的 `lib/index.js` 打开同一 home 并 `StoreKernel.query(['state'])`，返回 bootstrap 快照；
+- 这证明读路径不依赖 writer lock，且子进程只读同一 commit；测试在 CI 的 build-lib 之后运行。
+- 尚未做：子进程读与崩溃恢复的组合、HMR 重挂载、fresh npm profile 真机验收。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
