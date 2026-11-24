@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedBy": "packages/scripts/verify-mutations.mjs --probes",
-  "generatedAt": "2026-11-24T17:23:52.667Z",
+  "generatedAt": "2026-11-24T21:15:09.773Z",
   "records": [
     {
       "probe": "beh-approval-owner-audit",
@@ -65,8 +65,8 @@
     },
     {
       "probe": "beh-run-registry",
-      "signature": "ce565c91289dace02ed99ff3ddbb28845ff2c41ffb5e2ec7dda9b34c21a15002",
-      "provenAt": "2026-11-24T17:23:52.658Z",
+      "signature": "3fee891b4886564268e344f44c1972dba409912d5c857671a737e3f55aa50fff",
+      "provenAt": "2026-11-24T21:15:09.765Z",
       "tree": "overlay"
     },
     {
