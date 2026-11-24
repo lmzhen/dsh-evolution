@@ -13,6 +13,7 @@
 export const STORE_DOMAIN_IDS = [
   'state',
   'merge',
+  'mergeMeta',
   'runs',
   'usage',
   'feedback',

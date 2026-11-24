@@ -95,6 +95,21 @@ describe('MVCC state provider', () => {
     expect((await kernel.query(['merge'])).domains.merge).toEqual({ text: JSON.stringify({ schemaVersion: 3, rows: [] }) + '\n' })
   })
 
+  it('migrates merge run-meta and reports into the same first commit', async () => {
+    const root = await tempRoot('dsh-state-v2-aux-')
+    const ctx = await mountStateStack(root)
+    const io = ctx.evolutionIo.provider()
+    await mkdir(join(root, 'merge', 'run-meta'), { recursive: true })
+    await mkdir(join(root, 'reports'), { recursive: true })
+    await writeFile(join(root, 'merge', 'run-meta', 'run-1.json'), '{"phase":"settled"}\n')
+    await writeFile(join(root, 'reports', 'maintain-1.json'), '{"ok":true}\n')
+    await migrateStateToV2(ctx, { io, home: root })
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    const snapshot = await kernel.query(['mergeMeta', 'reports'])
+    expect(snapshot.domains.mergeMeta).toEqual({ 'merge/run-meta/run-1.json': '{"phase":"settled"}\n' })
+    expect(snapshot.domains.reports).toEqual({ 'reports/maintain-1.json': '{"ok":true}\n' })
+  })
+
   it('reads while the legacy state.lock is held because locking is internal', async () => {
     const { root, io, fence } = await seeded()
     const ctx = await mountStateStack(root)

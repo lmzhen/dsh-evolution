@@ -8,6 +8,7 @@
  */
 
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Domain } from '@deepseek-ai/dsh-evolution-platform/contract'
@@ -240,10 +241,25 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
     if (await io.exists(runsPath)) runs = parseRunIndexDocument(await io.readText(runsPath))
     const mergePath = join(home, 'merge', 'merge-state.json')
     const mergeText = await io.exists(mergePath) ? await io.readText(mergePath) : null
+    const readDirMap = async (relativeDir: string): Promise<Record<string, string> | undefined> => {
+      const dir = join(home, relativeDir)
+      if (!existsSync(dir)) return undefined
+      const map: Record<string, string> = {}
+      for (const name of await io.list(dir)) {
+        if (name.startsWith('.')) continue
+        const text = await io.readText(join(dir, name))
+        if (text !== null) map[`${relativeDir}/${name}`] = text
+      }
+      return Object.keys(map).length === 0 ? undefined : map
+    }
+    const mergeMeta = await readDirMap('merge/run-meta')
+    const reports = await readDirMap('reports')
     return await kernel.bootstrap({
       state: document,
       ...(runs === undefined ? {} : { runs }),
       ...(mergeText === null ? {} : { merge: { text: mergeText } }),
+      ...(mergeMeta === undefined ? {} : { mergeMeta }),
+      ...(reports === undefined ? {} : { reports }),
     }, 'bootstrap')
   })
   await writeMarker(source, result.commitId, snapshot)

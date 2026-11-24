@@ -5,4 +5,5 @@
 
 export { StoreKernel } from './store-kernel.ts'
 export * from './scoped-text-io.ts'
+export * from './scoped-tree-io.ts'
 export * from './types.ts'
