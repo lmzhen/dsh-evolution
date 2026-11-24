@@ -28,7 +28,7 @@
  * reconciliation is skipped, the staging is unpublishable, and the release path
  * (tags) never passes it.
  */
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { publishableDirs } from './lib-family-packages.mjs'
@@ -141,7 +141,20 @@ function readJson(path) {
 
 function npmPack(cwd) {
   if (process.platform === 'win32') {
-    return execFileSync('cmd.exe', ['/c', 'npm', 'pack', '--json'], { cwd, encoding: 'utf8' })
+    const node = process.env.EVOLUTION_NPM_NODE
+    const cli = process.env.EVOLUTION_NPM_CLI
+    if (node !== undefined && cli !== undefined) {
+      return execFileSync(node, [cli, 'pack', '--json'], { cwd, encoding: 'utf8' })
+    }
+    // Node's piped stdio deadlocks npm's pack child on Windows; redirect to a
+    // file and inherit the console instead (manual shell pack is reliable).
+    const out = join(cwd, '.npm-pack.json')
+    try {
+      execFileSync('cmd.exe', ['/c', 'npm pack --json > .npm-pack.json'], { cwd, stdio: 'inherit' })
+      return readFileSync(out, 'utf8')
+    } finally {
+      try { unlinkSync(out) } catch {}
+    }
   }
   return execFileSync('npm', ['pack', '--json'], { cwd, encoding: 'utf8' })
 }

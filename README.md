@@ -94,7 +94,7 @@ See [docs/commands.md](docs/commands.md) for the command reference and [docs/con
 |---|---|
 | Validated platform line | **`0.2.2-rc.5`** |
 | Published dependency window | `0.2.2-rc.5` |
-| Family version | `0.60.1` |
+| Family version | `0.61.0` |
 | Node | `^22.19.0` or `>=24.0.0` |
 
 Published packages do not cross older prerelease platform lines. See [INSTALL.md](INSTALL.md) for installation and upgrade order.

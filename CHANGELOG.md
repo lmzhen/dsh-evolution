@@ -1,3 +1,12 @@
+## 0.61.0 (2026-11-24) — 检索增强与写入 authority 时序修复
+
+- 检索增强（可选）：设置角色新增“检索增强（可选）”卡片，只允许 SiliconFlow / StartLux 两把官方 Key；Key 通过平台 `ctx.credentials` 的固定 refs 解析，不新增插件自有 secret 存储、不写 `process.env`、不进入 cfg/report/log/客户端快照；
+- 引擎：显式运行 Key 接入 live semantic/rank provider；未配置 Key 时引擎默认字段、档位顺序、阈值、prompt、seed/round/floor 与改造前逐字段一致，错误 Key 仍走原降级链；UPSTREAM 实质冻结改为 324 文件 + 7 个声明 sourcePatchSet + 19 个 substance fingerprint，并校验发布 bundle 与源码 manifest 同源；
+- authority 时序：修复 issue #23 / PR #24 的 `mutationLock`/`homeFence` 构造时冻结问题；curator/merge/commands/skill-discovery/memory/activity 等长生命周期消费者改为调用时 authority accessor；merge rollback/recovery 使用 `fence.run`，避免嵌套公共写自锁；
+- 状态：迁移 marker 写失败可恢复，显式 store pin/完整 store image 校验，损坏 marker 提前 fail loud，删除 marker 不再静默回退丢 store-era 写，`evolutionHome()` 成为唯一 home 源，HMR 重新解析 IO/authority；
+- 写入内核：PreparedMutation 单次消费，journal committed/failed 失败改为结构化 warning，不再产生“target 回滚但 snapshot committed”的分叉；
+- 验证：CI 9/9（pack、cohort、validate node22、desktop、cohort evidence），authority/curator/merge/state/UI 定向测试通过；检索增强未配置 Key 时行为不变，配置 Key 后只让原有云端档可用。
+
 ## 0.60.1 (2026-11-23) — 新装 IO provider 修复
 
 - P1：`evolution-all` / `evolution-host` 的 bundle patch 现在注册 `evolution-io-node`（node:fs provider），新 profile 不再因缺少默认 IO provider 卡在 `merge-state-v4-required` / `no evolution IO provider registered`；
