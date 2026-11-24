@@ -25,6 +25,28 @@ const command = (overrides: { dryRun?: boolean; positionals?: string[] } = {}) =
 })
 
 describe('/evolution migrate state', () => {
+  it('migrates to MVCC with --to v2 and writes the v2 head', async () => {
+    const { ctx, home } = await seeded()
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const result = await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['to', 'v2']]), positionals: [] }, ctx })
+      expect(result).toMatchObject({ kind: 'success' })
+      expect(await ctx.evolutionIo.provider().exists(join(home, 'evolution', 'store-v2', 'head.json'))).toBe(true)
+      expect(await ctx.evolutionIo.provider().exists(join(home, 'evolution', 'state', '.migrated-to-store-v2.json'))).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+    }
+  })
+
+  it('rejects an unknown --to target instead of silently using v1', async () => {
+    const { ctx } = await seeded()
+    const result = await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['to', 'v9']]), positionals: [] }, ctx })
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('migrate state')
+  })
+
   it('writes the store and reports the counts', async () => {
     const { ctx, home } = await seeded()
     const previous = process.env.DSH_HOME

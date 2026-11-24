@@ -682,24 +682,24 @@
       "pt": "/evolution subcomandos ({count}):"
     },
     "summary.migrate state": {
-      "zh": "把旧 domain 的 pending/review/curator 状态迁到文件 StateStore（显式、不覆盖已有 store）",
-      "en": "Move pending/review/curator state from the old domain to the file StateStore (explicit; never overwrites an existing store)",
-      "ja": "旧 domain の pending/review/curator 状態をファイル StateStore へ移行します（明示的、既存 store は上書きしません）",
-      "es": "Mueve el estado pending/review/curator del domain anterior al StateStore de archivo (explícito; no sobrescribe un store existente)",
-      "fr": "Déplace l’état pending/review/curator de l’ancien domain vers le StateStore fichier (explicite ; n’écrase jamais un store existant)",
-      "de": "Verschiebt pending/review/curator-Zustand vom alten Domain in den Datei-StateStore (explizit; überschreibt keinen vorhandenen Store)",
-      "pt": "Move o estado pending/review/curator do domain antigo para o StateStore em arquivo (explícito; nunca sobrescreve um store existente)",
-      "ru": "Переносит состояние pending/review/curator из старого domain в файловый StateStore (явно; не перезаписывает существующий store)"
+      "zh": "把旧 domain/文件 StateStore 状态迁到 MVCC（--to v2；显式、不覆盖已有数据）",
+      "en": "Move domain/file StateStore state to MVCC (--to v2; explicit; never overwrites existing data)",
+      "ja": "旧 domain／ファイル StateStore の状態を MVCC へ移行します（--to v2、明示的、既存データは上書きしません）",
+      "es": "Mueve el estado domain/StateStore de archivo a MVCC (--to v2; explícito; no sobrescribe datos existentes)",
+      "fr": "Déplace l’état domain/StateStore fichier vers MVCC (--to v2 ; explicite ; n’écrase jamais les données existantes)",
+      "de": "Verschiebt domain/Datei-StateStore-Zustand nach MVCC (--to v2; explizit; überschreibt keine vorhandenen Daten)",
+      "pt": "Move o estado domain/StateStore em arquivo para MVCC (--to v2; explícito; nunca sobrescreve dados existentes)",
+      "ru": "Переносит состояние domain/файлового StateStore в MVCC (--to v2; явно; не перезаписывает существующие данные)"
     },
     "help.migrate state": {
-      "zh": "用法：migrate state [--dry-run]\n只迁移 pending/review/curator；不删除旧 domain 数据；已有 store 时拒绝覆盖。",
-      "en": "Usage: migrate state [--dry-run]\nMigrates pending/review/curator only; the old domain data is kept; an existing store is never overwritten.",
-      "ja": "使い方：migrate state [--dry-run]\npending/review/curator のみ移行します。旧 domain のデータは削除しません。既存の store は上書きしません。",
-      "es": "Uso: migrate state [--dry-run]\nSolo migra pending/review/curator; los datos del domain anterior se conservan; un store existente nunca se sobrescribe.",
-      "fr": "Utilisation : migrate state [--dry-run]\nMigre uniquement pending/review/curator ; les données de l’ancien domain sont conservées ; un store existant n’est jamais écrasé.",
-      "de": "Verwendung: migrate state [--dry-run]\nMigriert nur pending/review/curator; die alten domain-Daten bleiben erhalten; ein vorhandener Store wird nie überschrieben.",
-      "pt": "Uso: migrate state [--dry-run]\nMigra apenas pending/review/curator; os dados do domain antigo são mantidos; um store existente nunca é sobrescrito.",
-      "ru": "Использование: migrate state [--dry-run]\nПереносит только pending/review/curator; данные старого domain сохраняются; существующий store никогда не перезаписывается."
+      "zh": "用法：migrate state [--dry-run] [--to v2]\n只迁移 pending/review/curator；不删除旧数据；已有 v2 head/store 时拒绝覆盖。",
+      "en": "Usage: migrate state [--dry-run] [--to v2]\nMigrates pending/review/curator only; old data is kept; an existing v2 head/store is never overwritten.",
+      "ja": "使い方：migrate state [--dry-run] [--to v2]\npending/review/curator のみ移行します。旧データは削除しません。既存の v2 head/store は上書きしません。",
+      "es": "Uso: migrate state [--dry-run] [--to v2]\nSolo migra pending/review/curator; los datos anteriores se conservan; un head/store v2 existente nunca se sobrescribe.",
+      "fr": "Utilisation : migrate state [--dry-run] [--to v2]\nMigre uniquement pending/review/curator ; les données précédentes sont conservées ; un head/store v2 existant n’est jamais écrasé.",
+      "de": "Verwendung: migrate state [--dry-run] [--to v2]\nMigriert nur pending/review/curator; alte Daten bleiben erhalten; ein vorhandener v2-Head/Store wird nie überschrieben.",
+      "pt": "Uso: migrate state [--dry-run] [--to v2]\nMigra apenas pending/review/curator; os dados antigos são mantidos; um head/store v2 existente nunca é sobrescrito.",
+      "ru": "Использование: migrate state [--dry-run] [--to v2]\nПереносит только pending/review/curator; старые данные сохраняются; существующий v2 head/store никогда не перезаписывается."
     },
     "command.migrate state.done": {
       "zh": "已迁移：review={review} 个会话，pending={pending} 条，curator={curator}；store={path}",

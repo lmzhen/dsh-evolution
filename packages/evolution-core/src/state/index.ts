@@ -22,7 +22,7 @@ import type {
   PendingStatus,
   ReviewStateRecord,
 } from './storage.ts'
-import { PROVIDER_DOMAIN, PROVIDER_STORE, STATE_MIGRATION_MARKER } from './storage.ts'
+import { PROVIDER_DOMAIN, PROVIDER_STORE, PROVIDER_STORE_V2, STATE_MIGRATION_MARKER, STATE_V2_MIGRATION_MARKER } from './storage.ts'
 import { parseStateStoreImage } from './store.ts'
 
 export * from './storage.ts'
@@ -106,9 +106,34 @@ export class EvolutionState extends Service {
     }
   }
 
+  /** The v2 marker promises a readable MVCC head; a marker without one must not select an empty store. */
+  private assertV2MarkerStore(): void {
+    const marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
+    if (!existsSync(marker)) return
+    const head = join(this.home, 'store-v2', 'head.json')
+    try {
+      const markerBody = JSON.parse(readFileSync(marker, 'utf8'))
+      const headText = readFileSync(head, 'utf8')
+      if (headText.trim() === '') throw new Error('v2 head is empty')
+      const parsed = JSON.parse(headText) as { commitId?: unknown }
+      if (typeof parsed.commitId !== 'string' || !/^[0-9a-f]{64}$/.test(parsed.commitId)) throw new Error('v2 head has no commitId')
+      if (typeof markerBody !== 'object' || markerBody === null || (markerBody as { target?: unknown }).target !== PROVIDER_STORE_V2) {
+        throw new Error('marker target is not ' + PROVIDER_STORE_V2)
+      }
+    } catch (error) {
+      throw new Error('evolution-state: the v2 migration marker/head is missing or unreadable: ' + (error instanceof Error ? error.message : String(error)))
+    }
+  }
+
   private assertProviderChoice(): void {
     if (this.providerName === 'auto') {
       const names = this.ctx.evolutionStateStorage.providerNames()
+      const v2Marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
+      if (existsSync(v2Marker)) {
+        if (!names.includes(PROVIDER_STORE_V2)) throw new Error('evolution-state: the v2 migration marker exists but no "' + PROVIDER_STORE_V2 + '" provider is registered')
+        this.assertV2MarkerStore()
+        return
+      }
       const marker = join(this.home, 'state', STATE_MIGRATION_MARKER)
       if (existsSync(marker)) {
         if (!names.includes(PROVIDER_STORE)) throw new Error('evolution-state: the migration marker exists but no "' + PROVIDER_STORE + '" provider is registered')
@@ -117,6 +142,12 @@ export class EvolutionState extends Service {
       return
     }
     if (this.providerName !== '') {
+      if (this.providerName === PROVIDER_STORE_V2) {
+        const marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
+        if (!existsSync(marker)) throw new Error('evolution-state: provider "' + PROVIDER_STORE_V2 + '" is pinned but the v2 migration marker is missing; run /evolution migrate state --to v2 first')
+        this.assertV2MarkerStore()
+        return
+      }
       if (this.providerName === PROVIDER_STORE) {
         const marker = join(this.home, 'state', STATE_MIGRATION_MARKER)
         if (!existsSync(marker)) throw new Error('evolution-state: provider "' + PROVIDER_STORE + '" is pinned but the migration marker is missing; refusing to read an empty store as authority')
@@ -136,6 +167,11 @@ export class EvolutionState extends Service {
   /** `auto` is the migration switch: the marker is the explicit one-way signal. */
   private autoProviderName(): string {
     const names = this.ctx.evolutionStateStorage.providerNames()
+    const v2Marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
+    if (existsSync(v2Marker)) {
+      this.assertV2MarkerStore()
+      return PROVIDER_STORE_V2
+    }
     const marker = join(this.home, 'state', STATE_MIGRATION_MARKER)
     if (existsSync(marker)) {
       // Full image validation: size alone lets a whitespace/truncated file pass.
@@ -160,10 +196,17 @@ export class EvolutionState extends Service {
     }
   }
 
-  /** Validate, then serialize against migration across processes. */
-  private run<T>(task: () => Promise<T>): Promise<T> {
+  /** Validate the pin synchronously, then resolve the current provider
+   * asynchronously so an auto marker failure is a rejected operation, matching
+   * the legacy caller contract. `internal` providers own their writer lock;
+   * legacy providers keep the caller-side state.lock. */
+  private run<T>(task: (storage: EvolutionStateStorage) => Promise<T>): Promise<T> {
     this.assertResolvable()
-    return this.withStateLock(task)
+    return (async () => {
+      const storage = this.storage()
+      if (storage.locking === 'internal') return await task(storage)
+      return await this.withStateLock(() => task(storage))
+    })()
   }
 
   /** Serialize state operations against the migration command across processes. */
@@ -187,50 +230,50 @@ export class EvolutionState extends Service {
 
   /** A2: refresh the mounted provider before a decision reads pending state. */
   reload(): Promise<void> {
-    return this.run(async () => this.storage().reload?.() ?? Promise.resolve())
+    return this.run(async storage => storage.reload?.() ?? Promise.resolve())
   }
 
   loadReviewState(sessionId: string): Promise<ReviewStateRecord | null> {
-    return this.run(async () => this.storage().loadReviewState(sessionId))
+    return this.run(async storage => storage.loadReviewState(sessionId))
   }
 
   saveReviewState(sessionId: string, record: ReviewStateRecord): Promise<void> {
-    return this.run(async () => this.storage().saveReviewState(sessionId, record))
+    return this.run(async storage => storage.saveReviewState(sessionId, record))
   }
 
   loadCuratorState(): Promise<CuratorStateRecord | null> {
-    return this.run(async () => this.storage().loadCuratorState())
+    return this.run(async storage => storage.loadCuratorState())
   }
 
   saveCuratorState(record: CuratorStateRecord): Promise<void> {
-    return this.run(async () => this.storage().saveCuratorState(record))
+    return this.run(async storage => storage.saveCuratorState(record))
   }
 
   /** Atomic read-modify-write the curator-state record (S5.5): `task` returns
    * the next record; returning null keeps the current record unchanged (the
    * seam has no delete semantic). */
   transactCuratorState(task: (current: CuratorStateRecord | null) => CuratorStateRecord | null): Promise<void> {
-    return this.run(async () => this.storage().transactCuratorState(task))
+    return this.run(async storage => storage.transactCuratorState(task))
   }
 
   listPending(status: PendingStatus = 'pending'): Promise<PendingRecord[]> {
-    return this.run(async () => this.storage().listPending(status))
+    return this.run(async storage => storage.listPending(status))
   }
 
   savePending(record: PendingRecord): Promise<void> {
-    return this.run(async () => this.storage().savePending(record))
+    return this.run(async storage => storage.savePending(record))
   }
 
   tryResolvePending(id: string, status: 'approved' | 'rejected', expectedClaimId?: string) {
-    return this.run(async () => this.storage().tryResolvePending(id, status, expectedClaimId))
+    return this.run(async storage => storage.tryResolvePending(id, status, expectedClaimId))
   }
 
   claimPending(id: string, claimId: string) {
-    return this.run(async () => this.storage().claimPending(id, claimId))
+    return this.run(async storage => storage.claimPending(id, claimId))
   }
 
   releasePendingClaim(id: string, claimId: string) {
-    return this.run(async () => this.storage().releasePendingClaim(id, claimId))
+    return this.run(async storage => storage.releasePendingClaim(id, claimId))
   }
 }
 

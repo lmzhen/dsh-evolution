@@ -82,6 +82,12 @@ export interface PendingResolution {
 /** Provider seam for durable evolution state; implementations own the medium. */
 export interface EvolutionStateStorage {
   readonly name: string
+  /**
+   * Where the cross-process writer lock lives. `consumer` (default) means the
+   * caller wraps operations in the legacy state.lock; `internal` means the
+   * provider serializes its own writes and readers must not take that lock.
+   */
+  readonly locking?: 'consumer' | 'internal'
   /** Re-read the durable medium; providers authoritative in memory omit this. */
   reload?(): Promise<void>
   /** Migration/diagnostics only: all review rows with their eviction stamps. */

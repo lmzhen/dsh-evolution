@@ -19,6 +19,10 @@ export const CURATOR_STATE_KEY = 'primary'
 /** Provider names as registered on the `evolutionStateStorage` seam. */
 export const PROVIDER_DOMAIN = 'domain'
 export const PROVIDER_STORE = 'store'
+/** MVCC-backed provider name; selected only after its explicit marker exists. */
+export const PROVIDER_STORE_V2 = 'store-v2'
+/** Marker written after an explicit domain/v1 → v2 migration; `auto` uses it to pick the MVCC authority. */
+export const STATE_V2_MIGRATION_MARKER = '.migrated-to-store-v2.json'
 /** Marker written after an explicit domain→store migration; `auto` uses it to pick the authority. */
 export const STATE_MIGRATION_MARKER = '.migrated-from-domain.json'
 

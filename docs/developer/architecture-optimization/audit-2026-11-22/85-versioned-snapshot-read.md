@@ -287,6 +287,17 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 所有 state 命令/工具/UI 不需要改调用签名；只由 `EvolutionState` 内部选择 provider；
 - 更新 77/78/80：D1-LOCK-READ 的 v2 部分通过 locking 分支实现，v1 过渡未删除。
 
+#### R2 已落地（第一段）
+
+- `state/document.ts`：v1/v2 共用的 parse/serialize、review/pending/curator reducer；v1 `state/store.ts` 已改用，不再有第二套 claim/resolve/overflow 规则。
+- `state/v2-provider.ts`：`store-v2` provider，`locking: 'internal'`，所有读走 `kernel.query(['state'])`，所有写走 `kernel.mutate`。
+- `EvolutionState`：`run()` 同步校验后按 `locking` 分支；v1/domain 继续 `state.lock`，v2 不取。
+- `auto`：v2 marker 优先，其次 v1 marker，其次 domain；v2 marker 缺 head 时 mount/first-op fail closed。
+- `/evolution migrate state --to v2`：从 v1 store 或 domain 读取完整 document，`kernel.bootstrap`，写 `.migrated-to-store-v2.json`；v1/domain 不删除；head 已存在且 marker 缺失时按 head 恢复 marker。
+- `store-plugin` 同时注册 v1/v2 provider；v2 provider 每次 apply 新建，fence 用 `liveHomeFence`，不在构造期冻结 authority。
+- 测试：v2 provider conformance 3 tests、migrate command 6 tests、state provider/auto 11 tests（含 `state.lock` 持有时 v2 读完成）；`tsc` core/commands exit 0。
+- 尚未切默认：`auto` 仍走 v1/domain，只有显式 v2 marker 才用 v2；R7 才删 v1/domain 并切默认。
+
 
 ## 6. 域与读写分类
 

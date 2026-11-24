@@ -10,7 +10,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
-import { migrateDomainToStore } from '@deepseek-ai/dsh-evolution-core/state/migrate'
+import { migrateDomainToStore, migrateStateToV2 } from '@deepseek-ai/dsh-evolution-core/state/migrate'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { hostCommandText } from '../host-locale.ts'
 import type { HostLocale } from '@deepseek-ai/dsh-evolution-core'
@@ -34,6 +34,10 @@ export function runMigrateStateCommand(context: MigrateStateContext): CommandRes
     return err(hostCommandText(context.locale, 'help.migrate state'))
   }
   const dryRun = context.command.flags.get('dry-run') === true
+  const to = context.command.flags.get('to')
+  if (to !== undefined && to !== 'v2') {
+    return err(hostCommandText(context.locale, 'help.migrate state'))
+  }
   // The command handler context is a restricted child: a bare `ctx.get` does
   // not grant the services. Inject first, then migrate on the scoped context.
   return new Promise<CommandResult>(resolve => {
@@ -41,7 +45,9 @@ export function runMigrateStateCommand(context: MigrateStateContext): CommandRes
       void (async (): Promise<void> => {
         try {
           const io = (scoped as unknown as { evolutionIo: { provider(): EvolutionIoLike } }).evolutionIo.provider()
-          const result = await migrateDomainToStore(scoped, { io, home: evolutionHome(), dryRun })
+          const result = to === 'v2'
+            ? await migrateStateToV2(scoped, { io, home: evolutionHome(), dryRun })
+            : await migrateDomainToStore(scoped, { io, home: evolutionHome(), dryRun })
           const values = { review: result.reviewSessions, pending: result.pending, curator: result.curator ? 'yes' : 'no', path: result.path }
           let text = hostCommandText(context.locale, dryRun ? 'command.migrate state.dry' : 'command.migrate state.done', values)
           const selection = (scoped as unknown as { evolutionState?: { providerSelection?: () => { configured: string; effective: string } } }).evolutionState?.providerSelection?.()

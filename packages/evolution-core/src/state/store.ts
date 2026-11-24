@@ -1,13 +1,11 @@
 /**
  * File-backed StateStore provider.
  *
- * This is the first D1 step: the provider owns ONE JSON file and every
- * transition is a read-modify-write inside the IO seam's transaction. There is
- * no process-local authoritative copy; `reload()` is therefore unnecessary and
- * reads always observe the medium.
+ * The provider owns ONE JSON document and every transition is a
+ * read-modify-write inside the IO seam's transaction. The document rules live
+ * in `state/document.ts`, shared with the v2 MVCC provider, so a claim/resolve
+ * or overflow change cannot drift between media.
  *
- * It is intentionally not mounted by the bundle yet: the domain provider is
- * still the shipped one until the migration/rollback path is implemented.
  * @module @deepseek-ai/dsh-evolution-core/state/store
  */
 
@@ -15,38 +13,37 @@ import { join } from 'node:path'
 import { evolutionHome } from '../state-store.ts'
 import { transactIo, type EvolutionIoLike } from '../io.ts'
 import {
-  assertCloneable,
-  canClaimPending,
-  canResolvePending,
-  cloneRecord,
-  recordIssue,
-  releasedStatus,
-  CURATOR_STATE_TABLE,
-  PENDING_RESOLVED_CAP,
-  PENDING_TABLE,
+  emptyStateDocument,
+  parseStateDocument,
+  readStateDocument,
+  serializeStateDocument,
+  snapshotStateDocument,
+  type StateDocument,
+  type StateDocumentSnapshot,
+} from './document.ts'
+import {
+  claimPendingInDocument,
+  listPendingInDocument,
+  releasePendingClaimInDocument,
+  resolvePendingInDocument,
+  saveCuratorInDocument,
+  savePendingInDocument,
+  saveReviewInDocument,
+  transactCuratorInDocument,
+} from './document.ts'
+import {
   PROVIDER_STORE,
-  REVIEW_STATE_SESSION_CAP,
-  REVIEW_STATE_TABLE,
-  selectPendingOverflow,
-  selectSessionOverflow,
-  type CuratorStateRecord,
-  type EvolutionStateStorage,
-  type PendingRecord,
-  type PendingResolution,
-  type PendingStatus,
-  type ReviewStateRecord,
-} from './index.ts'
+} from './constants.ts'
+import type {
+  CuratorStateRecord,
+  EvolutionStateStorage,
+  PendingRecord,
+  PendingResolution,
+  PendingStatus,
+  ReviewStateRecord,
+} from '../contract.ts'
 
-const STORE_VERSION = 1
-
-export type StoredReviewState = ReviewStateRecord & { updatedAt?: number }
-
-interface StoreFile {
-  version: typeof STORE_VERSION
-  review: Record<string, StoredReviewState>
-  curator: CuratorStateRecord | null
-  pending: Record<string, PendingRecord>
-}
+export type { StoredReviewState } from './document.ts'
 
 export interface StateStoreOptions {
   readonly io: EvolutionIoLike
@@ -56,23 +53,17 @@ export interface StateStoreOptions {
   readonly path?: string
 }
 
-const emptyStore = (): StoreFile => ({ version: STORE_VERSION, review: {}, curator: null, pending: {} })
-
 /** A complete store image, built by migration or by the provider itself. */
-export interface StateStoreSnapshot {
-  readonly review: Record<string, StoredReviewState>
-  readonly curator: CuratorStateRecord | null
-  readonly pending: Record<string, PendingRecord>
-}
+export type StateStoreSnapshot = StateDocumentSnapshot
 
 /** Validate and publish a complete store image. The write is create-if-absent:
  * an existing store is never overwritten by a migration. */
 export async function writeStateStoreSnapshot(io: EvolutionIoLike, path: string, snapshot: StateStoreSnapshot): Promise<void> {
-  const store: StoreFile = { ...emptyStore(), ...snapshot }
-  const text = serialize(store)
+  const document: StateDocument = { ...emptyStateDocument(), ...snapshot }
+  const text = serializeStateDocument(document)
   // Parsing our own image catches a migration source that produced a bad record
   // before the first byte reaches the medium.
-  parseStore(text)
+  parseStateDocument(text)
   if (io.exists !== undefined && await io.exists(path)) throw new Error('evolution-state-store: refusing to overwrite an existing store: ' + path)
   if (io.createTextIfAbsent !== undefined) {
     await io.createTextIfAbsent(path, text)
@@ -84,105 +75,46 @@ export async function writeStateStoreSnapshot(io: EvolutionIoLike, path: string,
 
 /** Parse a whole store image synchronously; a corrupt store fails loud. */
 export function parseStateStoreImage(text: string): StateStoreSnapshot {
-  const store = parseStore(text)
-  return { review: store.review, curator: store.curator, pending: store.pending }
+  return snapshotStateDocument(parseStateDocument(text))
 }
 
 /** Read a validated store image; a corrupt store fails loud. */
 export async function readStateStoreSnapshot(io: EvolutionIoLike, path: string): Promise<StateStoreSnapshot> {
-  const store = parseStore(await io.readText(path))
-  return { review: store.review, curator: store.curator, pending: store.pending }
+  return snapshotStateDocument(await readStateDocument(io, path))
 }
-
-function invalid(message: string): never {
-  throw new Error('evolution-state-store: ' + message)
-}
-
-/** Parse and validate one whole store image. A corrupt store fails loud: silently
- * treating it as empty would overwrite the only copy. */
-function parseStore(text: string | null): StoreFile {
-  if (text === null || text.trim() === '') return emptyStore()
-  let raw: unknown
-  try {
-    raw = JSON.parse(text)
-  } catch (error) {
-    invalid('store is not valid JSON: ' + (error instanceof Error ? error.message : String(error)))
-  }
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) invalid('store must be an object')
-  const candidate = raw as Record<string, unknown>
-  if (candidate.version !== STORE_VERSION) invalid('unsupported store version: ' + String(candidate.version))
-  const review = candidate.review
-  const pending = candidate.pending
-  if (typeof review !== 'object' || review === null || Array.isArray(review)) invalid('review must be an object')
-  if (typeof pending !== 'object' || pending === null || Array.isArray(pending)) invalid('pending must be an object')
-  const store = emptyStore()
-  for (const [sessionId, record] of Object.entries(review as Record<string, unknown>)) {
-    const issue = recordIssue(REVIEW_STATE_TABLE, record)
-    if (issue !== null) invalid(`review[${sessionId}]: ${issue}`)
-    store.review[sessionId] = cloneRecord(record as StoredReviewState)
-  }
-  for (const [key, record] of Object.entries(pending as Record<string, unknown>)) {
-    const issue = recordIssue(PENDING_TABLE, record)
-    if (issue !== null) invalid(`pending[${key}]: ${issue}`)
-    const pendingRecord = cloneRecord(record as PendingRecord)
-    // A hand-written/legacy slot whose key drifted from record.id is reachable
-    // by claim/resolve only after re-keying; the canonical id wins.
-    if (pendingRecord.id !== key) {
-      if (store.pending[pendingRecord.id] === undefined) store.pending[pendingRecord.id] = pendingRecord
-      continue
-    }
-    store.pending[pendingRecord.id] = pendingRecord
-  }
-  const curator = candidate.curator
-  if (curator !== undefined && curator !== null) {
-    const issue = recordIssue(CURATOR_STATE_TABLE, curator)
-    if (issue !== null) invalid('curator: ' + issue)
-    store.curator = cloneRecord(curator as CuratorStateRecord)
-  }
-  return store
-}
-
-const serialize = (store: StoreFile): string => JSON.stringify(store, null, 2) + '\n'
 
 /**
  * Build the file-backed provider. All mutating methods are a single
- * `transactIo` RMW; readers parse the current file, never a cached copy.
+ * `transactIo` RMW over the shared document; readers parse the current file,
+ * never a cached copy.
  */
 export function createStateStoreProvider(options: StateStoreOptions): EvolutionStateStorage {
   const file = options.path ?? join(options.home ?? evolutionHome(), 'state', 'store.json')
   const io = options.io
 
-  const read = async (): Promise<StoreFile> => parseStore(await io.readText(file))
+  const read = async (): Promise<StateDocument> => await readStateDocument(io, file)
 
-  const mutate = async <T>(task: (store: StoreFile) => T | Promise<T>): Promise<T> => {
+  const mutate = async <T>(task: (document: StateDocument) => T | Promise<T>): Promise<T> => {
     let result: T
     let ran = false
     await transactIo(io, file, (current) => {
-      const store = parseStore(current)
-      // The task assigns the result; it cannot throw with a half-written file
-      // because the transaction only writes after this callback resolves.
-      const outcome = task(store)
+      const document = parseStateDocument(current)
+      const outcome = task(document)
       if (outcome instanceof Promise) {
         return outcome.then((value) => {
           result = value
           ran = true
-          const next = serialize(store)
+          const next = serializeStateDocument(document)
           return next === current ? current : next
         })
       }
       result = outcome
       ran = true
-      const next = serialize(store)
+      const next = serializeStateDocument(document)
       return next === current ? current : next
     })
     if (!ran) throw new Error('evolution-state-store: transaction did not run the task')
     return result!
-  }
-
-  const savePendingValidated = (record: PendingRecord): PendingRecord => {
-    const issue = recordIssue(PENDING_TABLE, record) ?? assertCloneable(record)
-    if (issue !== null) throw new Error('evolution-state-store: refusing to persist an invalid pending record: ' + issue)
-    return cloneRecord(record)
   }
 
   return {
@@ -203,26 +135,7 @@ export function createStateStoreProvider(options: StateStoreOptions): EvolutionS
     },
 
     async saveReviewState(sessionId, record) {
-      const issue = recordIssue(REVIEW_STATE_TABLE, record) ?? assertCloneable(record)
-      if (issue !== null) throw new Error('evolution-state-store: refusing to persist an invalid review-state record: ' + issue)
-      await mutate((store) => {
-        store.review[sessionId] = { ...cloneRecord(record), updatedAt: Date.now() }
-        const entries = Object.entries(store.review)
-          .filter(([key]) => key !== sessionId)
-          .map(([key, row]) => ({ key, updatedAt: row.updatedAt ?? 0 }))
-        for (const victim of selectSessionOverflow(entries, {
-          keyOf: entry => entry.key,
-          stampOf: entry => entry.updatedAt,
-        }, REVIEW_STATE_SESSION_CAP)) {
-          // Re-read the stamp immediately before deleting; the transaction
-          // already serializes writers, so this is only for a value the task
-          // itself changed earlier in this same callback.
-          const current = store.review[victim]
-          if (current === undefined) continue
-          if ((current.updatedAt ?? 0) !== entries.find(entry => entry.key === victim)?.updatedAt) continue
-          delete store.review[victim]
-        }
-      })
+      await mutate(document => { saveReviewInDocument(document, sessionId, record) })
     },
 
     async loadCuratorState() {
@@ -231,91 +144,33 @@ export function createStateStoreProvider(options: StateStoreOptions): EvolutionS
     },
 
     async saveCuratorState(record) {
-      const issue = recordIssue(CURATOR_STATE_TABLE, record) ?? assertCloneable(record)
-      if (issue !== null) throw new Error('evolution-state-store: refusing to persist an invalid curator-state record: ' + issue)
-      await mutate((store) => { store.curator = cloneRecord(record) })
+      await mutate(document => { saveCuratorInDocument(document, record) })
     },
 
     async transactCuratorState(task) {
-      await mutate((store) => {
-        const current = store.curator === null ? null : cloneRecord(store.curator)
-        const next = task(current)
-        // The seam contract: null means "keep the current record", not delete.
-        if (next === null) return
-        const issue = recordIssue(CURATOR_STATE_TABLE, next) ?? assertCloneable(next)
-        if (issue !== null) throw new Error('evolution-state-store: refusing to persist an invalid curator-state record: ' + issue)
-        store.curator = cloneRecord(next)
-      })
+      await mutate(document => { transactCuratorInDocument(document, task) })
     },
 
     async listPending(status: PendingStatus = 'pending') {
-      const store = await read()
-      const seen = new Set<string>()
-      const out: PendingRecord[] = []
-      for (const record of Object.values(store.pending)) {
-        if (record.status !== status) continue
-        if (seen.has(record.id)) continue
-        seen.add(record.id)
-        out.push(structuredClone(record))
-      }
-      return out
+      return listPendingInDocument(await read(), status)
     },
 
     async savePending(record) {
-      const valid = savePendingValidated(record)
-      await mutate((store) => { store.pending[valid.id] = valid })
+      await mutate(document => { savePendingInDocument(document, record) })
     },
 
     async claimPending(id, claimId) {
-      let claimed: PendingRecord | null = null
-      await mutate((store) => {
-        const current = store.pending[id]
-        if (current === undefined || !canClaimPending(current.status)) return
-        const next: PendingRecord = {
-          ...current,
-          status: 'executing',
-          claimedBy: claimId,
-          claimedAt: new Date().toISOString(),
-        }
-        store.pending[id] = next
-        claimed = structuredClone(next)
-      })
-      return claimed
+      return await mutate(document => claimPendingInDocument(document, id, claimId))
     },
 
     async releasePendingClaim(id, claimId) {
-      await mutate((store) => {
-        const current = store.pending[id]
-        if (current === undefined || current.claimedBy !== claimId) return
-        if (current.status !== 'pending' && current.status !== 'executing') return
-        const next: PendingRecord = { ...current, status: releasedStatus(current.status) }
-        delete next.claimedBy
-        delete next.claimedAt
-        store.pending[id] = next
-      })
+      await mutate(document => { releasePendingClaimInDocument(document, id, claimId) })
     },
 
     async tryResolvePending(id, status, expectedClaimId): Promise<PendingResolution> {
-      let outcome: PendingResolution = { record: null, applied: false }
-      await mutate((store) => {
-        const current = store.pending[id]
-        if (current === undefined) return
-        if (!canResolvePending(current.status)) {
-          outcome = { record: structuredClone(current), applied: false }
-          return
-        }
-        if (expectedClaimId !== undefined && current.claimedBy !== expectedClaimId) {
-          outcome = { record: structuredClone(current), applied: false }
-          return
-        }
-        const resolved: PendingRecord = { ...current, status, resolvedAt: new Date().toISOString() }
-        store.pending[id] = resolved
-        outcome = { record: structuredClone(resolved), applied: true }
-        for (const victim of selectPendingOverflow(Object.values(store.pending), PENDING_RESOLVED_CAP)) {
-          if (store.pending[victim.id]?.resolvedAt === victim.resolvedAt) delete store.pending[victim.id]
-        }
-      })
-      return outcome
+      return await mutate(document => resolvePendingInDocument(document, id, status, expectedClaimId))
     },
   }
 }
+
+export type { CuratorStateRecord, PendingRecord, ReviewStateRecord }
