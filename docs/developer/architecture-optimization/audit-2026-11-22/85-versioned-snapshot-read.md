@@ -371,6 +371,13 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 失败模型：metadata commit 失败只 `console.warn`，树内容以 UnitKernel 快照为准；materialized tree 仍是迁移期 fallback。
 - 测试：tree-manifest-boundary 1 test；`tsc` core 0。
 - 尚未做：外层面板/命令层显式 flush（当前依赖公开方法边界）、materialized tree 的读兼容切换。
+
+#### R7a 已落地（surface registry）
+
+- `store/surface.ts`：登记 DCR-85 第 9 节全部模型工具、host 命令、UI action 的稳定 `id`、`kind`、读/写域、`expectsCommit`；不登记任何 secret 载体，settings/credentials 的读写域为空。
+- `requireStoreSurfaceCommand(id)` 对新 surface 失败关闭；`store-surface.spec.ts` 校验每个 `HOST_COMMAND_DEFS` id 都在 registry 中、registry 的 command 都是真实 host 命令、id 唯一。
+- 测试：store-surface 3 tests；`tsc` core/commands 0。
+- 尚未做：把 dispatch/route 实际改为只调用 query/command；该 registry 是 R7b 的闭包检查基线。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
 
