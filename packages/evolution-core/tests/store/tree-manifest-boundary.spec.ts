@@ -11,7 +11,7 @@ import { readTreeManifest } from '../../src/store/tree-manifest.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../../src/state/constants.ts'
 import { tempHome } from '../../../test-support/temp-home.ts'
 
-const skill = (name: string) => '---\nname: ' + name + '\ndescription: Tree manifest boundary fixture with a unique body.\n---\n\n# ' + name + '\n'
+const skill = (name: string) => '---\nname: ' + name + '\ndescription: Tree manifest boundary fixture with a unique body.\n---\n\n# ' + name + '\n\n## Details\n\nDetail text for the restructure fixture.\n'
 
 it('publishes a manifest after the outer mutation lock is released', async () => {
   const home = await tempHome('dsh-tree-boundary-')
@@ -41,4 +41,9 @@ it('publishes a manifest after the outer mutation lock is released', async () =>
   const after = await kernel.query(['state'])
   expect(after.commitId).not.toBe(snapshot.commitId)
   expect((await readTreeManifest(kernel, after.tree))?.unitId).not.toBe(manifest?.unitId)
+  const restructured = await lib.restructure('tree-skill', [{ heading: 'Details', toFile: 'references/details.md' }], 'foreground')
+  expect(restructured.ok, restructured.message).toBe(true)
+  const restructuredTree = await kernel.query(['state'])
+  expect(restructuredTree.commitId).not.toBe(after.commitId)
+  expect(await readTreeManifest(kernel, restructuredTree.tree)).not.toBeNull()
 }, 30_000)

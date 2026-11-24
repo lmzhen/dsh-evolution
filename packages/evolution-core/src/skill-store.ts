@@ -3532,7 +3532,11 @@ export class SkillLibrary {
     await this.ensureRecovered()
     // F-208: the whole read→plan→write runs under the in-process serialize
     // queue so two concurrent restructures on one skill never interleave.
-    return await this.rootGate.write(() => this.restructureCore(name, moves, origin, change))
+    try {
+      return await this.rootGate.write(() => this.restructureCore(name, moves, origin, change))
+    } finally {
+      await this.flushTreeUnits()
+    }
   }
 
   private async restructureCore(name: string, moves: SkillRestructureMove[], origin: WriteOrigin, change?: ChangeSummary): Promise<SkillActionResult> {
@@ -3695,7 +3699,11 @@ export class SkillLibrary {
    */
   async extract(plan: ExtractPlanDraft, origin: WriteOrigin = this.authority.origin, change?: ChangeSummary): Promise<SkillActionResult> {
     await this.ensureRecovered()
-    return await this.rootGate.write(() => this.extractCore(plan, origin, change))
+    try {
+      return await this.rootGate.write(() => this.extractCore(plan, origin, change))
+    } finally {
+      await this.flushTreeUnits()
+    }
   }
 
   private async extractCore(plan: ExtractPlanDraft, origin: WriteOrigin, change?: ChangeSummary): Promise<SkillActionResult> {
@@ -4244,6 +4252,7 @@ export class SkillLibrary {
       eventAction: 'update',
     })
     if (!applied.ok) return { ok: false, message: applied.errors.map(error => error.message).join('；'), outcomes: [], ...(applied.warnings === undefined ? {} : { warnings: applied.warnings }) }
+    await this.flushTreeUnits()
     let cursor = 0
     const outcomes: SkillWriteOutcome[] = plan.ops.map((op, index) => {
       if ((writeCounts[index] ?? 0) === 0) {

@@ -169,6 +169,20 @@ describe('MVCC state provider', () => {
     expect(await io.exists(join(root, 'state', STATE_V2_MIGRATION_MARKER))).toBe(true)
   })
 
+  it('refuses marker recovery when the legacy source moved after the head commit', async () => {
+    const root = await tempRoot('dsh-state-v2-recover-drift-')
+    const ctx = await mountStateStack(root)
+    const io = ctx.evolutionIo.provider()
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    await kernel.bootstrap({ state: emptyStateDocument() })
+    await writeStateStoreSnapshot(io, join(root, 'state', 'store.json'), {
+      review: { s1: { turnsSinceMemory: 1, turnsSinceSkill: 0, lastTurn: 1 } },
+      curator: { lastRunAt: 1, runCount: 1, lastSummary: 'late write', paused: false },
+      pending: {},
+    })
+    await expect(migrateStateToV2(ctx, { io, home: root })).rejects.toThrow(/legacy state changed/)
+  })
+
   it('reads while the legacy state.lock is held because locking is internal', async () => {
     const { root, io, fence } = await seeded()
     const ctx = await mountStateStack(root)

@@ -187,6 +187,15 @@ export interface StateV2MigrationResult extends StateMigrationResult {
  */
 export async function migrateStateToV2(ctx: Context, options: StateMigrationOptions): Promise<StateV2MigrationResult> {
   const home = options.home ?? evolutionHome()
+  await mkdir(home, { recursive: true })
+  // v1 writers serialize on state.lock; the source read, head bootstrap and
+  // marker write must sit inside the same lock or a concurrent v1 save can fall
+  // into neither medium.
+  return withFileLock(join(home, 'state.lock'), () => migrateStateToV2Unlocked(ctx, { ...options, home }))
+}
+
+async function migrateStateToV2Unlocked(ctx: Context, options: StateMigrationOptions): Promise<StateV2MigrationResult> {
+  const home = options.home ?? evolutionHome()
   const io = options.io
   const headPath = join(home, 'store-v2', 'head.json')
   const markerPath = join(home, 'state', STATE_V2_MIGRATION_MARKER)
@@ -203,6 +212,8 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
       curator: snapshot.curator !== null,
     }, null, 2) + '\n')
   }
+  const v1Path = join(home, 'state', 'store.json')
+  const source: 'store' | 'domain' = await io.exists(v1Path) ? 'store' : 'domain'
   if (await io.exists(headPath)) {
     // A previous run may have published the head and failed while writing the
     // marker. The head is the authority; recover the marker instead of
@@ -211,6 +222,14 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
     if (await io.exists(markerPath)) throw new Error('evolution-state-migrate-v2: a v2 head already exists; refusing to overwrite it')
     const snapshot = await kernel.query(['state'])
     const document = parseStateDocument(serializeStateDocument(snapshot.domains.state as StateDocument))
+    // The head may have been published just before a crash; v1 stayed writable
+    // until the marker appears. Refuse to bless a head whose legacy source has
+    // moved, otherwise writes in that window disappear silently.
+    const legacy = source === 'store' ? await readStateStoreSnapshot(io, v1Path) : await readDomainSnapshot(ctx)
+    const legacyDocument = parseStateDocument(serializeStateDocument({ ...emptyStateDocument(), ...legacy }))
+    if (serializeStateDocument(legacyDocument) !== serializeStateDocument(document)) {
+      throw new Error('evolution-state-migrate-v2: the legacy state changed after the v2 head was published; refusing to recover the marker')
+    }
     const recovered: StateV2MigrationResult = {
       reviewSessions: Object.keys(document.review).length,
       pending: Object.keys(document.pending).length,
@@ -224,8 +243,6 @@ export async function migrateStateToV2(ctx: Context, options: StateMigrationOpti
     return recovered
   }
 
-  const v1Path = join(home, 'state', 'store.json')
-  const source: 'store' | 'domain' = await io.exists(v1Path) ? 'store' : 'domain'
   const snapshot = source === 'store' ? await readStateStoreSnapshot(io, v1Path) : await readDomainSnapshot(ctx)
   if (options.dryRun === true) {
     return {
