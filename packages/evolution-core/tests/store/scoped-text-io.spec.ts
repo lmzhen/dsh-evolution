@@ -37,7 +37,7 @@ describe('scoped text IO bridge', () => {
     await mkdir(join(root, 'state'), { recursive: true })
     await writeFile(join(root, 'state', STATE_V2_MIGRATION_MARKER), '{}\n')
     const base = nodeEvolutionIo()
-    const bridge = (await import('../../src/store/scoped-text-io.ts')).mergeStateIoIfV2(undefined, base, root, new HomeFence({ home: root }))
+    const bridge = (await import('../../src/store/scoped-tree-io.ts')).mergeIoIfV2(undefined, base, root, new HomeFence({ home: root }))
     expect(bridge).not.toBeUndefined()
     await expect(bridge!.readText(join(root, 'merge', 'merge-state.json'))).rejects.toThrow()
   })

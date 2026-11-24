@@ -188,21 +188,6 @@ export function memoryIoIfV2(
   )
 }
 
-/** Select the merge-state bridge after the explicit v2 marker; otherwise the file stays. */export function mergeStateIoIfV2(
-  ctx: { get?(name: string): unknown } | undefined,
-  base: EvolutionIoLike,
-  home: string,
-  fence?: StoreWriterFence | undefined,
-): EvolutionIoLike | undefined {
-  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
-  const kernel = new StoreKernel({
-    io: base,
-    home,
-    fence: fence ?? liveHomeFence(ctx ?? {}, home),
-  })
-  return scopedTextIO(base, { path: join(home, 'merge', 'merge-state.json'), domain: 'merge', kernel })
-}
-
 export interface DiscoveryPaths {
   readonly domainMap: string
   readonly projectionJournal: string
