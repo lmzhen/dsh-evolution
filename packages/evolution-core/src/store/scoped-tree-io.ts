@@ -16,6 +16,7 @@ import { basename, join, relative, resolve } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { StoreKernel } from './store-kernel.ts'
+import { scopedTextIO } from './scoped-text-io.ts'
 import type { StoreDomainId, StoreWriterFence } from './types.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../state/constants.ts'
 
@@ -204,6 +205,26 @@ export function mergeAuxIoIfV2(
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
   const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
   return scopedTreeIO(base, {
+    home,
+    kernel,
+    mappings: [
+      { prefix: 'merge/run-meta', domain: 'mergeMeta' },
+      { prefix: 'reports', domain: 'reports' },
+    ],
+  })
+}
+
+/** One kernel/one view for merge state plus its run-meta/report files. */
+export function mergeIoIfV2(
+  ctx: { get?(name: string): unknown } | undefined,
+  base: EvolutionIoLike,
+  home: string,
+  fence?: StoreWriterFence | undefined,
+): EvolutionIoLike | undefined {
+  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
+  const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
+  const stateIo = scopedTextIO(base, { path: join(home, 'merge', 'merge-state.json'), domain: 'merge', kernel })
+  return scopedTreeIO(stateIo, {
     home,
     kernel,
     mappings: [

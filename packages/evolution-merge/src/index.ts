@@ -10,7 +10,7 @@ import { createEngineScreening, type EngineScreenPort } from './adapters/engine-
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
 import { resolveRetrievalCredentials } from './domain/retrieval-credentials.ts'
 import { commandsPort, settingsPort, toolsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
-import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, homeFenceFrom, liveHomeFence, mergeAuxIoIfV2, mergeStateIoIfV2, newRunRegistry, reportsSweepLockTarget, runStorePortIfV2, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, createSubagentChannel, evolutionHome, evolutionIoAdapter, homeFenceFrom, liveHomeFence, mergeIoIfV2, newRunRegistry, reportsSweepLockTarget, runStorePortIfV2, sweepReports, transactIo, type EvolutionIoLike, type PolicyStageFields } from '@deepseek-ai/dsh-evolution-core'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { registerHostRoutes } from '@deepseek-ai/dsh-evolution-core/http-routes'
@@ -204,8 +204,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const baseIo = evolutionIoAdapter(() => registry.provider())
     const home = evolutionHome()
     const homeFence = liveHomeFence(ctx as unknown as { get(name: string): unknown }, home)
-    const stateIo = mergeStateIoIfV2(ctx, baseIo, home, homeFence)
-    const io = mergeAuxIoIfV2(ctx, stateIo ?? baseIo, home, homeFence) ?? stateIo ?? baseIo
+    const io = mergeIoIfV2(ctx, baseIo, home, homeFence) ?? baseIo
     const ready = (async () => {
       const migration = await migrateMergeStateToV4(io, home, homeFence)
       if (!migration.ok) return migration
