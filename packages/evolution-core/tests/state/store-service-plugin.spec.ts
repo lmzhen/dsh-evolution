@@ -33,4 +33,23 @@ describe('evolutionStore service provider', () => {
     }
     expect(ctx.get('evolutionStore')).toBeDefined()
   })
+
+  it('re-provides the service after a plugin reload', async () => {
+    const root = await tempRoot('dsh-store-provider-hmr-')
+    await mkdir(join(root, 'state'), { recursive: true })
+    await writeFile(join(root, 'state', STATE_V2_MIGRATION_MARKER), '{}\n')
+    const ctx = await mountStateStack(root)
+    const previous = process.env.DSH_EVOLUTION_HOME
+    process.env.DSH_EVOLUTION_HOME = root
+    try {
+      const first = await ctx.plugin(StorePlugin) as unknown as { dispose(): Promise<void> }
+      expect(ctx.get('evolutionStore')).toBeDefined()
+      await first.dispose()
+      await ctx.plugin(StorePlugin)
+      expect(ctx.get('evolutionStore')).toBeDefined()
+    } finally {
+      if (previous === undefined) delete process.env.DSH_EVOLUTION_HOME
+      else process.env.DSH_EVOLUTION_HOME = previous
+    }
+  })
 })

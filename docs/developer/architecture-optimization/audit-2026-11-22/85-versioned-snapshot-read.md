@@ -431,6 +431,8 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 尚未做：子进程读与崩溃恢复的组合、HMR 重挂载、fresh npm profile 真机验收。
 
 补充：`v2-provider.spec` 新增“head 已提交但 marker 写入丢失”的恢复测试——`migrateStateToV2` 从 head 重建 marker 并返回 `store-v2-recovered`，commitId 不变；证明迁移的 commit point 是 head，不是 marker。
+
+补充：store-service-plugin 增加 HMR 用例——dispose 旧 fiber 后重新挂 store-plugin，`evolutionStore` 仍可解析；provider/service 都不缓存旧 IO/fence。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
