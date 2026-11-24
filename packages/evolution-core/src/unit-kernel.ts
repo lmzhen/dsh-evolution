@@ -236,6 +236,8 @@ export interface UnitKernelOptions {
   claim?: UnitClaimPort
   claimRunId?: string
   hooks?: UnitKernelHooks
+  /** Runs after the unit lease is released; a store writer can take HomeFence here. */
+  afterCommit?: (event: UnitKernelEvent) => Promise<void> | void
   context?: UnitKernelContext
   validateWrite?: (op: TreeChangeOp) => string | null
   transact?: typeof transactIo
@@ -299,6 +301,7 @@ export class UnitKernel {
   private readonly claim: UnitClaimPort | undefined
   private readonly claimRunId: string | undefined
   private readonly hooks: UnitKernelHooks | undefined
+  private readonly afterCommit: ((event: UnitKernelEvent) => Promise<void> | void) | undefined
   private readonly context: UnitKernelContext | undefined
   private readonly validateWrite: ((op: TreeChangeOp) => string | null) | undefined
   private readonly kernel: TargetWriter
@@ -321,6 +324,7 @@ export class UnitKernel {
     this.claim = options.claim
     this.claimRunId = options.claimRunId
     this.hooks = options.hooks
+    this.afterCommit = options.afterCommit
     this.context = options.context
     this.validateWrite = options.validateWrite
     this.transactGuard = options.transactGuard !== false
@@ -438,6 +442,7 @@ export class UnitKernel {
     this.preparedStates.set(prepared, 'committing')
     const { unitId, request, primary, validation, snapshots, eventOps, changed, warnings, bestEffort } = prepared
     const cleanup = request.cleanupPaths === undefined ? {} : { cleanup: request.cleanupPaths }
+    let result: MutationResult
     try {
       if (this.snapshots !== undefined) await bestEffort(() => this.snapshots!.write({ unitId, journalId: this.journalId, state: 'prepared', ops: eventOps, ...cleanup, createdAt: this.now(), ...this.contextFields() }))
       await bestEffort(async () => this.journal?.write({ unitId, journalId: this.journalId, ...(this.context?.runId === undefined ? {} : { runId: this.context.runId }), phase: 'prepared', changed: [], target: validation.roots.find(root => root.name === primary)?.name ?? primary, roots: validation.roots.map(root => root.name) }))
@@ -470,7 +475,7 @@ export class UnitKernel {
       } catch {
         // Hooks are audit/history/event side effects; a completed write must not be rolled back by one.
       }
-      return { ok: true, unitId, dryRun: false, changed, errors: [], ...(warnings.length === 0 ? {} : { warnings }) }
+      result = { ok: true, unitId, dryRun: false, changed, errors: [], ...(warnings.length === 0 ? {} : { warnings }) }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       let rollbackFailure = ''
@@ -504,10 +509,19 @@ export class UnitKernel {
       } catch {
         // best-effort hook; the structured write error remains authoritative
       }
-      return { ok: false, unitId, dryRun: false, changed, errors: [{ code: failureCode, message: detail }] }
+      result = { ok: false, unitId, dryRun: false, changed, errors: [{ code: failureCode, message: detail }] }
     } finally {
       await prepared.release()
     }
+    if (result.ok && this.afterCommit !== undefined) {
+      try {
+        await this.afterCommit({ unitId, changed, ops: eventOps, roots: validation.roots.map(root => root.name) })
+      } catch (error) {
+        const message = 'after-commit hook failed: ' + (error instanceof Error ? error.message : String(error))
+        result = { ...result, warnings: [...(result.warnings ?? []), message] }
+      }
+    }
+    return result
   }
 
   async apply(request: MutationRequest): Promise<MutationResult> {

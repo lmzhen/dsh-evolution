@@ -59,6 +59,7 @@ import { UnitKernel, fileMutationLock, type MutationLockPort, type MutationResul
 import { mutationLockFrom, liveHomeFence } from './mutation-authority.ts'
 import { StoreKernel } from './store/store-kernel.ts'
 import { scopedTextIO } from './store/scoped-text-io.ts'
+import { publishTreeManifestFiles, type TreeManifestFile } from './store/tree-manifest.ts'
 import { STATE_V2_MIGRATION_MARKER } from './state/constants.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
@@ -878,6 +879,9 @@ const PLAN_SINK = new AsyncLocalStorage<PlanSink>()
 const PLAN_SUMMARY = new AsyncLocalStorage<string>()
 
 export class SkillLibrary {
+  /** R6: publish after the outer mutation lock has been released. */
+  private readonly treePublisher: ((unitId: string, files: readonly TreeManifestFile[]) => Promise<void>) | undefined
+  private readonly pendingTreeUnits: { readonly unitId: string; readonly ops: readonly { readonly target: string; readonly after: string | null }[] }[] = []
   readonly root: string
   /** The ONE read face owner/health/panel consume; a thin adapter, not a store. */
   readonly model: SkillModel
@@ -925,6 +929,7 @@ export class SkillLibrary {
     fence?: HistoryFence,
     mutationLockResolver?: () => MutationLockPort | undefined,
     fenceResolver?: () => HistoryFence | undefined,
+    treePublisher?: (unitId: string, files: readonly TreeManifestFile[]) => Promise<void>,
   ) {
     this.root = root
     this.targetLocks = targetLocksFor(root)
@@ -938,6 +943,7 @@ export class SkillLibrary {
     this.mutationLockResolver = mutationLockResolver
     this.fence = fence
     this.fenceResolver = fenceResolver
+    this.treePublisher = treePublisher
     // V4-20: bind the ONE transaction seam by default. Explicit injection stays
     // first; a backend without transact keeps the plain read→write (the
     // in-process serial chain is the second layer). transactIo owns the backend
@@ -1057,6 +1063,30 @@ export class SkillLibrary {
       return await task()
     } finally {
       await lease.release()
+      await this.flushTreeUnits()
+    }
+  }
+
+  /** Publish recorded units only after the outer mutation lock is gone. */
+  private async flushTreeUnits(): Promise<void> {
+    if (this.treePublisher === undefined || this.pendingTreeUnits.length === 0) return
+    const fence = this.fence as { holdsTree?: () => boolean } | undefined
+    // An explicit outer fence (merge/undo/consolidate) is still held here; leave
+    // the units queued for the next boundary rather than self-deadlocking.
+    if (fence?.holdsTree?.() === true) return
+    const units = this.pendingTreeUnits.splice(0)
+    for (const unit of units) {
+      const files: TreeManifestFile[] = []
+      for (const op of unit.ops) {
+        const rel = relative(this.root, op.target).replace(/\\/g, '/')
+        if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) continue
+        files.push({ path: rel, content: op.after })
+      }
+      try {
+        await this.treePublisher(unit.unitId, files)
+      } catch (error) {
+        console.warn('skill-store: tree manifest publish failed for ' + unit.unitId + ': ' + (error instanceof Error ? error.message : String(error)))
+      }
     }
   }
 
@@ -1088,12 +1118,20 @@ export class SkillLibrary {
         },
       } as unknown as UnitKernel
     }
+    const publisher = this.treePublisher
+    const afterCommit = options.afterCommit
     return new UnitKernel({
       io: this.io,
       journal: unitJournalPort(this.io, dirname(this.root)),
       snapshots: unitSnapshotPort(this.io, dirname(this.root)),
       targetKeyResolver: keys => this.canonicalLockKeys(keys),
       ...options,
+      ...(publisher === undefined && afterCommit === undefined ? {} : {
+        afterCommit: async (event) => {
+          await afterCommit?.(event)
+          if (publisher !== undefined) this.pendingTreeUnits.push({ unitId: event.unitId, ops: event.ops })
+        },
+      }),
     })
   }
 
@@ -5103,6 +5141,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
   const { config, io, limits, ctx, transact, threatExemptLabels, authority } = options
   const root = resolveSkillsRoot(config ?? {})
   let effectiveIo = io
+  let treePublisher: ((unitId: string, files: readonly TreeManifestFile[]) => Promise<void>) | undefined
   // R4: the usage and curator-suppressed sidecars live beside the skill tree.
   // Under the explicit v2 marker they are one domain each; the wrapper delegates
   // every real skill path to the base seam, so the library code is unchanged.
@@ -5113,6 +5152,10 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
       scopedTextIO(io, { path: usageFile(root), domain: 'usage', kernel }),
       { path: suppressedFile(root), domain: 'suppressed', kernel },
     )
+    treePublisher = async (unitId, files) => {
+      const ref = await publishTreeManifestFiles(kernel, unitId, files)
+      await kernel.mutate({ domains: [], source: 'tool', change: () => ({}), tree: ref })
+    }
   }
   return new SkillLibrary(
     root,
@@ -5128,6 +5171,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     options.fence,
     options.mutationLock === undefined && ctx !== undefined ? () => mutationLockFrom(ctx) : undefined,
     options.fence === undefined && ctx !== undefined ? () => (ctx.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence : undefined,
+    treePublisher,
   )
 }
 

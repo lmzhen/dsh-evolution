@@ -33,6 +33,32 @@ export interface TreeManifest {
 
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex')
 
+/** One changed file after a committed unit; null content is a deletion. */
+export interface TreeManifestFile {
+  readonly path: string
+  readonly content: string | null
+}
+
+/** Build the canonical manifest from committed file contents. */
+export function buildTreeManifestFiles(unitId: string, files: readonly TreeManifestFile[]): TreeManifest {
+  const seen = new Map<string, TreeManifestEntry>()
+  for (const file of files) {
+    const path = file.path.replace(/\\/g, '/')
+    seen.set(path, file.content === null
+      ? { path, kind: 'deleted' }
+      : { path, kind: 'file', sha256: sha256(file.content), size: Buffer.byteLength(file.content, 'utf8') })
+  }
+  const entries = [...seen.values()].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+  return { version: 1, unitId, entries }
+}
+
+/** Publish a manifest from committed file contents and return the commit tree ref. */
+export async function publishTreeManifestFiles(kernel: StoreKernel, unitId: string, files: readonly TreeManifestFile[]): Promise<StoreTreeRef> {
+  const manifest = buildTreeManifestFiles(unitId, files)
+  const id = await kernel.putObject(manifest)
+  return { unitId, manifest: id }
+}
+
 /** Build the canonical manifest for one tree unit's changed files. */
 export function buildTreeManifest(unitId: string, ops: readonly TreeChangeOp[]): TreeManifest {
   const entries: TreeManifestEntry[] = []
