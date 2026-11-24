@@ -903,7 +903,15 @@ export class SkillLibrary {
   private readonly authority: WriteAuthority
   /** When supplied by the family MutationAuthority, replaces the per-directory file lock. */
   private readonly mutationLock: MutationLockPort | undefined
-  private readonly fence: HistoryFence | undefined
+  /** The same two values, read from the family authority at write time.
+   *
+   * `evolution-authority` publishes its service only after `await ctx.evolutionIo.whenReady()`, so a
+   * library constructed before that mount would freeze `undefined` for its whole life and refuse
+   * every production write ("no authority mutationLock was supplied"). The resolver keeps the write
+   * path fenced without making the row depend on the service already being present — which is what
+   * an agent-plane-only composition has. */
+  private readonly resolveAuthority: (() => MutationAuthorityPort | undefined) | undefined
+  private readonly fenceSnapshot: HistoryFence | undefined
   /** skill-history.ts: the content history is best-effort, so a failure must not be SILENT —
    * but it is a deployment condition, not a per-write event, so it warns once per instance. */
   private historyWarned = false
@@ -918,6 +926,7 @@ export class SkillLibrary {
     authority: WriteAuthority = CLASS_DEFAULT_AUTHORITY,
     mutationLock?: MutationLockPort,
     fence?: HistoryFence,
+    resolveAuthority?: () => MutationAuthorityPort | undefined,
   ) {
     this.root = root
     this.targetLocks = targetLocksFor(root)
@@ -928,7 +937,8 @@ export class SkillLibrary {
     this.threatExemptLabels = threatExemptLabels ?? []
     this.authority = authority
     this.mutationLock = mutationLock
-    this.fence = fence
+    this.fenceSnapshot = fence
+    this.resolveAuthority = resolveAuthority
     // V4-20: bind the ONE transaction seam by default. Explicit injection stays
     // first; a backend without transact keeps the plain read→write (the
     // in-process serial chain is the second layer). transactIo owns the backend
@@ -1121,9 +1131,23 @@ export class SkillLibrary {
     return { ok: true, body, onDisk: body.trimEnd() + '\n', norm }
   }
 
+  /** The family lock for THIS write: the value captured at construction, else the
+   * authority's current one. Resolving late is what lets a library built before
+   * `evolution-authority` finished mounting still take the fenced path instead of
+   * refusing every write for the life of the process. */
+  private currentLock(): MutationLockPort | undefined {
+    return this.mutationLock ?? this.resolveAuthority?.()?.mutationLock
+  }
+
+  /** The home fence for THIS write, resolved late for the same reason as the lock. */
+  private get fence(): HistoryFence | undefined {
+    return this.fenceSnapshot ?? this.resolveAuthority?.()?.homeFence
+  }
+
   /** True when the injected lock port is per-target rather than the home fence. */
   private keyedTargetLocks(): boolean {
-    if (this.mutationLock !== undefined) return this.mutationLock.keyed === true
+    const lock = this.currentLock()
+    if (lock !== undefined) return lock.keyed === true
     // A test library may have no injected lock (fileMutationLock fallback). A
     // production library without one must still fail closed, never silently
     // bypass the fence because the keyed probe swallowed the assembly error.
@@ -1132,7 +1156,8 @@ export class SkillLibrary {
   }
 
   private lockPort(): MutationLockPort {
-    if (this.mutationLock !== undefined) return this.mutationLock
+    const lock = this.currentLock()
+    if (lock !== undefined) return lock
     // Fail loud outside tests: production skill writes must use the family authority fence.
     if (process.env['VITEST'] === 'true' || process.env['NODE_ENV'] === 'test') return fileMutationLock(this.io, this.root)
     throw new Error('skill-store: no authority mutationLock was supplied; refusing an unfenced production write')
@@ -5054,6 +5079,12 @@ export interface SkillMutationSink {
   get?(name: string): unknown
 }
 
+/** The part of the family `MutationAuthority` the write path reads, resolved per write. */
+export interface MutationAuthorityPort {
+  readonly mutationLock?: MutationLockPort | undefined
+  readonly homeFence?: HistoryFence | undefined
+}
+
 /** V41 P2-26 (0.3.75): the ONE SkillLibrary construction point.
  *
  * Eleven call sites used to re-derive the root and hand-roll the
@@ -5076,10 +5107,17 @@ export interface NewSkillLibraryOptions {
   /** Optional family authority lock; absent falls back to per-directory file lock. */
   mutationLock?: MutationLockPort
   fence?: HistoryFence
+  /** Resolve the family authority per write instead of freezing its lock above.
+   *
+   * Defaults to `ctx.get('evolutionMutationAuthority')`. The authority mounts after this library
+   * in every composition that has one, so a construction-time snapshot can be `undefined` forever;
+   * the resolver is what makes the write path fenced anyway. */
+  resolveAuthority?: (() => MutationAuthorityPort | undefined) | undefined
 }
 
 export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
   const { config, io, limits, ctx, transact, threatExemptLabels, authority } = options
+  const read = ctx?.get?.bind(ctx)
   return new SkillLibrary(
     resolveSkillsRoot(config ?? {}),
     io,
@@ -5091,7 +5129,8 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     [...(threatExemptLabels ?? [])],
     authority,
     options.mutationLock ?? mutationLockFrom(ctx),
-    options.fence ?? (ctx?.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence,
+    options.fence ?? (read?.('evolutionMutationAuthority') as MutationAuthorityPort | undefined)?.homeFence,
+    options.resolveAuthority ?? (read === undefined ? undefined : () => read('evolutionMutationAuthority') as MutationAuthorityPort | undefined),
   )
 }
 

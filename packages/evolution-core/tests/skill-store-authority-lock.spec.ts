@@ -104,6 +104,22 @@ it('newSkillLibrary auto-detects evolutionMutationAuthority from ctx', async () 
   expect(acquired).toBeGreaterThan(0)
 })
 
+it('resolves the authority per write, so a library built before the mount still fences', async () => {
+  const root = await tempRoot('dsh-skill-authority-late-')
+  type StubLock = { acquire(keys?: readonly string[]): Promise<{ release(): Promise<void> }> }
+  let acquired = 0
+  let mounted: { mutationLock: StubLock } | undefined
+  const ctx = { emit() {}, get(name: string) { return name === 'evolutionMutationAuthority' ? mounted : undefined } }
+  const lib = newSkillLibrary({ config: { root }, io: nodeEvolutionIo(), ctx, authority: authorityFrom({ origin: 'foreground' }) })
+  // Constructed while evolution-authority was still awaiting the IO registry: the test process
+  // falls back to the per-directory file lock, and the library must not freeze that choice.
+  expect((await lib.create('before-mount', skill('before-mount'), 'foreground')).ok).toBe(true)
+  mounted = { mutationLock: { async acquire() { acquired += 1; return { async release() {} } } } }
+  expect((await lib.create('after-mount', skill('after-mount'), 'foreground')).ok).toBe(true)
+  expect(acquired).toBeGreaterThan(0)
+})
+
+
 it('fails closed when the authority lock cannot be acquired', async () => {
   const root = await tempRoot('dsh-skill-authority-fail-closed-')
   const lock = { async acquire() { throw new Error('skill-store: no authority mutationLock was supplied; refusing an unfenced production write') } }

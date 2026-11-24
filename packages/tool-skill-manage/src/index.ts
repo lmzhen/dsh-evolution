@@ -46,6 +46,13 @@ import { commitSkillAction, isReadOnlySkillAction, skillActionOf } from './skill
 const isReadOnlyAction = isReadOnlySkillAction
 
 export const name = 'tool-skill-manage'
+/**
+ * The family authority is NOT a hard injection: an agent-plane-only composition mounts this row
+ * without `evolution-authority` (the installation matrix asserts the tool still appears), and
+ * requiring the service would leave such a fiber permanently inactive. The lock the write path needs
+ * is resolved per write by `newSkillLibrary`'s resolver, so a library built before the authority
+ * finishes mounting still takes the fenced path instead of refusing every write.
+ */
 export const inject = ['tools', 'skillUsage', 'evolutionIo']
 
 /** 0.3.18 (E-70): review output lists at most this many near-duplicate groups
