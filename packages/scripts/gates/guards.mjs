@@ -30,7 +30,7 @@ export const guards = [
     title: "`node packages/evolution/scripts/smoke-built-entries.mjs packages/evolution`",
     argv: ["node","packages/evolution/scripts/smoke-built-entries.mjs","packages/evolution"],
     lanes: ["local"],
-    registration: {"reason":"smoke-built-entries needs built lib artifacts and a complete platform scope that a bare local overlay does not carry","owner":"scripts/gates","expiry":"0.61.0","plan":"run after build-lib with --platform on CI; local bare-overlay invocation stays a registered cannot-decide","renewal":"Renewed at 0.61.0: local overlay still lacks the platform scope; CI (`main release`) builds and validates the packed entries, so this registration covers only the no-build local invocation."},
+    registration: {"reason":"smoke-built-entries needs built lib artifacts and a complete platform scope that a bare local overlay does not carry","owner":"scripts/gates","expiry":"0.62.0","plan":"run after build-lib with --platform on CI; local bare-overlay invocation stays a registered cannot-decide","renewal":"Renewed at 0.61.0: local overlay still lacks the platform scope; CI (`main release`) builds and validates the packed entries, so this registration covers only the no-build local invocation."},
   }),
 
   gate("gate-86", {
@@ -236,7 +236,7 @@ export const guards = [
     // CI uses a synthetic plane home (the action's --home "$RUNNER_TEMP/plane-home").
     ci: { argv: ["node","packages/scripts/verify-write-inventory.mjs","packages","--strict","--home","${RUNNER_TEMP}/plane-home"] },
     lanes: ["local","ci-static"],
-    registration: {"reason":"the local argv carries a <plane home> placeholder; CI resolves it with $RUNNER_TEMP/plane-home","owner":"scripts/gate-manifest","expiry":"0.61.0","plan":"CI override supplies the plane home; local runs use the registration instead of inventing a real profile","renewal":"Renewed at 0.61.0: CI ci-static resolves the placeholder and is the release evidence; the local row remains a registered cannot-decide."},
+    registration: {"reason":"the local argv carries a <plane home> placeholder; CI resolves it with $RUNNER_TEMP/plane-home","owner":"scripts/gate-manifest","expiry":"0.62.0","plan":"CI override supplies the plane home; local runs use the registration instead of inventing a real profile","renewal":"Renewed at 0.61.0: CI ci-static resolves the placeholder and is the release evidence; the local row remains a registered cannot-decide."},
   }),
 
   gate("gate-30", {
@@ -564,7 +564,7 @@ export const guards = [
     title: "node packages/scripts/verify-health-admission.mjs",
     argv: ["node","packages/scripts/verify-health-admission.mjs"],
     lanes: ["local"],
-    registration: {"reason":"the health corpora baseline is produced by the build line; a bare local checkout has no baseline to judge","owner":"scripts/gates","expiry":"0.61.0","plan":"CI release lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay","renewal":"Renewed at 0.61.0: local corpora are still absent; the CI release lane remains the green evidence."},
+    registration: {"reason":"the health corpora baseline is produced by the build line; a bare local checkout has no baseline to judge","owner":"scripts/gates","expiry":"0.62.0","plan":"CI release lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay","renewal":"Renewed at 0.61.0: local corpora are still absent; the CI release lane remains the green evidence."},
   }),
 
   gate("gate-82", {

@@ -185,7 +185,7 @@
             {
               "script": "verify-layout-sync-local.mjs",
               "reason": "the dev↔mirror script-sync identity check needs both trees; a CI checkout carries only the mirror",
-              "expiry": "0.61.0"
+              "expiry": "0.62.0"
             }
           ],
           "machineLocal": [],
@@ -599,7 +599,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "25d06d9fe0ccb0e2ff0836c100a1a4080e118734a40dc78df88ff2c7eecc53d9",
+        "sha256": "517a950787e18b7648b8a5581af3194a8c0f8dc475190e46d3b800baf3c2fe6a",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -1761,7 +1761,7 @@
           "gate-33": {
             "reason": "this row declares no single command (composite cell: several commands in one table row), so there is no argv a mutation could run - it cannot be mutation-proven",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: either split the row into real argv rows or keep the exemption; the executability axis already counts it",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): this row declares no single command (composite cell: several commands in one table row), so there is no argv a mutation could run - it cannot be mutation-proven"
@@ -1769,7 +1769,7 @@
           "gate-16": {
             "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts"
@@ -1777,7 +1777,7 @@
           "gate-45": {
             "reason": "self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row moves to a repo-content form (arguments naming the tree it judges), delete this exemption and prove it by mutation",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): self-test form: the declared argv runs the guard over SYNTHETIC fixtures (--self-test), not over repo content, so no mutation inside this repo can red it; its falsifiability is carried by the fixture directions the self-test asserts"
@@ -1785,7 +1785,7 @@
           "ci-only-08": {
             "reason": "its TARGET path (upstream/tsconfig.base.json) exists only in the CI overlay job, never in this repo: the row injects alias lines into the upstream tree that the compat job checks out, so no mutation inside this repo can change what it judges",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row ever names an in-repo target, delete this exemption and prove it by mutation",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): its TARGET path (upstream/tsconfig.base.json) exists only in the CI overlay job, never in this repo: the row injects alias lines into the upstream tree that the compat job checks out, so no mutation inside this repo can change what it judges"
@@ -1793,7 +1793,7 @@
           "gate-18": {
             "reason": "its subject is the PLATFORM tree outside this repo: the receipts name packages/core/... files and the argv points at an out-of-repo upstream checkout, so the reviewed repo carries neither the files it judges nor a way to change them",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row ever judges in-repo files, delete this exemption and prove it by mutation",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): its subject is the PLATFORM tree outside this repo: the receipts name packages/core/... files and the argv points at an out-of-repo upstream checkout, so the reviewed repo carries neither the files it judges nor a way to change them"
@@ -1801,7 +1801,7 @@
           "gate-01": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology"
@@ -1809,7 +1809,7 @@
           "gate-02": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology"
@@ -1817,7 +1817,7 @@
           "gate-03": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology"
@@ -1825,7 +1825,7 @@
           "gate-04": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology"
@@ -1833,7 +1833,7 @@
           "gate-05": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology"
@@ -1841,7 +1841,7 @@
           "ci-only-13": {
             "reason": "toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "keep as an aggregate exemption, or replace it with targeted per-rule gates; the overlay mutation mode now exists but does not make this aggregate row mutation-provable",
             "condition": "the aggregate row is replaced by targeted per-rule gates; remove the exemption then",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): toolchain/aggregate row: it runs a compiler, linter, full suite or build over the whole tree; a single source mutation is judged by that tool own output, so mutating it would be a tautology"
@@ -1849,7 +1849,7 @@
           "gate-27": {
             "reason": "BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mutation in this repo can red it without first building",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if the row gains a source-level subject or dist becomes part of the reviewed tree, delete this exemption and prove it by mutation",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): BUILD-OUTPUT SUBJECT: its argv names packages/evolution/dist (a build artifact absent from the working tree) and a <platform version> placeholder the CI fills, so it judges a BUILT tree - no source mutation in this repo can red it without first building"
@@ -1857,7 +1857,7 @@
           "gate-50": {
             "reason": "PRODUCER ROW, NOT A CHECK: its registered argv carries no --check, and the script only READS the machine skill corpora and WRITES scripts/reports/health-baseline.json through the engine - it has no verdict to turn red, and its corpus is machine state (the reader that judges the artifact is health-admission, registered separately and cannot-decide without a platform corpus)",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "when the stated condition holds, delete this exemption and prove the row by mutation; the row stays counted until then",
             "condition": "release gate: if this row ever gains a --check form (the drift check the other generators carry), delete this exemption and prove it by hand-editing the artifact",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): PRODUCER ROW, NOT A CHECK: its registered argv carries no --check, and the script only READS the machine skill corpora and WRITES scripts/reports/health-baseline.json through the engine - it has no verdict to turn red, and its corpus is machine state (the reader that judges the artifact is health-admission, registered separately and cannot-decide without a platform corpus)"
@@ -1865,7 +1865,7 @@
           "gate-81": {
             "reason": "the health-admission gate is a registered local cannot: a bare overlay has no health-baseline corpora, so it exits cannot-decide before any mutation; a mutation cannot flip a missing input",
             "owner": "scripts/gates",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "run the row on a build line that carries the health baseline and replace this exemption with a proven record; the row stays counted until then",
             "condition": "release gate: revisit when the CI lane supplies the baseline",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): the health-admission gate is a registered local cannot: a bare overlay has no health-baseline corpora, so it exits cannot-decide before any mutation; a mutation cannot flip a missing input"
@@ -1873,7 +1873,7 @@
           "gate-59": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red"
@@ -1881,7 +1881,7 @@
           "gate-74": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red"
@@ -1889,7 +1889,7 @@
           "gate-67": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red"
@@ -1897,7 +1897,7 @@
           "gate-68": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red"
@@ -1905,7 +1905,7 @@
           "gate-69": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red"
@@ -1913,7 +1913,7 @@
           "gate-70": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red"
@@ -1921,7 +1921,7 @@
           "gate-71": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red"
@@ -1929,7 +1929,7 @@
           "gate-73": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red"
@@ -1937,7 +1937,7 @@
           "ci-only-18": {
             "reason": "step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): step row: the command is a release/CI shell invocation with env/array expansion and no family test anchor; a source mutation cannot flip it red"
@@ -1945,7 +1945,7 @@
           "gate-56": {
             "reason": "external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor"
@@ -1953,7 +1953,7 @@
           "gate-57": {
             "reason": "external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor"
@@ -1961,7 +1961,7 @@
           "gate-78": {
             "reason": "external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor",
             "owner": "scripts/release",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "convert the step to a script gate with a test anchor, or keep it as a documented manual step; the exemption stays counted until then",
             "condition": "release gate: revisit when the step becomes a script with a test anchor",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): external row: the command lives outside this family tree (release evidence/platform toolchain), declares no argv here and has no family test anchor"
@@ -1969,7 +1969,7 @@
           "gate-83": {
             "reason": "action step: the envelope check has no single in-repo command row a mutation could execute; the range guard gate-27 owns the mutation proof",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "delete this exemption if the envelope step gains a runnable gate row",
             "condition": "the action step stays an action step",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): action step: the envelope check has no single in-repo command row a mutation could execute; the range guard gate-27 owns the mutation proof"
@@ -1977,7 +1977,7 @@
           "gate-84": {
             "reason": "action step: the host acceptance launches an external platform process and has no single in-repo command row a mutation could execute",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "delete this exemption if host acceptance becomes a runnable gate row",
             "condition": "the action step stays an action step",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): action step: the host acceptance launches an external platform process and has no single in-repo command row a mutation could execute"
@@ -1985,7 +1985,7 @@
           "gate-32": {
             "reason": "the mutation fixture lives in the mirror README while verify-mutations runs the gate from the overlay tree, where that README does not exist; the local lane still executes gate-32 normally",
             "owner": "scripts/verify-mutations",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "move the marker region to a file present in both trees or make verify-mutations run mirror-tree gates from the mirror root",
             "condition": "gate-32 remains a mirror-only local row",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): the mutation fixture lives in the mirror README while verify-mutations runs the gate from the overlay tree, where that README does not exist; the local lane still executes gate-32 normally"
@@ -1995,21 +1995,21 @@
           "gate-29": {
             "reason": "the gate table cell states the step in prose or carries a placeholder the runner cannot resolve",
             "owner": "scripts/gate-manifest",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "split each prose cell into a real argv row (or give the row an args source); rows that stay unresolvable keep the registration",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): the gate table cell states the step in prose or carries a placeholder the runner cannot resolve"
           },
           "gate-81": {
             "reason": "the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge",
             "owner": "scripts/gates",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "the CI lane supplies the corpora; local runs keep the row registered until the baseline ships with the overlay",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): the health corpora baseline is produced by the build line; a bare local overlay has no baseline to judge"
           },
           "gate-05": {
             "reason": "smoke-built-entries needs built lib artifacts that a source checkout does not carry",
             "owner": "scripts/gates",
-            "expiry": "0.61.0",
+            "expiry": "0.62.0",
             "plan": "run after build-lib on the build line",
             "renewal": "Renewed at 0.60.0 (expiry 0.61.0): smoke-built-entries needs built lib artifacts that a source checkout does not carry"
           }

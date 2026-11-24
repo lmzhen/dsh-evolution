@@ -46,9 +46,9 @@ export const release = [
     registration: {
       reason: 'the mutation ledger still names retired or renumbered rows; the coverage probe reports those as cannot-decide instead of inventing a pass',
       owner: 'scripts/gates',
-      expiry: '0.61.0',
+      expiry: '0.62.0',
       plan: 'restore the retired-row mutation anchors and add the three missing records, then delete this registration',
-      renewal: 'Registered at 0.60.0 (expiry 0.61.0): mutation coverage debt for retired/renumbered rows',
+      renewal: 'Registered at 0.60.0 (expiry 0.62.0): mutation coverage debt for retired/renumbered rows',
     },
   }),
 
