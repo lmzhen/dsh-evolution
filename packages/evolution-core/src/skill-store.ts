@@ -1074,7 +1074,7 @@ export class SkillLibrary {
   /** Publish recorded units only after the outer mutation lock is gone. */
   private async flushTreeUnits(): Promise<void> {
     if (this.treePublisher === undefined || this.pendingTreeUnits.length === 0) return
-    const fence = this.fence as { holdsTree?: () => boolean } | undefined
+    const fence = (this.fence ?? this.fenceResolver?.()) as { holdsTree?: () => boolean } | undefined
     // An explicit outer fence (merge/undo/consolidate) is still held here; leave
     // the units queued for the next boundary rather than self-deadlocking.
     if (fence?.holdsTree?.() === true) return
