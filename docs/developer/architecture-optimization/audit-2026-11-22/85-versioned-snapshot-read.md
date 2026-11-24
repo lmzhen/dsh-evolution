@@ -394,6 +394,13 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - HMR 语义：store-plugin 重新 apply 时重新创建 kernel/service；旧 service 随旧 ctx 失效，不缓存 IO/fence。
 - 测试：store-service-plugin 2 tests（无 marker 不提供、有 marker 提供）；`tsc` core 0。
 - 尚未做：host command/tool/UI 的实际 dispatch 仍未改为 `ctx.get('evolutionStore')`；这是 R7d。
+
+#### R7d 已落地（doctor 首个消费者）
+
+- `doctor --json` 在 `ctx.get('evolutionStore')` 存在时调用 `query('doctor')`，报告新增 `store: { commitId, treeUnit }`；
+- 文本报告保持原样（没有新 locale key），未迁移 home 或 service 不可用时字段不出现；
+- 查询失败只省略该字段，不让诊断整体失败；
+- 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
 

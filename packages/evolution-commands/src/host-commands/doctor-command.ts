@@ -28,6 +28,21 @@ export async function runDoctorCommand(context: DoctorCommandContext): Promise<C
     ? {}
     : { mounted: { profile: mountedForDoctor.profile, dir: mountedForDoctor.profileDir, bundles: mountedForDoctor.bundles } }
   const report = await diagnose(ctx, { home: evolutionRoot(), ...mounted, runs: runs() })
-  if (input === 'doctor --json') return ok(JSON.stringify(report, null, 2))
+  // R7d: the diagnostics surface reads the v2 snapshot through the one
+  // evolutionStore service when the home has migrated; legacy homes keep the
+  // existing report shape and never acquire a second reader path.
+  const store = (ctx as unknown as { get?: (name: string) => unknown }).get?.('evolutionStore')
+  const storeReport = store === undefined
+    ? null
+    : await (async () => {
+      try {
+        const result = await (store as { query(commandId: string): Promise<{ snapshot: { commitId: string; tree: { unitId: string } | null } }> }).query('doctor')
+        return { commitId: result.snapshot.commitId, treeUnit: result.snapshot.tree?.unitId ?? null }
+      } catch {
+        return null
+      }
+    })()
+  const enriched = storeReport === null ? report : { ...report, store: storeReport }
+  if (input === 'doctor --json') return ok(JSON.stringify(enriched, null, 2))
   return ok(renderDoctorText(report, locale))
 }
