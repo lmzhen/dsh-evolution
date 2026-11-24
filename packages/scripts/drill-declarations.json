@@ -1,6 +1,11 @@
 {
   "$comment": "How each row green can be turned red. For the rows the mutation ledger has proven, the drill IS the ledger invocation (the prover applies the recorded mutation, runs the row, asserts the verdict and restores) - so a proof and its declaration cannot drift. verify-gate-manifest reads this table directly: a row declared here is no longer a falsifiability-carrier observation. Rows that cannot be drilled derive their noDrillReason from the mutation-exemption register, so a declared reason and its registration cannot drift either.",
   "drills": {
+    "gate-87": {
+      "drillCmd": "node packages/scripts/verify-store-kernel.mjs --self-test",
+      "evidence": "inject a HomeFence call into the query body of a temporary copy of store-kernel.ts; the gate must exit 1, proving the read-lock-free claim is falsifiable",
+      "provenAt": "2026-11-25T00:30:00.000Z"
+    },
     "gate-17": {
       "drillCmd": "node packages/scripts/verify-mutations.mjs --only gate-17",
       "evidence": "breaking one declaration id breaks the closure both ways, so the doc-facts gate must red: this is the replacement evidence for the real-tree pass retired from g",

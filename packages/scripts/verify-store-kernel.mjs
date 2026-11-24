@@ -12,8 +12,40 @@
  *
  * Usage: node packages/scripts/verify-store-kernel.mjs <packages-root>
  */
-import { existsSync, readFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, dirname, resolve } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+
+const SELF = fileURLToPath(import.meta.url)
+const HERE = dirname(SELF)
+
+if (process.argv.includes('--self-test')) {
+  const temp = mkdtempSync(join(tmpdir(), 'dsh-store-gate-'))
+  try {
+    const fakeRoot = join(temp, 'packages')
+    const sourceDir = join(fakeRoot, 'evolution-core/src/store')
+    mkdirSync(sourceDir, { recursive: true })
+    const source = readFileSync(join(HERE, '..', 'evolution-core', 'src', 'store', 'store-kernel.ts'), 'utf8')
+    // Inject a writer primitive into the query body: the gate must turn this red.
+    const mutated = source.replace('  async query(', '  async query(\n    await this.fence.run(async () => {});')
+    writeFileSync(join(sourceDir, 'store-kernel.ts'), mutated)
+    copyFileSync(
+      join(HERE, '..', 'evolution-core', 'persisted-write-inventory.json'),
+      join(fakeRoot, 'evolution-core', 'persisted-write-inventory.json'),
+    )
+    const result = spawnSync(process.execPath, [SELF, fakeRoot], { encoding: 'utf8' })
+    if (result.status !== 1) {
+      console.error('verify-store-kernel --self-test: injected query lock was not rejected (exit ' + String(result.status) + ')')
+      process.exit(1)
+    }
+    console.log('verify-store-kernel --self-test: OK — an injected query lock makes the gate exit 1')
+    process.exit(0)
+  } finally {
+    rmSync(temp, { recursive: true, force: true })
+  }
+}
 
 const root = resolve(process.argv[2] ?? 'packages')
 const kernelPath = join(root, 'evolution-core/src/store/store-kernel.ts')
