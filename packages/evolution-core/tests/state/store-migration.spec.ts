@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { mountStateStack } from '../../../test-support/state-stack.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { migrateDomainToStore, STATE_MIGRATION_MARKER } from '../../src/state/migrate.ts'
+import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values/fs'
 import { createStateStoreProvider } from '../../src/state/store.ts'
 import EvolutionState from '../../src/state/index.ts'
 import * as StorePlugin from '../../src/state/store-plugin.ts'
@@ -78,6 +79,23 @@ describe('domain → StateStore migration', () => {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
     }
+  })
+
+  it('serializes a state read against the migration lock (read consistency, not a deadlock)', async () => {
+    const { ctx, home } = await seeded()
+    let enteredResolve!: () => void
+    const entered = new Promise<void>(resolve => { enteredResolve = resolve })
+    let releaseResolve!: () => void
+    const gate = new Promise<void>(resolve => { releaseResolve = resolve })
+    const held = withFileLock(join(home, 'state.lock'), async () => { enteredResolve(); await gate })
+    await entered
+    let settled = false
+    const read = ctx.evolutionState.loadCuratorState().then(() => { settled = true })
+    await new Promise(resolve => setTimeout(resolve, 30))
+    expect(settled).toBe(false)
+    releaseResolve()
+    await held
+    await read
   })
 
   it('serializes a state write against the migration lock', async () => {
