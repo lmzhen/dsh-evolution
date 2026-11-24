@@ -19,7 +19,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { EvolutionIoLike, EvolutionPlanAppliedEvent, EvolutionReviewCompletedEvent } from '@deepseek-ai/dsh-evolution-core'
-import { evolutionHome, evolutionIoAdapter, transactIo, graphemeCount, truncateGraphemes, REVIEW_TEXT_PREVIEW_GRAPHEMES } from '@deepseek-ai/dsh-evolution-core'
+import { homeFenceFrom, evolutionHome, evolutionIoAdapter, transactIo, graphemeCount, truncateGraphemes, REVIEW_TEXT_PREVIEW_GRAPHEMES } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 /** One persisted plan outcome (payload v2 of `evolution/plan-applied`). */
@@ -404,13 +404,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // DSH_HOME cannot interleave between our read and write.
     const io = evolutionIoAdapter(() => ioRegistry.provider())
     const root = evolutionHome()
-    const authority = (ioCtx as unknown as { get(name: string): unknown }).get('evolutionMutationAuthority') as { readonly homeFence?: { run<T>(body: () => Promise<T>): Promise<T> } } | undefined
     const commit = async (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => {
       await transactIo(io, path, task)
     }
     /** The ONE cross-process writer: a home fence when the authority provides one, else the seam. */
     const write = async (path: string, task: (current: string | null) => Promise<string | null>): Promise<void> => {
-      if (authority?.homeFence !== undefined) await authority.homeFence.run(async () => { await commit(path, task) })
+      const fence = homeFenceFrom(ioCtx as unknown as { get(name: string): unknown })
+      if (fence !== undefined) await fence.run(async () => { await commit(path, task) })
       else await commit(path, task)
     }
     /**

@@ -27,7 +27,7 @@ import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 type Context = CordisContext & HostContext
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-skill-discovery/usage'
-import { appendEvolutionEvent, eventsFile, evolutionEventPayloadIssue, evolutionIoAdapter, evolutionRoot, isPresent, isUnknown, listEventArchives, parseEvolutionEvents, probeText, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, eventsFile, evolutionEventPayloadIssue, evolutionHome, evolutionIoAdapter, evolutionRoot, isPresent, isUnknown, listEventArchives, parseEvolutionEvents, probeText, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 
 declare module '@deepseek-ai/cordis' {
@@ -923,7 +923,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     (message) => {
       ctx.logger.warn(message)
     },
-    liveHomeFence(ctx as unknown as { get(name: string): unknown }, evolutionRoot()),
+    liveHomeFence(ctx as unknown as { get(name: string): unknown }, evolutionHome()),
   )
   // Make the service available first; restoration settles in the background.
   ctx.provide('evolutionFeedback', feedback)

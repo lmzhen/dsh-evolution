@@ -419,8 +419,9 @@ export class MergeUnitTransactions implements UnitTransaction {
   }
 
   private async withRecoveryFence<T>(task: () => Promise<T>): Promise<T> {
-    if (this.options.fence === undefined) return await task()
-    return await this.options.fence.run(async () => await task())
+    const fence = this.options.resolveFence?.() ?? this.options.fence
+    if (fence === undefined) return await task()
+    return await fence.run(async () => await task())
   }
 
   /** Acquire the one tree fence (or a HomeAuthority fallback) and prove it is held. */
@@ -583,8 +584,9 @@ export class MergeUnitTransactions implements UnitTransaction {
     const snapshot = await readUnitSnapshot(this.options.io, this.options.home, ref.unitId);
     if (snapshot === null) return { ok: false as const, code: "unit-rollback-blocked" as const, message: "snapshot missing" };
     const journal = await readUnitJournal(this.options.io, this.options.home, ref.unitId);
-    if (this.options.fence !== undefined) {
-      return await this.options.fence.run(async (lock) => await this.rollbackLocked(ref, snapshot, journal, lock))
+    const fence = this.options.resolveFence?.() ?? this.options.fence
+    if (fence !== undefined) {
+      return await fence.run(async (lock) => await this.rollbackLocked(ref, snapshot, journal, lock))
     }
     const acquired = await this.acquireTreeFence()
     try {
