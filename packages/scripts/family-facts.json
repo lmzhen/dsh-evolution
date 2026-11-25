@@ -191,6 +191,11 @@
               "script": "verify-cross-process-read.mjs",
               "reason": "needs the build overlay's installed platform lib graph; the CI static checkout has no evolution-platform/node_modules, so the child process cannot resolve @deepseek-ai/dsh-atomic-write",
               "expiry": "release gate: run on the build line after build-lib; move into the action if CI installs the platform dependency graph"
+            },
+            {
+              "script": "verify-store-head.mjs",
+              "reason": "needs the build overlay's installed platform lib graph; CI static cannot import the store's platform dependencies",
+              "expiry": "release gate: run on the build line after build-lib; move into the action if CI installs the platform dependency graph"
             }
           ],
           "machineLocal": [],
@@ -604,7 +609,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "8085aa64031d27a7cebf2c31de5d5903fabfe047b1b869d7f69f9437882cd25f",
+        "sha256": "f633b084a726f29ecf17e858c409ce5b3e9157dd3c2543b612446ec591caf3ec",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -985,6 +990,11 @@
             "id": "gate-90",
             "tier": "fast",
             "criterion": "verify-store-single-source"
+          },
+          {
+            "id": "gate-91",
+            "tier": "fast",
+            "criterion": "verify-store-head"
           },
           {
             "id": "gate-03",

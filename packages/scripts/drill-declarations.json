@@ -397,6 +397,9 @@
       "drillCmd": "node packages/scripts/verify-store-single-source.mjs packages --self-test",
       "evidence": "inject a synthetic merge source that names store-v2/head.json outside the kernel; the single-source gate must report it",
       "provenAt": "2026-11-25T09:55:00.000Z"
+    },
+    "gate-91": {
+      "noDrillReason": "real head-file drill (bootstrap/mutate/remove/corrupt); the script itself mutates the head to prove fail-closed behavior, and a synthetic patch would only duplicate it. Runs on the build line local lane."
     }
   }
 }

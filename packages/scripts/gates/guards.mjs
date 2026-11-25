@@ -668,4 +668,13 @@ export const guards = [
     lanes: ["local","ci-static"],
   }),
 
+  gate("gate-91", {
+    kind: "script",
+    tree: "overlay",
+    title: "`node packages/evolution/evolution-core/scripts/verify-store-head.mjs`（DCR-85：head 是唯一 commit point，缺失/损坏必须 fail closed）",
+    argv: ["node","packages/evolution/evolution-core/scripts/verify-store-head.mjs"],
+    lanes: ["local"],
+    registration: {"reason":"needs the build overlay's installed platform lib graph; CI static lane cannot resolve the store's platform dependencies","owner":"scripts/gates","expiry":"0.62.0","plan":"run on the build line via the local lane after build-lib","renewal":"Registered at 0.61.0: the drill passed locally but the ci-static checkout has no platform dependency install."},
+  }),
+
 ]
