@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
 import { DEFAULT_SKILL_LIMITS, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
-import { SkillLibrary, skillUnitHome } from '@deepseek-ai/dsh-evolution-core/skills'
+import { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { UnitKernel, fileMutationLock, unitJournalPort, unitSnapshotPort } from '@deepseek-ai/dsh-evolution-core/write'
 
 it('recovers a prepared tree-change snapshot before the first write', async () => {
@@ -15,7 +15,7 @@ it('recovers a prepared tree-change snapshot before the first write', async () =
     await mkdir(join(root, 'demo'), { recursive: true })
     const target = join(root, 'demo', 'SKILL.md')
     await writeFile(target, 'after')
-    await unitSnapshotPort(io, skillUnitHome(root)).write({
+    await unitSnapshotPort(io, home).write({
       unitId: 'boot-recover-1',
       state: 'prepared',
       createdAt: 1,
@@ -49,8 +49,8 @@ it('update records a unit that undo restores', async () => {
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
-      journal: unitJournalPort(io, skillUnitHome(root)),
-      snapshots: unitSnapshotPort(io, skillUnitHome(root)),
+      journal: unitJournalPort(io, home),
+      snapshots: unitSnapshotPort(io, home),
     })
     const undone = await unit.undo(unitId)
     expect(undone.ok, undone.errors[0]?.message).toBe(true)
@@ -77,8 +77,8 @@ it('patch records a unit that undo restores', async () => {
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
-      journal: unitJournalPort(io, skillUnitHome(root)),
-      snapshots: unitSnapshotPort(io, skillUnitHome(root)),
+      journal: unitJournalPort(io, home),
+      snapshots: unitSnapshotPort(io, home),
     })
     const undone = await unit.undo(unitId)
     expect(undone.ok, undone.errors[0]?.message).toBe(true)
@@ -104,8 +104,8 @@ it('create undo removes the body and the managed marker', async () => {
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
-      journal: unitJournalPort(io, skillUnitHome(root)),
-      snapshots: unitSnapshotPort(io, skillUnitHome(root)),
+      journal: unitJournalPort(io, home),
+      snapshots: unitSnapshotPort(io, home),
     })
     const undone = await unit.undo(unitId)
     expect(undone.ok, undone.errors[0]?.message).toBe(true)
@@ -124,7 +124,7 @@ it('runs recovery before the first create writes a new skill', async () => {
     await mkdir(join(root, 'demo'), { recursive: true })
     const target = join(root, 'demo', 'SKILL.md')
     await writeFile(target, 'after')
-    await unitSnapshotPort(io, skillUnitHome(root)).write({
+    await unitSnapshotPort(io, home).write({
       unitId: 'boot-recover-create',
       state: 'prepared',
       createdAt: 1,
@@ -147,7 +147,7 @@ it('A3: warns when a prepared unit cannot be recovered', async () => {
     await mkdir(join(root, 'demo'), { recursive: true })
     const target = join(root, 'demo', 'SKILL.md')
     await writeFile(target, 'third')
-    await unitSnapshotPort(io, skillUnitHome(root)).write({
+    await unitSnapshotPort(io, home).write({
       unitId: 'boot-recover-drift',
       state: 'prepared',
       createdAt: 1,

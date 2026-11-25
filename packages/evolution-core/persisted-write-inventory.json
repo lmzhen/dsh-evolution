@@ -327,7 +327,7 @@
     },
     {
       "id": "unit-journal",
-      "path": "<evolutionHome>/.skill-tree-units/<root>/units/skill/journals/**",
+      "path": "<evolutionHome>/merge/unit-journals/** | <evolutionHome>/units/skill/journals/**",
       "writer": "evolution-core/src/unit-journal.ts",
       "serializedBy": "transact",
       "marker": "transactIo(io, path, (current) => {",

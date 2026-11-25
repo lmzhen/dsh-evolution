@@ -878,11 +878,6 @@ const PLAN_SINK = new AsyncLocalStorage<PlanSink>()
 /** The model-supplied plan summary that must reach history/audit, not just command output. */
 const PLAN_SUMMARY = new AsyncLocalStorage<string>()
 
-/** Per-skill-root unit storage home; keeps two test roots from sharing prepared units. */
-export function skillUnitHome(root: string): string {
-  return join(dirname(root), '.skill-tree-units', basename(root))
-}
-
 export class SkillLibrary {
   /** R6: publish after the outer mutation lock has been released. */
   private readonly treePublisher: ((unitId: string, files: readonly TreeManifestFile[]) => Promise<void>) | undefined
@@ -1135,7 +1130,7 @@ export class SkillLibrary {
     }
     const publisher = this.treePublisher
     const afterCommit = options.afterCommit
-    const unitHome = skillUnitHome(this.root)
+    const unitHome = dirname(this.root)
     return new UnitKernel({
       io: this.io,
       journal: unitJournalPort(this.io, unitHome),
@@ -1238,7 +1233,7 @@ export class SkillLibrary {
 
   /** Recover every prepared tree-change snapshot in the shared unit store. */
   async recoverPreparedUnits(): Promise<MutationResult[]> {
-    const home = skillUnitHome(this.root)
+    const home = dirname(this.root)
     try { await this.lockPort().repair?.() } catch { /* diagnostics only */ }
     const unit = this.commitUnit({
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
@@ -1260,7 +1255,10 @@ export class SkillLibrary {
       },
     })
     const results = await this.rootGate.write(() => unit.recoverPrepared())
-    await pruneTreeChangeUnits(this.io, home).catch(() => {})
+    // Pruning scans every snapshot in the (shared) unit home; only do it when this
+    // root actually had recovery work, so an unrelated root's leftovers do not
+    // turn a first write into a whole-home scan.
+    if (results.length > 0) await pruneTreeChangeUnits(this.io, home).catch(() => {})
     return results
   }
 
