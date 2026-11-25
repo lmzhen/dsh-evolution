@@ -63,3 +63,16 @@ export class StoreService {
 export function createStoreService(kernel: StoreKernel): StoreService {
   return new StoreService(kernel)
 }
+
+/** A service value, or a use-time resolver (late provide / HMR replacement). */
+export type StoreServiceSource = StoreService | (() => StoreService | undefined) | undefined
+
+/** Resolve an optional service at USE time; a constructor-captured value would freeze HMR. */
+export function resolveStoreService(source: StoreServiceSource): StoreService | undefined {
+  return typeof source === 'function' ? source() : source
+}
+
+/** The one family-wide live resolver for `ctx.get('evolutionStore')`. */
+export function liveStoreService(ctx: { get?(name: string): unknown } | undefined): () => StoreService | undefined {
+  return () => ctx?.get?.('evolutionStore') as StoreService | undefined
+}

@@ -5,6 +5,8 @@
 约束：插件侧重写；平台侧只消费公开 service/事件，不 fork 平台。允许删除/合并包、破坏旧内部 API、重写核心路径；不保留“先双写再迁移”的长期兼容层。
 
 > DCR-85 修订（2026-11）：4.1 HomeFS 仍是 Phase B 的最终文件边界；过渡期 store-v2 直接消费 `ctx.evolutionIo`（单文件原子写）而不等待 HomeFS。4.4 StateStore 的具体读写语义改为 **Home MVCC Store**：写入串行提交不可变 `head/commit/objects`，读者无锁；`StateStore.transact` 仍保留为写入口，但不再以读锁作为一致性手段。详见 [85-versioned-snapshot-read.md](85-versioned-snapshot-read.md)。
+>
+> DCR-85 R10 全量根治（2026-11）：StateStore 的生命周期与数据面按“四个只有一个”重构——唯一的 `StoreAccess`（`ctx.inject` 晚绑定，使用点 `get()`，禁止构造期捕获）、唯一的 `legacy→staged→active` 激活状态机（启动时 promote，运行期不切）、唯一的事务（对象/commit/head/GC 同一 HomeFence）、唯一的 typed `StoreView` + domain codec（生产代码不再用 file-shaped IO）。平台侧只消费公开 `ctx.inject`/`ctx.get`/`evolutionIo`/`withFileLock`，不 fork、不加共享读锁。设计、发现落点与实施顺序见 85 的 R10 节；本节不重复细节。
 
 ## 1. 目标
 

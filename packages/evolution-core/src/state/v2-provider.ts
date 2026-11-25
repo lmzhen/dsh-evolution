@@ -12,7 +12,7 @@
 import { join } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
 import { StoreKernel } from '../store/store-kernel.ts'
-import type { StoreService } from '../store/service.ts'
+import { resolveStoreService, type StoreServiceSource } from '../store/service.ts'
 import type { StoreWriterFence } from '../store/types.ts'
 import type {
   EvolutionStateStorage,
@@ -50,7 +50,7 @@ export interface StateV2ProviderOptions {
   readonly storeDir?: string | undefined
   readonly now?: (() => number) | undefined
   /** The unified surface service; absent only in direct unit construction. */
-  readonly service?: StoreService | undefined
+  readonly service?: StoreServiceSource
 }
 
 /** Raised when the v2 provider is selected without an initialized head. */
@@ -75,10 +75,11 @@ export function createStateV2Provider(options: StateV2ProviderOptions): Evolutio
 
   const readDocument = async (): Promise<StateDocument> => {
     let value: unknown
+    const service = resolveStoreService(options.service)
     try {
-      value = options.service === undefined
+      value = service === undefined
         ? (await kernel.query(['state'])).domains.state
-        : (await options.service.query('state.provider', ['state'])).snapshot.domains.state
+        : (await service.query('state.provider', ['state'])).snapshot.domains.state
     } catch (error) {
       if (error instanceof Error && /not initialized/.test(error.message)) {
         throw new StateV2NotInitializedError(options.home)
@@ -99,10 +100,11 @@ export function createStateV2Provider(options: StateV2ProviderOptions): Evolutio
       ran = true
       return { state: document }
     }
-    if (options.service === undefined) {
+    const service = resolveStoreService(options.service)
+    if (service === undefined) {
       await kernel.mutate({ domains: ['state'], source: 'command', change })
     } else {
-      await options.service.command({ commandId: 'state.provider', domains: ['state'], source: 'command', change })
+      await service.command({ commandId: 'state.provider', domains: ['state'], source: 'command', change })
     }
     if (!ran) throw new Error('evolution-state-v2: mutation did not run')
     return result!

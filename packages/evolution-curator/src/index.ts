@@ -21,7 +21,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 import z from '@deepseek-ai/schemastery'
-import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, SKILL_NAME_RE, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, AUTHORING_SPLIT_LINE_CHARS, usageSidecarIoIfV2, type StoreService } from '@deepseek-ai/dsh-evolution-core'
+import { CuratorArchivedSkill, EvolutionGateSet, evolutionIoAdapter, SKILL_NAME_RE, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, DEFAULT_CURATOR_BOOT_GRACE_SECONDS, DEFAULT_CURATOR_REVIEW_MAX_TOKENS, AUTHORING_SPLIT_LINE_CHARS, usageSidecarIoIfV2, liveStoreService } from '@deepseek-ai/dsh-evolution-core'
 import { relatedSkillNames } from '@deepseek-ai/dsh-evolution-core/skills'
 import { SystemSkillWriter, skillBodyTarget, skillSupportTarget } from '@deepseek-ai/dsh-evolution-core/skills'
 import { type SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -432,7 +432,7 @@ export class EvolutionCurator extends Service {
     this.io = usageSidecarIoIfV2(ctx, baseIo, this.skills.root, {
       home: evolutionHome(),
       fence: homeFenceFrom(ctx),
-      ...(ctx.get('evolutionStore') === undefined ? {} : { service: ctx.get('evolutionStore') as StoreService }),
+      service: liveStoreService(ctx),
     }) ?? baseIo
     this.config = config
     this.enabled = config.enabled ?? true

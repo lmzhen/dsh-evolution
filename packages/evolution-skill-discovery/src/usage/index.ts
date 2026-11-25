@@ -8,7 +8,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type Schema from '@deepseek-ai/schemastery'
 
-import { evolutionHome, evolutionIoAdapter, evolutionRoot, homeFenceFrom, makeSerialQueue, usageSidecarIoIfV2, type StoreService } from '@deepseek-ai/dsh-evolution-core'
+import { evolutionHome, evolutionIoAdapter, evolutionRoot, homeFenceFrom, liveStoreService, makeSerialQueue, usageSidecarIoIfV2 } from '@deepseek-ai/dsh-evolution-core'
 import { resolveSkillsRoot } from '@deepseek-ai/dsh-evolution-core/skills'
 import { appendEvolutionEvent, eventsFile, usageObserved } from '@deepseek-ai/dsh-evolution-core'
 import { DEFAULT_SUPPORT_READ_TOOL_NAMES, ToolDispatchNormalizer, classifySessionEvent, isReviewChannelSession, sessionAudited, skillReadNameOf, supportFileReadOf } from '@deepseek-ai/dsh-evolution-core'
@@ -101,7 +101,7 @@ export class SkillUsageRegistry extends Service {
     this.io = usageSidecarIoIfV2(ctx, baseIo, this.root, {
       home: evolutionHome(),
       fence: homeFenceFrom(ctx),
-      ...(ctx.get('evolutionStore') === undefined ? {} : { service: ctx.get('evolutionStore') as StoreService }),
+      service: liveStoreService(ctx),
     }) ?? baseIo
     // A2 observation: `session/event` DISPATCH records are the read-side
     // signal, on the same bus seam evolution-review already listens to. This

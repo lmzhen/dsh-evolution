@@ -17,7 +17,7 @@ import { join, resolve } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { StoreKernel } from './store-kernel.ts'
-import type { StoreService } from './service.ts'
+import { resolveStoreService, type StoreServiceSource } from './service.ts'
 import type { StoreDomainId, StoreWriterFence } from './types.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../state/constants.ts'
 import { suppressedFile, usageFile } from '../usage.ts'
@@ -29,7 +29,7 @@ export interface ScopedTextIOOptions {
   readonly domain: StoreDomainId
   readonly kernel: StoreKernel
   /** When present, reads/writes go through the unified surface service. */
-  readonly service?: StoreService | undefined
+  readonly service?: StoreServiceSource
   readonly commandId?: string | undefined
 }
 
@@ -47,16 +47,18 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
   const isTarget = (path: string): boolean => resolve(path) === target
 
   const readMapped = async (): Promise<string | null> => {
-    const snapshot = options.service === undefined
+    const service = resolveStoreService(options.service)
+    const snapshot = service === undefined
       ? await options.kernel.query([options.domain])
-      : (await options.service.query(options.commandId ?? 'usage.rw', [options.domain])).snapshot
+      : (await service.query(options.commandId ?? 'usage.rw', [options.domain])).snapshot
     return textOf(snapshot.domains[options.domain])
   }
 
   const writeMapped = async (text: string): Promise<void> => {
+    const service = resolveStoreService(options.service)
     const change = (): Record<string, unknown> => ({ [options.domain]: { text } })
-    if (options.service !== undefined) {
-      await options.service.command({
+    if (service !== undefined) {
+      await service.command({
         commandId: options.commandId ?? 'usage.rw',
         domains: [options.domain],
         source: 'command',
@@ -67,9 +69,10 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
     await options.kernel.mutate({ domains: [options.domain], source: 'command', change })
   }
   const clearMapped = async (): Promise<void> => {
+    const service = resolveStoreService(options.service)
     const change = (): Record<string, unknown> => ({ [options.domain]: null })
-    if (options.service !== undefined) {
-      await options.service.command({
+    if (service !== undefined) {
+      await service.command({
         commandId: options.commandId ?? 'usage.rw',
         domains: [options.domain],
         source: 'command',
@@ -107,14 +110,15 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
         await base.transact(path, task)
         return
       }
+      const service = resolveStoreService(options.service)
       const change = async (current: { domains: Partial<Record<StoreDomainId, unknown>> }): Promise<Record<string, unknown>> => {
         const previous = textOf(current.domains[options.domain])
         const next = await task(previous)
         if (next === null) return { [options.domain]: null }
         return { [options.domain]: { text: next } }
       }
-      if (options.service !== undefined) {
-        await options.service.command({ commandId: options.commandId ?? 'usage.rw', domains: [options.domain], source: 'command', change })
+      if (service !== undefined) {
+        await service.command({ commandId: options.commandId ?? 'usage.rw', domains: [options.domain], source: 'command', change })
         return
       }
       await options.kernel.mutate({ domains: [options.domain], source: 'command', change })
@@ -201,7 +205,7 @@ export function memoryIoIfV2(
   home: string,
   memoryRootPath: string,
   fence?: StoreWriterFence | undefined,
-  service?: StoreService | undefined,
+  service?: StoreServiceSource,
 ): EvolutionIoLike | undefined {
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
   const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
@@ -217,7 +221,7 @@ export function usageSidecarIoIfV2(
   ctx: { get?(name: string): unknown } | undefined,
   base: EvolutionIoLike,
   skillsRoot: string,
-  options: { readonly home?: string | undefined; readonly fence?: StoreWriterFence | undefined; readonly service?: StoreService | undefined } = {},
+  options: { readonly home?: string | undefined; readonly fence?: StoreWriterFence | undefined; readonly service?: StoreServiceSource } = {},
 ): EvolutionIoLike | undefined {
   const home = options.home ?? join(skillsRoot, '..', 'evolution')
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
@@ -242,7 +246,7 @@ export function discoveryIoIfV2(
   home: string,
   paths: DiscoveryPaths,
   fence?: StoreWriterFence | undefined,
-  service?: StoreService | undefined,
+  service?: StoreServiceSource,
 ): EvolutionIoLike | undefined {
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
   const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })

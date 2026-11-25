@@ -17,7 +17,7 @@ import type { EvolutionIoLike } from '../io.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { StoreKernel } from './store-kernel.ts'
 import { scopedTextIO } from './scoped-text-io.ts'
-import type { StoreService } from './service.ts'
+import { resolveStoreService, type StoreServiceSource } from './service.ts'
 import type { StoreDomainId, StoreWriterFence } from './types.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../state/constants.ts'
 
@@ -45,7 +45,7 @@ export interface ScopedTreeIOOptions {
   readonly mappings: readonly ScopedTreeMapping[]
   readonly kernel: StoreKernel
   /** When present, reads/writes go through the unified surface service. */
-  readonly service?: StoreService | undefined
+  readonly service?: StoreServiceSource
   readonly commandId?: string | undefined
 }
 
@@ -65,20 +65,22 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
   }
 
   const readMap = async (domain: StoreDomainId): Promise<FileMap> => {
-    const snapshot = options.service === undefined
+    const service = resolveStoreService(options.service)
+    const snapshot = service === undefined
       ? await options.kernel.query([domain])
-      : (await options.service.query(options.commandId ?? 'merge', [domain])).snapshot
+      : (await service.query(options.commandId ?? 'merge', [domain])).snapshot
     return recordOf(snapshot.domains[domain])
   }
   const writeMap = async (domain: StoreDomainId, key: string, text: string | null): Promise<void> => {
+    const service = resolveStoreService(options.service)
     const change = async (current: { domains: Partial<Record<StoreDomainId, unknown>> }): Promise<Record<string, FileMap>> => {
       const map = recordOf(current.domains[domain])
       if (text === null) delete map[key]
       else map[key] = text
       return { [domain]: map }
     }
-    if (options.service !== undefined) {
-      await options.service.command({
+    if (service !== undefined) {
+      await service.command({
         commandId: options.commandId ?? 'merge',
         domains: [domain],
         source: 'command',
@@ -129,8 +131,9 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
         else map[target.key] = next
         return { [target.domain]: map }
       }
-      if (options.service !== undefined) {
-        await options.service.command({ commandId: options.commandId ?? 'merge', domains: [target.domain], source: 'command', change })
+      const service = resolveStoreService(options.service)
+      if (service !== undefined) {
+        await service.command({ commandId: options.commandId ?? 'merge', domains: [target.domain], source: 'command', change })
         return
       }
       await options.kernel.mutate({ domains: [target.domain], source: 'command', change })
@@ -218,7 +221,7 @@ export function mergeIoIfV2(
   base: EvolutionIoLike,
   home: string,
   fence?: StoreWriterFence | undefined,
-  service?: StoreService | undefined,
+  service?: StoreServiceSource,
 ): EvolutionIoLike | undefined {
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
   const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
