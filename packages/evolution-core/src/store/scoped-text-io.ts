@@ -141,8 +141,17 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
       return base.isSymlink === undefined ? null : await base.isSymlink(path)
     },
     mtime: async (path) => {
-      if (isTarget(path)) return (await readMapped()) === null ? null : null
-      return base.mtime === undefined ? null : await base.mtime(path)
+      if (!isTarget(path)) return base.mtime === undefined ? null : await base.mtime(path)
+      const service = resolveStoreService(options.service)
+      const snapshot = service === undefined
+        ? await options.kernel.query([options.domain])
+        : (await service.query(options.commandId ?? 'usage.rw', [options.domain])).snapshot
+      if (textOf(snapshot.domains[options.domain]) === null) return null
+      // The commit id is the domain's cross-process revision. Exposing a stable
+      // numeric projection lets caches (ProjectionJournal) invalidate after any
+      // commit instead of caching a null mtime forever.
+      const revision = Number.parseInt(snapshot.commitId.slice(0, 12), 16)
+      return Number.isFinite(revision) ? revision : 0
     },
   }
   // Property syntax (not object methods) keeps the io-discipline gate's

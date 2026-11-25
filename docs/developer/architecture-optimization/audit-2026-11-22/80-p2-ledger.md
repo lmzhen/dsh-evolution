@@ -63,7 +63,7 @@
 | R10-P2-2 GC retain/读失败 | FIXED | `collectGarbage` 非法 retain 抛 `store-invalid-retain`；GC 读失败被隔离，新增 `does not fail an already-published mutation when GC bookkeeping fails`。 |
 | R10-P2-3 lifecycle gate 漏闭包 | PARTIAL | gate-93 已拦字段式捕获/必需 inject；`run-registry` 已加 activation guard，但 service 仍按调用捕获，gate 尚未覆盖闭包捕获。 |
 | R10-P2-4 生命周期矩阵不全 | PARTIAL | 已补 state-auto 模式冻结、activation-guard bridge、HMR service 新实例、GC 故障注入；merge/memory/discovery/curator/feedback 的“先 mount 后 provide / 完全无 service”仍缺。 |
-| R10-P2-5 scoped `mtime=null` 缓存 | OPEN | ProjectionJournal 在域化后可能永不失效；需让 adapter 从 commit 派生稳定 mtime，或域值带 updatedAt。 |
+| R10-P2-5 scoped `mtime=null` 缓存 | FIXED | scoped text 的 `mtime` 现在返回 commit id 的稳定数值投影，commit 变化即失效；新增 `exposes the commit revision as mtime`。 |
 | R10-P2-6 双跨进程锁顺序 | OPEN | promote 仍 `state.lock → HomeFence`，tree 路径是 `HomeFence → state.lock`；需统一或删除 state.lock。 |
 | R10-P2-7 回退/坏 pending | OPEN | 无 `/evolution migrate state --revert`；坏 pending 只 throw，需可操作提示/修复命令。 |
 | R10-P2-8 store-plugin 捕获 IO provider | FIXED | `store-plugin` 改为 `evolutionIoAdapter(() => ctx.evolutionIo.provider())`，service/kernel/v2 provider 共用 live handle；HMR 替换 IO 后不再读旧对象。 |

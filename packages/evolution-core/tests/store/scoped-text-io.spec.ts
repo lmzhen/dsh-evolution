@@ -33,6 +33,21 @@ describe('scoped text IO bridge', () => {
     expect(await readFile(join(root, 'reports', 'x.json'), 'utf8')).toBe('{"ok":true}\n')
   })
 
+  it('exposes the commit revision as mtime for domain-backed files', async () => {
+    const root = await tempRoot('dsh-scoped-mtime-')
+    const io = nodeEvolutionIo()
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    const path = join(root, 'merge', 'merge-state.json')
+    await mkdir(join(root, 'merge'), { recursive: true })
+    await kernel.bootstrap({ merge: { text: 'v1' } })
+    const scoped = scopedTextIO(io, { path, domain: 'merge', kernel })
+    const first = await scoped.mtime!(path)
+    expect(first).not.toBeNull()
+    await kernel.mutate({ domains: ['merge'], source: 'command', change: () => ({ merge: { text: 'v2' } }) })
+    const second = await scoped.mtime!(path)
+    expect(second).not.toBe(first)
+  })
+
   it('only activates the merge bridge after the v2 marker exists', async () => {
     const root = await tempRoot('dsh-scoped-marker-')
     const io = nodeEvolutionIo()

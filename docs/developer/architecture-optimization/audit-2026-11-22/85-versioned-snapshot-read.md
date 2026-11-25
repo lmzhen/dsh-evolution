@@ -562,7 +562,8 @@ interface StoreView {
 
 ##### R10.6 树 manifest 成为唯一权威
 
-- **形状先定死：full manifest per unit**。当前增量 manifest + head 只留最后一个 + GC 只保 64 commit，无法回放出整棵树；因此 unit 提交后生成全树 `{path,sha,size,mode,deleted}` 快照，head 的 manifest 即完整权威；读侧只需一个对象。代价是每 unit O(tree)，接受。**已落地的 writer**：`SkillLibrary.treeManifestFiles()` 在 publisher 时遍历当前树，`tree-manifest-boundary` 断言 restructure 后 manifest 同时含 `SKILL.md` 与 `references/details.md`；reader 切换与 recovery 仍待。
+- **形状先定死：full manifest per unit**。当前增量 manifest + head 只留最后一个 + GC 只保 64 commit，无法回放出整棵树；因此 unit 提交后生成全树 `{path,sha,size,mode,deleted}` 快照，head 的 manifest 即完整**路径/哈希**权威；读侧只需一个对象。代价是每 unit O(tree)，接受。**已落地的 writer**：`SkillLibrary.treeManifestFiles()` 在 publisher 时遍历当前树，`tree-manifest-boundary` 断言 restructure 后 manifest 同时含 `SKILL.md` 与 `references/details.md`；reader 切换与 recovery 仍待。
+- **正文归属边界**：当前 manifest 条目只有 `sha256/size`，正文仍由 UnitKernel 的 materialized 文件持有；因此 manifest 是“树形状/内容指纹”的权威，不是正文存储。若要 manifest 独立还原正文，必须把 skill 正文 blob 化（R10.5 的 blob 路径）并把 manifest 条目升级为 `blobSha`；在 blob 化之前，materialized 文件仍是正文读权威，不能宣称“只靠 manifest 读整棵树”。
 - `TreeRepository`：写 = `StoreView.transact('tree')` + full manifest object；读 = `readTreeManifest`，模型/UI/维护扫描先读 manifest 再按 blob 取正文。
 - materialized 文件在 full manifest 落地前仍是读权威；切换后只在 manifest 缺失且处于迁移期时只读 fallback；active 模式下 manifest 缺失是 `StoreCorruptError`。
 - 恢复源不能用 prepared journal（tree unit 已 committed，afterCommit 才入队）：在 unit commit 前写一条 durable `manifest-pending` 记录（unitId + after hashes），publish 成功后清除；启动时按该记录重放，而不是扫 prepared journal。
@@ -643,7 +644,7 @@ interface StoreView {
 - GC `retain` 非法值已改为入口拒绝（`store-invalid-retain`）；GC 读阶段失败不再把已提交写判失败（有故障注入测试 `does not fail an already-published mutation when GC bookkeeping fails`）；
 - gate-93 只认字段式捕获，漏闭包捕获（`run-registry` 仍冻结 service）；R10.11 的 transaction/ports/manifest 三条门禁尚不存在；
 - 五个 bridge 无完整的 late-provide/HMR 矩阵；`store-service-plugin` 已断言 HMR 后 service 是新实例，`store-plugin` 已改用 live IO adapter，但其余消费者仍缺“先 mount 后 provide / 完全无 service”用例；
-- scoped adapter `mtime=null` 会让 ProjectionJournal 缓存永不失效；
+- scoped adapter `mtime=null` 导致 ProjectionJournal 缓存永不失效：已改为返回 commit revision 的数值投影，commit 变化即失效；
 - promote 的 `state.lock → HomeFence` 与 tree 路径 `HomeFence → state.lock` 顺序相反；
 - 回退/坏 pending 缺可操作命令；
 - surface 表中 `merge_stage writes:[]`、`source:'system'` 未入枚举、`expectsCommit` 仍是死字段；
