@@ -281,9 +281,14 @@ export class StoreKernel {
       if (this.gcEveryWrites > 0 && this.writesSinceGc >= this.gcEveryWrites) {
         this.writesSinceGc = 0
         // Bounded production GC: keep the 64-commit chain without requiring an
-        // external maintenance caller. Nested fence.run reuses this critical
-        // section, and collectGarbage reports deletion failures instead of throwing.
-        await this.collectGarbage()
+        // external maintenance caller. A GC read/deletion failure must not turn an
+        // already-published commit into a caller-visible failure (callers retry and
+        // duplicate side effects); the next pass reconciles.
+        try {
+          await this.collectGarbage()
+        } catch {
+          // committed; GC is best-effort after the head is safe
+        }
       }
       return { commitId: commit.commitId, domains: values, tree: commit.tree }
     })
@@ -315,7 +320,10 @@ export class StoreKernel {
    * wastes space; a reachable snapshot is never broken by this pass.
    */
   async collectGarbage(retain = 64): Promise<StoreGarbageCollectionResult> {
-    const limit = Number.isInteger(retain) && retain >= 2 ? retain : 64
+    if (!Number.isInteger(retain) || retain < 2) {
+      throw new StoreError('store-invalid-retain', 'collectGarbage retain must be an integer >= 2')
+    }
+    const limit = retain
     return await this.fence.run(async () => {
       const head = await this.readHead()
       if (head === null) return { commits: [], objects: [], failures: [] }

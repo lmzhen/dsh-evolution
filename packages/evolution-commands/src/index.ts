@@ -291,8 +291,8 @@ async function readRunReport(io: EvolutionIoLike, record: RunRecord, store?: Sto
   let text: string | null = isPresent(probed) ? probed.value : null
   // v2: merge/reports writes live in the reports domain; the legacy file is gone.
   if (text === null && store !== undefined) {
-    const reportsRoot = join(evolutionHome(), 'reports')
-    const rel = relative(reportsRoot, path).replace(/\\/g, '/')
+    // The reports domain keys are `reports/<name>` relative to the evolution home.
+    const rel = relative(evolutionHome(), path).replace(/\\/g, '/')
     if (rel !== '' && !rel.startsWith('..')) {
       try {
         const snapshot = await store.query('merge', ['reports'])

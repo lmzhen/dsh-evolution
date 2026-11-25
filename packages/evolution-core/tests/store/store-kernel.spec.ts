@@ -160,12 +160,12 @@ describe('home MVCC store kernel', () => {
     })).rejects.toThrow(/plain JSON/)
   })
 
-  it('keeps the head when GC receives an invalid retain value', async () => {
+  it('rejects an invalid retain value instead of silently using 64', async () => {
     const { io, root } = await seeded()
     const kernel = new StoreKernel({ io, home: root, fence: openFence() })
     await kernel.bootstrap({ state: { n: 0 } })
-    const result = await kernel.collectGarbage(Number.NaN)
-    expect(result.failures).toEqual([])
+    await expect(kernel.collectGarbage(Number.NaN)).rejects.toMatchObject({ code: 'store-invalid-retain' })
+    await expect(kernel.collectGarbage(1)).rejects.toMatchObject({ code: 'store-invalid-retain' })
     expect((await kernel.query(['state'])).domains.state).toEqual({ n: 0 })
   })
 
