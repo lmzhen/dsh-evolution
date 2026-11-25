@@ -218,18 +218,26 @@ export function runStorePortIfV2(
   if (!isStoreV2Active(home)) return undefined
   // R7e: when the composition mounted the one surface service, the run index
   // uses its declared maintain.* commands instead of opening a second kernel.
-  const service = ctx?.get?.('evolutionStore') as {
+  // Resolve it per operation: HMR may replace the service after this port exists.
+  type RunService = {
     query?(commandId: string, domains?: readonly string[]): Promise<{ snapshot: { domains: { runs?: unknown } } }>
     command?(request: { commandId: string; domains: readonly string[]; change: (current: { domains: { runs?: unknown } }) => Record<string, unknown> | Promise<Record<string, unknown>> }): Promise<unknown>
-  } | undefined
-  if (service?.query !== undefined && service.command !== undefined) {
-    return {
-      async read() {
-        const result = await service.query!('maintain.status', ['runs'])
+  }
+  const resolveService = (): RunService | undefined => ctx?.get?.('evolutionStore') as RunService | undefined
+  const fallback = createRunStorePort(new StoreKernel({ io, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) }))
+  return {
+    async read() {
+      const service = resolveService()
+      if (service?.query !== undefined && service.command !== undefined) {
+        const result = await service.query('maintain.status', ['runs'])
         return result.snapshot.domains.runs === undefined ? null : result.snapshot.domains.runs as RunIndexDocument
-      },
-      async write(task) {
-        await service.command!({
+      }
+      return await fallback.read()
+    },
+    async write(task) {
+      const service = resolveService()
+      if (service?.query !== undefined && service.command !== undefined) {
+        await service.command({
           commandId: 'maintain.handoff',
           domains: ['runs'],
           change: async (current) => {
@@ -237,10 +245,11 @@ export function runStorePortIfV2(
             return next === null ? {} : { runs: next }
           },
         })
-      },
-    }
+        return
+      }
+      await fallback.write(task)
+    },
   }
-  return createRunStorePort(new StoreKernel({ io, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) }))
 }
 
 /** Options for {@link newRunRegistry}. */

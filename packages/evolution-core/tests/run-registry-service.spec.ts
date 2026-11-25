@@ -28,4 +28,28 @@ describe('run registry surface adapter', () => {
     await port?.write(current => ({ ...(current ?? emptyRunIndex()), runs: [] }))
     expect(calls).toEqual(['query:maintain.status', 'command:maintain.handoff'])
   })
+
+  it('resolves the service per operation so an HMR replacement is not frozen', async () => {
+    const home = await tempRoot('dsh-run-service-hmr-')
+    await mkdir(join(home, 'state'), { recursive: true })
+    await writeFile(join(home, 'state', STATE_V2_MIGRATION_MARKER), '{}\n')
+    const calls: string[] = []
+    const fake = (label: string) => ({
+      query: async (commandId: string) => {
+        calls.push(label + ':query:' + commandId)
+        return { snapshot: { domains: { runs: emptyRunIndex() } } }
+      },
+      command: async (request: { commandId: string; change: (current: { domains: { runs?: unknown } }) => Record<string, unknown> | Promise<Record<string, unknown>> }) => {
+        calls.push(label + ':command:' + request.commandId)
+        await request.change({ domains: { runs: emptyRunIndex() } })
+      },
+    })
+    let current = fake('first')
+    const port = runStorePortIfV2({ get: () => current }, nodeEvolutionIo(), home)
+    await port?.read()
+    current = fake('second')
+    await port?.read()
+    await port?.write(index => index ?? emptyRunIndex())
+    expect(calls).toEqual(['first:query:maintain.status', 'second:query:maintain.status', 'second:command:maintain.handoff'])
+  })
 })
