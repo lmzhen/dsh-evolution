@@ -224,6 +224,22 @@ describe('home MVCC store kernel', () => {
     expect((await kernel.query(['state'])).domains.state).toEqual({ n: 3 })
   })
 
+  it('does not fail an already-published mutation when GC bookkeeping fails', async () => {
+    const root = await tempRoot('dsh-store-gc-failure-')
+    const base = nodeEvolutionIo()
+    const io = {
+      ...base,
+      list: async (path: string): Promise<string[]> => {
+        if (path.includes('objects')) throw new Error('simulated GC list failure')
+        return await base.list(path)
+      },
+    }
+    const kernel = new StoreKernel({ io, home: root, fence: openFence(), gcEveryWrites: 1 })
+    await kernel.bootstrap({ state: { n: 0 } })
+    await expect(kernel.mutate({ domains: ['state'], source: 'command', change: () => ({ state: { n: 1 } }) })).resolves.toBeDefined()
+    expect((await kernel.query(['state'])).domains.state).toEqual({ n: 1 })
+  })
+
   it('runs bounded GC from the write path instead of only on demand', async () => {
     const { io, root } = await seeded()
     const kernel = new StoreKernel({ io, home: root, fence: openFence(), gcEveryWrites: 1 })

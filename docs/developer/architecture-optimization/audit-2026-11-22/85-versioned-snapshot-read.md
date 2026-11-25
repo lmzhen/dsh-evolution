@@ -640,7 +640,7 @@ interface StoreView {
 同时确认仍待补的 P2（不阻塞设计，但进实施清单）：
 
 - reports fallback 的 key 前缀错误（域 key 是 `reports/x`，当前用 `x`）；写路径仍走 base；
-- GC `retain` 非法值已改为入口拒绝（`store-invalid-retain`）；GC 读阶段失败不再把已提交写判失败（已补 best-effort catch，待补故障注入测试）；
+- GC `retain` 非法值已改为入口拒绝（`store-invalid-retain`）；GC 读阶段失败不再把已提交写判失败（有故障注入测试 `does not fail an already-published mutation when GC bookkeeping fails`）；
 - gate-93 只认字段式捕获，漏闭包捕获（`run-registry` 仍冻结 service）；R10.11 的 transaction/ports/manifest 三条门禁尚不存在；
 - 五个 bridge 无 late-provide/HMR 矩阵；`store-plugin.spec` 的 HMR 只断言 defined；
 - scoped adapter `mtime=null` 会让 ProjectionJournal 缓存永不失效；

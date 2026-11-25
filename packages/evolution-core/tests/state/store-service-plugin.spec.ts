@@ -80,10 +80,13 @@ describe('evolutionStore service provider', () => {
     process.env.DSH_EVOLUTION_HOME = root
     try {
       const first = await ctx.plugin(StorePlugin) as unknown as { dispose(): Promise<void> }
-      expect(ctx.get('evolutionStore')).toBeDefined()
+      const firstService = ctx.get('evolutionStore')
+      expect(firstService).toBeDefined()
       await first.dispose()
       await ctx.plugin(StorePlugin)
-      expect(ctx.get('evolutionStore')).toBeDefined()
+      const secondService = ctx.get('evolutionStore')
+      expect(secondService).toBeDefined()
+      expect(secondService).not.toBe(firstService)
     } finally {
       if (previous === undefined) delete process.env.DSH_EVOLUTION_HOME
       else process.env.DSH_EVOLUTION_HOME = previous
