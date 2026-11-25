@@ -1079,6 +1079,7 @@ export class SkillLibrary {
     // the units queued for the next boundary rather than self-deadlocking.
     if (fence?.holdsTree?.() === true) return
     const units = this.pendingTreeUnits.splice(0)
+    const failed: typeof units = []
     for (const unit of units) {
       const files: TreeManifestFile[] = []
       for (const op of unit.ops) {
@@ -1089,9 +1090,14 @@ export class SkillLibrary {
       try {
         await this.treePublisher(unit.unitId, files)
       } catch (error) {
+        // The unit landed in the tree but not in the manifest. Keep it for the
+        // next boundary rather than dropping the manifest permanently; cap the
+        // retry set so a persistent store failure cannot grow without bound.
+        failed.push(unit)
         console.warn('skill-store: tree manifest publish failed for ' + unit.unitId + ': ' + (error instanceof Error ? error.message : String(error)))
       }
     }
+    if (failed.length > 0) this.pendingTreeUnits.unshift(...failed.slice(-64))
   }
 
 
