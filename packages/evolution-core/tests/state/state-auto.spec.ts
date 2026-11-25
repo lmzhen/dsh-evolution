@@ -5,7 +5,7 @@ import { mountStateStack } from '../../../test-support/state-stack.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import EvolutionState from '../../src/state/index.ts'
 import * as StorePlugin from '../../src/state/store-plugin.ts'
-import { STATE_MIGRATION_MARKER } from '../../src/state/constants.ts'
+import { STATE_MIGRATION_MARKER, STATE_V2_MIGRATION_MARKER } from '../../src/state/constants.ts'
 import { writeStateStoreSnapshot } from '../../src/state/store.ts'
 
 const previousDshHome = process.env.DSH_HOME
@@ -30,6 +30,17 @@ describe('state provider auto', () => {
     await writeStateStoreSnapshot(ctx.evolutionIo.provider(), join(evolution, 'state', 'store.json'), { review: {}, curator: null, pending: {} })
     await ctx.evolutionIo.provider().writeText(join(evolution, 'state', STATE_MIGRATION_MARKER), JSON.stringify({ target: 'store' }))
     expect(await ctx.evolutionState.loadCuratorState()).toBeNull()
+  })
+
+  it('refuses a v2 activation that appears while the host is running', async () => {
+    const root = await tempRoot('dsh-state-auto-late-v2-')
+    const evolution = join(root, 'evolution')
+    process.env.DSH_HOME = root
+    const ctx = await mountStateStack(evolution)
+    await ctx.plugin(StorePlugin)
+    await ctx.plugin(EvolutionState, { provider: 'auto' })
+    await ctx.evolutionIo.provider().writeText(join(evolution, 'state', STATE_V2_MIGRATION_MARKER), JSON.stringify({ target: 'store-v2' }) + '\n')
+    expect(() => ctx.evolutionState.loadCuratorState()).toThrow(/restart the host/)
   })
 
   it('mounts before the store provider and validates on the first operation', async () => {

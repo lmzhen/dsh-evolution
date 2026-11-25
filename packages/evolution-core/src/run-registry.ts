@@ -40,11 +40,12 @@
 
 import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { clampedNumber } from './numeric.ts'
 import { isProcessAlive, transactIo } from './io.ts'
 import type { EvolutionIoLike } from './io.ts'
 import type { RunOutcome } from './contract.ts'
+import { guardLegacyActivation } from './store/activation-guard.ts'
 import { StoreKernel } from './store/store-kernel.ts'
 import { liveHomeFence } from './mutation-authority.ts'
 import { STATE_V2_MIGRATION_MARKER } from './state/constants.ts'
@@ -341,8 +342,11 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
   const maxRecords = clampedNumber(options.maxRecords ?? DEFAULT_RUN_RECORDS, DEFAULT_RUN_RECORDS, { min: 1 })
   const warn = options.warn ?? (() => {})
   const path = runsFile(options.home)
+  const io = options.store === undefined
+    ? guardLegacyActivation(options.io, options.home, { path: candidate => resolve(candidate) === resolve(path) })
+    : options.io
   const readIndexText = async (): Promise<string | null> => {
-    if (options.store === undefined) return await options.io.readText(path)
+    if (options.store === undefined) return await io.readText(path)
     const document = await options.store.read()
     return document === null ? null : JSON.stringify(document)
   }
@@ -356,7 +360,7 @@ export function newRunRegistry(options: RunRegistryOptions): RunRegistry {
       })
       return
     }
-    const run = async (): Promise<void> => { await transactIo(options.io, path, task) }
+    const run = async (): Promise<void> => { await transactIo(io, path, task) }
     const fence = options.resolveFence?.() ?? options.fence
   if (fence !== undefined) await fence.run(run)
     else await run()

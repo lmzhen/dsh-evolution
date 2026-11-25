@@ -12,9 +12,10 @@
  */
 
 import { existsSync } from 'node:fs'
-import { basename, join, relative, resolve } from 'node:path'
+import { basename, join, relative, resolve, sep } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
+import { guardLegacyActivation } from './activation-guard.ts'
 import { StoreKernel } from './store-kernel.ts'
 import { scopedTextIO } from './scoped-text-io.ts'
 import { resolveStoreService, type StoreServiceSource } from './service.ts'
@@ -223,7 +224,18 @@ export function mergeIoIfV2(
   fence?: StoreWriterFence | undefined,
   service?: StoreServiceSource,
 ): EvolutionIoLike | undefined {
-  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
+  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
+    const statePath = resolve(join(home, 'merge', 'merge-state.json'))
+    const runMeta = resolve(join(home, 'merge', 'run-meta'))
+    const reports = resolve(join(home, 'reports'))
+    const guardedPath = (path: string): boolean => {
+      const resolved = resolve(path)
+      return resolved === statePath
+        || resolved.startsWith(runMeta + sep)
+        || resolved.startsWith(reports + sep)
+    }
+    return guardLegacyActivation(base, home, { path: guardedPath })
+  }
   const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
   const serviceOptions = service === undefined ? {} : { service, commandId: 'merge' }
   const stateIo = scopedTextIO(base, { path: join(home, 'merge', 'merge-state.json'), domain: 'merge', kernel, ...serviceOptions })

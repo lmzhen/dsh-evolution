@@ -504,7 +504,7 @@ plugin apply (sync)
   - 完全没有 service → row 仍能 mount，能力缺失可诊断，写 fail loud（active 模式下）；
   - `inject` 必需集合固定（借鉴 PR #26 的 `inject-authority.spec.ts`，每个可选能力都有一条负向 spec）。
 
-已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。`verify-store-lifecycle` 已成为 gate-93（构造期字段捕获、可选服务进必需 inject 都红）。**仍缺**：闭包捕获检测（run-registry 仍把 service 冻结进 port）、activation oracle、HMR 旧实例断言。
+已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。`verify-store-lifecycle` 已成为 gate-93（构造期字段捕获、可选服务进必需 inject 都红）。另外 `EvolutionState` 不再运行期切 v2：启动时的模式缓存 + `guardLegacyActivation` 让另一宿主激活后本进程的 state/sidecar/runs 写 fail loud，而不是继续写 legacy；单测证明 activation guard 只拦迁移路径、skill tree 等非迁移路径仍可写。**仍缺**：闭包捕获检测（run-registry 已加 guard，但 service 仍按调用捕获）、完整 activation record/generation、HMR 旧实例断言。
 
 ##### R10.3 激活状态机与迁移
 
@@ -633,6 +633,8 @@ interface StoreView {
 | 激活记录缺 mode/generation；删 marker 再 stage 会静默删 v2 数据 | `.store-activation.json` 加 mode/generation/lastActiveCommitId；回退写记录；曾激活过的 head 不匹配拒绝 promote，需显式 `--discard-active-store` |
 | 增量 manifest + 只保 64 commit 无法回放整棵树；恢复源用 prepared journal 不成立 | 改为 **full manifest per unit**；unit commit 前写 durable manifest-pending，启动重放；materialized 文件在 full manifest 落地前仍是读权威 |
 | 层数/职责重叠（StoreAccess+StoreView+7 ports+surface+2 事务） | 只留 kernel + service；codec 表；内部 `mutate(system)` + 外部 `command`；CAS 只约束人/模型 surface，provider RMW CAS-free |
+
+已落地的部分：`EvolutionState` 启动模式缓存 + `guardLegacyActivation`（state/sidecar/runs 在另一宿主激活后 fail loud；skill tree 等非迁移路径不拦）；activation record/generation、full manifest、codec 表仍是设计态。
 
 同时确认仍待补的 P2（不阻塞设计，但进实施清单）：
 

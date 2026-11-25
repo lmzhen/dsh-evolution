@@ -59,11 +59,14 @@ export class EvolutionState extends Service {
 
   private readonly providerName: string
   private readonly home: string
+  /** Activation mode is fixed for this process: a marker appearing later means restart. */
+  private readonly v2ActiveAtMount: boolean
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'evolutionState')
     this.providerName = config.provider ?? ''
     this.home = evolutionHome()
+    this.v2ActiveAtMount = existsSync(join(this.home, 'state', STATE_V2_MIGRATION_MARKER))
     // S-07: a PINNED provider name is verified at mount when any
     // provider is already registered — a config typo used to explode only at
     // the first state access, far away from the mistake (the registry's
@@ -123,7 +126,17 @@ export class EvolutionState extends Service {
     }
   }
 
+  /** Activation is a process-lifetime fact; a marker appearing later means another
+   * host promoted it, and this process must restart instead of silently switching. */
+  private assertActivationStable(): void {
+    const now = existsSync(join(this.home, 'state', STATE_V2_MIGRATION_MARKER))
+    if (now !== this.v2ActiveAtMount) {
+      throw new Error('evolution-state: the v2 activation marker changed while this host was running; restart the host before using the new medium')
+    }
+  }
+
   private assertProviderChoice(): void {
+    this.assertActivationStable()
     if (this.providerName === 'auto') {
       const names = this.ctx.evolutionStateStorage.providerNames()
       const v2Marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
