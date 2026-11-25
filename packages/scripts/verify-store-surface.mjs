@@ -28,7 +28,10 @@ const host = new Set(ids(defs))
 
 const problems = []
 for (const id of host) if (!allSurface.has(id)) problems.push('host command not registered in surface: ' + id)
-for (const id of commandSurface) if (!host.has(id)) problems.push('surface command has no host command: ' + id)
+for (const id of commandSurface) {
+  const subcommandOfRegisteredHost = id.includes('.') && host.has(id.slice(0, id.indexOf('.')))
+  if (!host.has(id) && !subcommandOfRegisteredHost) problems.push('surface command has no host command: ' + id)
+}
 if (allSurface.size === 0) problems.push('surface registry is empty (a vacuum pass is not a pass)')
 
 if (process.argv.includes('--self-test')) {

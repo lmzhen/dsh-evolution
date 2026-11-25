@@ -444,7 +444,8 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：marker 恢复成功/拒绝两例通过；restructure manifest 通过；usage-sidecar-v2 通过；`tsc` core/curator/discovery/commands 0。
 - P1-6：跨进程无锁读 drill 注册为 gate-88（overlay tree, local/ci-static），有 family-facts 声明与 no-drill reason；本地已运行通过。
 - P1-7（部分）：新增 gate-89 `verify-store-surface`，host command ↔ surface command 双向闭包；`--self-test` 注入未登记命令并证明必红；gate-manifest / check-registry 通过。
-- 未修：剩余 3 个静态门禁（read-lock/head/single-source 深度）、surface 清单不完整（P1-8），继续按复核清单处理。
+- P1-8（部分）：surface registry 补齐 merge 子命令（scan/pair/status/report/cancel/runs/doctor/reconcile/pending/candidates/approve/reject/resume/skipped/discard/undo）、usage observation 与漏掉的 UI action；gate-89 现校验 29 host commands ↔ 45 command ids（子命令按父命令归属）。
+- 未修：剩余 3 个静态门禁（read-lock/head/single-source 深度）、多数 surface 仍无真实消费者（service 目前只被 doctor/run-registry 使用），继续按复核清单处理。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 

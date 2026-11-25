@@ -11,7 +11,8 @@ describe('DCR-85 surface registry', () => {
   it('every registered command id is a real host command', () => {
     const defined = new Set(HOST_COMMAND_DEFS.map(def => def.id))
     for (const command of STORE_SURFACE_COMMANDS.filter(entry => entry.kind === 'command')) {
-      expect(defined.has(command.id), command.id).toBe(true)
+      const subcommand = command.id.includes('.') && defined.has(command.id.slice(0, command.id.indexOf('.')))
+      expect(defined.has(command.id) || subcommand, command.id).toBe(true)
     }
   })
 
