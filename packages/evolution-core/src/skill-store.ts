@@ -881,6 +881,8 @@ const PLAN_SUMMARY = new AsyncLocalStorage<string>()
 export class SkillLibrary {
   /** R6: publish after the outer mutation lock has been released. */
   private readonly treePublisher: ((unitId: string, files: readonly TreeManifestFile[]) => Promise<void>) | undefined
+  /** Boot reconciliation for a missing head manifest (full-manifest writer follow-up). */
+  private readonly treeManifestRecoverer: (() => Promise<void>) | undefined
   private readonly pendingTreeUnits: { readonly unitId: string; readonly ops: readonly { readonly target: string; readonly after: string | null }[] }[] = []
   readonly root: string
   /** The ONE read face owner/health/panel consume; a thin adapter, not a store. */
@@ -930,6 +932,7 @@ export class SkillLibrary {
     mutationLockResolver?: () => MutationLockPort | undefined,
     fenceResolver?: () => HistoryFence | undefined,
     treePublisher?: (unitId: string, files: readonly TreeManifestFile[]) => Promise<void>,
+    treeManifestRecoverer?: () => Promise<void>,
   ) {
     this.root = root
     this.targetLocks = targetLocksFor(root)
@@ -944,6 +947,7 @@ export class SkillLibrary {
     this.fence = fence
     this.fenceResolver = fenceResolver
     this.treePublisher = treePublisher
+    this.treeManifestRecoverer = treeManifestRecoverer
     // V4-20: bind the ONE transaction seam by default. Explicit injection stays
     // first; a backend without transact keeps the plain read→write (the
     // in-process serial chain is the second layer). transactIo owns the backend
@@ -1229,6 +1233,7 @@ export class SkillLibrary {
   /** Public boot hook: idempotent with the first-write recovery. */
   async recoverOnBoot(): Promise<void> {
     await this.ensureRecovered()
+    await this.treeManifestRecoverer?.()
   }
 
   /** Recover every prepared tree-change snapshot in the shared unit store. */
@@ -5190,6 +5195,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
   let effectiveIo = io
   let library: SkillLibrary | undefined
   let treePublisher: ((unitId: string, files: readonly TreeManifestFile[]) => Promise<void>) | undefined
+  let treeManifestRecoverer: (() => Promise<void>) | undefined
   // R4: the usage and curator-suppressed sidecars live beside the skill tree.
   // Under the explicit v2 marker they are one domain each; the wrapper delegates
   // every real skill path to the base seam, so the library code is unchanged.
@@ -5213,6 +5219,18 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
         treeManifest: buildTreeManifestFiles(unitId, files),
       })
     }
+    treeManifestRecoverer = async () => {
+      const snapshot = await kernel.query(['state'])
+      if (snapshot.tree?.manifest !== undefined) return
+      const files = await library?.treeManifestFiles() ?? []
+      await kernel.mutate({
+        domains: [],
+        source: 'system',
+        change: () => ({}),
+        tree: { unitId: 'boot-manifest' },
+        treeManifest: buildTreeManifestFiles('boot-manifest', files),
+      })
+    }
   }
   const created = new SkillLibrary(
     root,
@@ -5229,6 +5247,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     options.mutationLock === undefined && ctx !== undefined ? () => mutationLockFrom(ctx) : undefined,
     options.fence === undefined && ctx !== undefined ? () => (ctx.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence : undefined,
     treePublisher,
+    treeManifestRecoverer,
   )
   library = created
   return created

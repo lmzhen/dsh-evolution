@@ -30,8 +30,13 @@ it('publishes a manifest after the outer mutation lock is released', async () =>
     fence: authority.homeFence,
     ctx: { emit: () => {}, get: () => undefined } as never,
   })
+  await lib.recoverOnBoot()
   const created = await lib.create('tree-skill', skill('tree-skill'), 'foreground')
   expect(created.ok, created.message).toBe(true)
+  // Boot reconciliation publishes the missing full manifest before any unit;
+  // the manifest is the tree's shape authority even when the tree is empty.
+  const booted = await kernel.query(['state'])
+  expect(booted.tree?.manifest).toBeDefined()
   const snapshot = await kernel.query(['state'])
   expect(snapshot.tree).not.toBeNull()
   const manifest = await readTreeManifest(kernel, snapshot.tree)
