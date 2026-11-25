@@ -11,11 +11,14 @@
 
 import { requireStoreSurfaceCommand } from './surface.ts'
 import { StoreKernel } from './store-kernel.ts'
+import { StoreError } from './types.ts'
 import type { StoreCommitResult, StoreDomainId, StoreDomainValues, StoreSnapshot, StoreTreeRef } from './types.ts'
 
 export interface StoreQueryResult {
   readonly commandId: string
   readonly snapshot: StoreSnapshot
+  /** Activation generation this service was created for. */
+  readonly generation: number
 }
 
 export interface StoreCommandRequest {
@@ -23,6 +26,8 @@ export interface StoreCommandRequest {
   readonly domains: readonly StoreDomainId[]
   readonly source?: Parameters<StoreKernel['mutate']>[0]['source'] | undefined
   readonly expectedCommit?: string | undefined
+  /** Optional activation guard: a stale generation refuses the write. */
+  readonly expectedGeneration?: number | undefined
   readonly change: (current: StoreSnapshot) => StoreDomainValues | Promise<StoreDomainValues>
   readonly tree?: StoreTreeRef | null | undefined
 }
@@ -35,13 +40,14 @@ export interface DomainCodec<T> {
 
 export interface StoreDomainRead<T> {
   readonly commitId: string
+  readonly generation: number
   readonly tree: StoreTreeRef | null
   readonly value: T
 }
 
 /** One store service per evolution home; every surface calls the same instance. */
 export class StoreService {
-  constructor(private readonly kernel: StoreKernel) {}
+  constructor(private readonly kernel: StoreKernel, readonly generation = 0) {}
 
   /**
    * Internal typed read (no surface closure): the caller owns the domain codec.
@@ -49,7 +55,7 @@ export class StoreService {
    */
   async read<T>(domain: StoreDomainId, codec: DomainCodec<T>): Promise<StoreDomainRead<T>> {
     const snapshot = await this.kernel.query([domain])
-    return { commitId: snapshot.commitId, tree: snapshot.tree, value: codec.decode(snapshot.domains[domain]) }
+    return { commitId: snapshot.commitId, generation: this.generation, tree: snapshot.tree, value: codec.decode(snapshot.domains[domain]) }
   }
 
   /**
@@ -82,7 +88,7 @@ export class StoreService {
     for (const domain of requested) {
       if (!declared.has(domain)) throw new Error(`store surface ${commandId} may not read domain ${domain}`)
     }
-    return { commandId, snapshot: await this.kernel.query(requested) }
+    return { commandId, snapshot: await this.kernel.query(requested), generation: this.generation }
   }
 
   /** Publish one surface mutation; the service rejects undeclared write domains. */
@@ -91,6 +97,10 @@ export class StoreService {
     const declared = new Set<StoreDomainId>(command.writes)
     for (const domain of request.domains) {
       if (!declared.has(domain)) throw new Error(`store surface ${request.commandId} may not write domain ${domain}`)
+    }
+    if (request.expectedGeneration !== undefined && request.expectedGeneration !== this.generation) {
+      throw new StoreError('store-generation-mismatch',
+        `store activation changed: expected generation ${String(request.expectedGeneration)}, current ${String(this.generation)}`)
     }
     return await this.kernel.mutate({
       domains: request.domains,
@@ -103,8 +113,8 @@ export class StoreService {
 }
 
 /** Build the surface service around one kernel instance. */
-export function createStoreService(kernel: StoreKernel): StoreService {
-  return new StoreService(kernel)
+export function createStoreService(kernel: StoreKernel, generation = 0): StoreService {
+  return new StoreService(kernel, generation)
 }
 
 /** A service value, or a use-time resolver (late provide / HMR replacement). */

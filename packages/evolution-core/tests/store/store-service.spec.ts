@@ -44,4 +44,25 @@ describe('store surface service', () => {
     await service.transact('state', codec, current => current + 1)
     expect((await service.read('state', codec)).value).toBe(1)
   })
+
+  it('guards a write against a stale activation generation', async () => {
+    const home = await tempRoot('dsh-store-service-generation-')
+    const io = nodeEvolutionIo()
+    const kernel = new StoreKernel({ io, home, fence: new HomeFence({ home }) })
+    await kernel.bootstrap({ state: { n: 0 } })
+    const service = createStoreService(kernel, 7)
+    expect((await service.query('pending')).generation).toBe(7)
+    await expect(service.command({
+      commandId: 'approve',
+      domains: ['state'],
+      expectedGeneration: 6,
+      change: () => ({ state: { n: 1 } }),
+    })).rejects.toMatchObject({ code: 'store-generation-mismatch' })
+    await expect(service.command({
+      commandId: 'approve',
+      domains: ['state'],
+      expectedGeneration: 7,
+      change: () => ({ state: { n: 2 } }),
+    })).resolves.toBeDefined()
+  })
 })

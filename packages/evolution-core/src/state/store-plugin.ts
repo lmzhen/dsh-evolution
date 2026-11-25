@@ -18,7 +18,7 @@ import { activatePendingStateV2 } from './migrate.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { StoreKernel } from '../store/store-kernel.ts'
 import { createStoreService } from '../store/service.ts'
-import { isStoreV2Active } from './activation.ts'
+import { readStoreActivation } from './activation.ts'
 
 export const name = 'evolution-state-store'
 export const inject = ['evolutionStateStorage', 'evolutionIo']
@@ -44,8 +44,9 @@ export async function apply(ctx: Context): Promise<void> {
   // authority provisioning cannot freeze a stale writer lock.
   // The unified surface service is created first: the state provider becomes
   // one of its consumers instead of opening a second kernel path.
-  const service = isStoreV2Active(home)
-    ? createStoreService(new StoreKernel({ io, home, fence: liveHomeFence(ctx, home) }))
+  const activation = readStoreActivation(home)
+  const service = activation?.mode === 'store-v2'
+    ? createStoreService(new StoreKernel({ io, home, fence: liveHomeFence(ctx, home) }), activation.generation)
     : undefined
   const v2Provider = createStateV2Provider({
     io,
