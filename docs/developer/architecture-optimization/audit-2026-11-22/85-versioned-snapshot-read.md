@@ -444,9 +444,10 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：marker 恢复成功/拒绝两例通过；restructure manifest 通过；usage-sidecar-v2 通过；`tsc` core/curator/discovery/commands 0。
 - P1-6：跨进程无锁读 drill 注册为 gate-88（overlay tree, local lane；CI static 缺 platform 安装依赖，已登记 local-runner only），有 family-facts 声明与 no-drill reason；本地已运行通过。
 - P1-7：新增 gate-89 `verify-store-surface`、gate-90 `verify-store-single-source`、gate-91 `verify-store-head`、gate-92 `verify-store-read-lock`；分别覆盖 surface 闭包、store 路径单一来源、head 唯一 commit/fail-closed、query 无锁；均有 self-test 或真实负例；gate-manifest / check-registry 通过。gate-91 因 build overlay 依赖登记为 build-line local。
-- P1-8（部分）：v2 StateStore provider（`state.provider`）、usage/suppressed（`usage.rw`）、merge（`merge`）、memory（`memory.rw`）、discovery（`discovery.rw`）、feedback（`feedback.rw`）的读写与 `transact` 均可经 `evolutionStore` service，无 service 时保留 kernel fallback；新增用例覆盖 state/usage/merge/memory/feedback。consumers 现为 doctor、run-registry、state provider、usage sidecar、merge bridge、memory bridge、discovery bridge、feedback bridge。
+- P1-8（按 9.0 边界）：家族插件 durable 读已收口到同一内核——state/review/pending/curator 经 `state.provider`，usage 经 `usage.rw`，merge 经 `merge`，memory 经 `memory.rw`，discovery 经 `discovery.rw`，feedback 经 `feedback.rw`；doctor/run-registry 直接消费 service；`transact` 同样走 service。skill tree 读取仍走 UnitKernel + manifest（R5），activity 事件日志按 R4 保持 append-only base，二者都不是第二读写内核。
+- 读取范围边界见 9.0：平台、storage backend、其他插件的读不在 DCR-85 范围内，不作为 blocker。
 - P2（部分）：tree-only commit（空 domains + tree ref）不再解析全部 domain blob；manifest 发布失败改为有界重试；query 的 head 重试从 3×10ms 放宽到 5×20ms；GC 对年轻 object 默认 5 分钟宽限，避免并发 GC 删除尚未 commit 引用的 manifest object（`graceMs=0` 可显式关闭）。
-- 未修：工具与大部分 host command/UI 仍直接走 scoped IO 或 legacy，P1-8 继续。
+- 未修（P2，非读取面）：非法 retain、tree list/mtime、marker 校验等；之后独立复核、R8 真机验收。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
@@ -605,6 +606,15 @@ type CommandSpec = {
 - Settings/credentials 按钮例外：继续走平台 `remote.credentials` / `settings`，不进入 family store（secrets 永不进快照）。
 
 ## 9. 全量读写表面矩阵
+
+### 9.0 读取范围边界
+
+DCR-85 的 R6 只约束**家族插件自身**的读取行为：
+
+- **在范围内**：家族包通过 `ctx.evolutionIo`、state provider、scoped IO 适配器、`evolutionStore` 读取的 state/usage/merge/memory/discovery/feedback/tree；模型工具、host command、UI 按钮/路由属于这条读取面。
+- **不在范围内**：平台自身的读实现（`ctx.fs`、`dsh-atomic-write`、storage backend 的读锁/快照语义）、其他插件的读取、上游 session/log/credential 的读路径。DCR-85 不要求也不允许通过改平台去“统一”这些读。
+- **判据**：家族插件里每一个 durable 读要么落在 `StoreKernel`/`StoreService`，要么落在一个显式 scoped 适配器（并最终写同一 MVCC commit）；skill tree 的读取仍走 UnitKernel，tree manifest 是 R5 的权威，不因 R6 改成第二条读路径。
+- 因此 P1-8 的“surface 未收口”只按家族读取面判定；平台/其他插件的读取不计入，也不作为 blocker。
 
 ### 9.1 模型工具
 
