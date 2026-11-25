@@ -972,6 +972,11 @@
             "criterion": "verify-cross-process-read"
           },
           {
+            "id": "gate-89",
+            "tier": "fast",
+            "criterion": "verify-store-surface"
+          },
+          {
             "id": "gate-03",
             "tier": "ci-only",
             "criterion": "vitest"

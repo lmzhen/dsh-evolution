@@ -1553,6 +1553,25 @@
       ]
     },
     {
+      "id": "gate-89",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-store-surface.mjs packages`（DCR-85 §9：每个 host command 有 surface id，每个 command-kind id 是真实 host command）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-store-surface.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
+    },
+    {
       "id": "gate-03",
       "kind": "toolchain",
       "human": "`node node_modules/vitest/vitest.mjs run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2`",

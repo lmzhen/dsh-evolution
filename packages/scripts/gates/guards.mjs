@@ -651,4 +651,12 @@ export const guards = [
     lanes: ["local","ci-static"],
   }),
 
+  gate("gate-89", {
+    kind: "script",
+    tree: "mirror",
+    title: "`node packages/scripts/verify-store-surface.mjs packages`（DCR-85 §9：每个 host command 有 surface id，每个 command-kind id 是真实 host command）",
+    argv: ["node","packages/scripts/verify-store-surface.mjs","packages"],
+    lanes: ["local","ci-static"],
+  }),
+
 ]

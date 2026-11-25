@@ -123,6 +123,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 86 | `node packages/evolution-merge-engine/scripts/verify-bundle-fresh.mjs`（审过的 src/vendor 源码与入库 index.bundle.js/manifest 必须同源） | mirror |
 | 87 | `node packages/scripts/verify-store-kernel.mjs packages`（DCR-85：query 无写锁、写入单一 HomeFence + IO seam、MVCC 路径已入 inventory） | mirror |
 | 88 | `node packages/evolution/evolution-core/scripts/verify-cross-process-read.mjs`（DCR-85 R8：父进程持 HomeFence，子进程仍能读到同一 commit） | overlay |
+| 89 | `node packages/scripts/verify-store-surface.mjs packages`（DCR-85 §9：每个 host command 有 surface id，每个 command-kind id 是真实 host command） | mirror |
 
 ## Pull request checklist
 
