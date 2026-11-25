@@ -67,11 +67,13 @@ export function unitStorageKey(unitId: string): string {
 export type UnitStoreScope = 'merge' | 'skill'
 
 export function unitSnapshotsDir(home: string, scope: UnitStoreScope = 'merge'): string {
-  return scope === 'merge' ? join(home, 'merge', 'unit-snapshots') : join(home, 'units', 'skill', 'snapshots')
+  return scope === 'merge' ? join(home, 'merge', 'unit-snapshots') : join(home)
 }
 
 export function unitSnapshotPath(home: string, unitId: string, scope: UnitStoreScope = 'merge'): string {
-  return join(unitSnapshotsDir(home, scope), unitStorageKey(unitId) + '.json')
+  return scope === 'merge'
+    ? join(unitSnapshotsDir(home, scope), unitStorageKey(unitId) + '.json')
+    : join(home, '.unit-snapshot-' + unitStorageKey(unitId) + '.json')
 }
 
 export function unitEvidencePath(home: string, unitId: string): string {

@@ -61,10 +61,11 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
     async listPrepared(): Promise<MutationSnapshot[]> {
       const out: MutationSnapshot[] = []
       const seen = new Set<string>()
-      for (const dir of [unitSnapshotsDir(home, 'skill'), unitSnapshotsDir(home)]) {
+      for (const [dir, prefix] of [[unitSnapshotsDir(home, 'skill'), '.unit-snapshot-'], [unitSnapshotsDir(home), '']] as const) {
         const names = await io.list(dir)
         for (const name of names) {
           if (!name.endsWith('.json')) continue
+          if (prefix !== '' && !name.startsWith(prefix)) continue
           const raw = await io.readText(join(dir, name))
           if (raw === null) continue
           let snapshot: UnitSnapshot
@@ -88,10 +89,11 @@ export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSna
 export async function pruneTreeChangeUnits(io: EvolutionIoLike, home: string, keep = 500): Promise<number> {
   if (!Number.isInteger(keep) || keep < 1) return 0
   const dir = unitSnapshotsDir(home, 'skill')
-  const names = await io.list(dir)
+  const names = (await io.list(dir)).filter(name => name.endsWith('.json') && name.startsWith('.unit-snapshot-'))
+  // The common case is far below the cap; do not read/parse every snapshot then.
+  if (names.length <= keep) return 0
   const terminal: Array<{ name: string; unitId: string; journalId?: string; createdAt: number }> = []
   for (const name of names) {
-    if (!name.endsWith('.json')) continue
     try {
       const snapshot = JSON.parse(await io.readText(join(dir, name)) ?? '') as UnitSnapshot
       if (snapshot.kind !== 'tree-change' || snapshot.mutationState === 'prepared') continue

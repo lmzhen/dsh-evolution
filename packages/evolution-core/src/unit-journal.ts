@@ -47,8 +47,10 @@ export interface UnitJournal {
 export type UnitJournalScope = 'merge' | 'skill'
 
 export function unitJournalPath(home: string, unitId: string, scope: UnitJournalScope = 'merge'): string {
-  const base = scope === 'merge' ? join(home, 'merge', 'unit-journals') : join(home, 'units', 'skill', 'journals')
-  return join(base, createHash('sha256').update(unitId).digest('hex') + '.json')
+  const hash = createHash('sha256').update(unitId).digest('hex')
+  return scope === 'merge'
+    ? join(home, 'merge', 'unit-journals', hash + '.json')
+    : join(home, '.unit-journal-' + hash + '.json')
 }
 
 export function unitJournalPhaseRank(phase: UnitJournalPhase): number {

@@ -15,7 +15,7 @@ it('recovers a prepared tree-change snapshot before the first write', async () =
     await mkdir(join(root, 'demo'), { recursive: true })
     const target = join(root, 'demo', 'SKILL.md')
     await writeFile(target, 'after')
-    await unitSnapshotPort(io, home).write({
+    await unitSnapshotPort(io, root).write({
       unitId: 'boot-recover-1',
       state: 'prepared',
       createdAt: 1,
@@ -49,8 +49,8 @@ it('update records a unit that undo restores', async () => {
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
-      journal: unitJournalPort(io, home),
-      snapshots: unitSnapshotPort(io, home),
+      journal: unitJournalPort(io, root),
+      snapshots: unitSnapshotPort(io, root),
     })
     const undone = await unit.undo(unitId)
     expect(undone.ok, undone.errors[0]?.message).toBe(true)
@@ -77,8 +77,8 @@ it('patch records a unit that undo restores', async () => {
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
-      journal: unitJournalPort(io, home),
-      snapshots: unitSnapshotPort(io, home),
+      journal: unitJournalPort(io, root),
+      snapshots: unitSnapshotPort(io, root),
     })
     const undone = await unit.undo(unitId)
     expect(undone.ok, undone.errors[0]?.message).toBe(true)
@@ -104,8 +104,8 @@ it('create undo removes the body and the managed marker', async () => {
       io,
       limits: { maxSkillFileBytes: DEFAULT_SKILL_LIMITS.maxSkillFileBytes, maxSkillContentChars: DEFAULT_SKILL_LIMITS.maxSkillContentChars },
       lock: fileMutationLock(io, root),
-      journal: unitJournalPort(io, home),
-      snapshots: unitSnapshotPort(io, home),
+      journal: unitJournalPort(io, root),
+      snapshots: unitSnapshotPort(io, root),
     })
     const undone = await unit.undo(unitId)
     expect(undone.ok, undone.errors[0]?.message).toBe(true)
@@ -124,7 +124,7 @@ it('runs recovery before the first create writes a new skill', async () => {
     await mkdir(join(root, 'demo'), { recursive: true })
     const target = join(root, 'demo', 'SKILL.md')
     await writeFile(target, 'after')
-    await unitSnapshotPort(io, home).write({
+    await unitSnapshotPort(io, root).write({
       unitId: 'boot-recover-create',
       state: 'prepared',
       createdAt: 1,
@@ -147,7 +147,7 @@ it('A3: warns when a prepared unit cannot be recovered', async () => {
     await mkdir(join(root, 'demo'), { recursive: true })
     const target = join(root, 'demo', 'SKILL.md')
     await writeFile(target, 'third')
-    await unitSnapshotPort(io, home).write({
+    await unitSnapshotPort(io, root).write({
       unitId: 'boot-recover-drift',
       state: 'prepared',
       createdAt: 1,
