@@ -48,7 +48,7 @@ for (const pkg of readdirSync(root)) {
 if (process.argv.includes('--self-test')) {
   const fake = "private store = ctx.get('evolutionStore')\nexport const inject = ['tools', 'evolutionMutationAuthority']"
   const before = problems.length
-  audit('packages/fake/src/index.ts', fake)
+  audit('__self-test__.ts', fake)
   const detected = problems.length > before
   problems.length = before
   if (!detected) {
