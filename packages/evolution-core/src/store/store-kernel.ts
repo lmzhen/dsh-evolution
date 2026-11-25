@@ -232,7 +232,11 @@ export class StoreKernel {
         throw new StoreConflictError(request.expectedHead, head.commitId)
       }
       const previous = await this.readCommit(head)
-      const current = await this.resolveDomains(previous, Object.keys(previous.domains) as StoreDomainId[])
+      // A tree-only commit (skill manifest) must not read every domain's blob
+      // just to publish an empty domain set; the tree ref is the whole change.
+      const current = request.domains.length === 0
+        ? { commitId: previous.commitId, domains: {}, tree: previous.tree }
+        : await this.resolveDomains(previous, Object.keys(previous.domains) as StoreDomainId[])
       const changed = await request.change(deepFreeze(current))
       // `change` may be async and HomeFence permits a nested commit (runNested).
       // If anything advanced the head while the mutator ran, this commit would
