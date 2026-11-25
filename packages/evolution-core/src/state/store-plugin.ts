@@ -9,6 +9,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { evolutionHome } from '../state-store.ts'
+import { evolutionIoAdapter } from '../io.ts'
 import type {} from '../io-registry.ts'
 import type {} from './storage.ts'
 import { createStateStoreProvider } from './store.ts'
@@ -25,15 +26,18 @@ export const inject = ['evolutionStateStorage', 'evolutionIo']
 export async function apply(ctx: Context): Promise<void> {
   await ctx.evolutionIo.whenReady()
   const home = evolutionHome()
+  // Resolve the IO provider at every call: HMR may replace it, and the service,
+  // kernel and v2 provider must not freeze the disposed backend.
+  const io = evolutionIoAdapter(() => ctx.evolutionIo.provider())
   // Promote a staged migration before any provider/bridge reads the marker:
   // the command deliberately does not activate a live host. This rebuilds the
   // head from the current legacy bytes and writes the active marker; a crash
   // between the two leaves the pending marker so the next start retries.
-  await activatePendingStateV2(ctx, { io: ctx.evolutionIo.provider(), home })
+  await activatePendingStateV2(ctx, { io, home })
   // A fresh provider per apply: HMR may replace the IO provider, and a cached
   // provider would keep reading through the disposed one. The effect cleanup
   // unregisters this exact object before the next apply registers its own.
-  const provider = createStateStoreProvider({ io: ctx.evolutionIo.provider(), home })
+  const provider = createStateStoreProvider({ io, home })
   ctx.effect(() => ctx.evolutionStateStorage.registerProvider(provider), 'evolution-state-store.provider')
   // R2: the MVCC provider is registered but never auto-selected until the
   // explicit v2 marker exists. Its fence is resolved per use so HMR/late
@@ -41,10 +45,10 @@ export async function apply(ctx: Context): Promise<void> {
   // The unified surface service is created first: the state provider becomes
   // one of its consumers instead of opening a second kernel path.
   const service = isStoreV2Active(home)
-    ? createStoreService(new StoreKernel({ io: ctx.evolutionIo.provider(), home, fence: liveHomeFence(ctx, home) }))
+    ? createStoreService(new StoreKernel({ io, home, fence: liveHomeFence(ctx, home) }))
     : undefined
   const v2Provider = createStateV2Provider({
-    io: ctx.evolutionIo.provider(),
+    io,
     home,
     fence: liveHomeFence(ctx, home),
     ...(service === undefined ? {} : { service }),

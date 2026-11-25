@@ -53,6 +53,23 @@
 
 其余 D1/D2/D3 行仍按上表 DEFERRED（owner/reason/expiry/判据）。
 
+## DCR-85 R10 复核 P2（第三轮，2026-11-25）
+
+这些是第三轮只读复核新发现/未落地的 P2，不属于已发布 0.61.0 的回归；全部 owner=`DCR-85 R10`，到期判据=`0.62.0` 发布前必须关闭或用户批准 DEFERRED。
+
+| ID | 状态 | 证据 / 剩余动作 |
+|---|---|---|
+| R10-P2-1 reports 双介质 | PARTIAL | `readRunReport` 的 fallback key 已改为相对 evolution home 的 `reports/<name>`；写路径仍走 base，需按 R10.5 单 owner 迁入 reports codec。 |
+| R10-P2-2 GC retain/读失败 | FIXED | `collectGarbage` 非法 retain 抛 `store-invalid-retain`；GC 读失败被隔离，新增 `does not fail an already-published mutation when GC bookkeeping fails`。 |
+| R10-P2-3 lifecycle gate 漏闭包 | PARTIAL | gate-93 已拦字段式捕获/必需 inject；`run-registry` 已加 activation guard，但 service 仍按调用捕获，gate 尚未覆盖闭包捕获。 |
+| R10-P2-4 生命周期矩阵不全 | PARTIAL | 已补 state-auto 模式冻结、activation-guard bridge、HMR service 新实例、GC 故障注入；merge/memory/discovery/curator/feedback 的“先 mount 后 provide / 完全无 service”仍缺。 |
+| R10-P2-5 scoped `mtime=null` 缓存 | OPEN | ProjectionJournal 在域化后可能永不失效；需让 adapter 从 commit 派生稳定 mtime，或域值带 updatedAt。 |
+| R10-P2-6 双跨进程锁顺序 | OPEN | promote 仍 `state.lock → HomeFence`，tree 路径是 `HomeFence → state.lock`；需统一或删除 state.lock。 |
+| R10-P2-7 回退/坏 pending | OPEN | 无 `/evolution migrate state --revert`；坏 pending 只 throw，需可操作提示/修复命令。 |
+| R10-P2-8 store-plugin 捕获 IO provider | FIXED | `store-plugin` 改为 `evolutionIoAdapter(() => ctx.evolutionIo.provider())`，service/kernel/v2 provider 共用 live handle；HMR 替换 IO 后不再读旧对象。 |
+| R10-P2-9 surface/commit 元数据漂移 | OPEN | `merge_stage writes:[]`、`source:'system'` 未入枚举、`expectsCommit` 仍是死字段。 |
+| R10-P2-10 复核记录不可审计 | PARTIAL | 第三轮结论已入 85 R10.12；第一/二轮复核原始记录仍未入库。 |
+
 ## 发布阻断项（不是 P2）
 
 1. **release evidence 仍是旧数据**：`packages/scripts/release-evidence-rehearsal.json` 的 `measuredCommit`、traceability source 都是 0.59.6 旧值；发布前必须重新 build、pack、复算 dist sha256，并重测 S1–S4。

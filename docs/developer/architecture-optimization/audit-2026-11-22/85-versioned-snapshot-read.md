@@ -642,7 +642,7 @@ interface StoreView {
 - reports fallback 的 key 前缀错误（域 key 是 `reports/x`，当前用 `x`）；写路径仍走 base；
 - GC `retain` 非法值已改为入口拒绝（`store-invalid-retain`）；GC 读阶段失败不再把已提交写判失败（有故障注入测试 `does not fail an already-published mutation when GC bookkeeping fails`）；
 - gate-93 只认字段式捕获，漏闭包捕获（`run-registry` 仍冻结 service）；R10.11 的 transaction/ports/manifest 三条门禁尚不存在；
-- 五个 bridge 无 late-provide/HMR 矩阵；`store-plugin.spec` 的 HMR 只断言 defined；
+- 五个 bridge 无完整的 late-provide/HMR 矩阵；`store-service-plugin` 已断言 HMR 后 service 是新实例，`store-plugin` 已改用 live IO adapter，但其余消费者仍缺“先 mount 后 provide / 完全无 service”用例；
 - scoped adapter `mtime=null` 会让 ProjectionJournal 缓存永不失效；
 - promote 的 `state.lock → HomeFence` 与 tree 路径 `HomeFence → state.lock` 顺序相反；
 - 回退/坏 pending 缺可操作命令；
