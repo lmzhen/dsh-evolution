@@ -6,17 +6,17 @@
  * queries the MVCC store through the built core package. This proves readers do
  * not take the writer lock and see one commit.
  *
- * Usage (build line):
- *   EVOLUTION_OVERLAY_ROOT=D:\dsh\harness-rc3 node packages/scripts/verify-cross-process-read.mjs
+ * Usage (build line, after build-lib):
+ *   node packages/evolution/evolution-core/scripts/verify-cross-process-read.mjs
  */
 import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const overlay = resolve(process.env.EVOLUTION_OVERLAY_ROOT ?? process.cwd())
-const lib = pathToFileURL(join(overlay, 'packages', 'evolution', 'evolution-core', 'lib', 'index.js')).href
+const here = dirname(fileURLToPath(import.meta.url))
+const lib = pathToFileURL(join(here, '..', 'lib', 'index.js')).href
 const { HomeFence, StoreKernel, nodeEvolutionIo } = await import(lib)
 const home = await mkdtemp(join(tmpdir(), 'dsh-cross-process-read-'))
 

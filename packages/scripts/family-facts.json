@@ -967,6 +967,11 @@
             "criterion": "verify-store-kernel"
           },
           {
+            "id": "gate-88",
+            "tier": "pre-tag",
+            "criterion": "verify-cross-process-read"
+          },
+          {
             "id": "gate-03",
             "tier": "ci-only",
             "criterion": "vitest"

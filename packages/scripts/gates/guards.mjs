@@ -643,4 +643,12 @@ export const guards = [
     lanes: ["local","ci-static"],
   }),
 
+  gate("gate-88", {
+    kind: "script",
+    tree: "overlay",
+    title: "`node packages/evolution/evolution-core/scripts/verify-cross-process-read.mjs`（DCR-85 R8：父进程持 HomeFence，子进程仍能读到同一 commit）",
+    argv: ["node","packages/evolution/evolution-core/scripts/verify-cross-process-read.mjs"],
+    lanes: ["local","ci-static"],
+  }),
+
 ]

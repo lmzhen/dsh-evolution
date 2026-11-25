@@ -1535,6 +1535,24 @@
       ]
     },
     {
+      "id": "gate-88",
+      "kind": "script",
+      "human": "`node packages/evolution/evolution-core/scripts/verify-cross-process-read.mjs`（DCR-85 R8：父进程持 HomeFence，子进程仍能读到同一 commit）",
+      "argv": [
+        "node",
+        "packages/evolution/evolution-core/scripts/verify-cross-process-read.mjs"
+      ],
+      "tree": "overlay",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
+    },
+    {
       "id": "gate-03",
       "kind": "toolchain",
       "human": "`node node_modules/vitest/vitest.mjs run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2`",

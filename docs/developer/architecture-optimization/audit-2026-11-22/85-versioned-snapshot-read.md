@@ -426,8 +426,8 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 
 #### R8 证据（跨进程无锁读）
 
-- `packages/scripts/verify-cross-process-read.mjs`：父进程在 `HomeFence.run` 内持有 writer fence，子进程用构建后的 `lib/index.js` 打开同一 home 并 `StoreKernel.query(['state'])`，返回 bootstrap 快照；
-- 这证明读路径不依赖 writer lock，且子进程只读同一 commit；脚本在 build 线运行（`EVOLUTION_OVERLAY_ROOT=... node packages/scripts/verify-cross-process-read.mjs`），不放进 unit lane 以避免 CI 无 lib 时的假失败。
+- `packages/evolution-core/scripts/verify-cross-process-read.mjs`：父进程在 `HomeFence.run` 内持有 writer fence，子进程用构建后的 `lib/index.js` 打开同一 home 并 `StoreKernel.query(['state'])`，返回 bootstrap 快照；
+- 这证明读路径不依赖 writer lock，且子进程只读同一 commit；已注册为 gate-88（local/ci-static，build-lib 之后运行），不再是无人执行的证据。
 - 尚未做：子进程读与崩溃恢复的组合、HMR 重挂载、fresh npm profile 真机验收。
 
 补充：`v2-provider.spec` 新增“head 已提交但 marker 写入丢失”的恢复测试——`migrateStateToV2` 从 head 重建 marker 并返回 `store-v2-recovered`，commitId 不变；证明迁移的 commit point 是 head，不是 marker。
@@ -442,7 +442,8 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - P1-2：`usageSidecarIoIfV2` 统一包 usage/suppressed；`SkillUsageRegistry` 与 curator 的私有 `this.io` 都改用它，`mutateUsage`/`loadSuppressedNames` 不再写第二份文件；测试 `usage-sidecar-v2.spec` 证明 domain 有值且 base 文件不存在。
 - P1-3：`migrate state` 新增 `--skills-root` / `--memory-root` / `--discovery-root` / `--feedback-path`，把自定义根/路径传给 `migrateStateToV2`；默认路径不变，未传时仍按 `<home>` 约定。
 - 测试：marker 恢复成功/拒绝两例通过；restructure manifest 通过；usage-sidecar-v2 通过；`tsc` core/curator/discovery/commands 0。
-- 未修：跨进程 drill 未注册门禁（P1-6）、缺 4 个静态门禁（P1-7）、surface 清单不完整（P1-8），继续按复核清单处理。
+- P1-6：跨进程无锁读 drill 注册为 gate-88（overlay tree, local/ci-static），有 family-facts 声明与 no-drill reason；本地已运行通过。
+- 未修：缺 4 个静态门禁（P1-7）、surface 清单不完整（P1-8），继续按复核清单处理。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 
