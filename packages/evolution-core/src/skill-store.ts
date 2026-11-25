@@ -1130,10 +1130,11 @@ export class SkillLibrary {
     }
     const publisher = this.treePublisher
     const afterCommit = options.afterCommit
+    const unitHome = join(dirname(this.root), '.skill-tree-units', basename(this.root))
     return new UnitKernel({
       io: this.io,
-      journal: unitJournalPort(this.io, dirname(this.root)),
-      snapshots: unitSnapshotPort(this.io, dirname(this.root)),
+      journal: unitJournalPort(this.io, unitHome),
+      snapshots: unitSnapshotPort(this.io, unitHome),
       targetKeyResolver: keys => this.canonicalLockKeys(keys),
       ...options,
       ...(publisher === undefined && afterCommit === undefined ? {} : {
@@ -1232,7 +1233,7 @@ export class SkillLibrary {
 
   /** Recover every prepared tree-change snapshot in the shared unit store. */
   async recoverPreparedUnits(): Promise<MutationResult[]> {
-    const home = dirname(this.root)
+    const home = join(dirname(this.root), '.skill-tree-units', basename(this.root))
     try { await this.lockPort().repair?.() } catch { /* diagnostics only */ }
     const unit = this.commitUnit({
       limits: { maxSkillFileBytes: this.limits.maxSkillFileBytes, maxSkillContentChars: this.limits.maxSkillContentChars },
