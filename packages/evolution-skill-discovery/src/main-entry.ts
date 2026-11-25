@@ -8,7 +8,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 // platform-declaration anchor: this composition probes skills/workingDirectory/tools/evolutionIo/systemPrompt; all are declared in core PLATFORM_SERVICE_PROBES.
-import { authorityFrom, discoveryIoIfV2, evolutionIoAdapter, evolutionRoot, liveHomeFence, type EvolutionIoLike, type EvolutionProjectionHistoryState } from '@deepseek-ai/dsh-evolution-core'
+import { authorityFrom, discoveryIoIfV2, evolutionIoAdapter, evolutionRoot, liveHomeFence, type EvolutionIoLike, type EvolutionProjectionHistoryState, type StoreService } from '@deepseek-ai/dsh-evolution-core'
 import { newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import type { LlmTextService } from './domain-generation-llm.ts'
@@ -149,7 +149,7 @@ export function apply(ctx: Context, config: Config): void {
     domainMap: domainMapPath,
     projectionJournal: projectionJournalPath,
     viewSnapshots: viewSnapshotPath,
-  }, fence) ?? io
+  }, fence, ctx.get('evolutionStore') as StoreService | undefined) ?? io
   const map = new DomainMapFileStore(storeIo, domainMapPath, undefined, fence)
   const descriptionStaleAfterHours = config.descriptionStaleAfterHours ?? 24 * 7
   const journal = new ProjectionJournal(storeIo, projectionJournalPath, { ...(fence === undefined ? {} : { fence }) })

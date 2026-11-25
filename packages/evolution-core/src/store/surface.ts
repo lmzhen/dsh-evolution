@@ -31,6 +31,10 @@ export const STORE_SURFACE_COMMANDS: readonly StoreSurfaceCommand[] = [
   { id: 'state.provider', kind: 'provider', reads: ['state'], writes: ['state'], expectsCommit: false },
   // Usage sidecar bridge: usage/suppressed text documents.
   { id: 'usage.rw', kind: 'provider', reads: ['usage', 'suppressed'], writes: ['usage', 'suppressed'], expectsCommit: false },
+  // Discovery bridge: domain map, projection journal and view snapshots.
+  { id: 'discovery.rw', kind: 'provider', reads: ['discovery', 'domainMap', 'projectionJournal', 'viewSnapshots'], writes: ['discovery', 'domainMap', 'projectionJournal', 'viewSnapshots'], expectsCommit: false },
+  // Memory bridge: MEMORY.md and USER.md.
+  { id: 'memory.rw', kind: 'provider', reads: ['memoryFile', 'userFile'], writes: ['memoryFile', 'userFile'], expectsCommit: false },
   // 9.1 model tools
   { id: 'skill_manage', kind: 'tool', reads: ['state'], writes: ['state'], expectsCommit: true },
   { id: 'memory', kind: 'tool', reads: ['memoryFile', 'userFile'], writes: ['memoryFile', 'userFile'], expectsCommit: true },

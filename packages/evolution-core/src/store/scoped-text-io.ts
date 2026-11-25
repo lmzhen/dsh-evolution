@@ -198,12 +198,14 @@ export function memoryIoIfV2(
   home: string,
   memoryRootPath: string,
   fence?: StoreWriterFence | undefined,
+  service?: StoreService | undefined,
 ): EvolutionIoLike | undefined {
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
   const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
+  const serviceOptions = service === undefined ? {} : { service, commandId: 'memory.rw' }
   return scopedTextIO(
-    scopedTextIO(base, { path: join(memoryRootPath, 'MEMORY.md'), domain: 'memoryFile', kernel }),
-    { path: join(memoryRootPath, 'USER.md'), domain: 'userFile', kernel },
+    scopedTextIO(base, { path: join(memoryRootPath, 'MEMORY.md'), domain: 'memoryFile', kernel, ...serviceOptions }),
+    { path: join(memoryRootPath, 'USER.md'), domain: 'userFile', kernel, ...serviceOptions },
   )
 }
 
@@ -237,14 +239,16 @@ export function discoveryIoIfV2(
   home: string,
   paths: DiscoveryPaths,
   fence?: StoreWriterFence | undefined,
+  service?: StoreService | undefined,
 ): EvolutionIoLike | undefined {
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
   const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
+  const serviceOptions = service === undefined ? {} : { service, commandId: 'discovery.rw' }
   return scopedTextIO(
     scopedTextIO(
-      scopedTextIO(base, { path: paths.domainMap, domain: 'domainMap', kernel }),
-      { path: paths.projectionJournal, domain: 'projectionJournal', kernel },
+      scopedTextIO(base, { path: paths.domainMap, domain: 'domainMap', kernel, ...serviceOptions }),
+      { path: paths.projectionJournal, domain: 'projectionJournal', kernel, ...serviceOptions },
     ),
-    { path: paths.viewSnapshots, domain: 'viewSnapshots', kernel },
+    { path: paths.viewSnapshots, domain: 'viewSnapshots', kernel, ...serviceOptions },
   )
 }

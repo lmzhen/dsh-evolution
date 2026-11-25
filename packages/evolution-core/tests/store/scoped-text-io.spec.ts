@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { nodeEvolutionIo, transactIo } from '../../src/io.ts'
 import { HomeFence } from '../../src/home-fence.ts'
 import { StoreKernel } from '../../src/store/store-kernel.ts'
-import { scopedTextIO } from '../../src/store/scoped-text-io.ts'
+import { createStoreService } from '../../src/store/service.ts'
+import { memoryIoIfV2, scopedTextIO } from '../../src/store/scoped-text-io.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../../src/state/constants.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 
@@ -40,6 +41,21 @@ describe('scoped text IO bridge', () => {
     const bridge = (await import('../../src/store/scoped-tree-io.ts')).mergeIoIfV2(undefined, base, root, new HomeFence({ home: root }))
     expect(bridge).not.toBeUndefined()
     await expect(bridge!.readText(join(root, 'merge', 'merge-state.json'))).rejects.toThrow()
+  })
+
+  it('routes memory files through the memory service when supplied', async () => {
+    const root = await tempRoot('dsh-scoped-memory-')
+    const io = nodeEvolutionIo()
+    await mkdir(join(root, 'state'), { recursive: true })
+    await writeFile(join(root, 'state', STATE_V2_MIGRATION_MARKER), '{}\n')
+    const fence = new HomeFence({ home: root })
+    const kernel = new StoreKernel({ io, home: root, fence })
+    await kernel.bootstrap({ memoryFile: { text: 'old\n' }, userFile: { text: 'user\n' } })
+    const scoped = memoryIoIfV2(undefined, io, root, join(root, 'memories'), fence, createStoreService(kernel))
+    expect(scoped).not.toBeUndefined()
+    await scoped!.writeText(join(root, 'memories', 'MEMORY.md'), 'new\n')
+    expect(await scoped!.readText(join(root, 'memories', 'MEMORY.md'))).toBe('new\n')
+    expect((await kernel.query(['memoryFile'])).domains.memoryFile).toEqual({ text: 'new\n' })
   })
 })
 
