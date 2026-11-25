@@ -1638,6 +1638,25 @@
       ]
     },
     {
+      "id": "gate-93",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-store-lifecycle.mjs packages`（DCR-85：可选 evolutionStore/authority 必须使用期解析，不得构造期捕获或放进必需 inject）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-store-lifecycle.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
+    },
+    {
       "id": "gate-03",
       "kind": "toolchain",
       "human": "`node node_modules/vitest/vitest.mjs run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2`",

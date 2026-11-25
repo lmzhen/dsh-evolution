@@ -685,4 +685,12 @@ export const guards = [
     lanes: ["local","ci-static"],
   }),
 
+  gate("gate-93", {
+    kind: "script",
+    tree: "mirror",
+    title: "`node packages/scripts/verify-store-lifecycle.mjs packages`（DCR-85：可选 evolutionStore/authority 必须使用期解析，不得构造期捕获或放进必需 inject）",
+    argv: ["node","packages/scripts/verify-store-lifecycle.mjs","packages"],
+    lanes: ["local","ci-static"],
+  }),
+
 ]

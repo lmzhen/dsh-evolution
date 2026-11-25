@@ -496,7 +496,7 @@ plugin apply (sync)
   - 完全没有 service → row 仍能 mount，能力缺失可诊断，写 fail loud；
   - `inject` 必需集合固定（借鉴 PR #26 的 `inject-authority.spec.ts`，每个可选能力都有一条负向 spec）。
 
-已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。剩余：把 `ctx.get` 字段化扫描做成 gate，其他消费者迁移。
+已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。`verify-store-lifecycle` 已成为 gate-93（构造期字段捕获、可选服务进必需 inject 都红）。剩余：把 `ctx.get` 字段化扫描扩到 authority/IO 等全部可选服务，其他消费者迁移。
 
 ##### R10.3 激活状态机与迁移
 

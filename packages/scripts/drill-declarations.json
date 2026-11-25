@@ -405,6 +405,11 @@
       "drillCmd": "node packages/scripts/verify-store-read-lock.mjs packages --self-test",
       "evidence": "inject a synthetic query that calls fence.run; the read-lock gate must report it",
       "provenAt": "2026-11-25T10:28:00.000Z"
+    },
+    "gate-93": {
+      "drillCmd": "node packages/scripts/verify-store-lifecycle.mjs packages --self-test",
+      "evidence": "inject a synthetic field capture of ctx.get('evolutionStore') and a required inject listing evolutionMutationAuthority; both must be reported",
+      "provenAt": "2026-11-25T18:30:00.000Z"
     }
   }
 }

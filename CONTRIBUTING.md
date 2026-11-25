@@ -127,6 +127,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 90 | `node packages/scripts/verify-store-single-source.mjs packages`（DCR-85：store-v2 head/commit/objects 路径只出现在 kernel 与 state 迁移层） | mirror |
 | 91 | `node packages/evolution/evolution-core/scripts/verify-store-head.mjs`（DCR-85：head 是唯一 commit point，缺失/损坏必须 fail closed） | overlay |
 | 92 | `node packages/scripts/verify-store-read-lock.mjs packages`（DCR-85：query 及其读 helper 不得出现 fence/withFileLock/acquire；mutate 独占 fence.run） | mirror |
+| 93 | `node packages/scripts/verify-store-lifecycle.mjs packages`（DCR-85：可选 evolutionStore/authority 必须使用期解析，不得构造期捕获或放进必需 inject） | mirror |
 
 ## Pull request checklist
 

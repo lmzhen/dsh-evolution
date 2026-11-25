@@ -609,7 +609,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "29926c2e9cd2d12e955c283eb4b96fed9885f2bd150e85332bab983aecdee0b7",
+        "sha256": "edfac818eb74491f7aaa101a4de63285c536df5a3e9608d6645aad7db3714d88",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -1000,6 +1000,11 @@
             "id": "gate-92",
             "tier": "fast",
             "criterion": "verify-store-read-lock"
+          },
+          {
+            "id": "gate-93",
+            "tier": "fast",
+            "criterion": "verify-store-lifecycle"
           },
           {
             "id": "gate-03",
