@@ -474,13 +474,24 @@ rewriteScopedScripts(staged, familyNames)
         const hashShaped = (remainder) => /^-[A-Za-z0-9_-]{4,}$/.test(remainder)
         if ([...sourceModules].some((candidate) => module.startsWith(candidate + '-') && hashShaped(module.slice(candidate.length)))) continue
         // A code-split chunk may also be named after the SOURCE BASENAME only
-        // (`ensure-DEWwc877.js` for `src/composition/ensure.ts`). Resolve a unique basename match;
-        // an ambiguous or missing basename stays an orphan (never silently accepted).
-        // Use the LAST hyphen as the hash separator: `scoped-text-io-<hash>` has
-        // hyphens inside the basename, and the first-hyphen form cut it to `scoped`.
-        const stem = module.includes('-') ? module.slice(0, module.lastIndexOf('-')) : module
-        const basenameMatches = [...sourceModules].filter((candidate) => candidate === stem || candidate.endsWith('/' + stem))
-        if (basenameMatches.length === 1) continue
+        // (`ensure-DEWwc877.js` for `src/composition/ensure.ts`). The hash can
+        // itself contain hyphens (`tree-manifest-Dbn-MfNl`), so try every
+        // prefix split and accept the first whose remainder is hash-shaped.
+        // Resolve a unique basename match; an ambiguous or missing basename
+        // stays an orphan (never silently accepted).
+        const basenameMatches = (stem) => [...sourceModules].filter((candidate) => candidate === stem || candidate.endsWith('/' + stem)).length
+        const parts = module.split('-')
+        let matched = false
+        for (let split = 1; split < parts.length; split += 1) {
+          const stem = parts.slice(0, split).join('-')
+          const remainder = '-' + parts.slice(split).join('-')
+          if (!hashShaped(remainder)) continue
+          // A prose-looking remainder is not a tsdown hash; require at least
+          // one digit/uppercase/underscore after the separator.
+          if (!/[0-9A-Z_]/.test(remainder.slice(1))) continue
+          if (basenameMatches(stem) === 1) { matched = true; break }
+        }
+        if (matched) continue
         orphans.push(`lib/${raw}`)
       }
     }
