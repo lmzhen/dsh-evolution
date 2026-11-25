@@ -379,6 +379,24 @@ export async function activatePendingStateV2(ctx: Context, options: StateMigrati
       return null
     }
     if (!await io.exists(pendingPath)) return null
+    let pending: {
+      target?: unknown
+      skillsRoot?: string
+      memoryRoot?: string
+      discoveryPaths?: { domainMap: string; projectionJournal: string; viewSnapshots: string }
+      feedbackPath?: string
+    }
+    try {
+      pending = JSON.parse(await io.readText(pendingPath) ?? '{}') as typeof pending
+    } catch (error) {
+      throw new Error('evolution-state-migrate-v2: the staged marker at ' + pendingPath
+        + ' is not valid JSON (' + (error instanceof Error ? error.message : String(error))
+        + '); delete that file and re-run `/evolution migrate state --to v2`')
+    }
+    if (pending.target !== PROVIDER_STORE_V2) {
+      throw new Error('evolution-state-migrate-v2: the staged marker at ' + pendingPath
+        + ' has target ' + String(pending.target) + '; delete that file and re-run `/evolution migrate state --to v2`')
+    }
     // A rollback record means the user explicitly re-staged after `--revert`.
     // Archive the old v2 store instead of deleting it; the new activation starts
     // from a clean bootstrap and the rollback bytes remain inspectable.
@@ -389,14 +407,6 @@ export async function activatePendingStateV2(ctx: Context, options: StateMigrati
         await io.rename(storeDir, backup)
       }
     }
-    const pending = JSON.parse(await io.readText(pendingPath) ?? '{}') as {
-      target?: unknown
-      skillsRoot?: string
-      memoryRoot?: string
-      discoveryPaths?: { domainMap: string; projectionJournal: string; viewSnapshots: string }
-      feedbackPath?: string
-    }
-    if (pending.target !== PROVIDER_STORE_V2) throw new Error('evolution-state-migrate-v2: the staged migration marker is invalid')
     // A head left by a crashed promotion is not authoritative: the active
     // marker was never written, so no v2 consumer could have read it. Remove
     // the staged store and rebuild from the current legacy bytes.

@@ -98,6 +98,14 @@ describe('/evolution migrate state', () => {
     }
   })
 
+  it('gives an actionable error for a corrupt staged marker', async () => {
+    const { ctx, home } = await seeded()
+    const evolution = join(home, 'evolution')
+    const io = ctx.evolutionIo.provider()
+    await io.writeText(join(evolution, 'state', STATE_V2_PENDING_MARKER), '{not json\n')
+    await expect(activatePendingStateV2(ctx, { io, home: evolution })).rejects.toThrow(/delete that file and re-run/)
+  })
+
   it('rejects an unknown --to target instead of silently using v1', async () => {
     const { ctx } = await seeded()
     const result = await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['to', 'v9']]), positionals: [] }, ctx })
