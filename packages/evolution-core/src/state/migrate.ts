@@ -209,10 +209,13 @@ async function migrateStateToV2Unlocked(ctx: Context, options: StateMigrationOpt
   const kernel = new StoreKernel({ io, home, fence, ...(options.now === undefined ? {} : { now: options.now }) })
   const writeMarker = async (source: StateV2MigrationResult['source'], commitId: string, snapshot: StateStoreSnapshot): Promise<void> => {
     await io.writeText(markerPath, JSON.stringify({
+      mode: PROVIDER_STORE_V2,
+      generation: options.now?.() ?? Date.now(),
       migratedAt: new Date(options.now?.() ?? Date.now()).toISOString(),
       source,
       target: PROVIDER_STORE_V2,
       commitId,
+      lastActiveCommitId: commitId,
       reviewSessions: Object.keys(snapshot.review).length,
       pending: Object.keys(snapshot.pending).length,
       curator: snapshot.curator !== null,
