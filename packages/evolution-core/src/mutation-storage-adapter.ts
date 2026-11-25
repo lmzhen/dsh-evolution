@@ -5,6 +5,25 @@ import { unitJournalPath, writeUnitJournal, type UnitJournal, type UnitJournalPh
 import type { EvolutionIoLike } from './io.ts'
 import type { MutationJournalPort, MutationJournalRecord, MutationSnapshot, MutationSnapshotPort } from './unit-kernel.ts'
 
+const preparedHomes = new Map<string, Promise<void>>()
+
+/** Create the unit-storage directories through the IO seam (platform fs has no mkdir API). */
+async function ensureUnitHome(io: EvolutionIoLike, home: string): Promise<void> {
+  const key = home
+  let pending = preparedHomes.get(key)
+  if (pending === undefined) {
+    pending = (async () => {
+      for (const dir of [join(home, 'units', 'skill', 'journals'), join(home, 'units', 'skill', 'snapshots')]) {
+        const keep = join(dir, '.keep')
+        await io.writeText(keep, '')
+        await io.remove(keep).catch(() => {})
+      }
+    })()
+    preparedHomes.set(key, pending)
+  }
+  await pending
+}
+
 /**
  * Production adapter onto the existing unit snapshot store. A tree-change
  * snapshot is encoded as a UnitSnapshot with kind='tree-change'; merge
@@ -13,6 +32,7 @@ import type { MutationJournalPort, MutationJournalRecord, MutationSnapshot, Muta
 export function unitSnapshotPort(io: EvolutionIoLike, home: string): MutationSnapshotPort {
   return {
     async write(snapshot: MutationSnapshot): Promise<void> {
+      await ensureUnitHome(io, home)
       const first = snapshot.ops[0]
       const body: UnitSnapshot = {
         schemaVersion: 1,
@@ -126,6 +146,7 @@ const PHASE: Record<MutationJournalRecord['phase'], UnitJournalPhase> = {
 export function unitJournalPort(io: EvolutionIoLike, home: string): MutationJournalPort {
   return {
     async write(record: MutationJournalRecord): Promise<void> {
+      await ensureUnitHome(io, home)
       const journal: UnitJournal = {
         schemaVersion: 1,
         unitId: record.unitId,

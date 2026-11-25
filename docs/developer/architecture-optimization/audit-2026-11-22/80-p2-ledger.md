@@ -69,7 +69,7 @@
 | R10-P2-8 store-plugin 捕获 IO provider | FIXED | `store-plugin` 改为 `evolutionIoAdapter(() => ctx.evolutionIo.provider())`，service/kernel/v2 provider 共用 live handle；HMR 替换 IO 后不再读旧对象。 |
 | R10-P2-9 surface/commit 元数据漂移 | PARTIAL | `source:'system'` 已加入 `STORE_COMMIT_SOURCES`，tree manifest 提交改用 system；`merge_stage writes:[]` 与 `expectsCommit` 死字段仍待处理。 |
 | R10-P2-10 复核记录不可审计 | PARTIAL | 第三轮结论已入 85 R10.12；第一/二轮复核原始记录仍未入库。 |
-| R10-P2-11 测试隔离 flake | OPEN | `create-tree-reads` 在 `/tmp` 下遗留 skill unit journal 时，`recoverPreparedUnits` 扫描共享 `dirname(root)` 会串扰；尝试按 root 隔离 unit home 时 platform filesystem backend 无法创建新嵌套目录，已回退。需先让 unit storage 注入可 mkdir 的 seam，或测试 root 使用唯一父目录。 |
+| R10-P2-11 测试隔离 flake | FIXED | unit journal/snapshot 按 skill root 隔离到 `.skill-tree-units/<root>`；`unitJournalPort`/`unitSnapshotPort` 先经 IO 创建目录（平台 fs 无 mkdir API），`mutation-recovery` 改用 `skillUnitHome`；`create-tree-reads` 回归通过。 |
 
 ## 发布阻断项（不是 P2）
 
