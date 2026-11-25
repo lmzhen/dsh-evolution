@@ -694,14 +694,14 @@ export const HOST_COMMANDS = {
       "pt": "Move o estado domain/StateStore em arquivo para MVCC (--to v2; explícito; nunca sobrescreve dados existentes)"
     },
     "help.migrate state": {
-      "zh": "用法：migrate state [--dry-run] [--to v2]\n只迁移 pending/review/curator；不删除旧数据；已有 v2 head/store 时拒绝覆盖。",
-      "en": "Usage: migrate state [--dry-run] [--to v2]\nMigrates pending/review/curator only; old data is kept; an existing v2 head/store is never overwritten.",
-      "ja": "使い方：migrate state [--dry-run] [--to v2]\npending/review/curator のみ移行します。旧データは削除しません。既存の v2 head/store は上書きしません。",
-      "es": "Uso: migrate state [--dry-run] [--to v2]\nSolo migra pending/review/curator; los datos anteriores se conservan; un head/store v2 existente nunca se sobrescribe.",
-      "fr": "Utilisation : migrate state [--dry-run] [--to v2]\nMigre uniquement pending/review/curator ; les données précédentes sont conservées ; un head/store v2 existant n’est jamais écrasé.",
-      "de": "Verwendung: migrate state [--dry-run] [--to v2]\nMigriert nur pending/review/curator; alte Daten bleiben erhalten; ein vorhandener v2-Head/Store wird nie überschrieben.",
-      "ru": "Использование: migrate state [--dry-run] [--to v2]\nПереносит только pending/review/curator; старые данные сохраняются; существующий v2 head/store никогда не перезаписывается.",
-      "pt": "Uso: migrate state [--dry-run] [--to v2]\nMigra apenas pending/review/curator; os dados antigos são mantidos; um head/store v2 existente nunca é sobrescrito."
+      "zh": "用法：migrate state [--dry-run] [--to v2] [--revert]\n只迁移 pending/review/curator；不删除旧数据；已有 v2 head/store 时拒绝覆盖。--revert 写回退记录（重启后回旧介质，v2 字节保留）。",
+      "en": "Usage: migrate state [--dry-run] [--to v2] [--revert]\nMigrates pending/review/curator only; old data is kept; an existing v2 head/store is never overwritten. --revert records a rollback (legacy medium after restart; v2 bytes are kept).",
+      "ja": "使い方：migrate state [--dry-run] [--to v2] [--revert]\npending/review/curator のみ移行します。旧データは削除しません。既存の v2 head/store は上書きしません。--revert は回退記録を書き、再起動後に旧メディアへ戻します（v2 のバイトは保持）。",
+      "es": "Uso: migrate state [--dry-run] [--to v2] [--revert]\nSolo migra pending/review/curator; los datos anteriores se conservan; un head/store v2 existente nunca se sobrescribe. --revert registra una reversión (medio anterior tras reiniciar; los bytes v2 se conservan).",
+      "fr": "Utilisation : migrate state [--dry-run] [--to v2] [--revert]\nMigre uniquement pending/review/curator ; les données précédentes sont conservées ; un head/store v2 existant n’est jamais écrasé. --revert enregistre un retour (ancien support après redémarrage ; les octets v2 sont conservés).",
+      "de": "Verwendung: migrate state [--dry-run] [--to v2] [--revert]\nMigriert nur pending/review/curator; alte Daten bleiben erhalten; ein vorhandener v2-Head/Store wird nie überschrieben. --revert schreibt einen Rücknahme-Datensatz (altes Medium nach Neustart; v2-Bytes bleiben erhalten).",
+      "ru": "Использование: migrate state [--dry-run] [--to v2] [--revert]\nПереносит только pending/review/curator; старые данные сохраняются; существующий v2 head/store никогда не перезаписывается. --revert записывает запись возврата (прежний носитель после перезапуска; байты v2 сохраняются).",
+      "pt": "Uso: migrate state [--dry-run] [--to v2] [--revert]\nMigra apenas pending/review/curator; os dados antigos são mantidos; um head/store v2 existente nunca é sobrescrito. --revert registra uma reversão (meio anterior após reiniciar; os bytes v2 são mantidos)."
     },
     "command.migrate state.done": {
       "zh": "已迁移：review={review} 个会话，pending={pending} 条，curator={curator}；store={path}",
@@ -732,6 +732,16 @@ export const HOST_COMMANDS = {
       "de": "dry-run: review={review} Sitzungen, pending={pending}, curator={curator}; nichts geschrieben",
       "ru": "dry-run: review={review} сессий, pending={pending}, curator={curator}; ничего не записано",
       "pt": "dry-run: review={review} sessões, pending={pending}, curator={curator}; nada foi gravado"
+    },
+    "command.migrate state.reverted": {
+      "zh": "已回退到旧介质（generation={generation}）。重启宿主后生效；v2 数据保留在磁盘上，未回灌旧文件。",
+      "en": "Rolled back to the legacy medium (generation={generation}). It takes effect after a host restart; the v2 bytes stay on disk and are not copied back into legacy files.",
+      "ja": "旧メディアに戻しました（generation={generation}）。ホスト再起動後に有効になります。v2 のデータはディスクに残り、旧ファイルへは書き戻しません。",
+      "es": "Se volvió al medio anterior (generation={generation}). Se aplica al reiniciar el host; los datos v2 quedan en disco y no se copian a los archivos anteriores.",
+      "fr": "Retour à l’ancien support (generation={generation}). Prend effet au redémarrage de l’hôte ; les données v2 restent sur disque et ne sont pas recopiées dans les anciens fichiers.",
+      "de": "Auf das alte Medium zurückgesetzt (generation={generation}). Wirkt nach einem Host-Neustart; die v2-Daten bleiben auf der Platte und werden nicht in alte Dateien zurückgeschrieben.",
+      "ru": "Выполнен возврат на прежний носитель (generation={generation}). Вступит в силу после перезапуска хоста; данные v2 остаются на диске и не копируются обратно в старые файлы.",
+      "pt": "Revertido para o meio anterior (generation={generation}). Vale após reiniciar o host; os dados v2 ficam no disco e não são copiados para os arquivos antigos."
     },
     "command.migrate state.error": {
       "zh": "迁移失败：{message}",

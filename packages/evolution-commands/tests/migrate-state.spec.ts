@@ -52,6 +52,28 @@ describe('/evolution migrate state', () => {
     }
   })
 
+  it('reverts to a legacy activation record without deleting the v2 head', async () => {
+    const { ctx, home } = await seeded()
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['to', 'v2']]), positionals: [] }, ctx })
+      const io = ctx.evolutionIo.provider()
+      const evolution = join(home, 'evolution')
+      await activatePendingStateV2(ctx, { io, home: evolution })
+      const result = await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['revert', true]]), positionals: [] }, ctx })
+      expect(result, result.text).toMatchObject({ kind: 'success' })
+      expect(result.text).toContain('Rolled back')
+      const record = JSON.parse(await io.readText(join(evolution, 'state', STATE_V2_MIGRATION_MARKER)) ?? '{}') as { mode?: string; generation?: number }
+      expect(record.mode).toBe('legacy')
+      expect(record.generation).toBeGreaterThan(0)
+      expect(await io.exists(join(evolution, 'store-v2', 'head.json'))).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+    }
+  })
+
   it('rejects an unknown --to target instead of silently using v1', async () => {
     const { ctx } = await seeded()
     const result = await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['to', 'v9']]), positionals: [] }, ctx })

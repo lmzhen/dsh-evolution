@@ -65,7 +65,7 @@
 | R10-P2-4 生命周期矩阵不全 | PARTIAL | 已补 state-auto 模式冻结、activation-guard bridge、HMR service 新实例、GC 故障注入；merge/memory/discovery/curator/feedback 的“先 mount 后 provide / 完全无 service”仍缺。 |
 | R10-P2-5 scoped `mtime=null` 缓存 | FIXED | scoped text 的 `mtime` 现在返回 commit id 的稳定数值投影，commit 变化即失效；新增 `exposes the commit revision as mtime`。 |
 | R10-P2-6 双跨进程锁顺序 | FIXED | `activatePendingStateV2` 现在先 HomeFence 再 state.lock，并把同一 fence 传给 promote；生产命令仍只 stage，直调 `migrateStateToV2` 的测试路径保留旧顺序。 |
-| R10-P2-7 回退/坏 pending | PARTIAL | `revertStateToLegacy` 已写 `mode:'legacy'` 记录、保留 v2 字节，并有测试；仍无 host 命令入口，坏 pending 也缺可操作修复命令，re-stage 对 legacy 记录的语义未定。 |
+| R10-P2-7 回退/坏 pending | PARTIAL | `migrate state --revert` 已写 `mode:'legacy'` 记录、保留 v2 字节并通过命令测试；坏 pending 的可操作修复命令与“legacy 记录后再 stage”语义仍未定。 |
 | R10-P2-8 store-plugin 捕获 IO provider | FIXED | `store-plugin` 改为 `evolutionIoAdapter(() => ctx.evolutionIo.provider())`，service/kernel/v2 provider 共用 live handle；HMR 替换 IO 后不再读旧对象。 |
 | R10-P2-9 surface/commit 元数据漂移 | PARTIAL | `source:'system'` 已加入 `STORE_COMMIT_SOURCES`，tree manifest 提交改用 system；`merge_stage writes:[]` 与 `expectsCommit` 死字段仍待处理。 |
 | R10-P2-10 复核记录不可审计 | PARTIAL | 第三轮结论已入 85 R10.12；第一/二轮复核原始记录仍未入库。 |

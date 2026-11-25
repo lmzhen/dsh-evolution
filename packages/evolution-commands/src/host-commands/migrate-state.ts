@@ -10,7 +10,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { CommandResult } from '@deepseek-ai/dsh-evolution-platform/contract'
 import { evolutionHome } from '@deepseek-ai/dsh-evolution-core'
-import { migrateDomainToStore, migrateStateToV2 } from '@deepseek-ai/dsh-evolution-core/state/migrate'
+import { migrateDomainToStore, migrateStateToV2, revertStateToLegacy } from '@deepseek-ai/dsh-evolution-core/state/migrate'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import { join } from 'node:path'
 import { hostCommandText } from '../host-locale.ts'
@@ -36,7 +36,11 @@ export function runMigrateStateCommand(context: MigrateStateContext): CommandRes
   }
   const dryRun = context.command.flags.get('dry-run') === true
   const to = context.command.flags.get('to')
+  const revert = context.command.flags.get('revert') === true
   if (to !== undefined && to !== 'v2') {
+    return err(hostCommandText(context.locale, 'help.migrate state'))
+  }
+  if (revert && (to !== undefined || dryRun)) {
     return err(hostCommandText(context.locale, 'help.migrate state'))
   }
   // The command handler context is a restricted child: a bare `ctx.get` does
@@ -49,6 +53,11 @@ export function runMigrateStateCommand(context: MigrateStateContext): CommandRes
           const valueFlag = (name: string): string | undefined => {
             const value = context.command.flags.get(name)
             return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined
+          }
+          if (revert) {
+            const rolledBack = await revertStateToLegacy(scoped, { io, home: evolutionHome() })
+            resolve(ok(hostCommandText(context.locale, 'command.migrate state.reverted', { generation: String(rolledBack.generation) })))
+            return
           }
           const skillsRoot = valueFlag('skills-root')
           const memoryRoot = valueFlag('memory-root')
