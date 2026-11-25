@@ -13,6 +13,7 @@ import { mountStateStack } from '../../../test-support/state-stack.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { HomeFence } from '../../src/home-fence.ts'
 import { StoreKernel } from '../../src/store/store-kernel.ts'
+import { createStoreService } from '../../src/store/service.ts'
 import { createStateV2Provider } from '../../src/state/v2-provider.ts'
 import { emptyStateDocument } from '../../src/state/document.ts'
 import { PROVIDER_STORE_V2, STATE_V2_MIGRATION_MARKER } from '../../src/state/constants.ts'
@@ -37,6 +38,16 @@ describe('MVCC state provider', () => {
     const provider = createStateV2Provider({ io, home: root, fence })
     expect(provider.locking).toBe('internal')
     await runStateProviderConsistency(provider, expect)
+  })
+
+  it('routes provider reads and writes through the surface service when supplied', async () => {
+    const { root, io, fence } = await seeded()
+    const service = createStoreService(new StoreKernel({ io, home: root, fence }))
+    const provider = createStateV2Provider({ io, home: root, fence, service })
+    await provider.saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
+    expect(await provider.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
+    const state = (await service.query('state.provider', ['state'])).snapshot.domains.state as { review: Record<string, unknown> }
+    expect(state.review.s1).toMatchObject({ lastTurn: 3 })
   })
 
   it('migrates a v1 store document and auto-selects the v2 provider', async () => {

@@ -12,6 +12,7 @@
 import { join } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
 import { StoreKernel } from '../store/store-kernel.ts'
+import type { StoreService } from '../store/service.ts'
 import type { StoreWriterFence } from '../store/types.ts'
 import type {
   EvolutionStateStorage,
@@ -48,6 +49,8 @@ export interface StateV2ProviderOptions {
   readonly fence: StoreWriterFence
   readonly storeDir?: string | undefined
   readonly now?: (() => number) | undefined
+  /** The unified surface service; absent only in direct unit construction. */
+  readonly service?: StoreService | undefined
 }
 
 /** Raised when the v2 provider is selected without an initialized head. */
@@ -73,7 +76,9 @@ export function createStateV2Provider(options: StateV2ProviderOptions): Evolutio
   const readDocument = async (): Promise<StateDocument> => {
     let value: unknown
     try {
-      value = (await kernel.query(['state'])).domains.state
+      value = options.service === undefined
+        ? (await kernel.query(['state'])).domains.state
+        : (await options.service.query('state.provider', ['state'])).snapshot.domains.state
     } catch (error) {
       if (error instanceof Error && /not initialized/.test(error.message)) {
         throw new StateV2NotInitializedError(options.home)
@@ -87,17 +92,18 @@ export function createStateV2Provider(options: StateV2ProviderOptions): Evolutio
   const mutateDocument = async <T>(task: (document: StateDocument) => T | Promise<T>): Promise<T> => {
     let result: T
     let ran = false
-    await kernel.mutate({
-      domains: ['state'],
-      source: 'command',
-      change: async (current) => {
-        if (current.domains.state === undefined) throw new Error('evolution-state-v2: the state domain is missing from the current commit')
-        const document = parseStateDocument(serializeStateDocument(current.domains.state as StateDocument))
-        result = await task(document)
-        ran = true
-        return { state: document }
-      },
-    })
+    const change = async (current: { domains: { state?: unknown } }): Promise<{ state: StateDocument }> => {
+      if (current.domains.state === undefined) throw new Error('evolution-state-v2: the state domain is missing from the current commit')
+      const document = parseStateDocument(serializeStateDocument(current.domains.state as StateDocument))
+      result = await task(document)
+      ran = true
+      return { state: document }
+    }
+    if (options.service === undefined) {
+      await kernel.mutate({ domains: ['state'], source: 'command', change })
+    } else {
+      await options.service.command({ commandId: 'state.provider', domains: ['state'], source: 'command', change })
+    }
     if (!ran) throw new Error('evolution-state-v2: mutation did not run')
     return result!
   }

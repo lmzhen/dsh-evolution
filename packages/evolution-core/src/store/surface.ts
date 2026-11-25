@@ -12,7 +12,7 @@
 
 import type { StoreDomainId } from './types.ts'
 
-export type StoreSurfaceKind = 'tool' | 'command' | 'ui'
+export type StoreSurfaceKind = 'tool' | 'command' | 'ui' | 'provider'
 
 export interface StoreSurfaceCommand {
   /** Stable id shared by the model tool, host command, and UI action. */
@@ -27,6 +27,8 @@ export interface StoreSurfaceCommand {
 }
 
 export const STORE_SURFACE_COMMANDS: readonly StoreSurfaceCommand[] = [
+  // State provider: the MVCC StateStore adapter writes/reads the state domain.
+  { id: 'state.provider', kind: 'provider', reads: ['state'], writes: ['state'], expectsCommit: false },
   // 9.1 model tools
   { id: 'skill_manage', kind: 'tool', reads: ['state'], writes: ['state'], expectsCommit: true },
   { id: 'memory', kind: 'tool', reads: ['memoryFile', 'userFile'], writes: ['memoryFile', 'userFile'], expectsCommit: true },

@@ -34,17 +34,17 @@ export async function apply(ctx: Context): Promise<void> {
   // R2: the MVCC provider is registered but never auto-selected until the
   // explicit v2 marker exists. Its fence is resolved per use so HMR/late
   // authority provisioning cannot freeze a stale writer lock.
+  // The unified surface service is created first: the state provider becomes
+  // one of its consumers instead of opening a second kernel path.
+  const service = existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))
+    ? createStoreService(new StoreKernel({ io: ctx.evolutionIo.provider(), home, fence: liveHomeFence(ctx, home) }))
+    : undefined
   const v2Provider = createStateV2Provider({
     io: ctx.evolutionIo.provider(),
     home,
     fence: liveHomeFence(ctx, home),
+    ...(service === undefined ? {} : { service }),
   })
   ctx.effect(() => ctx.evolutionStateStorage.registerProvider(v2Provider), 'evolution-state-store-v2.provider')
-  // The unified surface service exists only after the explicit v2 marker; until
-  // then consumers must use their legacy ports. The service is stateless around
-  // the same live fence, so HMR can re-provide it on the next apply.
-  if (existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
-    const kernel = new StoreKernel({ io: ctx.evolutionIo.provider(), home, fence: liveHomeFence(ctx, home) })
-    ctx.provide('evolutionStore', createStoreService(kernel))
-  }
+  if (service !== undefined) ctx.provide('evolutionStore', service)
 }
