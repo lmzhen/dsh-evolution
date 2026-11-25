@@ -124,6 +124,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 87 | `node packages/scripts/verify-store-kernel.mjs packages`（DCR-85：query 无写锁、写入单一 HomeFence + IO seam、MVCC 路径已入 inventory） | mirror |
 | 88 | `node packages/evolution/evolution-core/scripts/verify-cross-process-read.mjs`（DCR-85 R8：父进程持 HomeFence，子进程仍能读到同一 commit） | overlay |
 | 89 | `node packages/scripts/verify-store-surface.mjs packages`（DCR-85 §9：每个 host command 有 surface id，每个 command-kind id 是真实 host command） | mirror |
+| 90 | `node packages/scripts/verify-store-single-source.mjs packages`（DCR-85：store-v2 head/commit/objects 路径只出现在 kernel 与 state 迁移层） | mirror |
 
 ## Pull request checklist
 

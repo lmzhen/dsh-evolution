@@ -660,4 +660,12 @@ export const guards = [
     lanes: ["local","ci-static"],
   }),
 
+  gate("gate-90", {
+    kind: "script",
+    tree: "mirror",
+    title: "`node packages/scripts/verify-store-single-source.mjs packages`（DCR-85：store-v2 head/commit/objects 路径只出现在 kernel 与 state 迁移层）",
+    argv: ["node","packages/scripts/verify-store-single-source.mjs","packages"],
+    lanes: ["local","ci-static"],
+  }),
+
 ]

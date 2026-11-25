@@ -392,6 +392,11 @@
       "drillCmd": "node packages/scripts/verify-store-surface.mjs packages --self-test",
       "evidence": "inject a synthetic host command that is absent from the surface registry; the closure gate must report it, proving the row can go red",
       "provenAt": "2026-11-25T09:02:00.000Z"
+    },
+    "gate-90": {
+      "drillCmd": "node packages/scripts/verify-store-single-source.mjs packages --self-test",
+      "evidence": "inject a synthetic merge source that names store-v2/head.json outside the kernel; the single-source gate must report it",
+      "provenAt": "2026-11-25T09:55:00.000Z"
     }
   }
 }

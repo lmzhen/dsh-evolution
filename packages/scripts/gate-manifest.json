@@ -1577,6 +1577,25 @@
       ]
     },
     {
+      "id": "gate-90",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-store-single-source.mjs packages`（DCR-85：store-v2 head/commit/objects 路径只出现在 kernel 与 state 迁移层）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-store-single-source.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
+    },
+    {
       "id": "gate-03",
       "kind": "toolchain",
       "human": "`node node_modules/vitest/vitest.mjs run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2`",
