@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { nodeEvolutionIo, transactIo } from '../../src/io.ts'
 import { HomeFence } from '../../src/home-fence.ts'
 import { StoreKernel } from '../../src/store/store-kernel.ts'
+import { StoreActivationPendingError } from '../../src/store/activation-guard.ts'
 import { createStoreService } from '../../src/store/service.ts'
 import { memoryIoIfV2, scopedTextIO } from '../../src/store/scoped-text-io.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../../src/state/constants.ts'
@@ -65,6 +66,18 @@ describe('scoped text IO bridge', () => {
     await scoped!.writeText(join(root, 'memories', 'MEMORY.md'), 'new\n')
     expect(await scoped!.readText(join(root, 'memories', 'MEMORY.md'))).toBe('new\n')
     expect((await kernel.query(['memoryFile'])).domains.memoryFile).toEqual({ text: 'new\n' })
+  })
+
+  it('guards the legacy memory bridge when another host activates v2', async () => {
+    const root = await tempRoot('dsh-scoped-memory-guard-')
+    const io = nodeEvolutionIo()
+    await mkdir(join(root, 'memories'), { recursive: true })
+    await mkdir(join(root, 'state'), { recursive: true })
+    const scoped = memoryIoIfV2(undefined, io, root, join(root, 'memories'))
+    await scoped!.writeText(join(root, 'memories', 'MEMORY.md'), 'legacy\n')
+    await writeFile(join(root, 'state', STATE_V2_MIGRATION_MARKER), '{}\n')
+    await expect(scoped!.writeText(join(root, 'memories', 'MEMORY.md'), 'lost\n')).rejects.toBeInstanceOf(StoreActivationPendingError)
+    expect(await scoped!.readText(join(root, 'memories', 'MEMORY.md'))).toBe('legacy\n')
   })
 })
 
