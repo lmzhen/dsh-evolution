@@ -69,6 +69,7 @@
 | R10-P2-8 store-plugin 捕获 IO provider | FIXED | `store-plugin` 改为 `evolutionIoAdapter(() => ctx.evolutionIo.provider())`，service/kernel/v2 provider 共用 live handle；HMR 替换 IO 后不再读旧对象。 |
 | R10-P2-9 surface/commit 元数据漂移 | PARTIAL | `source:'system'` 已加入 `STORE_COMMIT_SOURCES`，tree manifest 提交改用 system；`merge_stage writes:[]` 与 `expectsCommit` 死字段仍待处理。 |
 | R10-P2-10 复核记录不可审计 | PARTIAL | 第三轮结论已入 85 R10.12；第一/二轮复核原始记录仍未入库。 |
+| R10-P2-11 测试隔离 flake | OPEN | `create-tree-reads` 在 `/tmp` 下遗留 skill unit journal 时，`recoverPreparedUnits` 扫描共享 `dirname(root)` 会串扰；本次 CI 失败后 rerun 通过。需把测试 root 放到唯一父目录，或让 recovery 按 skill root 隔离。 |
 
 ## 发布阻断项（不是 P2）
 
