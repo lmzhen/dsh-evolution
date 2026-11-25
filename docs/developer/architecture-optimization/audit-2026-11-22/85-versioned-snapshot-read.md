@@ -516,7 +516,7 @@ none --migrate state --to v2--> staged(pending) --startup--> active
 ```
 
 - 激活记录（目标文件名 `state/.store-activation.json`，当前复用 `.migrated-to-store-v2.json`）是唯一权威：`{ mode: 'legacy'|'store-v2', generation, commitId, lastActiveCommitId?, migratedAt }`；`generation` 每次激活递增。当前实现已在既有 marker 上追加 `mode/generation/lastActiveCommitId`，并由 `readStoreActivation()` 解析：缺 marker=legacy、`mode:'legacy'`=回退、未知 mode/坏 JSON=fail loud；旧 marker 无字段按 store-v2 读，改文件名的步骤留到激活状态机完整落地。
-- **已落地**：`StoreService.read/transact` 的 codec 底座、activation record 解析与 gate-94；**未落地**：回退命令写 `mode:'legacy'`、promote 对“曾激活过”的拒绝条件、generation 冲突校验。
+- **已落地**：`StoreService.read/transact` 的 codec 底座、activation record 解析、`revertStateToLegacy` 写回退记录并保留 v2 字节、gate-94；**未落地**：回退 host 命令入口、promote 对“曾激活过”的拒绝条件、generation 冲突校验。
 - 回退也写记录：`mode:'legacy'` + 保留 `lastActiveCommitId`，不删除记录；promote 只有在“记录显示从未激活过（无 lastActiveCommitId）且 head 无 active 记录”时才丢弃 head；曾激活过却出现不匹配 head ⇒ 拒绝 promote，要求显式 `--discard-active-store` 并打印将丢弃的 commitId。禁止“删 marker 再 stage”静默清空 v2 数据。
 - 启动时 `store-plugin` 在**任何 provider/DAO/bridge 构造前**完成 promote；promote 只允许在本进程首次 apply 执行，HMR 重挂发现 pending 只报“下次启动生效”。
 - `migrate state` 只做三件事：读当前 legacy 做校验、写 staged 记录、打印“重启后生效”；不建 head、不写 active、也不提供 `evolutionStore`。

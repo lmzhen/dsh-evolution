@@ -24,6 +24,7 @@ import { StoreKernel } from '../store/store-kernel.ts'
 import type { StoreWriterFence } from '../store/types.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { STATE_V2_MIGRATION_MARKER, STATE_V2_PENDING_MARKER, PROVIDER_STORE_V2 } from './constants.ts'
+import { readStoreActivation, storeV2ActivationPath } from './activation.ts'
 import { parseRunIndexDocument, type RunIndexDocument } from '../run-registry.ts'
 import { EVOLUTION_DOMAIN } from './domain/index.ts'
 import {
@@ -408,4 +409,37 @@ export async function activatePendingStateV2(ctx: Context, options: StateMigrati
     await io.remove(pendingPath)
     return result
   }))
+}
+
+/** The result of an explicit rollback; the v2 bytes stay on disk for inspection. */
+export interface StateV2RevertResult {
+  readonly reverted: boolean
+  readonly generation: number
+  readonly lastActiveCommitId?: string | undefined
+}
+
+/**
+ * Explicit rollback: write a `mode:'legacy'` activation record and let the next
+ * host start read the legacy medium. The v2 head/commits are NOT deleted, so an
+ * operator can inspect them; they are simply not selected. Writes made while v2
+ * was active are not backfilled into legacy files by this function.
+ */
+export async function revertStateToLegacy(ctx: Context, options: { readonly io: EvolutionIoLike; readonly home?: string; readonly now?: () => number }): Promise<StateV2RevertResult> {
+  const home = options.home ?? evolutionHome()
+  const current = readStoreActivation(home)
+  if (current === null) throw new Error('evolution-state-migrate-v2: there is no v2 activation to revert')
+  if (current.mode === 'legacy') {
+    return { reverted: false, generation: current.generation, ...(current.lastActiveCommitId === undefined ? {} : { lastActiveCommitId: current.lastActiveCommitId }) }
+  }
+  const generation = current.generation + 1
+  const fence = liveHomeFence(ctx, home)
+  await fence.run(async () => withFileLock(join(home, 'state.lock'), async () => {
+    await options.io.writeText(storeV2ActivationPath(home), JSON.stringify({
+      mode: 'legacy',
+      generation,
+      ...(current.commitId === undefined ? {} : { commitId: current.commitId, lastActiveCommitId: current.commitId }),
+      migratedAt: new Date(options.now?.() ?? Date.now()).toISOString(),
+    }, null, 2) + '\n')
+  }))
+  return { reverted: true, generation, ...(current.commitId === undefined ? {} : { lastActiveCommitId: current.commitId }) }
 }
