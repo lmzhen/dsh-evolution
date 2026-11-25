@@ -1657,6 +1657,25 @@
       ]
     },
     {
+      "id": "gate-94",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-store-activation-oracle.mjs packages`（DCR-85：v2 介质判定只能经 state/activation.ts；迁移/激活文件除外）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-store-activation-oracle.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
+    },
+    {
       "id": "gate-03",
       "kind": "toolchain",
       "human": "`node node_modules/vitest/vitest.mjs run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2`",

@@ -609,7 +609,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "edfac818eb74491f7aaa101a4de63285c536df5a3e9608d6645aad7db3714d88",
+        "sha256": "4bd372833bd1c3a018a71f230de77e3f5e1d7be6158f9184e88e300551646e6b",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
@@ -1005,6 +1005,11 @@
             "id": "gate-93",
             "tier": "fast",
             "criterion": "verify-store-lifecycle"
+          },
+          {
+            "id": "gate-94",
+            "tier": "fast",
+            "criterion": "verify-store-activation-oracle"
           },
           {
             "id": "gate-03",

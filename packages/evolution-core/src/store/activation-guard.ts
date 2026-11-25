@@ -9,10 +9,8 @@
  *
  * @module @deepseek-ai/dsh-evolution-core/store/activation-guard
  */
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
-import { STATE_V2_MIGRATION_MARKER } from '../state/constants.ts'
+import { isStoreV2Active } from '../state/activation.ts'
 
 export class StoreActivationPendingError extends Error {
   readonly code = 'store-activation-pending'
@@ -23,19 +21,16 @@ export class StoreActivationPendingError extends Error {
   }
 }
 
-const active = (home: string): boolean => existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))
-
 export interface ActivationGuardOptions {
   /** Optional path predicate; only guarded paths are blocked (default: all writes). */
   readonly path?: (path: string) => boolean
 }
 
-/** Wrap a legacy IO backend so a post-bind activation turns writes into a loud refusal. */
 export function guardLegacyActivation(base: EvolutionIoLike, home: string, options: ActivationGuardOptions = {}): EvolutionIoLike {
-  const activeAtBind = active(home)
+  const activeAtBind = isStoreV2Active(home)
   const guarded = (path: string): boolean => options.path?.(path) ?? true
   const assert = (path: string): void => {
-    if (guarded(path) && active(home) !== activeAtBind) throw new StoreActivationPendingError()
+    if (guarded(path) && isStoreV2Active(home) !== activeAtBind) throw new StoreActivationPendingError()
   }
   return {
     get processScope() { return base.processScope },

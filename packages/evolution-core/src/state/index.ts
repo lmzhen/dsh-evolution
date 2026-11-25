@@ -14,6 +14,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { withFileLock } from '@deepseek-ai/dsh-evolution-platform/values/fs'
 import { evolutionHome } from '../state-store.ts'
+import { isStoreV2Active, storeV2ActivationPath } from './activation.ts'
 import type Schema from '@deepseek-ai/schemastery'
 import type {
   CuratorStateRecord,
@@ -22,7 +23,7 @@ import type {
   PendingStatus,
   ReviewStateRecord,
 } from './storage.ts'
-import { PROVIDER_DOMAIN, PROVIDER_STORE, PROVIDER_STORE_V2, STATE_MIGRATION_MARKER, STATE_V2_MIGRATION_MARKER } from './storage.ts'
+import { PROVIDER_DOMAIN, PROVIDER_STORE, PROVIDER_STORE_V2, STATE_MIGRATION_MARKER } from './storage.ts'
 import { parseStateStoreImage } from './store.ts'
 
 export * from './storage.ts'
@@ -66,7 +67,7 @@ export class EvolutionState extends Service {
     super(ctx, 'evolutionState')
     this.providerName = config.provider ?? ''
     this.home = evolutionHome()
-    this.v2ActiveAtMount = existsSync(join(this.home, 'state', STATE_V2_MIGRATION_MARKER))
+    this.v2ActiveAtMount = isStoreV2Active(this.home)
     // S-07: a PINNED provider name is verified at mount when any
     // provider is already registered — a config typo used to explode only at
     // the first state access, far away from the mistake (the registry's
@@ -111,7 +112,7 @@ export class EvolutionState extends Service {
 
   /** The v2 marker promises a readable MVCC head; a marker without one must not select an empty store. */
   private assertV2MarkerStore(): void {
-    const marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
+    const marker = storeV2ActivationPath(this.home)
     if (!existsSync(marker)) return
     // Do NOT pre-read head.json here: this runs on every state operation and a
     // lock-free reader may catch Windows' rename window. The v2 provider's own
@@ -129,7 +130,7 @@ export class EvolutionState extends Service {
   /** Activation is a process-lifetime fact; a marker appearing later means another
    * host promoted it, and this process must restart instead of silently switching. */
   private assertActivationStable(): void {
-    const now = existsSync(join(this.home, 'state', STATE_V2_MIGRATION_MARKER))
+    const now = isStoreV2Active(this.home)
     if (now !== this.v2ActiveAtMount) {
       throw new Error('evolution-state: the v2 activation marker changed while this host was running; restart the host before using the new medium')
     }
@@ -139,8 +140,7 @@ export class EvolutionState extends Service {
     this.assertActivationStable()
     if (this.providerName === 'auto') {
       const names = this.ctx.evolutionStateStorage.providerNames()
-      const v2Marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
-      if (existsSync(v2Marker)) {
+      if (isStoreV2Active(this.home)) {
         if (!names.includes(PROVIDER_STORE_V2)) throw new Error('evolution-state: the v2 migration marker exists but no "' + PROVIDER_STORE_V2 + '" provider is registered')
         this.assertV2MarkerStore()
         return
@@ -154,8 +154,7 @@ export class EvolutionState extends Service {
     }
     if (this.providerName !== '') {
       if (this.providerName === PROVIDER_STORE_V2) {
-        const marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
-        if (!existsSync(marker)) throw new Error('evolution-state: provider "' + PROVIDER_STORE_V2 + '" is pinned but the v2 migration marker is missing; run /evolution migrate state --to v2 first')
+        if (!isStoreV2Active(this.home)) throw new Error('evolution-state: provider "' + PROVIDER_STORE_V2 + '" is pinned but the v2 migration marker is missing; run /evolution migrate state --to v2 first')
         this.assertV2MarkerStore()
         return
       }
@@ -178,8 +177,7 @@ export class EvolutionState extends Service {
   /** `auto` is the migration switch: the marker is the explicit one-way signal. */
   private autoProviderName(): string {
     const names = this.ctx.evolutionStateStorage.providerNames()
-    const v2Marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
-    if (existsSync(v2Marker)) {
+    if (isStoreV2Active(this.home)) {
       this.assertV2MarkerStore()
       return PROVIDER_STORE_V2
     }

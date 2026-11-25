@@ -34,7 +34,7 @@
  */
 
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
-import { existsSync, realpathSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { authorityFrom, type WriteAuthority } from './write-authority.ts'
@@ -60,7 +60,7 @@ import { mutationLockFrom, liveHomeFence } from './mutation-authority.ts'
 import { StoreKernel } from './store/store-kernel.ts'
 import { scopedTextIO } from './store/scoped-text-io.ts'
 import { buildTreeManifestFiles, type TreeManifestFile } from './store/tree-manifest.ts'
-import { STATE_V2_MIGRATION_MARKER } from './state/constants.ts'
+import { isStoreV2Active } from './state/activation.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
 import { projectExtractBodies, type ExtractPlanDraft } from './extract-plan.ts'
@@ -5190,7 +5190,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
   // Under the explicit v2 marker they are one domain each; the wrapper delegates
   // every real skill path to the base seam, so the library code is unchanged.
   const home = evolutionHome()
-  if (ctx !== undefined && existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
+  if (ctx !== undefined && isStoreV2Active(home)) {
     const kernel = new StoreKernel({ io, home, fence: liveHomeFence(ctx, home) })
     effectiveIo = scopedTextIO(
       scopedTextIO(io, { path: usageFile(root), domain: 'usage', kernel }),

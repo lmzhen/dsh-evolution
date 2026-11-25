@@ -20,13 +20,11 @@
  * @module @deepseek-ai/dsh-evolution-feedback
  */
 
-import { liveHomeFence, HomeFence, guardLegacyActivation, isRecord, liveStoreService, scopedTextIO, StoreKernel, type StoreServiceSource } from '@deepseek-ai/dsh-evolution-core'
-import { STATE_V2_MIGRATION_MARKER } from '@deepseek-ai/dsh-evolution-core/state/storage'
+import { liveHomeFence, HomeFence, guardLegacyActivation, isRecord, liveStoreService, isStoreV2Active, scopedTextIO, StoreKernel, type StoreServiceSource } from '@deepseek-ai/dsh-evolution-core'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 
 type Context = CordisContext & HostContext
-import { existsSync } from 'node:fs'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-evolution-skill-discovery/usage'
 import { appendEvolutionEvent, eventsFile, evolutionEventPayloadIssue, evolutionHome, evolutionIoAdapter, evolutionRoot, isPresent, isUnknown, listEventArchives, parseEvolutionEvents, probeText, readEvolutionTimeline, transactIo, clampedNumber, EVENT_LOG_VERSION, type EvolutionEvent, type EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
@@ -161,7 +159,7 @@ export class EvolutionFeedback {
   private bindIo(io: IoLike | undefined): IoLike | undefined {
     if (io === undefined) return undefined
     const home = join(this.home, 'evolution')
-    if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
+    if (!isStoreV2Active(home)) {
       const feedbackPath = this.path
       if (feedbackPath === undefined) return io
       return guardLegacyActivation(io, home, { path: path => path === feedbackPath })

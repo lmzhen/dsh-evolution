@@ -11,16 +11,15 @@
  * @module @deepseek-ai/dsh-evolution-core/store/scoped-tree-io
  */
 
-import { existsSync } from 'node:fs'
 import { basename, join, relative, resolve, sep } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
+import { isStoreV2Active } from '../state/activation.ts'
 import { guardLegacyActivation } from './activation-guard.ts'
 import { StoreKernel } from './store-kernel.ts'
 import { scopedTextIO } from './scoped-text-io.ts'
 import { resolveStoreService, type StoreServiceSource } from './service.ts'
 import type { StoreDomainId, StoreWriterFence } from './types.ts'
-import { STATE_V2_MIGRATION_MARKER } from '../state/constants.ts'
 
 type FileMap = Record<string, string>
 
@@ -224,7 +223,7 @@ export function mergeIoIfV2(
   fence?: StoreWriterFence | undefined,
   service?: StoreServiceSource,
 ): EvolutionIoLike | undefined {
-  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
+  if (!isStoreV2Active(home)) {
     const statePath = resolve(join(home, 'merge', 'merge-state.json'))
     const runMeta = resolve(join(home, 'merge', 'run-meta'))
     const reports = resolve(join(home, 'reports'))

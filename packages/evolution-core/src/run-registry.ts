@@ -38,7 +38,6 @@
  * @module
  */
 
-import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join, resolve } from 'node:path'
 import { clampedNumber } from './numeric.ts'
@@ -48,7 +47,7 @@ import type { RunOutcome } from './contract.ts'
 import { guardLegacyActivation } from './store/activation-guard.ts'
 import { StoreKernel } from './store/store-kernel.ts'
 import { liveHomeFence } from './mutation-authority.ts'
-import { STATE_V2_MIGRATION_MARKER } from './state/constants.ts'
+import { isStoreV2Active } from './state/activation.ts'
 export type { RunOutcome } from './contract.ts'
 
 /** The kinds of long-running work the registry tracks. */
@@ -216,7 +215,7 @@ export function runStorePortIfV2(
   home: string,
   fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined,
 ): RunStorePort | undefined {
-  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
+  if (!isStoreV2Active(home)) return undefined
   // R7e: when the composition mounted the one surface service, the run index
   // uses its declared maintain.* commands instead of opening a second kernel.
   const service = ctx?.get?.('evolutionStore') as {

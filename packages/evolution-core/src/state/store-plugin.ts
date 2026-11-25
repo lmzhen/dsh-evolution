@@ -8,8 +8,6 @@
  * @module @deepseek-ai/dsh-evolution-core/state/store-plugin
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { evolutionHome } from '../state-store.ts'
 import type {} from '../io-registry.ts'
 import type {} from './storage.ts'
@@ -19,7 +17,7 @@ import { activatePendingStateV2 } from './migrate.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { StoreKernel } from '../store/store-kernel.ts'
 import { createStoreService } from '../store/service.ts'
-import { STATE_V2_MIGRATION_MARKER } from './constants.ts'
+import { isStoreV2Active } from './activation.ts'
 
 export const name = 'evolution-state-store'
 export const inject = ['evolutionStateStorage', 'evolutionIo']
@@ -42,7 +40,7 @@ export async function apply(ctx: Context): Promise<void> {
   // authority provisioning cannot freeze a stale writer lock.
   // The unified surface service is created first: the state provider becomes
   // one of its consumers instead of opening a second kernel path.
-  const service = existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))
+  const service = isStoreV2Active(home)
     ? createStoreService(new StoreKernel({ io: ctx.evolutionIo.provider(), home, fence: liveHomeFence(ctx, home) }))
     : undefined
   const v2Provider = createStateV2Provider({

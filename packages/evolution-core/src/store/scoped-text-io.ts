@@ -12,15 +12,14 @@
  * @module @deepseek-ai/dsh-evolution-core/store/scoped-text-io
  */
 
-import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
+import { isStoreV2Active } from '../state/activation.ts'
 import { guardLegacyActivation } from './activation-guard.ts'
 import { StoreKernel } from './store-kernel.ts'
 import { resolveStoreService, type StoreServiceSource } from './service.ts'
 import type { StoreDomainId, StoreWriterFence } from './types.ts'
-import { STATE_V2_MIGRATION_MARKER } from '../state/constants.ts'
 import { suppressedFile, usageFile } from '../usage.ts'
 
 export interface ScopedTextIOOptions {
@@ -208,7 +207,7 @@ export function memoryIoIfV2(
   fence?: StoreWriterFence | undefined,
   service?: StoreServiceSource,
 ): EvolutionIoLike | undefined {
-  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
+  if (!isStoreV2Active(home)) {
     const guarded = [join(memoryRootPath, 'MEMORY.md'), join(memoryRootPath, 'USER.md')].map(path => resolve(path))
     return guardLegacyActivation(base, home, { path: path => guarded.includes(resolve(path)) })
   }
@@ -228,7 +227,7 @@ export function usageSidecarIoIfV2(
   options: { readonly home?: string | undefined; readonly fence?: StoreWriterFence | undefined; readonly service?: StoreServiceSource } = {},
 ): EvolutionIoLike | undefined {
   const home = options.home ?? join(skillsRoot, '..', 'evolution')
-  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
+  if (!isStoreV2Active(home)) {
     const guarded = [usageFile(skillsRoot), suppressedFile(skillsRoot)].map(path => resolve(path))
     return guardLegacyActivation(base, home, { path: path => guarded.includes(resolve(path)) })
   }
@@ -255,7 +254,7 @@ export function discoveryIoIfV2(
   fence?: StoreWriterFence | undefined,
   service?: StoreServiceSource,
 ): EvolutionIoLike | undefined {
-  if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) {
+  if (!isStoreV2Active(home)) {
     const guarded = [paths.domainMap, paths.projectionJournal, paths.viewSnapshots].map(path => resolve(path))
     return guardLegacyActivation(base, home, { path: path => guarded.includes(resolve(path)) })
   }

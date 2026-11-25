@@ -693,4 +693,12 @@ export const guards = [
     lanes: ["local","ci-static"],
   }),
 
+  gate("gate-94", {
+    kind: "script",
+    tree: "mirror",
+    title: "`node packages/scripts/verify-store-activation-oracle.mjs packages`（DCR-85：v2 介质判定只能经 state/activation.ts；迁移/激活文件除外）",
+    argv: ["node","packages/scripts/verify-store-activation-oracle.mjs","packages"],
+    lanes: ["local","ci-static"],
+  }),
+
 ]

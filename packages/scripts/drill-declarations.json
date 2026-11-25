@@ -410,6 +410,11 @@
       "drillCmd": "node packages/scripts/verify-store-lifecycle.mjs packages --self-test",
       "evidence": "inject a synthetic field capture of ctx.get('evolutionStore') and a required inject listing evolutionMutationAuthority; both must be reported",
       "provenAt": "2026-11-25T18:30:00.000Z"
+    },
+    "gate-94": {
+      "drillCmd": "node packages/scripts/verify-store-activation-oracle.mjs packages --self-test",
+      "evidence": "a direct STATE_V2_MIGRATION_MARKER reference must be rejected while the isStoreV2Active import is not",
+      "provenAt": "2026-11-25T21:55:00.000Z"
     }
   }
 }

@@ -493,6 +493,7 @@ plugin apply (sync)
 - 平台侧无需新 API：`ctx.inject` 是公开的“可选依赖晚绑定”seam；`ctx.get` 只允许在 `get()`/使用点出现。
 - 静态门禁：长生命周期对象字段禁止 `ctx.get(...)` 赋值；新增 `verify-store-lifecycle` 扫描 `ctx.get('evolutionStore')`/`ctx.get('evolutionMutationAuthority')` 的字段化用法，和白名单（迁移命令）之外一律红。
 - **唯一 oracle**：`StoreAccess.get()` 的 undefined 语义必须由激活状态决定，而不是各自 `existsSync(marker)`：
+  - 所有消费者只调用 `isStoreV2Active(home)`（`state/activation.ts`）；gate-94 禁止其他源文件直接引用 marker 常量（迁移/激活文件除外）；
   - legacy 且无 service → 允许 base IO（bridge 常驻，不建/不拆）；
   - active 且无 service → `StoreUnavailableError`（重启/服务未挂载指引）；
   - 运行期发现另一进程激活（service 首次出现而本进程启动时无记录）→ fail loud，禁止本进程静默切介质；
@@ -504,7 +505,7 @@ plugin apply (sync)
   - 完全没有 service → row 仍能 mount，能力缺失可诊断，写 fail loud（active 模式下）；
   - `inject` 必需集合固定（借鉴 PR #26 的 `inject-authority.spec.ts`，每个可选能力都有一条负向 spec）。
 
-已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。`verify-store-lifecycle` 已成为 gate-93（构造期字段捕获、可选服务进必需 inject 都红）。另外 `EvolutionState` 不再运行期切 v2：启动时的模式缓存 + `guardLegacyActivation` 让另一宿主激活后本进程的 state/sidecar/runs 写 fail loud，而不是继续写 legacy；单测证明 activation guard 只拦迁移路径、skill tree 等非迁移路径仍可写。**仍缺**：闭包捕获检测（run-registry 已加 guard，但 service 仍按调用捕获）、完整 activation record/generation、HMR 旧实例断言。
+已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。`verify-store-lifecycle` 已成为 gate-93（构造期字段捕获、可选服务进必需 inject 都红），`verify-store-activation-oracle` 成为 gate-94（除迁移/激活文件外不得直接引用 marker）。另外 `EvolutionState` 不再运行期切 v2：启动时的模式缓存 + `guardLegacyActivation` 让另一宿主激活后本进程的 state/sidecar/runs 写 fail loud，而不是继续写 legacy；单测证明 activation guard 只拦迁移路径、skill tree 等非迁移路径仍可写。**仍缺**：闭包捕获检测（run-registry 已加 guard，但 service 仍按调用捕获）、完整 activation record/generation 的消费方、HMR 旧实例断言。
 
 ##### R10.3 激活状态机与迁移
 
