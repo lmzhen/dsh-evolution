@@ -677,4 +677,12 @@ export const guards = [
     registration: {"reason":"needs the build overlay's installed platform lib graph; CI static lane cannot resolve the store's platform dependencies","owner":"scripts/gates","expiry":"0.62.0","plan":"run on the build line via the local lane after build-lib","renewal":"Registered at 0.61.0: the drill passed locally but the ci-static checkout has no platform dependency install."},
   }),
 
+  gate("gate-92", {
+    kind: "script",
+    tree: "mirror",
+    title: "`node packages/scripts/verify-store-read-lock.mjs packages`（DCR-85：query 及其读 helper 不得出现 fence/withFileLock/acquire；mutate 独占 fence.run）",
+    argv: ["node","packages/scripts/verify-store-read-lock.mjs","packages"],
+    lanes: ["local","ci-static"],
+  }),
+
 ]

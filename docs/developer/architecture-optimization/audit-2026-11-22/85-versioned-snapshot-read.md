@@ -443,8 +443,8 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - P1-3：`migrate state` 新增 `--skills-root` / `--memory-root` / `--discovery-root` / `--feedback-path`，把自定义根/路径传给 `migrateStateToV2`；默认路径不变，未传时仍按 `<home>` 约定。
 - 测试：marker 恢复成功/拒绝两例通过；restructure manifest 通过；usage-sidecar-v2 通过；`tsc` core/curator/discovery/commands 0。
 - P1-6：跨进程无锁读 drill 注册为 gate-88（overlay tree, local lane；CI static 缺 platform 安装依赖，已登记 local-runner only），有 family-facts 声明与 no-drill reason；本地已运行通过。
-- P1-7（部分）：新增 gate-89 `verify-store-surface`（host command ↔ surface command 双向闭包）与 gate-90 `verify-store-single-source`（store-v2 head/commit/objects 路径只出现在 kernel/state 迁移层），以及 gate-91 `verify-store-head`（head schema/advance/缺失/损坏；build-line local）；均有 self-test 或真实负例；gate-manifest / check-registry 通过。
-- 未修：剩余 1 个静态门禁（read-lock 深度）、多数 surface 仍无真实消费者（service 目前只被 doctor/run-registry 使用），继续按复核清单处理。
+- P1-7：新增 gate-89 `verify-store-surface`、gate-90 `verify-store-single-source`、gate-91 `verify-store-head`、gate-92 `verify-store-read-lock`；分别覆盖 surface 闭包、store 路径单一来源、head 唯一 commit/fail-closed、query 无锁；均有 self-test 或真实负例；gate-manifest / check-registry 通过。gate-91 因 build overlay 依赖登记为 build-line local。
+- 未修：多数 surface 仍无真实消费者（service 目前只被 doctor/run-registry 使用），P1-8 继续按复核清单处理。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
 

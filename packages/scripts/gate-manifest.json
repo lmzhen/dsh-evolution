@@ -1619,6 +1619,25 @@
       }
     },
     {
+      "id": "gate-92",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-store-read-lock.mjs packages`（DCR-85：query 及其读 helper 不得出现 fence/withFileLock/acquire；mutate 独占 fence.run）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-store-read-lock.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
+    },
+    {
       "id": "gate-03",
       "kind": "toolchain",
       "human": "`node node_modules/vitest/vitest.mjs run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2`",

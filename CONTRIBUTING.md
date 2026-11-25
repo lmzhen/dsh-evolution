@@ -126,6 +126,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 89 | `node packages/scripts/verify-store-surface.mjs packages`（DCR-85 §9：每个 host command 有 surface id，每个 command-kind id 是真实 host command） | mirror |
 | 90 | `node packages/scripts/verify-store-single-source.mjs packages`（DCR-85：store-v2 head/commit/objects 路径只出现在 kernel 与 state 迁移层） | mirror |
 | 91 | `node packages/evolution/evolution-core/scripts/verify-store-head.mjs`（DCR-85：head 是唯一 commit point，缺失/损坏必须 fail closed） | overlay |
+| 92 | `node packages/scripts/verify-store-read-lock.mjs packages`（DCR-85：query 及其读 helper 不得出现 fence/withFileLock/acquire；mutate 独占 fence.run） | mirror |
 
 ## Pull request checklist
 
