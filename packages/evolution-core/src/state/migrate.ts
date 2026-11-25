@@ -21,6 +21,7 @@ import type { EvolutionIoLike } from '../io.ts'
 import { readStateStoreSnapshot, writeStateStoreSnapshot, type StateStoreSnapshot, type StoredReviewState } from './store.ts'
 import { emptyStateDocument } from './document.ts'
 import { StoreKernel } from '../store/store-kernel.ts'
+import type { StoreWriterFence } from '../store/types.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { STATE_V2_MIGRATION_MARKER, STATE_V2_PENDING_MARKER, PROVIDER_STORE_V2 } from './constants.ts'
 import { parseRunIndexDocument, type RunIndexDocument } from '../run-registry.ts'
@@ -52,6 +53,8 @@ export interface StateMigrationOptions {
   readonly feedbackPath?: string
   /** Stage the migration for the next host start instead of activating it now. */
   readonly stage?: boolean
+  /** Reuse an already-held fence (activation holds it before state.lock). */
+  readonly fence?: StoreWriterFence
   readonly now?: () => number
 }
 
@@ -205,7 +208,7 @@ async function migrateStateToV2Unlocked(ctx: Context, options: StateMigrationOpt
   const io = options.io
   const headPath = join(home, 'store-v2', 'head.json')
   const markerPath = join(home, 'state', STATE_V2_MIGRATION_MARKER)
-  const fence = liveHomeFence(ctx, home)
+  const fence = options.fence ?? liveHomeFence(ctx, home)
   const kernel = new StoreKernel({ io, home, fence, ...(options.now === undefined ? {} : { now: options.now }) })
   const writeMarker = async (source: StateV2MigrationResult['source'], commitId: string, snapshot: StateStoreSnapshot): Promise<void> => {
     await io.writeText(markerPath, JSON.stringify({
@@ -363,7 +366,10 @@ export async function activatePendingStateV2(ctx: Context, options: StateMigrati
   const home = options.home ?? evolutionHome()
   const io = options.io
   await mkdir(home, { recursive: true })
-  return withFileLock(join(home, 'state.lock'), async () => {
+  const fence = liveHomeFence(ctx, home)
+  // Lock order matches the tree write path: HomeFence first, then state.lock.
+  // The fence is passed down so promotion does not request a second authority.
+  return await fence.run(async () => withFileLock(join(home, 'state.lock'), async () => {
     const markerPath = join(home, 'state', STATE_V2_MIGRATION_MARKER)
     const pendingPath = join(home, 'state', STATE_V2_PENDING_MARKER)
     if (await io.exists(markerPath)) {
@@ -392,6 +398,7 @@ export async function activatePendingStateV2(ctx: Context, options: StateMigrati
     const result = await migrateStateToV2Unlocked(ctx, {
       ...options,
       home,
+      fence,
       stage: false,
       ...(pending.skillsRoot === undefined ? {} : { skillsRoot: pending.skillsRoot }),
       ...(pending.memoryRoot === undefined ? {} : { memoryRoot: pending.memoryRoot }),
@@ -400,5 +407,5 @@ export async function activatePendingStateV2(ctx: Context, options: StateMigrati
     })
     await io.remove(pendingPath)
     return result
-  })
+  }))
 }

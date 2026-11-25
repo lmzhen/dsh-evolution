@@ -645,7 +645,7 @@ interface StoreView {
 - gate-93 只认字段式捕获，漏闭包捕获（`run-registry` 仍冻结 service）；R10.11 的 transaction/ports/manifest 三条门禁尚不存在；
 - 五个 bridge 无完整的 late-provide/HMR 矩阵；`store-service-plugin` 已断言 HMR 后 service 是新实例，`store-plugin` 已改用 live IO adapter，但其余消费者仍缺“先 mount 后 provide / 完全无 service”用例；
 - scoped adapter `mtime=null` 导致 ProjectionJournal 缓存永不失效：已改为返回 commit revision 的数值投影，commit 变化即失效；
-- promote 的 `state.lock → HomeFence` 与 tree 路径 `HomeFence → state.lock` 顺序相反；
+- promote 的锁顺序已改为 `HomeFence → state.lock`，与 tree 路径一致，并把同一 fence 传入 promote；直调 `migrateStateToV2` 的测试路径仍保留旧顺序；
 - 回退/坏 pending 缺可操作命令；
 - surface 表中 `merge_stage writes:[]`、`source:'system'` 未入枚举、`expectsCommit` 仍是死字段；
 - R8/R9 复核记录未入库，R10.9 缺少覆盖 id，P2 全集不可审计。
