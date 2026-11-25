@@ -1,8 +1,8 @@
 {
   "generatedBy": "gen-test-lines.mjs",
-  "measuredAt": "2026-11-25T22:17:06.269Z",
-  "tree": "a3711217",
-  "specDigest": "5129eda0749b3fd04deb17b9daf5fd6cacaa2cdce677524e866d382b7e4730ab",
+  "measuredAt": "2026-11-25T22:33:13.419Z",
+  "tree": "f38f76b5",
+  "specDigest": "3018c2312c7d068d0f5e3a4c97b729617f367e328b1386e028a09851d7a84da9",
   "testLines": [
     {
       "spec": "packages/evolution-activity/tests/learning-graph/graph.spec.ts",
