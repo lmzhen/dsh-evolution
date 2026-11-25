@@ -17,6 +17,7 @@ import { join, resolve } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { StoreKernel } from './store-kernel.ts'
+import type { StoreService } from './service.ts'
 import type { StoreDomainId, StoreWriterFence } from './types.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../state/constants.ts'
 import { suppressedFile, usageFile } from '../usage.ts'
@@ -27,6 +28,9 @@ export interface ScopedTextIOOptions {
   /** MVCC domain that owns the file text. */
   readonly domain: StoreDomainId
   readonly kernel: StoreKernel
+  /** When present, reads/writes go through the unified surface service. */
+  readonly service?: StoreService | undefined
+  readonly commandId?: string | undefined
 }
 
 const textOf = (value: unknown): string | null => {
@@ -41,23 +45,37 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
   const isTarget = (path: string): boolean => resolve(path) === target
 
   const readMapped = async (): Promise<string | null> => {
-    const snapshot = await options.kernel.query([options.domain])
+    const snapshot = options.service === undefined
+      ? await options.kernel.query([options.domain])
+      : (await options.service.query(options.commandId ?? 'usage.rw', [options.domain])).snapshot
     return textOf(snapshot.domains[options.domain])
   }
 
   const writeMapped = async (text: string): Promise<void> => {
-    await options.kernel.mutate({
-      domains: [options.domain],
-      source: 'command',
-      change: () => ({ [options.domain]: { text } }),
-    })
+    const change = (): Record<string, unknown> => ({ [options.domain]: { text } })
+    if (options.service !== undefined) {
+      await options.service.command({
+        commandId: options.commandId ?? 'usage.rw',
+        domains: [options.domain],
+        source: 'command',
+        change,
+      })
+      return
+    }
+    await options.kernel.mutate({ domains: [options.domain], source: 'command', change })
   }
   const clearMapped = async (): Promise<void> => {
-    await options.kernel.mutate({
-      domains: [options.domain],
-      source: 'command',
-      change: () => ({ [options.domain]: null }),
-    })
+    const change = (): Record<string, unknown> => ({ [options.domain]: null })
+    if (options.service !== undefined) {
+      await options.service.command({
+        commandId: options.commandId ?? 'usage.rw',
+        domains: [options.domain],
+        source: 'command',
+        change,
+      })
+      return
+    }
+    await options.kernel.mutate({ domains: [options.domain], source: 'command', change })
   }
 
   const partial: Omit<EvolutionIoLike, 'remove' | 'rename' | 'copy'> = {
@@ -194,14 +212,15 @@ export function usageSidecarIoIfV2(
   ctx: { get?(name: string): unknown } | undefined,
   base: EvolutionIoLike,
   skillsRoot: string,
-  options: { readonly home?: string | undefined; readonly fence?: StoreWriterFence | undefined } = {},
+  options: { readonly home?: string | undefined; readonly fence?: StoreWriterFence | undefined; readonly service?: StoreService | undefined } = {},
 ): EvolutionIoLike | undefined {
   const home = options.home ?? join(skillsRoot, '..', 'evolution')
   if (!existsSync(join(home, 'state', STATE_V2_MIGRATION_MARKER))) return undefined
   const kernel = new StoreKernel({ io: base, home, fence: options.fence ?? liveHomeFence(ctx ?? {}, home) })
+  const service = options.service === undefined ? {} : { service: options.service, commandId: 'usage.rw' }
   return scopedTextIO(
-    scopedTextIO(base, { path: usageFile(skillsRoot), domain: 'usage', kernel }),
-    { path: suppressedFile(skillsRoot), domain: 'suppressed', kernel },
+    scopedTextIO(base, { path: usageFile(skillsRoot), domain: 'usage', kernel, ...service }),
+    { path: suppressedFile(skillsRoot), domain: 'suppressed', kernel, ...service },
   )
 }
 
