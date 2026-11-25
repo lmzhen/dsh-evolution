@@ -713,6 +713,16 @@ export const HOST_COMMANDS = {
       "ru": "Перенесено: review={review} сессий, pending={pending}, curator={curator}; store={path}",
       "pt": "Migrado: review={review} sessões, pending={pending}, curator={curator}; store={path}"
     },
+    "command.migrate state.staged": {
+      "zh": "已暂存 v2 迁移（review={review} 个会话，pending={pending} 条，curator={curator}）。重启宿主后才会激活；重启前旧介质继续可写，不会丢写。",
+      "en": "Staged the v2 migration (review={review} sessions, pending={pending}, curator={curator}). It activates after a host restart; the legacy medium stays writable until then, so no write is lost.",
+      "ja": "v2 移行をステージしました（review={review} セッション、pending={pending}、curator={curator}）。ホスト再起動後に有効になります。それまでは旧メディアに書き込み可能で、書き込みは失われません。",
+      "es": "Migración v2 preparada (review={review} sesiones, pending={pending}, curator={curator}). Se activa al reiniciar el host; hasta entonces el medio anterior sigue escribible y no se pierde ninguna escritura.",
+      "fr": "Migration v2 préparée (review={review} sessions, pending={pending}, curator={curator}). Elle s’active au redémarrage de l’hôte ; d’ici là l’ancien support reste inscriptible, sans perte d’écriture.",
+      "de": "v2-Migration vorbereitet (review={review} Sitzungen, pending={pending}, curator={curator}). Sie wird nach einem Host-Neustart aktiv; bis dahin bleibt das alte Medium beschreibbar, es geht kein Schreibvorgang verloren.",
+      "ru": "Миграция v2 подготовлена (review={review} сессий, pending={pending}, curator={curator}). Она активируется после перезапуска хоста; до этого старый носитель остаётся доступным для записи, потери записи нет.",
+      "pt": "Migração v2 preparada (review={review} sessões, pending={pending}, curator={curator}). Ela é ativada após reiniciar o host; até lá o meio antigo continua gravável, sem perda de escritas."
+    },
     "command.migrate state.dry": {
       "zh": "dry-run：review={review} 个会话，pending={pending} 条，curator={curator}；未写 store",
       "en": "dry-run: review={review} sessions, pending={pending}, curator={curator}; nothing written",

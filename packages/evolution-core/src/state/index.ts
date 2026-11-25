@@ -110,18 +110,16 @@ export class EvolutionState extends Service {
   private assertV2MarkerStore(): void {
     const marker = join(this.home, 'state', STATE_V2_MIGRATION_MARKER)
     if (!existsSync(marker)) return
-    const head = join(this.home, 'store-v2', 'head.json')
+    // Do NOT pre-read head.json here: this runs on every state operation and a
+    // lock-free reader may catch Windows' rename window. The v2 provider's own
+    // query already fails closed (and retries) when the head is missing/corrupt.
     try {
       const markerBody = JSON.parse(readFileSync(marker, 'utf8'))
-      const headText = readFileSync(head, 'utf8')
-      if (headText.trim() === '') throw new Error('v2 head is empty')
-      const parsed = JSON.parse(headText) as { commitId?: unknown }
-      if (typeof parsed.commitId !== 'string' || !/^[0-9a-f]{64}$/.test(parsed.commitId)) throw new Error('v2 head has no commitId')
       if (typeof markerBody !== 'object' || markerBody === null || (markerBody as { target?: unknown }).target !== PROVIDER_STORE_V2) {
         throw new Error('marker target is not ' + PROVIDER_STORE_V2)
       }
     } catch (error) {
-      throw new Error('evolution-state: the v2 migration marker/head is missing or unreadable: ' + (error instanceof Error ? error.message : String(error)))
+      throw new Error('evolution-state: the v2 migration marker is missing or unreadable: ' + (error instanceof Error ? error.message : String(error)))
     }
   }
 

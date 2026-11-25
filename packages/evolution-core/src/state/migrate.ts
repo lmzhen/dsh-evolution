@@ -19,10 +19,10 @@ import { memoryRoot } from '../memory-store.ts'
 import { suppressedFile, usageFile } from '../usage.ts'
 import type { EvolutionIoLike } from '../io.ts'
 import { readStateStoreSnapshot, writeStateStoreSnapshot, type StateStoreSnapshot, type StoredReviewState } from './store.ts'
-import { emptyStateDocument, parseStateDocument, serializeStateDocument, type StateDocument } from './document.ts'
+import { emptyStateDocument } from './document.ts'
 import { StoreKernel } from '../store/store-kernel.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
-import { STATE_V2_MIGRATION_MARKER, PROVIDER_STORE_V2 } from './constants.ts'
+import { STATE_V2_MIGRATION_MARKER, STATE_V2_PENDING_MARKER, PROVIDER_STORE_V2 } from './constants.ts'
 import { parseRunIndexDocument, type RunIndexDocument } from '../run-registry.ts'
 import { EVOLUTION_DOMAIN } from './domain/index.ts'
 import {
@@ -50,6 +50,8 @@ export interface StateMigrationOptions {
   readonly discoveryPaths?: { readonly domainMap: string; readonly projectionJournal: string; readonly viewSnapshots: string }
   /** Override the feedback rebuild-cache path. */
   readonly feedbackPath?: string
+  /** Stage the migration for the next host start instead of activating it now. */
+  readonly stage?: boolean
   readonly now?: () => number
 }
 
@@ -218,33 +220,49 @@ async function migrateStateToV2Unlocked(ctx: Context, options: StateMigrationOpt
   }
   const v1Path = join(home, 'state', 'store.json')
   const source: 'store' | 'domain' = await io.exists(v1Path) ? 'store' : 'domain'
-  if (await io.exists(headPath)) {
-    // A previous run may have published the head and failed while writing the
-    // marker. The head is the authority; recover the marker instead of
-    // refusing a retry. A marker that already exists means this command has
-    // completed and must not silently re-run.
-    if (await io.exists(markerPath)) throw new Error('evolution-state-migrate-v2: a v2 head already exists; refusing to overwrite it')
-    const snapshot = await kernel.query(['state'])
-    const document = parseStateDocument(serializeStateDocument(snapshot.domains.state as StateDocument))
-    // The head may have been published just before a crash; v1 stayed writable
-    // until the marker appears. Refuse to bless a head whose legacy source has
-    // moved, otherwise writes in that window disappear silently.
-    const legacy = source === 'store' ? await readStateStoreSnapshot(io, v1Path) : await readDomainSnapshot(ctx)
-    const legacyDocument = parseStateDocument(serializeStateDocument({ ...emptyStateDocument(), ...legacy }))
-    if (serializeStateDocument(legacyDocument) !== serializeStateDocument(document)) {
-      throw new Error('evolution-state-migrate-v2: the legacy state changed after the v2 head was published; refusing to recover the marker')
+  if (options.stage === true) {
+    if (await io.exists(markerPath)) throw new Error('evolution-state-migrate-v2: the v2 migration is already active')
+    const snapshot = source === 'store' ? await readStateStoreSnapshot(io, v1Path) : await readDomainSnapshot(ctx)
+    if (options.dryRun === true) {
+      return {
+        reviewSessions: Object.keys(snapshot.review).length,
+        pending: Object.keys(snapshot.pending).length,
+        curator: snapshot.curator !== null,
+        path: headPath,
+        dryRun: true,
+        commitId: '',
+        source,
+      }
     }
-    const recovered: StateV2MigrationResult = {
-      reviewSessions: Object.keys(document.review).length,
-      pending: Object.keys(document.pending).length,
-      curator: document.curator !== null,
+    const pendingPath = join(home, 'state', STATE_V2_PENDING_MARKER)
+    await io.writeText(pendingPath, JSON.stringify({
+      target: PROVIDER_STORE_V2,
+      stagedAt: new Date(options.now?.() ?? Date.now()).toISOString(),
+      source,
+      reviewSessions: Object.keys(snapshot.review).length,
+      pending: Object.keys(snapshot.pending).length,
+      curator: snapshot.curator !== null,
+      ...(options.skillsRoot === undefined ? {} : { skillsRoot: options.skillsRoot }),
+      ...(options.memoryRoot === undefined ? {} : { memoryRoot: options.memoryRoot }),
+      ...(options.discoveryPaths === undefined ? {} : { discoveryPaths: options.discoveryPaths }),
+      ...(options.feedbackPath === undefined ? {} : { feedbackPath: options.feedbackPath }),
+    }, null, 2) + '\n')
+    return {
+      reviewSessions: Object.keys(snapshot.review).length,
+      pending: Object.keys(snapshot.pending).length,
+      curator: snapshot.curator !== null,
       path: headPath,
-      dryRun: options.dryRun === true,
-      commitId: snapshot.commitId,
-      source: 'store-v2-recovered',
+      dryRun: false,
+      commitId: '',
+      source,
     }
-    if (options.dryRun !== true) await writeMarker('store-v2-recovered', snapshot.commitId, document)
-    return recovered
+  }
+  if (await io.exists(headPath)) {
+    // Production promotion never reaches this: it removes a head that has no
+    // active marker before rebootstrap. A head without its marker can only be
+    // a hand-rolled/direct call; blessing it would silently drop every other
+    // domain's legacy writes after the head was published. Fail loud instead.
+    throw new Error('evolution-state-migrate-v2: a v2 head exists without an active marker; refusing to recover it (remove the staged store-v2 directory or re-run the two-stage migration)')
   }
 
   const snapshot = source === 'store' ? await readStateStoreSnapshot(io, v1Path) : await readDomainSnapshot(ctx)
@@ -326,4 +344,58 @@ async function migrateStateToV2Unlocked(ctx: Context, options: StateMigrationOpt
     commitId: result.commitId,
     source,
   }
+}
+
+/**
+ * Promote a staged v2 migration on the next host start.
+ *
+ * The command writes only `.migrate-store-v2.pending.json`; no v2 head exists
+ * while the live host keeps writing legacy media, so there is no window where
+ * one domain set has switched and another has not. Promotion runs before any
+ * provider/bridge binds, rebuilds the head from the CURRENT legacy bytes (a
+ * crash during a previous promotion is discarded, not blessed), then writes the
+ * active marker. Idempotent: no pending marker is a no-op.
+ */
+export async function activatePendingStateV2(ctx: Context, options: StateMigrationOptions): Promise<StateV2MigrationResult | null> {
+  const home = options.home ?? evolutionHome()
+  const io = options.io
+  await mkdir(home, { recursive: true })
+  return withFileLock(join(home, 'state.lock'), async () => {
+    const markerPath = join(home, 'state', STATE_V2_MIGRATION_MARKER)
+    const pendingPath = join(home, 'state', STATE_V2_PENDING_MARKER)
+    if (await io.exists(markerPath)) {
+      if (await io.exists(pendingPath)) await io.remove(pendingPath)
+      return null
+    }
+    if (!await io.exists(pendingPath)) return null
+    const pending = JSON.parse(await io.readText(pendingPath) ?? '{}') as {
+      target?: unknown
+      skillsRoot?: string
+      memoryRoot?: string
+      discoveryPaths?: { domainMap: string; projectionJournal: string; viewSnapshots: string }
+      feedbackPath?: string
+    }
+    if (pending.target !== PROVIDER_STORE_V2) throw new Error('evolution-state-migrate-v2: the staged migration marker is invalid')
+    // A head left by a crashed promotion is not authoritative: the active
+    // marker was never written, so no v2 consumer could have read it. Remove
+    // the staged store and rebuild from the current legacy bytes.
+    const headPath = join(home, 'store-v2', 'head.json')
+    if (await io.exists(headPath)) await io.remove(headPath)
+    for (const dir of ['commits', 'objects']) {
+      const path = join(home, 'store-v2', dir)
+      if (!existsSync(path)) continue
+      for (const name of await io.list(path)) await io.remove(join(path, name))
+    }
+    const result = await migrateStateToV2Unlocked(ctx, {
+      ...options,
+      home,
+      stage: false,
+      ...(pending.skillsRoot === undefined ? {} : { skillsRoot: pending.skillsRoot }),
+      ...(pending.memoryRoot === undefined ? {} : { memoryRoot: pending.memoryRoot }),
+      ...(pending.discoveryPaths === undefined ? {} : { discoveryPaths: pending.discoveryPaths }),
+      ...(pending.feedbackPath === undefined ? {} : { feedbackPath: pending.feedbackPath }),
+    })
+    await io.remove(pendingPath)
+    return result
+  })
 }

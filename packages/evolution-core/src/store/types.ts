@@ -129,6 +129,8 @@ export interface StoreKernelOptions {
   readonly now?: (() => number) | undefined
   /** Test seam: override the store directory. */
   readonly storeDir?: string | undefined
+  /** Commits between bounded GC passes; defaults to 256 (0 disables the in-write pass). */
+  readonly gcEveryWrites?: number | undefined
 }
 
 /** Base class for every store refusal. */

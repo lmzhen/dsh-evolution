@@ -64,6 +64,7 @@ export function runMigrateStateCommand(context: MigrateStateContext): CommandRes
               io,
               home: evolutionHome(),
               dryRun,
+              stage: true,
               ...(skillsRoot === undefined ? {} : { skillsRoot }),
               ...(memoryRoot === undefined ? {} : { memoryRoot }),
               ...(discoveryPaths === undefined ? {} : { discoveryPaths }),
@@ -71,9 +72,12 @@ export function runMigrateStateCommand(context: MigrateStateContext): CommandRes
             })
             : await migrateDomainToStore(scoped, { io, home: evolutionHome(), dryRun })
           const values = { review: result.reviewSessions, pending: result.pending, curator: result.curator ? 'yes' : 'no', path: result.path }
-          let text = hostCommandText(context.locale, dryRun ? 'command.migrate state.dry' : 'command.migrate state.done', values)
+          const staged = to === 'v2' && !dryRun && 'commitId' in result && result.commitId === ''
+          let text = hostCommandText(context.locale, staged
+            ? 'command.migrate state.staged'
+            : dryRun ? 'command.migrate state.dry' : 'command.migrate state.done', values)
           const selection = (scoped as unknown as { evolutionState?: { providerSelection?: () => { configured: string; effective: string } } }).evolutionState?.providerSelection?.()
-          if (selection?.effective === 'domain') text += '\n' + hostCommandText(context.locale, 'command.migrate state.pin')
+          if (!staged && selection?.effective === 'domain') text += '\n' + hostCommandText(context.locale, 'command.migrate state.pin')
           resolve(ok(text))
         } catch (error) {
           resolve(err(hostCommandText(context.locale, 'command.migrate state.error', {

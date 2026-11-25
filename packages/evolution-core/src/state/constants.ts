@@ -23,6 +23,8 @@ export const PROVIDER_STORE = 'store'
 export const PROVIDER_STORE_V2 = 'store-v2'
 /** Marker written after an explicit domain/v1 → v2 migration; `auto` uses it to pick the MVCC authority. */
 export const STATE_V2_MIGRATION_MARKER = '.migrated-to-store-v2.json'
+/** Staged v2 migration: written by the command, promoted on the next host start. */
+export const STATE_V2_PENDING_MARKER = '.migrate-store-v2.pending.json'
 /** Marker written after an explicit domain→store migration; `auto` uses it to pick the authority. */
 export const STATE_MIGRATION_MARKER = '.migrated-from-domain.json'
 

@@ -1,5 +1,5 @@
 // @tier fast
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { nodeEvolutionIo } from '../../src/io.ts'
@@ -226,5 +226,15 @@ describe('home MVCC store kernel', () => {
     const aged = await kernel.collectGarbage(2, 0)
     expect(aged.objects.length).toBeGreaterThan(0)
     expect((await kernel.query(['state'])).domains.state).toEqual({ n: 3 })
+  })
+
+  it('runs bounded GC from the write path instead of only on demand', async () => {
+    const { io, root } = await seeded()
+    const kernel = new StoreKernel({ io, home: root, fence: openFence(), gcEveryWrites: 1 })
+    await kernel.bootstrap({ state: { n: 0 } })
+    const gc = vi.spyOn(kernel, 'collectGarbage')
+    await kernel.mutate({ domains: ['state'], source: 'command', change: () => ({ state: { n: 1 } }) })
+    expect(gc).toHaveBeenCalledTimes(1)
+    expect((await kernel.query(['state'])).domains.state).toEqual({ n: 1 })
   })
 })

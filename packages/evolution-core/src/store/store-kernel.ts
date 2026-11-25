@@ -180,12 +180,16 @@ export class StoreKernel {
   private readonly fence: StoreKernelOptions['fence']
   private readonly root: string
   private readonly now: () => number
+  /** Commits between bounded GC passes; 0 disables the in-write pass. */
+  private readonly gcEveryWrites: number
+  private writesSinceGc = 0
 
   constructor(options: StoreKernelOptions) {
     this.io = options.io
     this.fence = options.fence
     this.root = options.storeDir ?? join(options.home, 'store-v2')
     this.now = options.now ?? Date.now
+    this.gcEveryWrites = Number.isInteger(options.gcEveryWrites) && (options.gcEveryWrites ?? 0) >= 0 ? (options.gcEveryWrites ?? 256) : 256
   }
 
   /** Read one consistent commit. This method never acquires the writer fence. */
@@ -268,6 +272,14 @@ export class StoreKernel {
       const commit = this.buildCommit(previous.commitId, domains, tree, request.source)
       await this.writeCommit(commit)
       await this.writeHead(commit)
+      this.writesSinceGc += 1
+      if (this.gcEveryWrites > 0 && this.writesSinceGc >= this.gcEveryWrites) {
+        this.writesSinceGc = 0
+        // Bounded production GC: keep the 64-commit chain without requiring an
+        // external maintenance caller. Nested fence.run reuses this critical
+        // section, and collectGarbage reports deletion failures instead of throwing.
+        await this.collectGarbage()
+      }
       return { commitId: commit.commitId, domains: values, tree: commit.tree }
     })
   }

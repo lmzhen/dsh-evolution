@@ -15,6 +15,7 @@ import type {} from '../io-registry.ts'
 import type {} from './storage.ts'
 import { createStateStoreProvider } from './store.ts'
 import { createStateV2Provider } from './v2-provider.ts'
+import { activatePendingStateV2 } from './migrate.ts'
 import { liveHomeFence } from '../mutation-authority.ts'
 import { StoreKernel } from '../store/store-kernel.ts'
 import { createStoreService } from '../store/service.ts'
@@ -26,6 +27,11 @@ export const inject = ['evolutionStateStorage', 'evolutionIo']
 export async function apply(ctx: Context): Promise<void> {
   await ctx.evolutionIo.whenReady()
   const home = evolutionHome()
+  // Promote a staged migration before any provider/bridge reads the marker:
+  // the command deliberately does not activate a live host. This rebuilds the
+  // head from the current legacy bytes and writes the active marker; a crash
+  // between the two leaves the pending marker so the next start retries.
+  await activatePendingStateV2(ctx, { io: ctx.evolutionIo.provider(), home })
   // A fresh provider per apply: HMR may replace the IO provider, and a cached
   // provider would keep reading through the disposed one. The effect cleanup
   // unregisters this exact object before the next apply registers its own.

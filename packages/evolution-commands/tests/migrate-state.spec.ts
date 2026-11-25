@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { mountStateStack } from '../../test-support/state-stack.ts'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { runMigrateStateCommand } from '../src/host-commands/migrate-state.ts'
+import { activatePendingStateV2 } from '@deepseek-ai/dsh-evolution-core/state/migrate'
+import { STATE_V2_MIGRATION_MARKER, STATE_V2_PENDING_MARKER } from '@deepseek-ai/dsh-evolution-core/state/storage'
 
 const seeded = async (): Promise<{ ctx: Awaited<ReturnType<typeof mountStateStack>>; home: string }> => {
   const home = await tempRoot('dsh-cmd-migrate-')
@@ -25,15 +27,25 @@ const command = (overrides: { dryRun?: boolean; positionals?: string[] } = {}) =
 })
 
 describe('/evolution migrate state', () => {
-  it('migrates to MVCC with --to v2 and writes the v2 head', async () => {
+  it('stages migration with --to v2 and activates only on the next start', async () => {
     const { ctx, home } = await seeded()
     const previous = process.env.DSH_HOME
     process.env.DSH_HOME = home
     try {
       const result = await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['to', 'v2']]), positionals: [] }, ctx })
       expect(result).toMatchObject({ kind: 'success' })
-      expect(await ctx.evolutionIo.provider().exists(join(home, 'evolution', 'store-v2', 'head.json'))).toBe(true)
-      expect(await ctx.evolutionIo.provider().exists(join(home, 'evolution', 'state', '.migrated-to-store-v2.json'))).toBe(true)
+      expect(result.text).toContain('Staged')
+      const io = ctx.evolutionIo.provider()
+      const evolution = join(home, 'evolution')
+      expect(await io.exists(join(evolution, 'store-v2', 'head.json'))).toBe(false)
+      expect(await io.exists(join(evolution, 'state', STATE_V2_MIGRATION_MARKER))).toBe(false)
+      expect(await io.exists(join(evolution, 'state', STATE_V2_PENDING_MARKER))).toBe(true)
+      // A restart promotes from the CURRENT legacy bytes; the staged head is
+      // deliberately absent until then.
+      await activatePendingStateV2(ctx, { io, home: evolution })
+      expect(await io.exists(join(evolution, 'store-v2', 'head.json'))).toBe(true)
+      expect(await io.exists(join(evolution, 'state', STATE_V2_MIGRATION_MARKER))).toBe(true)
+      expect(await io.exists(join(evolution, 'state', STATE_V2_PENDING_MARKER))).toBe(false)
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous

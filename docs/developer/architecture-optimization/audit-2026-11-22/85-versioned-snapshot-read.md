@@ -293,7 +293,8 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - `state/v2-provider.ts`：`store-v2` provider，`locking: 'internal'`，所有读走 `kernel.query(['state'])`，所有写走 `kernel.mutate`。
 - `EvolutionState`：`run()` 同步校验后按 `locking` 分支；v1/domain 继续 `state.lock`，v2 不取。
 - `auto`：v2 marker 优先，其次 v1 marker，其次 domain；v2 marker 缺 head 时 mount/first-op fail closed。
-- `/evolution migrate state --to v2`：从 v1 store 或 domain 读取完整 document，`kernel.bootstrap`，写 `.migrated-to-store-v2.json`；v1/domain 不删除；head 已存在且 marker 缺失时按 head 恢复 marker。
+- `/evolution migrate state --to v2`：**两阶段**——命令只校验当前 legacy 并写 `state/.migrate-store-v2.pending.json`（不建 head、不激活）；下次宿主启动时 `store-plugin` 在任何 provider/bridge 绑定前调用 `activatePendingStateV2`，从**当时的 legacy 字节**重建 head 并写 active marker，然后删除 pending。命令后旧 host 继续写 legacy，不存在“state 已切 v2、其他域仍写 legacy”的窗口。
+- 激活时若存在无 active marker 的旧 head（上次激活崩溃），该 head 从未被任何 reader 使用，直接丢弃并按当前 legacy 重建；不比对、不放行旧快照。
 - `store-plugin` 同时注册 v1/v2 provider；v2 provider 每次 apply 新建，fence 用 `liveHomeFence`，不在构造期冻结 authority。
 - 测试：v2 provider conformance 3 tests、migrate command 6 tests、state provider/auto 11 tests（含 `state.lock` 持有时 v2 读完成）；`tsc` core/commands exit 0。
 - 尚未切默认：`auto` 仍走 v1/domain，只有显式 v2 marker 才用 v2；R7 才删 v1/domain 并切默认。
@@ -450,6 +451,17 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 未修（P2，非读取面）：非法 retain、tree list/mtime、marker 校验等；之后独立复核、R8 真机验收。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。
+
+#### R9 第二轮独立复核（迁移激活/GC）
+
+- P0 修复：v2 迁移改为**两阶段**。命令只写 pending，不建 head、不写 active marker；`store-plugin` 在下次启动、任何 provider/bridge 绑定前执行 `activatePendingStateV2`，从当前 legacy 重建 head，再写 active marker。消除了“marker 一写，state 切 v2、其他域仍写 legacy、重启丢写”的窗口。
+- 激活的崩溃恢复：无 active marker 的旧 head 从未被 reader 使用，激活路径直接丢弃并按当前 legacy 重建；直接调用迁移函数遇到“head 无 active marker”则 fail loud，不再做只比对 state 的“恢复”。
+- P1-3 修复：迁移崩溃恢复不再只比对 state；生产路径用 pending 重建，绕过该分支；直接调用遇到孤儿 head 拒绝恢复。
+- P1-1 修复：`StoreKernel.mutate` 每 256 次提交执行一次有界 `collectGarbage`（`gcEveryWrites` 可调，0 关闭），GC 不再是死代码。
+- P1-2 修复：`EvolutionState` 的 v2 前置校验不再同步 `readFileSync(head.json)`；head 缺失/损坏由 v2 provider 的无锁 query + bounded retry 失败关闭，Windows rename 窗口不再让正常 state op 误报。
+- 测试：`migrate state --to v2` staged/activate 用例、promotion 读取“staging 之后”的 legacy 写、store-plugin 启动 promotion、in-write GC 用例；command / store-plugin / store-kernel 定向套件通过。
+- 未修：P2 见复核记录；P1 三项已关闭，待下一轮独立复验。
+
 
 
 ## 6. 域与读写分类
