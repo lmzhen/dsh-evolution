@@ -205,6 +205,14 @@ Evolution Plane
 6. `PortRegistry`：从平台类型/平台定义派生；能力表单一 owner。
 7. `Assurance`：每个门禁有 falsifier，证据绑定产物哈希/commit/实际执行树。
 
+### 8.2 DCR-85 实施状态（2026-11）
+
+- Fact Store 的 v2 实现是 Home MVCC Store：`head.json -> commits/* -> objects/*`，唯一 `HomeFence` 写，读者无锁读；`StoreKernel` 与 `StoreService` 分别承担机制与 surface 闭包。
+- state/review/pending/curator、usage、merge、memory、discovery、feedback 已能经 `evolutionStore` service 读写（无 service 时保留 kernel fallback）；doctor 与 run-registry 已消费 service。
+- skill tree 仍走 UnitKernel + HomeFence；每个 tree unit 释放外层锁后发布 tree manifest，失败有界重试。
+- 尚未完成：模型工具与多数 host command/UI 仍直接走 scoped IO/legacy，需在 R6/R7 逐个改为 query/command；GC grace、marker/head 校验等 P2 仍待清。
+- 证据与门禁见 [85-versioned-snapshot-read.md](85-versioned-snapshot-read.md)；10 的七平面不因实现落地而改变。
+
 ### 8.2 判断一条新代码是否“系统上正确”的六问
 
 1. 它写的是哪个 fact？这个 fact 的 owner 是谁？
