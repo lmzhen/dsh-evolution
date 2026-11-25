@@ -297,8 +297,9 @@ export class StoreKernel {
    * chain. Deletion failures are reported, never thrown: an orphan file only
    * wastes space; a reachable snapshot is never broken by this pass.
    */
-  async collectGarbage(retain = 64): Promise<StoreGarbageCollectionResult> {
+  async collectGarbage(retain = 64, objectGraceMs = 300_000): Promise<StoreGarbageCollectionResult> {
     const limit = Number.isInteger(retain) && retain >= 2 ? retain : 64
+    const grace = Number.isFinite(objectGraceMs) && objectGraceMs > 0 ? objectGraceMs : 0
     return await this.fence.run(async () => {
       const head = await this.readHead()
       if (head === null) return { commits: [], objects: [], failures: [] }
@@ -334,6 +335,12 @@ export class StoreKernel {
         const id = name.endsWith('.json') ? name.slice(0, -5) : ''
         if (!/^[0-9a-f]{64}$/.test(id) || keepObjects.has(id)) continue
         const path = join(this.root, OBJECTS_DIR, name)
+        // A manifest object is published before its commit/head; a concurrent GC
+        // that only sees the old head must not delete that young object.
+        if (grace > 0 && this.io.mtime !== undefined) {
+          const modified = await this.io.mtime(path).catch(() => null)
+          if (modified !== null && Date.now() - modified < grace) continue
+        }
         if (await remove(path)) removedObjects.push(id)
       }
       return { commits: removedCommits, objects: removedObjects, failures }
