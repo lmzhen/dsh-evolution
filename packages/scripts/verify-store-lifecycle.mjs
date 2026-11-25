@@ -30,9 +30,9 @@ function audit(path, text) {
   const rel = relative(root, path)
   for (const name of OPTIONAL) {
     // Field/const capture of the optional service at construction time.
-    const capture = new RegExp('(?:this\\.[A-Za-z_$][\\w$]*|(?:private|readonly|protected)\\s+[A-Za-z_$][\\w$]*)\\s*(?:=|:)[^;\\n]*ctx\\.get\\(\\s*[\'"]' + name + '[\'"]')
+    const capture = new RegExp('(?:this\\.[A-Za-z_$][\\w$]*|(?:private|readonly|protected)\\s+[A-Za-z_$][\\w$]*)\\s*(?:=|:)[^;\\n]*ctx\\??\\.get\\??\\.?\\(\\s*[\'"]' + name + '[\'"]')
     if (capture.test(text)) problems.push(rel + ': captures ctx.get(\'' + name + '\') in a field (use a use-time resolver)')
-    const local = new RegExp('(?:const|let|var)\\s+[A-Za-z_$][\\w$]*\\s*=\\s*ctx\\??\\.get\\??\\(\\s*[\'"]' + name + '[\'"]')
+    const local = new RegExp('(?:const|let|var)\\s+(?:[A-Za-z_$][\\w$]*|\\{[^}]*\\})\\s*=\\s*\\(*\\s*ctx\\??\\.get\\??\\.?\\(\\s*[\'"]' + name + '[\'"]')
     if (local.test(text)) problems.push(rel + ': captures ctx.get(\'' + name + '\') in a local before use (resolve at the use point)')
     // Required inject must not carry an optional capability.
     const inject = /export const inject\s*=\s*\[([^\]]*)\]/.exec(text)
@@ -48,13 +48,22 @@ for (const pkg of readdirSync(root)) {
 }
 
 if (process.argv.includes('--self-test')) {
-  const fake = "private store = ctx.get('evolutionStore')\nexport const inject = ['tools', 'evolutionMutationAuthority']"
-  const before = problems.length
-  audit('__self-test__.ts', fake)
-  const detected = problems.length > before
-  problems.length = before
+  const fakes = [
+    "private store = ctx.get('evolutionStore')\nexport const inject = ['tools', 'evolutionMutationAuthority']",
+    "const store = ctx.get('evolutionStore')\nexport const inject = ['tools']",
+    "const store = (ctx?.get?.('evolutionStore'))\nexport const inject = ['tools']",
+    "const { store } = ctx.get('evolutionStore')\nexport const inject = ['tools']",
+  ]
+  let detected = true
+  const missed = []
+  for (const fake of fakes) {
+    const before = problems.length
+    audit('__self-test__.ts', fake)
+    if (problems.length <= before) { detected = false; missed.push(fake.split('\n')[0]) }
+    problems.length = before
+  }
   if (!detected) {
-    console.error('verify-store-lifecycle: SELF-TEST FAILED — a constructor capture/required inject was not detected')
+    console.error('verify-store-lifecycle: SELF-TEST FAILED — not detected: ' + missed.join(' | '))
     process.exit(1)
   }
   console.log('verify-store-lifecycle: self-test OK — constructor capture and required optional inject both turn the gate red')
