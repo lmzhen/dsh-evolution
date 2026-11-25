@@ -108,3 +108,15 @@ core state: 9 files / 56 tests passed
 ```
 
 剩余 P2：marker 写失败后 store 已存在会阻止重试、dry-run 不检查已有 store、HMR 二次注册、旧 pin domain 命令不切换提示、README row 计数/tsconfig 子路径。
+
+## DCR-85 后续（v2 快照存储）
+
+D1b 的 `store` provider 是**单文件 StateStore**，不是 DCR-85 的 Home MVCC Store。DCR-85 在其上新增 `store-v2`：
+
+- 路径：`<evolutionHome>/store-v2/head.json`、`commits/<commitId>.json`、`objects/<sha256>.json`；
+- 写入：唯一 `HomeFence` 下 `head -> commit -> objects`，`expectedHead` 做 CAS；读：只读 head/commit/objects，不取 writer lock；
+- 迁移：`/evolution migrate state --to v2`，成功后写 `state/.migrated-to-store-v2.json`；v1 `store.json` 不删，供回退；
+- v1→v2 迁移在 `state.lock` 内完成源读取、head bootstrap、marker 写入；head 已存在但 marker 缺失时重读 legacy source 比对，不一致拒绝恢复；
+- 域覆盖：state/runs/merge/mergeMeta/reports/usage/suppressed/feedback/domainMap/projectionJournal/viewSnapshots/memoryFile/userFile；skill tree 走 UnitKernel + tree manifest；
+- 当前实现进度与剩余 P1/P2 见 [85-versioned-snapshot-read.md](85-versioned-snapshot-read.md)。本文件保留 D1b 历史语义，不把 v2 的 head/commit 写成 D1b 的单文件协议。
+
