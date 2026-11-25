@@ -59,7 +59,7 @@
 
 | ID | 状态 | 证据 / 剩余动作 |
 |---|---|---|
-| R10-P2-1 reports 双介质 | PARTIAL | 读 fallback key 已改为 `reports/<name>`；写路径在挂载 `evolutionStore` 时改走 `merge` surface 的 reports 域，不再写 base 文件；域内 retention（原 20 份窗口）尚未迁移。 |
+| R10-P2-1 reports 双介质 | FIXED | 读 key 对齐 `reports/<name>`；v2 下写走 `merge` surface 的 reports 域；域内保留最新 20 份 maintain 报告（JSON+MD，按 endedAt），有单测；merge 其它前缀不动。 |
 | R10-P2-2 GC retain/读失败 | FIXED | `collectGarbage` 非法 retain 抛 `store-invalid-retain`；GC 读失败被隔离，新增 `does not fail an already-published mutation when GC bookkeeping fails`。 |
 | R10-P2-3 lifecycle gate 漏闭包 | PARTIAL | gate-93 已拦字段式捕获/必需 inject；`run-registry` 已加 activation guard，但 service 仍按调用捕获，gate 尚未覆盖闭包捕获。 |
 | R10-P2-4 生命周期矩阵不全 | PARTIAL | 已补 state-auto 模式冻结、activation-guard bridge、HMR service 新实例、GC 故障注入；merge/memory/discovery/curator/feedback 的“先 mount 后 provide / 完全无 service”仍缺。 |

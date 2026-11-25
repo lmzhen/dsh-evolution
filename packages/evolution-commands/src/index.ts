@@ -238,6 +238,21 @@ async function syncRuns(registry: RunRegistry): Promise<{ ok: boolean; note?: st
   }
 }
 
+/** Prune only maintain reports in the reports domain; other report prefixes are untouched. */
+export function pruneMaintainReportsDomain(reports: Record<string, string>, keep = 20): Record<string, string> {
+  const next = { ...reports }
+  const jsonKeys = Object.keys(next).filter(key => /^reports\/maintain-[^/]+\.json$/.test(key))
+  const endedAt = (key: string): number => {
+    try { return Number((JSON.parse(next[key] ?? '{}') as { endedAt?: unknown }).endedAt ?? 0) } catch { return 0 }
+  }
+  const kept = new Set(jsonKeys.sort((a, b) => endedAt(b) - endedAt(a)).slice(0, Math.max(1, keep)).map(key => key.slice(0, -'.json'.length)))
+  for (const key of Object.keys(next)) {
+    const match = /^(reports\/maintain-[^/]+)\.(?:json|md)$/.exec(key)
+    if (match !== null && !kept.has(match[1]!)) delete next[key]
+  }
+  return next
+}
+
 async function writeMaintainReport(
   io: EvolutionIoLike,
   record: MaintainReportRecord,
@@ -261,7 +276,7 @@ async function writeMaintainReport(
         commandId: 'merge',
         domains: ['reports'],
         change: current => ({
-          reports: { ...(current.domains.reports ?? {}), [jsonKey]: JSON.stringify(record, null, 2), [mdKey]: markdown },
+          reports: pruneMaintainReportsDomain({ ...(current.domains.reports ?? {}), [jsonKey]: JSON.stringify(record, null, 2), [mdKey]: markdown }),
         }),
       })
     } else {
