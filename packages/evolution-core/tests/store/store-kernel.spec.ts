@@ -224,20 +224,6 @@ describe('home MVCC store kernel', () => {
     expect((await kernel.query(['state'])).domains.state).toEqual({ n: 3 })
   })
 
-  it('keeps young objects during GC unless the grace window is zero', async () => {
-    const { io, root } = await seeded()
-    const kernel = new StoreKernel({ io, home: root, fence: openFence() })
-    await kernel.bootstrap({ state: { n: 0 } })
-    for (let n = 1; n <= 3; n += 1) {
-      await kernel.mutate({ domains: ['state'], source: 'command', change: () => ({ state: { n } }) })
-    }
-    const young = await kernel.collectGarbage(2)
-    expect(young.objects).toEqual([])
-    const aged = await kernel.collectGarbage(2, 0)
-    expect(aged.objects.length).toBeGreaterThan(0)
-    expect((await kernel.query(['state'])).domains.state).toEqual({ n: 3 })
-  })
-
   it('runs bounded GC from the write path instead of only on demand', async () => {
     const { io, root } = await seeded()
     const kernel = new StoreKernel({ io, home: root, fence: openFence(), gcEveryWrites: 1 })

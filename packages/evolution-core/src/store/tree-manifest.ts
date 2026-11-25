@@ -52,13 +52,6 @@ export function buildTreeManifestFiles(unitId: string, files: readonly TreeManif
   return { version: 1, unitId, entries }
 }
 
-/** Publish a manifest from committed file contents and return the commit tree ref. */
-export async function publishTreeManifestFiles(kernel: StoreKernel, unitId: string, files: readonly TreeManifestFile[]): Promise<StoreTreeRef> {
-  const manifest = buildTreeManifestFiles(unitId, files)
-  const id = await kernel.putObject(manifest)
-  return { unitId, manifest: id }
-}
-
 /** Build the canonical manifest for one tree unit's changed files. */
 export function buildTreeManifest(unitId: string, ops: readonly TreeChangeOp[]): TreeManifest {
   const entries: TreeManifestEntry[] = []
@@ -79,13 +72,6 @@ export function buildTreeManifest(unitId: string, ops: readonly TreeChangeOp[]):
   for (const entry of seen.values()) unique.push(entry)
   unique.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
   return { version: 1, unitId, entries: unique }
-}
-
-/** Publish the manifest as an immutable object and return the commit tree ref. */
-export async function publishTreeManifest(kernel: StoreKernel, unitId: string, ops: readonly TreeChangeOp[]): Promise<StoreTreeRef> {
-  const manifest = buildTreeManifest(unitId, ops)
-  const id = await kernel.putObject(manifest)
-  return { unitId, manifest: id }
 }
 
 /** Resolve the manifest a commit's tree ref names; null when the ref has none. */
