@@ -67,7 +67,7 @@
 | R10-P2-6 双跨进程锁顺序 | FIXED | `activatePendingStateV2` 现在先 HomeFence 再 state.lock，并把同一 fence 传给 promote；生产命令仍只 stage，直调 `migrateStateToV2` 的测试路径保留旧顺序。 |
 | R10-P2-7 回退/坏 pending | FIXED | `migrate state --revert` 写 legacy 记录；re-stage 把旧 v2 store 归档为 `store-v2-rollback-*`；坏 pending 报出文件路径并提示删除后重跑，均有测试。 |
 | R10-P2-8 store-plugin 捕获 IO provider | FIXED | `store-plugin` 改为 `evolutionIoAdapter(() => ctx.evolutionIo.provider())`，service/kernel/v2 provider 共用 live handle；HMR 替换 IO 后不再读旧对象。 |
-| R10-P2-9 surface/commit 元数据漂移 | PARTIAL | `source:'system'` 已加入 `STORE_COMMIT_SOURCES`，tree manifest 提交改用 system；`merge_stage writes:[]` 与 `expectsCommit` 死字段仍待处理。 |
+| R10-P2-9 surface/commit 元数据漂移 | FIXED | `source:'system'` 已入枚举；`StoreService.command` 对 `expectsCommit` surface 强制要求 observed commit；内部 merge/reports/runs RMW 拆成 `*.rw` CAS-free provider surface；`merge_stage writes:[]` 是 staging 文件而非 store 域，保持显式。 |
 | R10-P2-10 复核记录不可审计 | PARTIAL | 第三轮结论已入 85 R10.12；第一/二轮复核原始记录仍未入库。 |
 | R10-P2-11 测试隔离 flake | FIXED | skill unit journal/snapshot 改为 skill root 内 flat 文件 `.unit-journal-*.json`/`.unit-snapshot-*.json`，不需要新建目录（platform fs 可写）；prune 只数 `.unit-snapshot-*` 并在 ≤keep 时短路；`mutation-recovery`/`skill-history`/`skill-store`/`create-tree-reads` 回归通过。 |
 

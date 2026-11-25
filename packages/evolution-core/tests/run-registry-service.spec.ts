@@ -26,7 +26,7 @@ describe('run registry surface adapter', () => {
     const port = runStorePortIfV2({ get: () => fake }, nodeEvolutionIo(), home)
     expect(await port?.read()).toEqual(emptyRunIndex())
     await port?.write(current => ({ ...(current ?? emptyRunIndex()), runs: [] }))
-    expect(calls).toEqual(['query:maintain.status', 'command:maintain.handoff'])
+    expect(calls).toEqual(['query:maintain.status', 'command:runs.rw'])
   })
 
   it('resolves the service per operation so an HMR replacement is not frozen', async () => {
@@ -50,6 +50,6 @@ describe('run registry surface adapter', () => {
     current = fake('second')
     await port?.read()
     await port?.write(index => index ?? emptyRunIndex())
-    expect(calls).toEqual(['first:query:maintain.status', 'second:query:maintain.status', 'second:command:maintain.handoff'])
+    expect(calls).toEqual(['first:query:maintain.status', 'second:query:maintain.status', 'second:command:runs.rw'])
   })
 })

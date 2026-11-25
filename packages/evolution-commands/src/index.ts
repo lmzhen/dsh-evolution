@@ -275,7 +275,7 @@ async function writeMaintainReport(
       await store.transact('reports', reportsCodec, current => pruneMaintainReportsDomain({ ...current, [jsonKey]: JSON.stringify(record, null, 2), [mdKey]: markdown }))
     } else if (store?.command !== undefined) {
       await store.command({
-        commandId: 'merge',
+        commandId: 'reports.rw',
         domains: ['reports'],
         change: current => ({
           reports: pruneMaintainReportsDomain({ ...(current.domains.reports ?? {}), [jsonKey]: JSON.stringify(record, null, 2), [mdKey]: markdown }),

@@ -236,7 +236,7 @@ export function mergeIoIfV2(
     return guardLegacyActivation(base, home, { path: guardedPath })
   }
   const kernel = new StoreKernel({ io: base, home, fence: fence ?? liveHomeFence(ctx ?? {}, home) })
-  const serviceOptions = service === undefined ? {} : { service, commandId: 'merge' }
+  const serviceOptions = service === undefined ? {} : { service, commandId: 'merge.rw' }
   const stateIo = scopedTextIO(base, { path: join(home, 'merge', 'merge-state.json'), domain: 'merge', kernel, ...serviceOptions })
   return scopedTreeIO(stateIo, {
     home,

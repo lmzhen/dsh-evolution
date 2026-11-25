@@ -52,7 +52,7 @@ describe('scoped tree IO bridge', () => {
       home,
       kernel,
       service,
-      commandId: 'merge',
+      commandId: 'merge.rw',
       mappings: [{ prefix: 'merge/run-meta', domain: 'mergeMeta' }],
     })
     const path = join(home, 'merge', 'run-meta', 'run-2.json')

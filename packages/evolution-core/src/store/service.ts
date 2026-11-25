@@ -94,6 +94,10 @@ export class StoreService {
   /** Publish one surface mutation; the service rejects undeclared write domains. */
   async command(request: StoreCommandRequest): Promise<StoreCommitResult> {
     const command = requireStoreSurfaceCommand(request.commandId)
+    if (command.expectsCommit && request.expectedCommit === undefined) {
+      throw new StoreError('store-expected-commit-required',
+        `store surface ${request.commandId} requires the observed commit; re-read before writing`)
+    }
     const declared = new Set<StoreDomainId>(command.writes)
     for (const domain of request.domains) {
       if (!declared.has(domain)) throw new Error(`store surface ${request.commandId} may not write domain ${domain}`)

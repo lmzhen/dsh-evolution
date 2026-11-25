@@ -19,12 +19,19 @@ describe('store surface service', () => {
     const write = await service.command({
       commandId: 'approve',
       domains: ['state'],
+      expectedCommit: read.snapshot.commitId,
       change: current => ({ ...current.domains, state: { version: 2 } }),
     })
     expect(write.domains.state).toEqual({ version: 2 })
     await expect(service.command({
       commandId: 'approve',
+      domains: ['state'],
+      change: () => ({ state: { version: 3 } }),
+    })).rejects.toMatchObject({ code: 'store-expected-commit-required' })
+    await expect(service.command({
+      commandId: 'approve',
       domains: ['merge'],
+      expectedCommit: write.commitId,
       change: () => ({ merge: {} }),
     })).rejects.toThrow(/may not write/)
     await expect(service.query('not-a-command')).rejects.toThrow(/unregistered store surface/)
@@ -51,16 +58,19 @@ describe('store surface service', () => {
     const kernel = new StoreKernel({ io, home, fence: new HomeFence({ home }) })
     await kernel.bootstrap({ state: { n: 0 } })
     const service = createStoreService(kernel, 7)
-    expect((await service.query('pending')).generation).toBe(7)
+    const observed = await service.query('pending')
+    expect(observed.generation).toBe(7)
     await expect(service.command({
       commandId: 'approve',
       domains: ['state'],
+      expectedCommit: observed.snapshot.commitId,
       expectedGeneration: 6,
       change: () => ({ state: { n: 1 } }),
     })).rejects.toMatchObject({ code: 'store-generation-mismatch' })
     await expect(service.command({
       commandId: 'approve',
       domains: ['state'],
+      expectedCommit: observed.snapshot.commitId,
       expectedGeneration: 7,
       change: () => ({ state: { n: 2 } }),
     })).resolves.toBeDefined()

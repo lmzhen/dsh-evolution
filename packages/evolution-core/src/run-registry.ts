@@ -238,7 +238,7 @@ export function runStorePortIfV2(
       const service = resolveService()
       if (service?.query !== undefined && service.command !== undefined) {
         await service.command({
-          commandId: 'maintain.handoff',
+          commandId: 'runs.rw',
           domains: ['runs'],
           change: async (current) => {
             const next = await task(current.domains.runs === undefined ? null : current.domains.runs as RunIndexDocument)

@@ -37,6 +37,11 @@ export const STORE_SURFACE_COMMANDS: readonly StoreSurfaceCommand[] = [
   { id: 'memory.rw', kind: 'provider', reads: ['memoryFile', 'userFile'], writes: ['memoryFile', 'userFile'], expectsCommit: false },
   // Feedback rebuild cache (events stay append-only on the base medium).
   { id: 'feedback.rw', kind: 'provider', reads: ['feedback'], writes: ['feedback'], expectsCommit: false },
+  // Internal merge/runs RMW bridges: they carry no human snapshot, so they are
+  // CAS-free. The user-visible `merge`/`maintain.handoff` commands keep CAS.
+  { id: 'merge.rw', kind: 'provider', reads: ['merge', 'mergeMeta'], writes: ['merge', 'mergeMeta'], expectsCommit: false },
+  { id: 'reports.rw', kind: 'provider', reads: ['reports'], writes: ['reports'], expectsCommit: false },
+  { id: 'runs.rw', kind: 'provider', reads: ['runs'], writes: ['runs'], expectsCommit: false },
   // 9.1 model tools
   { id: 'skill_manage', kind: 'tool', reads: ['state'], writes: ['state'], expectsCommit: true },
   { id: 'memory', kind: 'tool', reads: ['memoryFile', 'userFile'], writes: ['memoryFile', 'userFile'], expectsCommit: true },

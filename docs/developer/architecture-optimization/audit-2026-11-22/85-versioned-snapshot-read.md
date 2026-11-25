@@ -574,7 +574,7 @@ interface StoreView {
 ##### R10.7 表面与 CAS
 
 - **层数收敛**：只保留 `StoreKernel` + `StoreService` 两层。`StoreService` 直接暴露 `read(domain, codec)` / `transact(domain, codec, fn)`；删除 `StoreView.querySurface` 与 7 个手写 port，改为一张 `DomainCodecs: Record<StoreDomainId, DomainCodec<T>>`。两个写入口：kernel `mutate`（内部，`source:'system'`）与 service `command`（外部）；不再有第二套 `tx.*` API。
-- **CAS 只约束人/模型看到快照再写的 surface**：pending approve/reject、merge approve/reject/undo/discard、skill undo/restore、params save。provider/RMW 明确 CAS-free，不用 expectedCommit。删除“所有 mutation surface 必须带 expectedCommit”的写法。
+- **CAS 只约束人/模型看到快照再写的 surface**：pending approve/reject、merge approve/reject/undo/discard、skill undo/restore、params save。provider/RMW 明确 CAS-free，不用 expectedCommit。删除“所有 mutation surface 必须带 expectedCommit”的写法。**已落地**：`StoreService.command` 对声明 `expectsCommit` 的 surface 强制要求 observed commit；merge/reports/runs 的内部 RMW 拆成 `merge.rw`/`reports.rw`/`runs.rw`，不参与 CAS。
 - `expectedCommit` 由这些 surface 的调用方从 query 带回；service 校验，冲突返回可展示的 `StoreConflictError`；内部 system 写不受约束。
 - 查询返回 `commitId + generation`；UI/命令/工具把版本原样带回写请求。
 - surface registry 只登记人/模型可见命令；provider/internal 写入用 `read/transact` + `source:'system'`，不登记 surface，不伪造 command id。
