@@ -338,7 +338,7 @@ export class StoreKernel {
         // A manifest object is published before its commit/head; a concurrent GC
         // that only sees the old head must not delete that young object.
         if (grace > 0 && this.io.mtime !== undefined) {
-          const modified = await this.io.mtime(path).catch(() => null)
+          const modified = await this.io.mtime(path)
           if (modified !== null && Date.now() - modified < grace) continue
         }
         if (await remove(path)) removedObjects.push(id)
