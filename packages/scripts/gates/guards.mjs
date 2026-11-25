@@ -648,7 +648,8 @@ export const guards = [
     tree: "overlay",
     title: "`node packages/evolution/evolution-core/scripts/verify-cross-process-read.mjs`（DCR-85 R8：父进程持 HomeFence，子进程仍能读到同一 commit）",
     argv: ["node","packages/evolution/evolution-core/scripts/verify-cross-process-read.mjs"],
-    lanes: ["local","ci-static"],
+    lanes: ["local"],
+    registration: {"reason":"needs the build overlay's installed platform lib graph; CI static lane lacks evolution-platform/node_modules, so a ci-static run cannot resolve @deepseek-ai/dsh-atomic-write","owner":"scripts/gates","expiry":"0.62.0","plan":"run on the build line via the local lane after build-lib; the CI static lane keeps gate-87/89 static checks","renewal":"Registered at 0.61.0: the drill passed locally but the ci-static environment has no platform dependency install."},
   }),
 
   gate("gate-89", {

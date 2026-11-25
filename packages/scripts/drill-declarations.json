@@ -386,7 +386,7 @@
       "noDrillReason": "bundle freshness gate: red when reviewed source or checked-in bundle bytes drift; the manifest intentionally records both"
     },
     "gate-88": {
-      "noDrillReason": "real two-process integration drill (parent holds HomeFence, child reads); a synthetic mutation cannot prove subprocess behavior. It is the acceptance carrier itself, run in the build lane."
+      "noDrillReason": "real two-process integration drill (parent holds HomeFence, child reads); a synthetic mutation cannot prove subprocess behavior. Runs on the build line (local lane) because CI static lacks the platform package's installed lib graph."
     },
     "gate-89": {
       "drillCmd": "node packages/scripts/verify-store-surface.mjs packages --self-test",

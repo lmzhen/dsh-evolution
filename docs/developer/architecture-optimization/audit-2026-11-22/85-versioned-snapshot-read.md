@@ -442,7 +442,7 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - P1-2：`usageSidecarIoIfV2` 统一包 usage/suppressed；`SkillUsageRegistry` 与 curator 的私有 `this.io` 都改用它，`mutateUsage`/`loadSuppressedNames` 不再写第二份文件；测试 `usage-sidecar-v2.spec` 证明 domain 有值且 base 文件不存在。
 - P1-3：`migrate state` 新增 `--skills-root` / `--memory-root` / `--discovery-root` / `--feedback-path`，把自定义根/路径传给 `migrateStateToV2`；默认路径不变，未传时仍按 `<home>` 约定。
 - 测试：marker 恢复成功/拒绝两例通过；restructure manifest 通过；usage-sidecar-v2 通过；`tsc` core/curator/discovery/commands 0。
-- P1-6：跨进程无锁读 drill 注册为 gate-88（overlay tree, local/ci-static），有 family-facts 声明与 no-drill reason；本地已运行通过。
+- P1-6：跨进程无锁读 drill 注册为 gate-88（overlay tree, local lane；CI static 缺 platform 安装依赖，已登记 local-runner only），有 family-facts 声明与 no-drill reason；本地已运行通过。
 - P1-7（部分）：新增 gate-89 `verify-store-surface`，host command ↔ surface command 双向闭包；`--self-test` 注入未登记命令并证明必红；gate-manifest / check-registry 通过。
 - P1-8（部分）：surface registry 补齐 merge 子命令（scan/pair/status/report/cancel/runs/doctor/reconcile/pending/candidates/approve/reject/resume/skipped/discard/undo）、usage observation 与漏掉的 UI action；gate-89 现校验 29 host commands ↔ 45 command ids（子命令按父命令归属）。
 - 未修：剩余 3 个静态门禁（read-lock/head/single-source 深度）、多数 surface 仍无真实消费者（service 目前只被 doctor/run-registry 使用），继续按复核清单处理。

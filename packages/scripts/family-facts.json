@@ -186,6 +186,11 @@
               "script": "verify-layout-sync-local.mjs",
               "reason": "the dev↔mirror script-sync identity check needs both trees; a CI checkout carries only the mirror",
               "expiry": "0.62.0"
+            },
+            {
+              "script": "verify-cross-process-read.mjs",
+              "reason": "needs the build overlay's installed platform lib graph; the CI static checkout has no evolution-platform/node_modules, so the child process cannot resolve @deepseek-ai/dsh-atomic-write",
+              "expiry": "release gate: run on the build line after build-lib; move into the action if CI installs the platform dependency graph"
             }
           ],
           "machineLocal": [],
@@ -599,7 +604,7 @@
       "machine": {
         "kind": "checks",
         "file": "scripts/gate-manifest.json",
-        "sha256": "de8e220312ccb2fb4c5f0f5d61925b48dcef1c01228434bbbc72fc75ce382119",
+        "sha256": "28b9112d816b9c8b272e0ccc97f8afdae9408b827eaabe6735a51c49f77570a0",
         "tierSource": "testing-policy",
         "rule": {
           "tier": "the earliest lane the manifest requires the check at: local => fast, pre-tag => pre-tag, ci => ci-only",
