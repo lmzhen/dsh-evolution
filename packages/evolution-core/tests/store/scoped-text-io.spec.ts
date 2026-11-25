@@ -8,7 +8,7 @@ import { HomeFence } from '../../src/home-fence.ts'
 import { StoreKernel } from '../../src/store/store-kernel.ts'
 import { StoreActivationPendingError } from '../../src/store/activation-guard.ts'
 import { createStoreService } from '../../src/store/service.ts'
-import { memoryIoIfV2, scopedTextIO } from '../../src/store/scoped-text-io.ts'
+import { memoryIoIfV2, scopedTextIO, discoveryIoIfV2 } from '../../src/store/scoped-text-io.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../../src/state/constants.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 
@@ -93,6 +93,23 @@ describe('scoped text IO bridge', () => {
     await writeFile(join(root, 'state', STATE_V2_MIGRATION_MARKER), '{}\n')
     await expect(scoped!.writeText(join(root, 'memories', 'MEMORY.md'), 'lost\n')).rejects.toBeInstanceOf(StoreActivationPendingError)
     expect(await scoped!.readText(join(root, 'memories', 'MEMORY.md'))).toBe('legacy\n')
+  })
+
+  it('guards the discovery bridge after another host activates v2', async () => {
+    const root = await tempRoot('dsh-discovery-guard-')
+    const io = nodeEvolutionIo()
+    await mkdir(join(root, 'state'), { recursive: true })
+    await mkdir(join(root, 'discovery'), { recursive: true })
+    const paths = {
+      domainMap: join(root, 'discovery', 'domain-map.json'),
+      projectionJournal: join(root, 'discovery', 'projection-journal.json'),
+      viewSnapshots: join(root, 'discovery', 'view-snapshots.json'),
+    }
+    const scoped = discoveryIoIfV2(undefined, io, root, paths)
+    await scoped!.writeText(paths.domainMap, '{}\n')
+    await writeFile(join(root, 'state', STATE_V2_MIGRATION_MARKER), '{}\n')
+    await expect(scoped!.writeText(paths.domainMap, '{"changed":true}\n')).rejects.toBeInstanceOf(StoreActivationPendingError)
+    expect(await scoped!.readText(paths.domainMap)).toBe('{}\n')
   })
 })
 
