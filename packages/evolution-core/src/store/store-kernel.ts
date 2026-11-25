@@ -348,10 +348,10 @@ export class StoreKernel {
 
   /** A lock-free reader can transiently miss a just-replaced file on Windows; retry a bounded few times. */
   private async readHeadForQuery(): Promise<StoreHead | null> {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
       const head = await this.readHead()
       if (head !== null) return head
-      if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 10 * (attempt + 1)))
+      if (attempt < 4) await new Promise(resolve => setTimeout(resolve, 20 * (attempt + 1)))
     }
     return null
   }
