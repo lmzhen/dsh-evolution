@@ -123,7 +123,7 @@
       "path": "<evolutionHome>/runs.json",
       "writer": "evolution-core/src/run-registry.ts",
       "serializedBy": "transact",
-      "marker": "transactIo(options.io, path",
+      "marker": "transactIo(io, path",
       "state": [],
       "note": "The run registry's index (0.19.0/S2): what is in flight, how each run ended, where its report lives. Read-modify-write under the IO backend's cross-process lock, and it MERGES instead of overwriting — the desktop and the web plane share one DSH_HOME, so two hosts each know their own runs and this file is their shared view. resultRef only POINTS at the report; results never live here."
     },
