@@ -568,7 +568,7 @@ interface StoreView {
 - **正文归属边界**：当前 manifest 条目只有 `sha256/size`，正文仍由 UnitKernel 的 materialized 文件持有；因此 manifest 是“树形状/内容指纹”的权威，不是正文存储。若要 manifest 独立还原正文，必须把 skill 正文 blob 化（R10.5 的 blob 路径）并把 manifest 条目升级为 `blobSha`；在 blob 化之前，materialized 文件仍是正文读权威，不能宣称“只靠 manifest 读整棵树”。
 - `TreeRepository`：写 = `StoreView.transact('tree')` + full manifest object；读 = `readTreeManifest`，模型/UI/维护扫描先读 manifest 再按 blob 取正文。
 - materialized 文件在 full manifest 落地前仍是读权威；切换后只在 manifest 缺失且处于迁移期时只读 fallback；active 模式下 manifest 缺失是 `StoreCorruptError`。
-- 恢复源不能用 prepared journal（tree unit 已 committed，afterCommit 才入队）：在 unit commit 前写一条 durable `manifest-pending` 记录（unitId + after hashes），publish 成功后清除；启动时按该记录重放，而不是扫 prepared journal。**已落地第一步**：`recoverOnBoot` 在 head tree 无 manifest 时按当前 materialized tree 发布 full manifest；完整的 manifest-pending 重放仍待。
+- 恢复源不能用 prepared journal（tree unit 已 committed，afterCommit 才入队）：在 unit commit 前写一条 durable `manifest-pending` 记录（unitId + after hashes），publish 成功后清除；启动时按该记录重放，而不是扫 prepared journal。**已落地第一步**：`recoverOnBoot` 按当前 materialized tree 生成 full manifest，与 head manifest 的 canonical entries 比较，不同则发布；这覆盖“fresh bootstrap 无 manifest”和“unit 已落盘、manifest 未发布”的崩溃窗口；显式 manifest-pending 记录仍待。
 - manifest 条目包含 `path/blobSha/size/mode`，删除显式标记；tree list/mtime 由 manifest 生成，不再由 adapter 猜。
 
 ##### R10.7 表面与 CAS

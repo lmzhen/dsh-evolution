@@ -59,7 +59,7 @@ import { UnitKernel, fileMutationLock, type MutationLockPort, type MutationResul
 import { mutationLockFrom, liveHomeFence } from './mutation-authority.ts'
 import { StoreKernel } from './store/store-kernel.ts'
 import { scopedTextIO } from './store/scoped-text-io.ts'
-import { buildTreeManifestFiles, type TreeManifestFile } from './store/tree-manifest.ts'
+import { buildTreeManifestFiles, readTreeManifest, type TreeManifestEntry, type TreeManifestFile } from './store/tree-manifest.ts'
 import { isStoreV2Active } from './state/activation.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
@@ -5221,14 +5221,22 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     }
     treeManifestRecoverer = async () => {
       const snapshot = await kernel.query(['state'])
-      if (snapshot.tree?.manifest !== undefined) return
       const files = await library?.treeManifestFiles() ?? []
+      const next = buildTreeManifestFiles('boot-manifest', files)
+      const previous = await readTreeManifest(kernel, snapshot.tree)
+      // A crash after the tree unit but before its manifest commit leaves the
+      // materialized tree newer than the head manifest; boot reconciles it.
+      // Compare canonical tuples: the stable-stringified object orders keys
+      // alphabetically, so raw JSON text of the parsed objects differs.
+      const canonical = (entries: readonly TreeManifestEntry[]): string =>
+        JSON.stringify(entries.map(entry => [entry.path, entry.kind, entry.sha256 ?? null, entry.size ?? null]))
+      if (previous !== null && canonical(previous.entries) === canonical(next.entries)) return
       await kernel.mutate({
         domains: [],
         source: 'system',
         change: () => ({}),
         tree: { unitId: 'boot-manifest' },
-        treeManifest: buildTreeManifestFiles('boot-manifest', files),
+        treeManifest: next,
       })
     }
   }

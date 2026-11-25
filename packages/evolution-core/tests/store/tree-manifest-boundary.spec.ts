@@ -37,6 +37,9 @@ it('publishes a manifest after the outer mutation lock is released', async () =>
   // the manifest is the tree's shape authority even when the tree is empty.
   const booted = await kernel.query(['state'])
   expect(booted.tree?.manifest).toBeDefined()
+  await lib.recoverOnBoot()
+  const afterBoot = await kernel.query(['state'])
+  expect(afterBoot.commitId).toBe(booted.commitId)
   const snapshot = await kernel.query(['state'])
   expect(snapshot.tree).not.toBeNull()
   const manifest = await readTreeManifest(kernel, snapshot.tree)
