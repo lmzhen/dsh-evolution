@@ -105,16 +105,17 @@ export function scopedTextIO(base: EvolutionIoLike, options: ScopedTextIOOptions
         await base.transact(path, task)
         return
       }
-      await options.kernel.mutate({
-        domains: [options.domain],
-        source: 'command',
-        change: async (current) => {
-          const previous = textOf(current.domains[options.domain])
-          const next = await task(previous)
-          if (next === null) return { [options.domain]: null }
-          return { [options.domain]: { text: next } }
-        },
-      })
+      const change = async (current: { domains: Partial<Record<StoreDomainId, unknown>> }): Promise<Record<string, unknown>> => {
+        const previous = textOf(current.domains[options.domain])
+        const next = await task(previous)
+        if (next === null) return { [options.domain]: null }
+        return { [options.domain]: { text: next } }
+      }
+      if (options.service !== undefined) {
+        await options.service.command({ commandId: options.commandId ?? 'usage.rw', domains: [options.domain], source: 'command', change })
+        return
+      }
+      await options.kernel.mutate({ domains: [options.domain], source: 'command', change })
     },
     async list(path) {
       return await base.list(path)

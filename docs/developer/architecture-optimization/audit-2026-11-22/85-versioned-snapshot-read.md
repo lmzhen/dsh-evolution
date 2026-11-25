@@ -444,7 +444,7 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：marker 恢复成功/拒绝两例通过；restructure manifest 通过；usage-sidecar-v2 通过；`tsc` core/curator/discovery/commands 0。
 - P1-6：跨进程无锁读 drill 注册为 gate-88（overlay tree, local lane；CI static 缺 platform 安装依赖，已登记 local-runner only），有 family-facts 声明与 no-drill reason；本地已运行通过。
 - P1-7：新增 gate-89 `verify-store-surface`、gate-90 `verify-store-single-source`、gate-91 `verify-store-head`、gate-92 `verify-store-read-lock`；分别覆盖 surface 闭包、store 路径单一来源、head 唯一 commit/fail-closed、query 无锁；均有 self-test 或真实负例；gate-manifest / check-registry 通过。gate-91 因 build overlay 依赖登记为 build-line local。
-- P1-8（部分）：v2 StateStore provider（`state.provider`）、usage/suppressed（`usage.rw`）、merge（`merge`）、memory（`memory.rw`）、discovery（`discovery.rw`）、feedback 重建缓存（`feedback.rw`）均可经 `evolutionStore` service 读写，无 service 时保留 kernel fallback；新增用例覆盖 state/usage/merge/memory/feedback。consumers 现为 doctor、run-registry、state provider、usage sidecar、merge bridge、memory bridge、discovery bridge、feedback bridge。
+- P1-8（部分）：v2 StateStore provider（`state.provider`）、usage/suppressed（`usage.rw`）、merge（`merge`）、memory（`memory.rw`）、discovery（`discovery.rw`）、feedback（`feedback.rw`）的读写与 `transact` 均可经 `evolutionStore` service，无 service 时保留 kernel fallback；新增用例覆盖 state/usage/merge/memory/feedback。consumers 现为 doctor、run-registry、state provider、usage sidecar、merge bridge、memory bridge、discovery bridge、feedback bridge。
 - P2（部分）：tree-only commit（空 domains + tree ref）不再解析全部 domain blob，只读 commit 的 domain 引用；manifest 发布失败改为有界重试而不是丢弃。
 - 未修：工具与大部分 host command/UI 仍直接走 scoped IO 或 legacy，P1-8 继续。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。

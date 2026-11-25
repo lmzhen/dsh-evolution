@@ -56,7 +56,9 @@ describe('scoped tree IO bridge', () => {
     const path = join(home, 'merge', 'run-meta', 'run-2.json')
     await scoped.writeText(path, '{"phase":"done"}\n')
     expect(await scoped.readText(path)).toBe('{"phase":"done"}\n')
+    await scoped.transact(path, previous => previous === null ? null : previous.replace('done', 'transacted'))
+    expect(await scoped.readText(path)).toBe('{"phase":"transacted"}\n')
     const snapshot = (await service.query('merge', ['mergeMeta'])).snapshot
-    expect(snapshot.domains.mergeMeta).toMatchObject({ 'merge/run-meta/run-2.json': '{"phase":"done"}\n' })
+    expect(snapshot.domains.mergeMeta).toMatchObject({ 'merge/run-meta/run-2.json': '{"phase":"transacted"}\n' })
   })
 })

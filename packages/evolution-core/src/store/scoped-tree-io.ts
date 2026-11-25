@@ -117,18 +117,19 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
         await base.transact(path, task)
         return
       }
-      await options.kernel.mutate({
-        domains: [target.domain],
-        source: 'command',
-        change: async (current) => {
-          const map = recordOf(current.domains[target.domain])
-          const previous = map[target.key] ?? null
-          const next = await task(previous)
-          if (next === null) delete map[target.key]
-          else map[target.key] = next
-          return { [target.domain]: map }
-        },
-      })
+      const change = async (current: { domains: Partial<Record<StoreDomainId, unknown>> }): Promise<Record<string, FileMap>> => {
+        const map = recordOf(current.domains[target.domain])
+        const previous = map[target.key] ?? null
+        const next = await task(previous)
+        if (next === null) delete map[target.key]
+        else map[target.key] = next
+        return { [target.domain]: map }
+      }
+      if (options.service !== undefined) {
+        await options.service.command({ commandId: options.commandId ?? 'merge', domains: [target.domain], source: 'command', change })
+        return
+      }
+      await options.kernel.mutate({ domains: [target.domain], source: 'command', change })
     },
     async list(path) {
       const key = relativeKey(path).replace(/\/+$/, '')
