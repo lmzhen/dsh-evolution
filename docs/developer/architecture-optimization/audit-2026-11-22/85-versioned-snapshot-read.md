@@ -622,7 +622,7 @@ interface StoreView {
 - `verify-store-lifecycle`：构造期 `ctx.get` 可选服务、必需 inject 误加、服务替换后旧句柄残留 → 红。
 - `verify-store-transaction`：object/commit/head 任一崩溃点后没有“半发布”；并发 GC 不删可达对象；retain 非法入口拒绝。
 - `verify-store-ports`：生产代码不得出现 file-shaped domain read/write（迁移命令/R4 白名单除外）；每个 port 有 codec 负例。
-- `verify-store-manifest`：manifest 读写同源、崩溃恢复、materialized fallback 仅迁移期。
+- `verify-store-manifest`：已落地 gate-95，禁止 pre-commit `putObject`/`publishTreeManifest*`，要求 kernel 在 mutate 内应用 `treeManifest`；manifest 读写同源/崩溃恢复/materialized fallback 判据仍待实现。
 - `verify-store-surface`：每个 mutation 强制 expectedCommit；generation 不匹配返回 conflict。
 - 所有测试必须用真实 kernel/service，不允许 fake service 绕过 CAS/GC；生命周期矩阵覆盖“先 consumer 后 service”“HMR 替换”“完全无 service”。
 
@@ -643,7 +643,7 @@ interface StoreView {
 
 - reports fallback 的 key 前缀错误（域 key 是 `reports/x`，当前用 `x`）；写路径仍走 base；
 - GC `retain` 非法值已改为入口拒绝（`store-invalid-retain`）；GC 读阶段失败不再把已提交写判失败（有故障注入测试 `does not fail an already-published mutation when GC bookkeeping fails`）；
-- gate-93 只认字段式捕获，漏闭包捕获（`run-registry` 仍冻结 service）；R10.11 的 transaction/ports/manifest 三条门禁尚不存在；
+- gate-93 只认字段式捕获，漏闭包捕获（`run-registry` 仍冻结 service）；R10.11 的 transaction/ports 两条门禁尚不存在，manifest 只落地了 writer 门禁（gate-95）；
 - 五个 bridge 无完整的 late-provide/HMR 矩阵；`store-service-plugin` 已断言 HMR 后 service 是新实例，`store-plugin` 已改用 live IO adapter，但其余消费者仍缺“先 mount 后 provide / 完全无 service”用例；
 - scoped adapter `mtime=null` 导致 ProjectionJournal 缓存永不失效：已改为返回 commit revision 的数值投影，commit 变化即失效；
 - promote 的锁顺序已改为 `HomeFence → state.lock`，与 tree 路径一致，并把同一 fence 传入 promote；直调 `migrateStateToV2` 的测试路径仍保留旧顺序；

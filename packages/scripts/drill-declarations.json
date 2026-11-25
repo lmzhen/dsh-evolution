@@ -415,6 +415,11 @@
       "drillCmd": "node packages/scripts/verify-store-activation-oracle.mjs packages --self-test",
       "evidence": "a direct STATE_V2_MIGRATION_MARKER reference must be rejected while the isStoreV2Active import is not",
       "provenAt": "2026-11-25T21:55:00.000Z"
+    },
+    "gate-95": {
+      "drillCmd": "node packages/scripts/verify-store-manifest.mjs packages --self-test",
+      "evidence": "a synthetic putObject(manifest) must be reported while the transactional treeManifest field is not",
+      "provenAt": "2026-11-26T02:45:00.000Z"
     }
   }
 }

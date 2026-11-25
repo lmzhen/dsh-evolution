@@ -1676,6 +1676,25 @@
       ]
     },
     {
+      "id": "gate-95",
+      "kind": "script",
+      "human": "`node packages/scripts/verify-store-manifest.mjs packages`（DCR-85：tree manifest 只能经 StoreMutation.treeManifest 在 commit 事务内写；禁止 pre-commit putObject/publish 助手）",
+      "argv": [
+        "node",
+        "packages/scripts/verify-store-manifest.mjs",
+        "packages"
+      ],
+      "tree": "mirror",
+      "profiles": [
+        "local",
+        "ci"
+      ],
+      "lanes": [
+        "local",
+        "ci-static"
+      ]
+    },
+    {
       "id": "gate-03",
       "kind": "toolchain",
       "human": "`node node_modules/vitest/vitest.mjs run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2`",

@@ -701,4 +701,12 @@ export const guards = [
     lanes: ["local","ci-static"],
   }),
 
+  gate("gate-95", {
+    kind: "script",
+    tree: "mirror",
+    title: "`node packages/scripts/verify-store-manifest.mjs packages`（DCR-85：tree manifest 只能经 StoreMutation.treeManifest 在 commit 事务内写；禁止 pre-commit putObject/publish 助手）",
+    argv: ["node","packages/scripts/verify-store-manifest.mjs","packages"],
+    lanes: ["local","ci-static"],
+  }),
+
 ]
