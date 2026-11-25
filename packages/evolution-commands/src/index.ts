@@ -28,7 +28,7 @@ declare module '@deepseek-ai/dsh-llm' {
     'evolution-commands': { kind: 'evolution-commands' } & ContextFormed
   }
 }
-import { appendEvolutionEvent, buildLearnPrompt, reviewPrompt, markReviewChannel, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, runStorePortIfV2, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
+import { appendEvolutionEvent, buildLearnPrompt, reviewPrompt, markReviewChannel, clampedNumber, liveBool, DEFAULT_SKILL_LIMITS, policyStageLimits, reportsCodec, type DomainCodec, type PolicyStageFields, eventsFile, evolutionHome, evolutionRoot, isPresent, isUnknown, probeMtime, MAX_TIMER_DELAY_MS, newRunRegistry, probeText, reportsSweepLockTarget, runStorePortIfV2, sweepReports, transactIo, type EvolutionIoLike, type RunRecord, type RunRegistry, type EvolutionErrorId } from '@deepseek-ai/dsh-evolution-core'
 import { buildMaintainFacts, runMaintain, snapshotFromLibrary } from '@deepseek-ai/dsh-evolution-maintenance'
 import { migrateFromContext, renderNamespaceMigration } from './migration.ts'
 import { hostCommandText, hostErrorText, resolveHostLocale } from './host-locale.ts'
@@ -268,10 +268,12 @@ async function writeMaintainReport(
   let written = true
   const body = async (): Promise<void> => {
   try {
-    if (store?.command !== undefined) {
-      const jsonKey = relative(evolutionHomePath, path).replace(/\\/g, '/')
-      const mdKey = relative(evolutionHomePath, join(dir, `maintain-${record.runId}.md`)).replace(/\\/g, '/')
-      const markdown = record.text.trim() === '' ? `Maintenance run ${record.runId}: ${record.failure ?? 'no plan'}\n` : record.text
+    const jsonKey = relative(evolutionHomePath, path).replace(/\\/g, '/')
+    const mdKey = relative(evolutionHomePath, join(dir, `maintain-${record.runId}.md`)).replace(/\\/g, '/')
+    const markdown = record.text.trim() === '' ? `Maintenance run ${record.runId}: ${record.failure ?? 'no plan'}\n` : record.text
+    if (store?.transact !== undefined) {
+      await store.transact('reports', reportsCodec, current => pruneMaintainReportsDomain({ ...current, [jsonKey]: JSON.stringify(record, null, 2), [mdKey]: markdown }))
+    } else if (store?.command !== undefined) {
       await store.command({
         commandId: 'merge',
         domains: ['reports'],
@@ -305,6 +307,8 @@ async function writeMaintainReport(
 /** Three-state read of a run's result: present, missing, or unreadable (never collapsed). */
 interface StoreReportsQuery {
   query(commandId: string, domains: readonly string[]): Promise<{ snapshot: { domains: { reports?: Record<string, string> } } }>
+  read?<T>(domain: 'reports', codec: DomainCodec<T>): Promise<{ value: T }>
+  transact?<T>(domain: 'reports', codec: DomainCodec<T>, change: (current: T) => T | Promise<T>): Promise<unknown>
   command?(request: {
     readonly commandId: string
     readonly domains: readonly string[]
@@ -325,9 +329,15 @@ async function readRunReport(io: EvolutionIoLike, record: RunRecord, store?: Sto
     const rel = relative(evolutionHome(), path).replace(/\\/g, '/')
     if (rel !== '' && !rel.startsWith('..')) {
       try {
-        const snapshot = await store.query('merge', ['reports'])
-        const mapped = snapshot.snapshot.domains.reports?.[rel]
-        if (mapped !== undefined) text = mapped
+        if (store.read !== undefined) {
+          const domain = await store.read('reports', reportsCodec)
+          const mapped = domain.value[rel]
+          if (mapped !== undefined) text = mapped
+        } else {
+          const snapshot = await store.query('merge', ['reports'])
+          const mapped = snapshot.snapshot.domains.reports?.[rel]
+          if (mapped !== undefined) text = mapped
+        }
       } catch (error) {
         return { kind: 'unknown', reason: `the reports domain could not be read (${error instanceof Error ? error.message : String(error)})` }
       }

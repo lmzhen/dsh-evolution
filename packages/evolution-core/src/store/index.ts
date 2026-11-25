@@ -5,6 +5,7 @@
 
 export { StoreKernel } from './store-kernel.ts'
 export * from './activation-guard.ts'
+export * from './codecs.ts'
 export * from './scoped-text-io.ts'
 export * from './scoped-tree-io.ts'
 export * from './service.ts'

@@ -172,6 +172,7 @@
         "evolution-core::tests/state/store-service-plugin.spec.ts",
         "evolution-core::tests/state/v2-provider.spec.ts",
         "evolution-core::tests/store/activation-guard.spec.ts",
+        "evolution-core::tests/store/codecs.spec.ts",
         "evolution-core::tests/store/scoped-text-io.spec.ts",
         "evolution-core::tests/store/scoped-tree-io.spec.ts",
         "evolution-core::tests/store/store-kernel.spec.ts",
@@ -576,6 +577,7 @@
         "evolution-core::tests/state/store-service-plugin.spec.ts",
         "evolution-core::tests/state/v2-provider.spec.ts",
         "evolution-core::tests/store/activation-guard.spec.ts",
+        "evolution-core::tests/store/codecs.spec.ts",
         "evolution-core::tests/store/scoped-text-io.spec.ts",
         "evolution-core::tests/store/scoped-tree-io.spec.ts",
         "evolution-core::tests/store/store-kernel.spec.ts",
@@ -1301,6 +1303,7 @@
         "evolution-core::tests/state/store-service-plugin.spec.ts",
         "evolution-core::tests/state/v2-provider.spec.ts",
         "evolution-core::tests/store/activation-guard.spec.ts",
+        "evolution-core::tests/store/codecs.spec.ts",
         "evolution-core::tests/store/scoped-text-io.spec.ts",
         "evolution-core::tests/store/scoped-tree-io.spec.ts",
         "evolution-core::tests/store/store-kernel.spec.ts",
@@ -1964,6 +1967,7 @@
         "evolution-core::tests/state/store-service-plugin.spec.ts",
         "evolution-core::tests/state/v2-provider.spec.ts",
         "evolution-core::tests/store/activation-guard.spec.ts",
+        "evolution-core::tests/store/codecs.spec.ts",
         "evolution-core::tests/store/scoped-text-io.spec.ts",
         "evolution-core::tests/store/scoped-tree-io.spec.ts",
         "evolution-core::tests/store/store-kernel.spec.ts",
@@ -2408,11 +2412,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 161
+      "specs": 162
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 472
+      "specs": 473
     },
     "ci-only": {
       "gates": 10,
@@ -2420,16 +2424,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 472
+      "specs": 473
     },
     "full(ci=on)": {
       "gates": 85,
-      "specs": 543
+      "specs": 544
     }
   },
   "specs": {
-    "total": 543,
-    "marked": 543,
+    "total": 544,
+    "marked": 544,
     "unmarked": 0
   }
 }
