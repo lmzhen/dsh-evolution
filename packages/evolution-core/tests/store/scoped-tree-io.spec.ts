@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { nodeEvolutionIo } from '../../src/io.ts'
 import { HomeFence } from '../../src/home-fence.ts'
 import { StoreKernel } from '../../src/store/store-kernel.ts'
+import { createStoreService } from '../../src/store/service.ts'
 import { scopedTreeIO } from '../../src/store/scoped-tree-io.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 
@@ -37,5 +38,25 @@ describe('scoped tree IO bridge', () => {
     await writeFile(lock, 'lock\n')
     await scoped.writeText(lock, 'still-base\n')
     expect(await readFile(lock, 'utf8')).toBe('still-base\n')
+  })
+
+  it('routes mapped writes through the merge surface service when supplied', async () => {
+    const home = await tempRoot('dsh-scoped-tree-service-')
+    const io = nodeEvolutionIo()
+    const kernel = new StoreKernel({ io, home, fence: new HomeFence({ home }) })
+    await kernel.bootstrap({ mergeMeta: {}, reports: {} })
+    const service = createStoreService(kernel)
+    const scoped = scopedTreeIO(io, {
+      home,
+      kernel,
+      service,
+      commandId: 'merge',
+      mappings: [{ prefix: 'merge/run-meta', domain: 'mergeMeta' }],
+    })
+    const path = join(home, 'merge', 'run-meta', 'run-2.json')
+    await scoped.writeText(path, '{"phase":"done"}\n')
+    expect(await scoped.readText(path)).toBe('{"phase":"done"}\n')
+    const snapshot = (await service.query('merge', ['mergeMeta'])).snapshot
+    expect(snapshot.domains.mergeMeta).toMatchObject({ 'merge/run-meta/run-2.json': '{"phase":"done"}\n' })
   })
 })
