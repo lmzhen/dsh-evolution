@@ -265,7 +265,12 @@ export class StoreKernel {
         domains[domain] = objectId
         values[domain] = value
       }
-      const tree = request.tree === undefined ? previous.tree : request.tree
+      let tree = request.tree === undefined ? previous.tree : request.tree
+      if (request.treeManifest !== undefined) {
+        // Write the manifest object inside this transaction so a concurrent GC
+        // can never observe it as an unreferenced pre-commit orphan.
+        tree = { unitId: request.tree?.unitId ?? '', manifest: await this.writeObject(request.treeManifest) }
+      }
       if (!changedAny && sameTree(previous.tree, tree)) {
         return { commitId: previous.commitId, domains: current.domains, tree: previous.tree }
       }

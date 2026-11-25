@@ -59,7 +59,7 @@ import { UnitKernel, fileMutationLock, type MutationLockPort, type MutationResul
 import { mutationLockFrom, liveHomeFence } from './mutation-authority.ts'
 import { StoreKernel } from './store/store-kernel.ts'
 import { scopedTextIO } from './store/scoped-text-io.ts'
-import { publishTreeManifestFiles, type TreeManifestFile } from './store/tree-manifest.ts'
+import { buildTreeManifestFiles, type TreeManifestFile } from './store/tree-manifest.ts'
 import { STATE_V2_MIGRATION_MARKER } from './state/constants.ts'
 import { SkillModel } from './skill-model.ts'
 import { pruneTreeChangeUnits, unitJournalPort, unitSnapshotPort } from './mutation-storage-adapter.ts'
@@ -5172,8 +5172,15 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
       { path: suppressedFile(root), domain: 'suppressed', kernel },
     )
     treePublisher = async (unitId, files) => {
-      const ref = await publishTreeManifestFiles(kernel, unitId, files)
-      await kernel.mutate({ domains: [], source: 'tool', change: () => ({}), tree: ref })
+      // object + head in ONE fence transaction: GC can never see the manifest
+      // between putObject and commit.
+      await kernel.mutate({
+        domains: [],
+        source: 'tool',
+        change: () => ({}),
+        tree: { unitId },
+        treeManifest: buildTreeManifestFiles(unitId, files),
+      })
     }
   }
   return new SkillLibrary(

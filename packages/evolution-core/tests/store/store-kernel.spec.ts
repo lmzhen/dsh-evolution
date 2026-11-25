@@ -203,6 +203,16 @@ describe('home MVCC store kernel', () => {
     expect((await kernel.query(['state'])).domains.state).toEqual({ turns: 3 })
   })
 
+  it('writes a tree manifest inside the commit transaction', async () => {
+    const { io, root } = await seeded()
+    const kernel = new StoreKernel({ io, home: root, fence: openFence() })
+    await kernel.bootstrap({ state: { n: 0 } })
+    const manifest = { version: 1, unitId: 'unit-1', entries: [] }
+    const result = await kernel.mutate({ domains: [], source: 'tool', change: () => ({}), tree: { unitId: 'unit-1' }, treeManifest: manifest })
+    expect(result.tree?.manifest).toMatch(/^[0-9a-f]{64}$/)
+    expect(await kernel.getObject(result.tree!.manifest!)).toEqual(manifest)
+  })
+
   it('garbage-collects unreachable commits but keeps the head readable', async () => {    const { io, root } = await seeded()
     const kernel = new StoreKernel({ io, home: root, fence: openFence(), now: () => 1_700_000_000_000 })
     await kernel.bootstrap({ state: { n: 0 } })

@@ -110,6 +110,8 @@ export interface StoreMutation {
   readonly change: (current: StoreSnapshot) => StoreDomainValues | Promise<StoreDomainValues>
   /** Attach a tree unit to the commit (the unit itself is committed by UnitKernel). */
   readonly tree?: StoreTreeRef | null | undefined
+  /** A manifest value written inside the same transaction; kernel derives `tree.manifest`. */
+  readonly treeManifest?: unknown
 }
 
 /** The result of a garbage-collection pass; failures are reported, never thrown after the head is safe. */

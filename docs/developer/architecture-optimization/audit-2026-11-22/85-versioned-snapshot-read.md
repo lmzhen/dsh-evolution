@@ -531,6 +531,7 @@ HomeFence.run(tx =>
 - 可达性由当前 head 的 retained 链 + 本事务要写的对象集合计算；retain 非法值在入口拒绝，不静默回退 64。
 - `collectGarbage` 保留为显式管理入口：生产每 N 次 commit 调用一次，测试可直接调用；不再依赖“有没有人想起来调用”。
 - tree publisher 走同一 transaction，一次提交完成 manifest object + metadata commit；metadata 失败则整个事务不发布，不存在“树已落、manifest 永失”的内存队列。
+- 已落地：`StoreMutation.treeManifest` 让 kernel 在 mutate 事务内写 manifest object 并派生 `tree.manifest`；skill-store 的 tree publisher 改为一次 `mutate`；`store-kernel.spec` 验证 object 与 commit 同事务可读。
 - 所有 commit 返回 `{commitId, generation}`；写服务校验 generation，跨激活/跨 HMR 的旧句柄直接 `StoreConflictError`。
 
 ##### R10.5 唯一域表示：typed `StoreView`
