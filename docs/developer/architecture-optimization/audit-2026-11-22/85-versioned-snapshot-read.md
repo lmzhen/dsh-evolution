@@ -472,7 +472,7 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 
 ##### R10.1 结论：四个“只有一个”
 
-> **状态标记（第三轮复核后）**：已落地 = 可选 service 的 use-time resolver + gate-93 + tree manifest 进 commit 事务 + 删除 pre-commit object/GC grace + activation mode 冻结/legacy 写守卫 + full manifest writer；**设计态（未落地）= 完整 activation record/generation、full manifest reader/recovery、codec 表、强制 CAS**。下文凡是“已落地”只指代码已存在；其余不得在实施时当作既成事实。
+> **状态标记（第三轮复核后）**：已落地 = 可选 service 的 use-time resolver + gate-93/94 + tree manifest 进 commit 事务 + 删除 pre-commit object/GC grace + activation mode 冻结/legacy 写守卫 + full manifest writer + `StoreService.read/transact` codec 底座；**设计态（未落地）= 完整 activation record/generation、full manifest reader/recovery、各域 codec 表迁移、强制 CAS**。下文凡是“已落地”只指代码已存在；其余不得在实施时当作既成事实。
 
 1. **只有一个 service 获取机制**：`StoreAccess` / `AuthorityAccess` 是稳定的插件侧 handle，内部用平台公开的 `ctx.inject([...], cb)` 在服务出现/替换时更新，消费者只在**使用点** `get()`；禁止把 `ctx.get('evolutionStore')` / `ctx.get('evolutionMutationAuthority')` 存进字段。当前最小实现是 `liveStoreService(ctx)` 闭包；后续把它收成显式 `StoreAccess` 只是为了命名和 gate，不改变机制。
 2. **只有一个激活状态机**：`legacy → staged → active`，进程启动时读一次，运行期不再切；迁移命令只 stage，重启时整体 promote。**唯一 oracle 是 `evolutionStore` 服务是否存在**（无服务=legacy，有服务=active），所有 bridge 不再各自 `existsSync(marker)`；active 模式下服务缺失必须 fail loud。没有“state 已切、其他域未切”的双速窗口。
@@ -554,7 +554,7 @@ interface StoreView {
 ```
 
 - `DomainCodec` 负责 `decode` / `encode` / `empty` / 形状校验；非法值抛 `StoreCorruptError`，不再有 `recordOf` 把坏值读成 `{}`、`textOf` 读成 `null` 的 fail-open。
-- **一张 codec 表，不建 7 个手写 port**：`DomainCodecs[domain]` 提供类型；消费者直接 `service.read/transact(domain, codec)`。`StatePort`/`UsagePort` 等如需命名，只用类型别名，不再各写一层类。
+- **一张 codec 表，不建 7 个手写 port**：`DomainCodecs[domain]` 提供类型；消费者直接 `service.read/transact(domain, codec)`。**已落地底座**：`StoreService.read<T>(domain, codec)` / `transact<T>(domain, codec, change)` 与 `DomainCodec<T>`，`store-service.spec` 用整数 codec 验证读写；把各域迁移到 codec 表仍待逐域完成。
 - reports 的读写只有 `reports` codec + 一个 owner：merge/commands/curator/maintenance 全部经 `service.read/transact('reports', reportsCodec)`；不再有“merge 写域、commands 读文件”的双介质。
 - merge 收据、staging-index、reconcile journal 合并进 `merge` codec 的带 `schemaVersion` 子文档，或保持独立域；不再散落 base 文件。
 - `EvolutionIoLike` 只保留两类用途：迁移命令读 legacy；R4 activity 事件 append log。生产域代码不再接收 file-shaped IO。

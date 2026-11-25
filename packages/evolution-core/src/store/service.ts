@@ -27,9 +27,52 @@ export interface StoreCommandRequest {
   readonly tree?: StoreTreeRef | null | undefined
 }
 
+/** Typed domain representation shared by internal providers (R10.5 codec table). */
+export interface DomainCodec<T> {
+  readonly decode: (value: unknown | undefined) => T
+  readonly encode: (value: T) => unknown
+}
+
+export interface StoreDomainRead<T> {
+  readonly commitId: string
+  readonly tree: StoreTreeRef | null
+  readonly value: T
+}
+
 /** One store service per evolution home; every surface calls the same instance. */
 export class StoreService {
   constructor(private readonly kernel: StoreKernel) {}
+
+  /**
+   * Internal typed read (no surface closure): the caller owns the domain codec.
+   * External/model surfaces use {@link query} so their declared reads are checked.
+   */
+  async read<T>(domain: StoreDomainId, codec: DomainCodec<T>): Promise<StoreDomainRead<T>> {
+    const snapshot = await this.kernel.query([domain])
+    return { commitId: snapshot.commitId, tree: snapshot.tree, value: codec.decode(snapshot.domains[domain]) }
+  }
+
+  /**
+   * Internal typed read-modify-write in one commit. External surfaces use
+   * {@link command}; this path exists for providers whose write is not a user
+   * command (source defaults to `system`).
+   */
+  async transact<T>(
+    domain: StoreDomainId,
+    codec: DomainCodec<T>,
+    change: (current: T) => T | Promise<T>,
+    options: { readonly source?: StoreCommandRequest['source']; readonly expectedCommit?: string } = {},
+  ): Promise<StoreCommitResult> {
+    return await this.kernel.mutate({
+      domains: [domain],
+      source: options.source ?? 'system',
+      ...(options.expectedCommit === undefined ? {} : { expectedHead: options.expectedCommit }),
+      change: async (current) => {
+        const next = await change(codec.decode(current.domains[domain]))
+        return { [domain]: codec.encode(next) }
+      },
+    })
+  }
 
   /** Read one surface's declared domains from one commit, without a writer lock. */
   async query(commandId: string, domains?: readonly StoreDomainId[]): Promise<StoreQueryResult> {
