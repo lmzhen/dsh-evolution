@@ -24,9 +24,13 @@ import { STATE_V2_MIGRATION_MARKER } from '../state/constants.ts'
 type FileMap = Record<string, string>
 
 const recordOf = (value: unknown): FileMap => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+  if (value === null || value === undefined) return {}
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('scoped-tree-io: the domain value is not a path->text map')
   const out: FileMap = {}
-  for (const [key, entry] of Object.entries(value)) if (typeof entry === 'string') out[key] = entry
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry !== 'string') throw new Error('scoped-tree-io: the domain map carries a non-string value at ' + key)
+    out[key] = entry
+  }
   return out
 }
 

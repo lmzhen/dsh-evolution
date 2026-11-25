@@ -448,6 +448,8 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - P1-8（按 9.0 边界）：家族插件 durable 读已收口到同一内核——state/review/pending/curator 经 `state.provider`，usage 经 `usage.rw`，merge 经 `merge`，memory 经 `memory.rw`，discovery 经 `discovery.rw`，feedback 经 `feedback.rw`；doctor/run-registry 直接消费 service；`transact` 同样走 service。skill tree 读取仍走 UnitKernel + manifest（R5），activity 事件日志按 R4 保持 append-only base，二者都不是第二读写内核。
 - 读取范围边界见 9.0：平台、storage backend、其他插件的读不在 DCR-85 范围内，不作为 blocker。
 - P2（部分）：tree-only commit（空 domains + tree ref）不再解析全部 domain blob；manifest 发布失败改为有界重试；query 的 head 重试从 3×10ms 放宽到 5×20ms；GC 对年轻 object 默认 5 分钟宽限，避免并发 GC 删除尚未 commit 引用的 manifest object（`graceMs=0` 可显式关闭）。
+- P2 reports 读修复：`maintain report` 在 v2 下先读 legacy 文件，缺失时经 `merge` surface query 读 `reports` 域；不再把域内报告误报为“没有结果”。
+- P2 适配器 fail-closed：scoped text 的 domain 值不是 `{text}`、scoped tree 的 domain 值不是 path→text map 时抛错，不再静默读成空。
 - 未修（P2，非读取面）：非法 retain、tree list/mtime、marker 校验等；之后独立复核、R8 真机验收。
 - 这是首个真实 dispatch 消费者；其余 host command/tool/UI 仍走 legacy 路径。
 - 验收判据：tree unit 后 query 的 `tree.manifest` 非空；manifest 条目与 unit ops 的 path/hash/delete 一一对应；metadata commit 失败只产生告警，不回滚已提交的树；并发两个 unit 各自得到独立 commit tree ref。

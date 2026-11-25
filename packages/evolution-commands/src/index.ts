@@ -41,7 +41,7 @@ import { hostCommandDefForCommand } from './host-command-defs.ts'
 import { atomicWriteFiles } from '@deepseek-ai/dsh-evolution-core'
 import { assertSkillsRootAliasRetired, resolveRootConfig, newSkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 export { atomicWriteFiles }
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 
 export const name = 'evolution-commands'
 
@@ -278,15 +278,34 @@ async function writeMaintainReport(
 }
 
 /** Three-state read of a run's result: present, missing, or unreadable (never collapsed). */
-async function readRunReport(io: EvolutionIoLike, record: RunRecord): Promise<{ kind: 'present'; text: string; report: Partial<MaintainReportRecord> } | { kind: 'missing' } | { kind: 'unknown'; reason: string }> {
+interface StoreReportsQuery {
+  query(commandId: string, domains: readonly string[]): Promise<{ snapshot: { domains: { reports?: Record<string, string> } } }>
+}
+
+async function readRunReport(io: EvolutionIoLike, record: RunRecord, store?: StoreReportsQuery | undefined): Promise<{ kind: 'present'; text: string; report: Partial<MaintainReportRecord> } | { kind: 'missing' } | { kind: 'unknown'; reason: string }> {
   // A report is read from the home it was WRITTEN in (the registry record was created
   // in this process's home); the fallback path exists for a record without resultRef.
   const path = record.resultRef ?? join(evolutionHome(), 'reports', `maintain-${record.id}.json`)
   const probed = await probeText(io, path)
   if (isUnknown(probed)) return { kind: 'unknown', reason: probed.reason }
-  if (!isPresent(probed)) return { kind: 'missing' }
+  let text: string | null = isPresent(probed) ? probed.value : null
+  // v2: merge/reports writes live in the reports domain; the legacy file is gone.
+  if (text === null && store !== undefined) {
+    const reportsRoot = join(evolutionHome(), 'reports')
+    const rel = relative(reportsRoot, path).replace(/\\/g, '/')
+    if (rel !== '' && !rel.startsWith('..')) {
+      try {
+        const snapshot = await store.query('merge', ['reports'])
+        const mapped = snapshot.snapshot.domains.reports?.[rel]
+        if (mapped !== undefined) text = mapped
+      } catch (error) {
+        return { kind: 'unknown', reason: `the reports domain could not be read (${error instanceof Error ? error.message : String(error)})` }
+      }
+    }
+  }
+  if (text === null) return { kind: 'missing' }
   try {
-    const parsed = JSON.parse(probed.value) as Partial<MaintainReportRecord>
+    const parsed = JSON.parse(text) as Partial<MaintainReportRecord>
     const header = `Maintenance run ${record.id} — ${record.state}${record.failure === undefined ? '' : ` (${record.failure})`}`
     const body = typeof parsed.text === 'string' && parsed.text.trim() !== '' ? parsed.text : renderRunRecord(record)
     // The parsed record rides along so a caller that needs the ledger's counts (handoff)
@@ -849,7 +868,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法查看运行结果。')
-          const probed = await readRunReport(ioRegistry.provider(), record)
+          const probed = await readRunReport(ioRegistry.provider(), record, ctx.get('evolutionStore') as StoreReportsQuery | undefined)
           // "no result" and "an unreadable result" must not look alike (the
           // three-state rule the rest of the family follows).
           if (probed.kind === 'missing') {
@@ -920,7 +939,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
           }
           const ioRegistry = ctx.get('evolutionIo') as { provider(name?: string): EvolutionIoLike } | undefined
           if (!ioRegistry) return err('未挂载 evolution-io 注册表：无法交付报告。')
-          const probed = await readRunReport(ioRegistry.provider(), record)
+          const probed = await readRunReport(ioRegistry.provider(), record, ctx.get('evolutionStore') as StoreReportsQuery | undefined)
           if (probed.kind === 'missing') {
             return err(`运行 ${record.id}（${record.state}）没有结果：没有写出报告${record.failure === undefined ? '' : `（${record.failure}）`}。`)
           }

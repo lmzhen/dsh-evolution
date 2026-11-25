@@ -43,6 +43,15 @@ describe('scoped text IO bridge', () => {
     await expect(bridge!.readText(join(root, 'merge', 'merge-state.json'))).rejects.toThrow()
   })
 
+  it('fails closed when a mapped domain has the wrong shape', async () => {
+    const root = await tempRoot('dsh-scoped-text-corrupt-')
+    const io = nodeEvolutionIo()
+    const kernel = new StoreKernel({ io, home: root, fence: new HomeFence({ home: root }) })
+    await kernel.bootstrap({ merge: { notText: true } })
+    const scoped = scopedTextIO(io, { path: join(root, 'merge', 'merge-state.json'), domain: 'merge', kernel })
+    await expect(scoped.readText(join(root, 'merge', 'merge-state.json'))).rejects.toThrow(/not a \{text\} document|no string text/)
+  })
+
   it('routes memory files through the memory service when supplied', async () => {
     const root = await tempRoot('dsh-scoped-memory-')
     const io = nodeEvolutionIo()

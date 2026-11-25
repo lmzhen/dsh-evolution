@@ -34,9 +34,11 @@ export interface ScopedTextIOOptions {
 }
 
 const textOf = (value: unknown): string | null => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+  if (value === null || value === undefined) return null
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('scoped-text-io: the domain value is not a {text} document')
   const text = (value as { text?: unknown }).text
-  return typeof text === 'string' ? text : null
+  if (typeof text !== 'string') throw new Error('scoped-text-io: the domain value has no string text')
+  return text
 }
 
 /** Wrap one base IO and map exactly `options.path` to one MVCC domain. */
