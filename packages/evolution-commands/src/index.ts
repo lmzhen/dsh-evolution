@@ -1194,7 +1194,6 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 },
               )
               const endedAt = Date.now()
-              const reportStore = ctx.get('evolutionStore') as StoreReportsQuery | undefined
               const resultRef = await writeMaintainReport(ioRegistry.provider(), {
                 runId: handle.id,
                 ...(outcome.ok
@@ -1213,10 +1212,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 startedAt: handle.startedAt,
                 endedAt,
                 text: outcome.text ?? '',
-              }, (message) => { ctx.logger.warn(message) }, runHome, homeFenceFrom(ctx), reportStore)
+              }, (message) => { ctx.logger.warn(message) }, runHome, homeFenceFrom(ctx), ctx.get('evolutionStore') as StoreReportsQuery | undefined)
               // W5 G3-S4: a settle that names a resultRef must be readable NOW — otherwise the
               // terminal record points at a file a reader/replay cannot open (write/io race).
-              if (resultRef !== undefined && reportStore?.command === undefined) {
+              if (resultRef !== undefined && (ctx.get('evolutionStore') as StoreReportsQuery | undefined)?.command === undefined) {
                 const readable = isPresent(await probeMtime(ioRegistry.provider(), resultRef))
                 if (!readable) {
                   await registry.settle(handle.id, {

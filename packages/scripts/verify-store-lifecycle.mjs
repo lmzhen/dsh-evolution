@@ -32,6 +32,8 @@ function audit(path, text) {
     // Field/const capture of the optional service at construction time.
     const capture = new RegExp('(?:this\\.[A-Za-z_$][\\w$]*|(?:private|readonly|protected)\\s+[A-Za-z_$][\\w$]*)\\s*(?:=|:)[^;\\n]*ctx\\.get\\(\\s*[\'"]' + name + '[\'"]')
     if (capture.test(text)) problems.push(rel + ': captures ctx.get(\'' + name + '\') in a field (use a use-time resolver)')
+    const local = new RegExp('(?:const|let|var)\\s+[A-Za-z_$][\\w$]*\\s*=\\s*ctx\\??\\.get\\??\\(\\s*[\'"]' + name + '[\'"]')
+    if (local.test(text)) problems.push(rel + ': captures ctx.get(\'' + name + '\') in a local before use (resolve at the use point)')
     // Required inject must not carry an optional capability.
     const inject = /export const inject\s*=\s*\[([^\]]*)\]/.exec(text)
     if (inject !== null && new RegExp('[\'"]' + name + '[\'"]').test(inject[1])) {

@@ -527,12 +527,13 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
   async function withReviewStateLock<T>(id: SessionId, task: () => Promise<T>): Promise<T> {
     const previous = reviewStateLocks.get(id) ?? Promise.resolve()
     const next = previous.catch(() => {}).then(async () => {
-      const authority = ctx.get('evolutionMutationAuthority') as {
+      const liveAuthority = () => ctx.get('evolutionMutationAuthority') as {
         lease: {
           acquire(owner: 'foreground', runId: string): Promise<{ ok: true; token: unknown } | { ok: false }>
           release(token: unknown): Promise<void>
         }
       } | undefined
+      const authority = liveAuthority()
       let token: unknown
       if (authority !== undefined) {
         for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -1145,7 +1146,8 @@ function snapshotReviewParent(agent: Agent): Agent {
       ctx.logger.warn('dsh-evolution-review: aux review skipped — llm/tools service is not mounted')
       return false
     }
-    const authority = ctx.get('evolutionMutationAuthority') as { lease?: { acquire(owner: 'background_review', runId: string, ttlMs?: number): Promise<{ ok: true; token: { id: string; owner: string; runId: string; epoch: number } } | { ok: false; reason: string }>; release(token: { id: string; owner: string; runId: string; epoch: number }): Promise<void>; renew(token: { id: string; owner: string; runId: string; epoch: number }): Promise<unknown | null> } } | undefined
+    const liveAuthority = () => ctx.get('evolutionMutationAuthority') as { lease?: { acquire(owner: 'background_review', runId: string, ttlMs?: number): Promise<{ ok: true; token: { id: string; owner: string; runId: string; epoch: number } } | { ok: false; reason: string }>; release(token: { id: string; owner: string; runId: string; epoch: number }): Promise<void>; renew(token: { id: string; owner: string; runId: string; epoch: number }): Promise<unknown | null> } } | undefined
+    const authority = liveAuthority()
     let leaseToken: { id: string; owner: string; runId: string; epoch: number } | undefined
     if (authority?.lease !== undefined) {
       const lease = await authority.lease.acquire('background_review', 'review:' + session.id + ':' + kind, Math.max(config.reviewTimeoutMs + 30_000, 60_000)).catch(() => undefined)

@@ -494,6 +494,7 @@ plugin apply (sync)
 - 静态门禁：长生命周期对象字段禁止 `ctx.get(...)` 赋值；新增 `verify-store-lifecycle` 扫描 `ctx.get('evolutionStore')`/`ctx.get('evolutionMutationAuthority')` 的字段化用法，和白名单（迁移命令）之外一律红。
 - **唯一 oracle**：`StoreAccess.get()` 的 undefined 语义必须由激活状态决定，而不是各自 `existsSync(marker)`：
   - 所有消费者只调用 `isStoreV2Active(home)`（`state/activation.ts`）；gate-94 禁止其他源文件直接引用 marker 常量（迁移/激活文件除外）；
+  - gate-93 已覆盖字段式捕获、直接 local 捕获、必需 inject；更复杂的包装表达式仍可能漏检；
   - legacy 且无 service → 允许 base IO（bridge 常驻，不建/不拆）；
   - active 且无 service → `StoreUnavailableError`（重启/服务未挂载指引）；
   - 运行期发现另一进程激活（service 首次出现而本进程启动时无记录）→ fail loud，禁止本进程静默切介质；
