@@ -189,7 +189,7 @@
 | [06-architecture.md](06-architecture.md) | 包边界、依赖、生成物、门禁、拆分建议 |
 | [07-ui-client.md](07-ui-client.md) | UI/client/host 接缝、settings、workbench、merge UI |
 | [08-tests-debt.md](08-tests-debt.md) | 测试/门禁/发布证据、永久 skip、假绿 |
-| [10-system-framework.md](10-system-framework.md) | 第一性原理/系统科学/系统工程整合框架：八不变量、七平面、六失效模式、V 模型与目标内核 |
+| [10-system-framework.md](10-system-framework.md) | 第一性原理/系统科学/系统工程整合框架：九不变量、七平面、六失效模式、V 模型与目标内核 |
 | [11-target-architecture.md](11-target-architecture.md) | 综合目标架构：HomeFS/UnitKernel/PlanService/StateStore/Projection/Assurance、旧组件去留、迁移与验收 |
 | [13-r0-platform-contract-design.md](13-r0-platform-contract-design.md) | R0-3/B5 + R0-4/D1 平台调用约定与 LLM 终态设计与实现 |
 | [14-r0-ui-confirm-design.md](14-r0-ui-confirm-design.md) | R0-5/F1-F2 UI 确认 effective value 与 settings 订阅 |
