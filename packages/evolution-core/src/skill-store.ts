@@ -5203,7 +5203,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
       const files = await library?.treeManifestFiles() ?? []
       await kernel.mutate({
         domains: [],
-        source: 'tool',
+        source: 'system',
         change: () => ({}),
         tree: { unitId },
         treeManifest: buildTreeManifestFiles(unitId, files),

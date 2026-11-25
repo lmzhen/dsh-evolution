@@ -67,7 +67,7 @@
 | R10-P2-6 双跨进程锁顺序 | OPEN | promote 仍 `state.lock → HomeFence`，tree 路径是 `HomeFence → state.lock`；需统一或删除 state.lock。 |
 | R10-P2-7 回退/坏 pending | OPEN | 无 `/evolution migrate state --revert`；坏 pending 只 throw，需可操作提示/修复命令。 |
 | R10-P2-8 store-plugin 捕获 IO provider | FIXED | `store-plugin` 改为 `evolutionIoAdapter(() => ctx.evolutionIo.provider())`，service/kernel/v2 provider 共用 live handle；HMR 替换 IO 后不再读旧对象。 |
-| R10-P2-9 surface/commit 元数据漂移 | OPEN | `merge_stage writes:[]`、`source:'system'` 未入枚举、`expectsCommit` 仍是死字段。 |
+| R10-P2-9 surface/commit 元数据漂移 | PARTIAL | `source:'system'` 已加入 `STORE_COMMIT_SOURCES`，tree manifest 提交改用 system；`merge_stage writes:[]` 与 `expectsCommit` 死字段仍待处理。 |
 | R10-P2-10 复核记录不可审计 | PARTIAL | 第三轮结论已入 85 R10.12；第一/二轮复核原始记录仍未入库。 |
 
 ## 发布阻断项（不是 P2）

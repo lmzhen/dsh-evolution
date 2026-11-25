@@ -35,7 +35,7 @@ export type StoreDomainId = (typeof STORE_DOMAIN_IDS)[number]
 export type StoreDomainValues = Partial<Record<StoreDomainId, unknown>>
 
 /** Why a commit was published. Diagnostics only; never used for authority. */
-export type StoreCommitSource = 'foreground' | 'background_review' | 'command' | 'ui' | 'tool' | 'bootstrap'
+export type StoreCommitSource = 'foreground' | 'background_review' | 'command' | 'ui' | 'tool' | 'bootstrap' | 'system'
 
 /** The durable source values a published commit may carry. */
 export const STORE_COMMIT_SOURCES: readonly StoreCommitSource[] = [
@@ -45,6 +45,7 @@ export const STORE_COMMIT_SOURCES: readonly StoreCommitSource[] = [
   'ui',
   'tool',
   'bootstrap',
+  'system',
 ]
 
 /** A skill-tree unit published together with this commit. */
