@@ -472,10 +472,12 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 
 ##### R10.1 结论：四个“只有一个”
 
+> **状态标记（第三轮复核后）**：已落地 = 可选 service 的 use-time resolver + gate-93 + tree manifest 进 commit 事务 + 删除 pre-commit object/GC grace；**设计态（未落地）= 单进程 activation oracle、activation record/generation、full manifest 权威、typed domain、强制 CAS**。下文凡是“已落地”只指代码已存在；其余不得在实施时当作既成事实。
+
 1. **只有一个 service 获取机制**：`StoreAccess` / `AuthorityAccess` 是稳定的插件侧 handle，内部用平台公开的 `ctx.inject([...], cb)` 在服务出现/替换时更新，消费者只在**使用点** `get()`；禁止把 `ctx.get('evolutionStore')` / `ctx.get('evolutionMutationAuthority')` 存进字段。当前最小实现是 `liveStoreService(ctx)` 闭包；后续把它收成显式 `StoreAccess` 只是为了命名和 gate，不改变机制。
-2. **只有一个激活状态机**：`legacy → staged → active`，进程启动时读一次，运行期不再切；迁移命令只 stage，重启时整体 promote。没有“state 已切、其他域未切”的双速窗口。
-3. **只有一个写事务**：对象写入、commit、head 发布、可达性 GC 在同一个 `HomeFence` 事务里完成；树 manifest 也是这个事务的一部分，不再有“putObject 后另一个 commit”的竞态。
-4. **只有一个域表示**：生产代码用 typed `StoreView`（`read`/`transact` + codec），不再用 `EvolutionIoLike` 假装文件路径；scoped text/tree 适配器只保留在迁移命令和 R4 append log 的读取侧，最终删除。
+2. **只有一个激活状态机**：`legacy → staged → active`，进程启动时读一次，运行期不再切；迁移命令只 stage，重启时整体 promote。**唯一 oracle 是 `evolutionStore` 服务是否存在**（无服务=legacy，有服务=active），所有 bridge 不再各自 `existsSync(marker)`；active 模式下服务缺失必须 fail loud。没有“state 已切、其他域未切”的双速窗口。
+3. **只有一个写事务**：对象写入、commit、head 发布、可达性 GC 在同一个 `HomeFence` 事务里完成；树 manifest 也是这个事务的一部分。已落地：tree manifest object + commit/head 同 fence；未落地：state/usage/merge 的 domain 写统一到同一事务（当前仍分别 `kernel.mutate`，但都在同一 fence 内串行）。
+4. **只有一个域表示**：生产代码用 typed `StoreView`（`read`/`transact` + codec），不再用 `EvolutionIoLike` 假装文件路径；scoped text/tree 适配器只保留在迁移命令和 R4 append log 的读取侧，最终删除。这是设计态，当前生产仍是 scoped adapter。
 
 ##### R10.2 插件侧生命周期层（同时修复 PR #26 类问题）
 
@@ -490,13 +492,19 @@ plugin apply (sync)
 - `AuthorityAccess` 同理管理 `evolutionMutationAuthority` / fence；`liveHomeFence` 只是它的读侧投影。
 - 平台侧无需新 API：`ctx.inject` 是公开的“可选依赖晚绑定”seam；`ctx.get` 只允许在 `get()`/使用点出现。
 - 静态门禁：长生命周期对象字段禁止 `ctx.get(...)` 赋值；新增 `verify-store-lifecycle` 扫描 `ctx.get('evolutionStore')`/`ctx.get('evolutionMutationAuthority')` 的字段化用法，和白名单（迁移命令）之外一律红。
+- **唯一 oracle**：`StoreAccess.get()` 的 undefined 语义必须由激活状态决定，而不是各自 `existsSync(marker)`：
+  - legacy 且无 service → 允许 base IO（bridge 常驻，不建/不拆）；
+  - active 且无 service → `StoreUnavailableError`（重启/服务未挂载指引）；
+  - 运行期发现另一进程激活（service 首次出现而本进程启动时无记录）→ fail loud，禁止本进程静默切介质；
+  - `EvolutionState` 的 auto 选择在首次解析后按进程缓存，运行期不重新读 marker。
+- 当前代码仍是 7 处 `existsSync(marker)`（`state/index.ts`、scoped text/tree、run-registry、skill-store），因此 R10.2 的 oracle 是设计态、不是已落地。
 - 回归矩阵（每个消费者都要有）：
   - 先 mount consumer，后 provide service → 使用点恢复；
   - HMR 替换 service → 旧 handle 不保留旧实例；
-  - 完全没有 service → row 仍能 mount，能力缺失可诊断，写 fail loud；
+  - 完全没有 service → row 仍能 mount，能力缺失可诊断，写 fail loud（active 模式下）；
   - `inject` 必需集合固定（借鉴 PR #26 的 `inject-authority.spec.ts`，每个可选能力都有一条负向 spec）。
 
-已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。`verify-store-lifecycle` 已成为 gate-93（构造期字段捕获、可选服务进必需 inject 都红）。剩余：把 `ctx.get` 字段化扫描扩到 authority/IO 等全部可选服务，其他消费者迁移。
+已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。`verify-store-lifecycle` 已成为 gate-93（构造期字段捕获、可选服务进必需 inject 都红）。**仍缺**：闭包捕获检测（run-registry 仍把 service 冻结进 port）、activation oracle、HMR 旧实例断言。
 
 ##### R10.3 激活状态机与迁移
 
@@ -506,13 +514,13 @@ none --migrate state --to v2--> staged(pending) --startup--> active
                                       +-- crash --> 丢弃 staged head，重建 -> active
 ```
 
-- 激活记录 `state/.store-activation.json` 是唯一权威：`{ mode: 'legacy'|'store-v2', generation, commitId, migratedAt }`；`generation` 每次激活递增。
-- 启动时 `store-plugin` 在**任何 provider/DAO/bridge 构造前**完成 promote；运行期不读 marker、不切模式。
+- 激活记录 `state/.store-activation.json` 是唯一权威：`{ mode: 'legacy'|'store-v2', generation, commitId, lastActiveCommitId?, migratedAt }`；`generation` 每次激活递增。
+- 回退也写记录：`mode:'legacy'` + 保留 `lastActiveCommitId`，不删除记录；promote 只有在“记录显示从未激活过（无 lastActiveCommitId）且 head 无 active 记录”时才丢弃 head；曾激活过却出现不匹配 head ⇒ 拒绝 promote，要求显式 `--discard-active-store` 并打印将丢弃的 commitId。禁止“删 marker 再 stage”静默清空 v2 数据。
+- 启动时 `store-plugin` 在**任何 provider/DAO/bridge 构造前**完成 promote；promote 只允许在本进程首次 apply 执行，HMR 重挂发现 pending 只报“下次启动生效”。
 - `migrate state` 只做三件事：读当前 legacy 做校验、写 staged 记录、打印“重启后生效”；不建 head、不写 active、也不提供 `evolutionStore`。
-- promote：删除任何无 active generation 的孤儿 head，按**当前** legacy 重建一个完整 head，写 active generation；无“只比对 state 的半恢复”。
-- 回退：删除 active 记录并重启回 legacy；v2 写入不回灌 legacy，文档/命令必须明确。
-- dry-run 只读、不写 staged；重复 stage 幂等覆盖；active 存在时 stage 拒绝。
-- 运行时切换被彻底禁止：不存在“命令执行后当前进程变 v2”的路径，也就不存在 PR #26 那种“服务晚到导致句柄冻结”的激活竞态。
+- promote 的锁顺序与 tree→state 一致：先 HomeFence，再 `state.lock`；不允许反向。
+- dry-run 只读、不写 staged；重复 stage 幂等覆盖；曾激活/active 存在时 stage 拒绝（回退记录也拒绝，除非显式 `--recollect`）。
+- 运行时切换被彻底禁止：不存在“命令执行后当前进程变 v2”的路径；另一宿主激活时，本进程发现 service 出现但启动记录是 legacy ⇒ `StoreUnavailableError`（重启）。
 
 ##### R10.4 唯一写事务与 GC
 
@@ -545,25 +553,28 @@ interface StoreView {
 ```
 
 - `DomainCodec` 负责 `decode` / `encode` / `empty` / 形状校验；非法值抛 `StoreCorruptError`，不再有 `recordOf` 把坏值读成 `{}`、`textOf` 读成 `null` 的 fail-open。
-- 定义 typed ports：`StatePort`、`UsagePort`、`MergePort`、`ReportsPort`、`DiscoveryPort`、`MemoryPort`、`FeedbackPort`；每个 port 只依赖 `StoreAccess`，不依赖 `EvolutionIoLike`、不依赖具体文件路径。
-- `reports` 的读写只有 `ReportsPort`：merge/commands/curator/maintenance 全部经它；不再有“merge 写域、commands 读文件”的双介质。
-- merge 收据、staging-index、reconcile journal 归入 `MergePort` 的子文档，不再散落 base 文件。
+- **一张 codec 表，不建 7 个手写 port**：`DomainCodecs[domain]` 提供类型；消费者直接 `service.read/transact(domain, codec)`。`StatePort`/`UsagePort` 等如需命名，只用类型别名，不再各写一层类。
+- reports 的读写只有 `reports` codec + 一个 owner：merge/commands/curator/maintenance 全部经 `service.read/transact('reports', reportsCodec)`；不再有“merge 写域、commands 读文件”的双介质。
+- merge 收据、staging-index、reconcile journal 合并进 `merge` codec 的带 `schemaVersion` 子文档，或保持独立域；不再散落 base 文件。
 - `EvolutionIoLike` 只保留两类用途：迁移命令读 legacy；R4 activity 事件 append log。生产域代码不再接收 file-shaped IO。
 - scoped text/tree 适配器标为迁移期 shim，R10 落地后删除；删除前用 gate 禁止新消费者引用。
 
 ##### R10.6 树 manifest 成为唯一权威
 
-- `TreeRepository`：写 = `StoreView.transact('tree')` + manifest object；读 = `readTreeManifest`，模型/UI/维护扫描先读 manifest 再按 blob 取正文。
-- materialized 文件只在 manifest 缺失且处于迁移期时只读 fallback；active 模式下 manifest 缺失是 `StoreCorruptError`，不是静默读旧文件。
-- 启动时 `recoverTreeManifests`：扫描 prepared unit journal，对已落盘但未发布的 unit 重新发布 metadata commit；进程内 flush 队列只作为加速，不再是恢复来源。
+- **形状先定死：full manifest per unit**。当前增量 manifest + head 只留最后一个 + GC 只保 64 commit，无法回放出整棵树；因此 unit 提交后生成全树 `{path,sha,size,mode,deleted}` 快照，head 的 manifest 即完整权威；读侧只需一个对象。代价是每 unit O(tree)，接受。
+- `TreeRepository`：写 = `StoreView.transact('tree')` + full manifest object；读 = `readTreeManifest`，模型/UI/维护扫描先读 manifest 再按 blob 取正文。
+- materialized 文件在 full manifest 落地前仍是读权威；切换后只在 manifest 缺失且处于迁移期时只读 fallback；active 模式下 manifest 缺失是 `StoreCorruptError`。
+- 恢复源不能用 prepared journal（tree unit 已 committed，afterCommit 才入队）：在 unit commit 前写一条 durable `manifest-pending` 记录（unitId + after hashes），publish 成功后清除；启动时按该记录重放，而不是扫 prepared journal。
 - manifest 条目包含 `path/blobSha/size/mode`，删除显式标记；tree list/mtime 由 manifest 生成，不再由 adapter 猜。
 
 ##### R10.7 表面与 CAS
 
-- `expectsCommit` 改为**强制**：所有 mutation surface 的 `StoreCommand` 必须带 `expectedCommit`；服务在执行前 CAS，冲突返回可展示的 `StoreConflictError`。
-- 查询返回 `commitId + generation`；UI/命令/工具把版本原样带回写请求，杜绝“读到旧值后静默覆盖”。
-- 内部系统写入（迁移、GC、tree manifest）使用独立 `source: 'system'`，不伪装 command；surface registry 只登记用户/模型可见命令。
-- service 只做“surface 闭包 + CAS + generation”，不做业务解析；业务 codec/port 归各自 domain 模块。
+- **层数收敛**：只保留 `StoreKernel` + `StoreService` 两层。`StoreService` 直接暴露 `read(domain, codec)` / `transact(domain, codec, fn)`；删除 `StoreView.querySurface` 与 7 个手写 port，改为一张 `DomainCodecs: Record<StoreDomainId, DomainCodec<T>>`。两个写入口：kernel `mutate`（内部，`source:'system'`）与 service `command`（外部）；不再有第二套 `tx.*` API。
+- **CAS 只约束人/模型看到快照再写的 surface**：pending approve/reject、merge approve/reject/undo/discard、skill undo/restore、params save。provider/RMW 明确 CAS-free，不用 expectedCommit。删除“所有 mutation surface 必须带 expectedCommit”的写法。
+- `expectedCommit` 由这些 surface 的调用方从 query 带回；service 校验，冲突返回可展示的 `StoreConflictError`；内部 system 写不受约束。
+- 查询返回 `commitId + generation`；UI/命令/工具把版本原样带回写请求。
+- surface registry 只登记人/模型可见命令；provider/internal 写入用 `read/transact` + `source:'system'`，不登记 surface，不伪造 command id。
+- service 只做“surface 闭包 + CAS + generation”，不做业务解析；codec 归 domain 模块。
 
 ##### R10.8 平台侧边界（不 fork）
 
@@ -580,7 +591,7 @@ interface StoreView {
 | P1 GC 无调用者 / manifest 删除竞态 | R10.4 事务内 GC |
 | P1 v2 同步 head 预检 | R10.3 启动读 activation + R10.4 query fail closed |
 | P1 恢复只比对 state | R10.3 staged head 丢弃重建 |
-| P1-8 各处 scoped IO / 构造期捕获 | R10.2 + R10.5 typed ports |
+| P1-8 各处 scoped IO / 构造期捕获 | R10.2 + R10.5 codec 表 |
 | reports 双介质 | R10.5 ReportsPort |
 | merge 收据/staging/journal 散落 base | R10.5 MergePort |
 | tree manifest 只写不读/崩溃丢失 | R10.6 TreeRepository + journal recovery |
@@ -611,6 +622,31 @@ interface StoreView {
 - `verify-store-manifest`：manifest 读写同源、崩溃恢复、materialized fallback 仅迁移期。
 - `verify-store-surface`：每个 mutation 强制 expectedCommit；generation 不匹配返回 conflict。
 - 所有测试必须用真实 kernel/service，不允许 fake service 绕过 CAS/GC；生命周期矩阵覆盖“先 consumer 后 service”“HMR 替换”“完全无 service”。
+
+##### R10.12 第三轮复核修订（设计层）
+
+第三轮只读复核的结论：方向可作长期基线，但原 R10 把“设计态”写成了“已落地”；以下四类问题已回写并在本节定稿：
+
+| 复核问题 | 修订 |
+|---|---|
+| 7 处各自 `existsSync(marker)` 决定介质；运行期仍会双速 | 唯一 oracle = `evolutionStore` 服务是否存在；bridge 常驻；legacy 无服务→base，active 无服务→`StoreUnavailableError`；运行期不切，另一宿主激活→重启 |
+| 激活记录缺 mode/generation；删 marker 再 stage 会静默删 v2 数据 | `.store-activation.json` 加 mode/generation/lastActiveCommitId；回退写记录；曾激活过的 head 不匹配拒绝 promote，需显式 `--discard-active-store` |
+| 增量 manifest + 只保 64 commit 无法回放整棵树；恢复源用 prepared journal 不成立 | 改为 **full manifest per unit**；unit commit 前写 durable manifest-pending，启动重放；materialized 文件在 full manifest 落地前仍是读权威 |
+| 层数/职责重叠（StoreAccess+StoreView+7 ports+surface+2 事务） | 只留 kernel + service；codec 表；内部 `mutate(system)` + 外部 `command`；CAS 只约束人/模型 surface，provider RMW CAS-free |
+
+同时确认仍待补的 P2（不阻塞设计，但进实施清单）：
+
+- reports fallback 的 key 前缀错误（域 key 是 `reports/x`，当前用 `x`）；写路径仍走 base；
+- GC `retain` 非法值仍静默回退 64（与 R10.4“入口拒绝”冲突）；GC 读阶段失败不应把已提交写判失败；
+- gate-93 只认字段式捕获，漏闭包捕获（`run-registry` 仍冻结 service）；R10.11 的 transaction/ports/manifest 三条门禁尚不存在；
+- 五个 bridge 无 late-provide/HMR 矩阵；`store-plugin.spec` 的 HMR 只断言 defined；
+- scoped adapter `mtime=null` 会让 ProjectionJournal 缓存永不失效；
+- promote 的 `state.lock → HomeFence` 与 tree 路径 `HomeFence → state.lock` 顺序相反；
+- 回退/坏 pending 缺可操作命令；
+- surface 表中 `merge_stage writes:[]`、`source:'system'` 未入枚举、`expectsCommit` 仍是死字段；
+- R8/R9 复核记录未入库，R10.9 缺少覆盖 id，P2 全集不可审计。
+
+这些 P2 在实施阶段必须逐条关闭或按 80 的 DEFERRED 模板登记，不能以“R10 设计已写”代替。
 
 
 并不是所有东西都塞进 MVCC。按语义分三类，避免过度设计。
