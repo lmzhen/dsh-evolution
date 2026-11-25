@@ -228,7 +228,8 @@ async function migrateStateToV2Unlocked(ctx: Context, options: StateMigrationOpt
   const v1Path = join(home, 'state', 'store.json')
   const source: 'store' | 'domain' = await io.exists(v1Path) ? 'store' : 'domain'
   if (options.stage === true) {
-    if (await io.exists(markerPath)) throw new Error('evolution-state-migrate-v2: the v2 migration is already active')
+    const current = readStoreActivation(home)
+    if (current?.mode === PROVIDER_STORE_V2) throw new Error('evolution-state-migrate-v2: the v2 migration is already active')
     const snapshot = source === 'store' ? await readStateStoreSnapshot(io, v1Path) : await readDomainSnapshot(ctx)
     if (options.dryRun === true) {
       return {
@@ -371,13 +372,23 @@ export async function activatePendingStateV2(ctx: Context, options: StateMigrati
   // Lock order matches the tree write path: HomeFence first, then state.lock.
   // The fence is passed down so promotion does not request a second authority.
   return await fence.run(async () => withFileLock(join(home, 'state.lock'), async () => {
-    const markerPath = join(home, 'state', STATE_V2_MIGRATION_MARKER)
     const pendingPath = join(home, 'state', STATE_V2_PENDING_MARKER)
-    if (await io.exists(markerPath)) {
+    const activation = readStoreActivation(home)
+    if (activation?.mode === PROVIDER_STORE_V2) {
       if (await io.exists(pendingPath)) await io.remove(pendingPath)
       return null
     }
     if (!await io.exists(pendingPath)) return null
+    // A rollback record means the user explicitly re-staged after `--revert`.
+    // Archive the old v2 store instead of deleting it; the new activation starts
+    // from a clean bootstrap and the rollback bytes remain inspectable.
+    if (activation?.mode === 'legacy') {
+      const storeDir = join(home, 'store-v2')
+      if (await io.exists(storeDir)) {
+        const backup = join(home, 'store-v2-rollback-' + String(activation.generation) + '-' + String(options.now?.() ?? Date.now()))
+        await io.rename(storeDir, backup)
+      }
+    }
     const pending = JSON.parse(await io.readText(pendingPath) ?? '{}') as {
       target?: unknown
       skillsRoot?: string

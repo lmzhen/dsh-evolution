@@ -74,6 +74,30 @@ describe('/evolution migrate state', () => {
     }
   })
 
+  it('re-stages after a rollback and archives the old v2 store', async () => {
+    const { ctx, home } = await seeded()
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      const evolution = join(home, 'evolution')
+      const io = ctx.evolutionIo.provider()
+      await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['to', 'v2']]), positionals: [] }, ctx })
+      await activatePendingStateV2(ctx, { io, home: evolution })
+      await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['revert', true]]), positionals: [] }, ctx })
+      const staged = await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['to', 'v2']]), positionals: [] }, ctx })
+      expect(staged, staged.text).toMatchObject({ kind: 'success' })
+      await activatePendingStateV2(ctx, { io, home: evolution })
+      expect(await io.exists(join(evolution, 'store-v2', 'head.json'))).toBe(true)
+      const record = JSON.parse(await io.readText(join(evolution, 'state', STATE_V2_MIGRATION_MARKER)) ?? '{}') as { mode?: string }
+      expect(record.mode).toBe('store-v2')
+      const rollbackDirs = await io.list(evolution)
+      expect(rollbackDirs.some(name => name.startsWith('store-v2-rollback-'))).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+    }
+  })
+
   it('rejects an unknown --to target instead of silently using v1', async () => {
     const { ctx } = await seeded()
     const result = await runMigrateStateCommand({ ...command(), command: { flags: new Map<string, string | boolean>([['to', 'v9']]), positionals: [] }, ctx })
