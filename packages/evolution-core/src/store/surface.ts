@@ -35,6 +35,8 @@ export const STORE_SURFACE_COMMANDS: readonly StoreSurfaceCommand[] = [
   { id: 'discovery.rw', kind: 'provider', reads: ['discovery', 'domainMap', 'projectionJournal', 'viewSnapshots'], writes: ['discovery', 'domainMap', 'projectionJournal', 'viewSnapshots'], expectsCommit: false },
   // Memory bridge: MEMORY.md and USER.md.
   { id: 'memory.rw', kind: 'provider', reads: ['memoryFile', 'userFile'], writes: ['memoryFile', 'userFile'], expectsCommit: false },
+  // Feedback rebuild cache (events stay append-only on the base medium).
+  { id: 'feedback.rw', kind: 'provider', reads: ['feedback'], writes: ['feedback'], expectsCommit: false },
   // 9.1 model tools
   { id: 'skill_manage', kind: 'tool', reads: ['state'], writes: ['state'], expectsCommit: true },
   { id: 'memory', kind: 'tool', reads: ['memoryFile', 'userFile'], writes: ['memoryFile', 'userFile'], expectsCommit: true },

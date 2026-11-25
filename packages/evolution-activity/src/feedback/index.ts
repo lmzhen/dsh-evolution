@@ -20,7 +20,7 @@
  * @module @deepseek-ai/dsh-evolution-feedback
  */
 
-import { liveHomeFence, HomeFence, isRecord, scopedTextIO, StoreKernel } from '@deepseek-ai/dsh-evolution-core'
+import { liveHomeFence, HomeFence, isRecord, scopedTextIO, StoreKernel, type StoreService } from '@deepseek-ai/dsh-evolution-core'
 import { STATE_V2_MIGRATION_MARKER } from '@deepseek-ai/dsh-evolution-core/state/storage'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
@@ -140,8 +140,9 @@ export class EvolutionFeedback {
 
   private readonly fence: { run<T>(body: () => Promise<T>): Promise<T> } | undefined
   private readonly home: string
+  private service: StoreService | undefined
 
-  constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}, fence?: { run<T>(body: () => Promise<T>): Promise<T> }) {
+  constructor(io?: IoLike, home = evolutionRoot(), pathOverride?: string, warn: (message: string) => void = () => {}, fence?: { run<T>(body: () => Promise<T>): Promise<T> }, service?: StoreService | undefined) {
     // rc.68 + K-6: BOTH paths derive from the constructor surface only —
     // record() takes no backend io, so path and io backend can never disagree.
     // They derive unconditionally so a late `attachIo` (S6.4) does not need to
@@ -151,6 +152,7 @@ export class EvolutionFeedback {
     this.eventsPath = eventsFile(home)
     this.warn = warn
     this.fence = fence
+    this.service = service
     this.io = this.bindIo(io)
   }
 
@@ -163,11 +165,13 @@ export class EvolutionFeedback {
     const path = this.path
     if (path === undefined) return io
     const kernel = new StoreKernel({ io, home, fence: this.fence ?? new HomeFence({ home }) })
-    return scopedTextIO(io, { path, domain: 'feedback', kernel })
+    const serviceOptions = this.service === undefined ? {} : { service: this.service, commandId: 'feedback.rw' }
+    return scopedTextIO(io, { path, domain: 'feedback', kernel, ...serviceOptions })
   }
 
   /** Bind the evolution IO backend after construction (S6.4 deferred binding). */
-  attachIo(io: IoLike): void {
+  attachIo(io: IoLike, service?: StoreService | undefined): void {
+    if (service !== undefined) this.service = service
     this.io = this.bindIo(io)
   }
 
@@ -949,7 +953,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
     // reads on restore and writes through transact), else the default backend.
     const ioRegistry = (ioCtx as unknown as { evolutionIo: { provider(name?: string): EvolutionIoLike } }).evolutionIo
     const io = evolutionIoAdapter(() => ioRegistry.provider())
-    feedback.attachIo(io)
+    feedback.attachIo(io, ioCtx.get('evolutionStore') as StoreService | undefined)
     void feedback.restore(io).catch((error: unknown) => {
       ioCtx.logger.warn(error)
     })
