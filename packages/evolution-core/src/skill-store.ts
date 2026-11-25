@@ -1388,6 +1388,30 @@ export class SkillLibrary {
    * member set rather than the summaries (the learning graph's node set) pays one directory listing
    * instead of a whole-tree read pass.
    * @returns the sorted skill directory names. */
+  /** Full tree snapshot for one tree unit's manifest (R10.6 full manifest). */
+  async treeManifestFiles(): Promise<TreeManifestFile[]> {
+    const files: TreeManifestFile[] = []
+    const walk = async (dir: string, prefix: string): Promise<void> => {
+      for (const name of await this.io.list(dir)) {
+        if (name.startsWith('.')) continue
+        const absolute = join(dir, name)
+        let content: string | null = null
+        try {
+          content = await this.io.readText(absolute)
+        } catch {
+          // Directories reject a text read; recurse instead.
+        }
+        if (content !== null) {
+          files.push({ path: prefix + name, content })
+          continue
+        }
+        await walk(absolute, prefix + name + '/')
+      }
+    }
+    await walk(this.root, '')
+    return files
+  }
+
   async treeNames(): Promise<string[]> {
     return await listNames(this.root, this.io)
   }
@@ -5160,6 +5184,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
   const { config, io, limits, ctx, transact, threatExemptLabels, authority } = options
   const root = resolveSkillsRoot(config ?? {})
   let effectiveIo = io
+  let library: SkillLibrary | undefined
   let treePublisher: ((unitId: string, files: readonly TreeManifestFile[]) => Promise<void>) | undefined
   // R4: the usage and curator-suppressed sidecars live beside the skill tree.
   // Under the explicit v2 marker they are one domain each; the wrapper delegates
@@ -5171,9 +5196,11 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
       scopedTextIO(io, { path: usageFile(root), domain: 'usage', kernel }),
       { path: suppressedFile(root), domain: 'suppressed', kernel },
     )
-    treePublisher = async (unitId, files) => {
-      // object + head in ONE fence transaction: GC can never see the manifest
-      // between putObject and commit.
+    treePublisher = async (unitId) => {
+      // Full manifest per unit: the head's tree ref is the complete tree, not
+      // just the last unit's delta. Read the tree at publish time, after the
+      // unit lock is gone, so the snapshot reflects the committed files.
+      const files = await library?.treeManifestFiles() ?? []
       await kernel.mutate({
         domains: [],
         source: 'tool',
@@ -5183,7 +5210,7 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
       })
     }
   }
-  return new SkillLibrary(
+  const created = new SkillLibrary(
     root,
     effectiveIo,
     limits,
@@ -5199,6 +5226,8 @@ export function newSkillLibrary(options: NewSkillLibraryOptions): SkillLibrary {
     options.fence === undefined && ctx !== undefined ? () => (ctx.get?.('evolutionMutationAuthority') as { readonly homeFence?: HistoryFence } | undefined)?.homeFence : undefined,
     treePublisher,
   )
+  library = created
+  return created
 }
 
 export {

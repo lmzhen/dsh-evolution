@@ -35,7 +35,7 @@ it('publishes a manifest after the outer mutation lock is released', async () =>
   const snapshot = await kernel.query(['state'])
   expect(snapshot.tree).not.toBeNull()
   const manifest = await readTreeManifest(kernel, snapshot.tree)
-  expect(manifest?.entries.some(entry => entry.path.endsWith('SKILL.md'))).toBe(true)
+  expect(manifest?.entries.some(entry => entry.path.endsWith('SKILL.md')), JSON.stringify(manifest)).toBe(true)
   const updated = await lib.update('tree-skill', skill('tree-skill') + '\nupdated\n', 'foreground')
   expect(updated.ok, updated.message).toBe(true)
   const after = await kernel.query(['state'])
@@ -45,5 +45,12 @@ it('publishes a manifest after the outer mutation lock is released', async () =>
   expect(restructured.ok, restructured.message).toBe(true)
   const restructuredTree = await kernel.query(['state'])
   expect(restructuredTree.commitId).not.toBe(after.commitId)
-  expect(await readTreeManifest(kernel, restructuredTree.tree)).not.toBeNull()
+  const restructuredManifest = await readTreeManifest(kernel, restructuredTree.tree)
+  expect(restructuredManifest).not.toBeNull()
+  // Full manifest per unit: the head snapshot still names the skill body and
+  // the reference created by the restructure, not only the last unit's delta.
+  expect(restructuredManifest?.entries.map(entry => entry.path)).toEqual(expect.arrayContaining([
+    'tree-skill/SKILL.md',
+    'tree-skill/references/details.md',
+  ]))
 }, 30_000)

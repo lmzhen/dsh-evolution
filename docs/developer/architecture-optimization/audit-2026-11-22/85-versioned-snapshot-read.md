@@ -472,7 +472,7 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 
 ##### R10.1 结论：四个“只有一个”
 
-> **状态标记（第三轮复核后）**：已落地 = 可选 service 的 use-time resolver + gate-93 + tree manifest 进 commit 事务 + 删除 pre-commit object/GC grace；**设计态（未落地）= 单进程 activation oracle、activation record/generation、full manifest 权威、typed domain、强制 CAS**。下文凡是“已落地”只指代码已存在；其余不得在实施时当作既成事实。
+> **状态标记（第三轮复核后）**：已落地 = 可选 service 的 use-time resolver + gate-93 + tree manifest 进 commit 事务 + 删除 pre-commit object/GC grace + activation mode 冻结/legacy 写守卫 + full manifest writer；**设计态（未落地）= 完整 activation record/generation、full manifest reader/recovery、codec 表、强制 CAS**。下文凡是“已落地”只指代码已存在；其余不得在实施时当作既成事实。
 
 1. **只有一个 service 获取机制**：`StoreAccess` / `AuthorityAccess` 是稳定的插件侧 handle，内部用平台公开的 `ctx.inject([...], cb)` 在服务出现/替换时更新，消费者只在**使用点** `get()`；禁止把 `ctx.get('evolutionStore')` / `ctx.get('evolutionMutationAuthority')` 存进字段。当前最小实现是 `liveStoreService(ctx)` 闭包；后续把它收成显式 `StoreAccess` 只是为了命名和 gate，不改变机制。
 2. **只有一个激活状态机**：`legacy → staged → active`，进程启动时读一次，运行期不再切；迁移命令只 stage，重启时整体 promote。**唯一 oracle 是 `evolutionStore` 服务是否存在**（无服务=legacy，有服务=active），所有 bridge 不再各自 `existsSync(marker)`；active 模式下服务缺失必须 fail loud。没有“state 已切、其他域未切”的双速窗口。
@@ -561,7 +561,7 @@ interface StoreView {
 
 ##### R10.6 树 manifest 成为唯一权威
 
-- **形状先定死：full manifest per unit**。当前增量 manifest + head 只留最后一个 + GC 只保 64 commit，无法回放出整棵树；因此 unit 提交后生成全树 `{path,sha,size,mode,deleted}` 快照，head 的 manifest 即完整权威；读侧只需一个对象。代价是每 unit O(tree)，接受。
+- **形状先定死：full manifest per unit**。当前增量 manifest + head 只留最后一个 + GC 只保 64 commit，无法回放出整棵树；因此 unit 提交后生成全树 `{path,sha,size,mode,deleted}` 快照，head 的 manifest 即完整权威；读侧只需一个对象。代价是每 unit O(tree)，接受。**已落地的 writer**：`SkillLibrary.treeManifestFiles()` 在 publisher 时遍历当前树，`tree-manifest-boundary` 断言 restructure 后 manifest 同时含 `SKILL.md` 与 `references/details.md`；reader 切换与 recovery 仍待。
 - `TreeRepository`：写 = `StoreView.transact('tree')` + full manifest object；读 = `readTreeManifest`，模型/UI/维护扫描先读 manifest 再按 blob 取正文。
 - materialized 文件在 full manifest 落地前仍是读权威；切换后只在 manifest 缺失且处于迁移期时只读 fallback；active 模式下 manifest 缺失是 `StoreCorruptError`。
 - 恢复源不能用 prepared journal（tree unit 已 committed，afterCommit 才入队）：在 unit commit 前写一条 durable `manifest-pending` 记录（unitId + after hashes），publish 成功后清除；启动时按该记录重放，而不是扫 prepared journal。
