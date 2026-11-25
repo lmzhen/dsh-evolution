@@ -244,6 +244,7 @@ async function writeMaintainReport(
   warn: (message: string) => void,
   evolutionHomePath: string,
   fence?: { run<T>(body: () => Promise<T>): Promise<T> } | undefined,
+  store?: StoreReportsQuery | undefined,
 ): Promise<string | undefined> {
   // The home is bound when the RUN starts (passed in, not read here): a run belongs to
   // the home it was started in, and a later home change must not misfile its report.
@@ -252,25 +253,34 @@ async function writeMaintainReport(
   let written = true
   const body = async (): Promise<void> => {
   try {
-    await io.writeText(path, JSON.stringify(record, null, 2))
-    await io.writeText(join(dir, `maintain-${record.runId}.md`), record.text.trim() === '' ? `Maintenance run ${record.runId}: ${record.failure ?? 'no plan'}\n` : record.text)
+    if (store?.command !== undefined) {
+      const jsonKey = relative(evolutionHomePath, path).replace(/\\/g, '/')
+      const mdKey = relative(evolutionHomePath, join(dir, `maintain-${record.runId}.md`)).replace(/\\/g, '/')
+      const markdown = record.text.trim() === '' ? `Maintenance run ${record.runId}: ${record.failure ?? 'no plan'}\n` : record.text
+      await store.command({
+        commandId: 'merge',
+        domains: ['reports'],
+        change: current => ({
+          reports: { ...(current.domains.reports ?? {}), [jsonKey]: JSON.stringify(record, null, 2), [mdKey]: markdown },
+        }),
+      })
+    } else {
+      await io.writeText(path, JSON.stringify(record, null, 2))
+      await io.writeText(join(dir, `maintain-${record.runId}.md`), record.text.trim() === '' ? `Maintenance run ${record.runId}: ${record.failure ?? 'no plan'}\n` : record.text)
+      // One sweep for every kind (core/reports.ts): the file window keeps its
+      // existing retention; the v2 domain path is compacted separately.
+      await transactIo(io, reportsSweepLockTarget(), async () => {
+        await sweepReports({ io, dir, buckets: [{ prefix: 'maintain-', keep: 20 }], owner: 'evolution-commands', warn })
+        // The lock target itself is never written — the task exists to hold the lock.
+        return null
+      })
+    }
   } catch (error) {
     // The report is the run's ONE result home: a write failure is WARNED about and
     // the run then answers "no result" — it must not disappear silently (P2-3).
     written = false
     warn(`evolution-commands: could not write the report for run ${record.runId} (${error instanceof Error ? error.message : String(error)}) — that run will answer "no result"`)
   }
-  // One sweep for every kind (core/reports.ts): the maintenance window reuses the
-  // implementation the curator's reports already had, instead of a second copy.
-  // The SAME per-home reports lock the curator's sweep holds (v43 FLOW2-1 / N20):
-  // "list the directory, then delete beyond the window" is multi-step, and a
-  // second host over one home (the desktop and web planes share DSH_HOME) must
-  // not interleave with it.
-  await transactIo(io, reportsSweepLockTarget(), async () => {
-    await sweepReports({ io, dir, buckets: [{ prefix: 'maintain-', keep: 20 }], owner: 'evolution-commands', warn })
-    // The lock target itself is never written — the task exists to hold the lock.
-    return null
-  })
   }
   if (fence !== undefined) await fence.run(body)
   else await body()
@@ -280,6 +290,11 @@ async function writeMaintainReport(
 /** Three-state read of a run's result: present, missing, or unreadable (never collapsed). */
 interface StoreReportsQuery {
   query(commandId: string, domains: readonly string[]): Promise<{ snapshot: { domains: { reports?: Record<string, string> } } }>
+  command?(request: {
+    readonly commandId: string
+    readonly domains: readonly string[]
+    readonly change: (current: { readonly domains: { readonly reports?: Record<string, string> } }) => { readonly reports: Record<string, string> }
+  }): Promise<unknown>
 }
 
 async function readRunReport(io: EvolutionIoLike, record: RunRecord, store?: StoreReportsQuery | undefined): Promise<{ kind: 'present'; text: string; report: Partial<MaintainReportRecord> } | { kind: 'missing' } | { kind: 'unknown'; reason: string }> {
@@ -1164,6 +1179,7 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 },
               )
               const endedAt = Date.now()
+              const reportStore = ctx.get('evolutionStore') as StoreReportsQuery | undefined
               const resultRef = await writeMaintainReport(ioRegistry.provider(), {
                 runId: handle.id,
                 ...(outcome.ok
@@ -1182,10 +1198,10 @@ export function apply(ctx: Context, rawConfig: Config = {}): void {
                 startedAt: handle.startedAt,
                 endedAt,
                 text: outcome.text ?? '',
-              }, (message) => { ctx.logger.warn(message) }, runHome, homeFenceFrom(ctx))
+              }, (message) => { ctx.logger.warn(message) }, runHome, homeFenceFrom(ctx), reportStore)
               // W5 G3-S4: a settle that names a resultRef must be readable NOW — otherwise the
               // terminal record points at a file a reader/replay cannot open (write/io race).
-              if (resultRef !== undefined) {
+              if (resultRef !== undefined && reportStore?.command === undefined) {
                 const readable = isPresent(await probeMtime(ioRegistry.provider(), resultRef))
                 if (!readable) {
                   await registry.settle(handle.id, {
