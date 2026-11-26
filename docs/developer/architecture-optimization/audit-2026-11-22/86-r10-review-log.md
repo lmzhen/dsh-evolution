@@ -57,12 +57,23 @@
   - `mutation-recovery`、`skill-history`、`skill-store`、`create-tree-reads` 回归。
 - 证据：`skill-store.ts`、`mutation-storage-adapter.ts`、`80-p2-ledger` R10-P2-11。
 
+## 第五轮（state codec + gate 收口复核）
+
+- 结论：新 P0=0，新 P1=0。
+- 复核点：
+  - `stateCodec` 的 read/transact 路径与旧 command 路径的 source/expectedCommit/原子性一致；
+  - kernel 路径与 service 路径的坏文档都抛 `StoreCorruptError`；
+  - inject gate 只读声明，`export const` 与 `static` 都覆盖，字面量检查 fail-closed；
+  - gate title/manifest/CONTRIBUTING/drill evidence 与代码一致。
+- 残余 P2（不升 P1）：数组内注释会被判非字面量、只取第一个 inject 声明、对象式 `Inject` 未支持；curator late-provide 矩阵仍缺。
+- 证据：`state/v2-provider.ts`、`verify-store-lifecycle.mjs`、`guards.mjs`、`installation-matrix.spec.ts`、`boundary.spec.ts`。
+
 ## 当前未决
 
-- P2-3：gate 仍是静态模式匹配，跨函数包装可能漏检。
-- P2-4：curator 的“先 mount 后 provide / 完全无 service”矩阵未补。
+- P2-3：gate 只守 `inject` 声明（字面量、含 static）；不再追跨函数包装，捕获由行为矩阵覆盖；数组内注释、对象式 `Inject` 未支持。
+- P2-4：curator 无 store/authority 的最小 mount 已覆盖；“先 mount 后 provide”仍缺。
 - P2-10：本页即为该条的可审计记录；原始对话不在库内。
-- manifest-pending 显式持久记录、逐域 codec 迁移、promote 未 re-stage 拒绝条件仍待。
+- manifest-pending 显式持久记录、usage/merge/memory/feedback 的 codec 收敛、promote 未 re-stage 拒绝条件仍待。
 
 ## 复核结论的用法
 
