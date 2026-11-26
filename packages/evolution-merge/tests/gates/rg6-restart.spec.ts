@@ -5,6 +5,7 @@ import { expect, it } from 'vitest'
 import { newRunRegistry, nodeEvolutionIo, runsFile } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { loadMergeState, pairKey, rowIdOf, runResumeCommand, type MergeDecision, type MergeRow } from '../../src/index.ts'
+import { readRunMeta } from '../../src/domain/run-coordinator.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const DECISION: MergeDecision = { shouldMerge: true, mode: 'merge-into-existing', target: 'a', sources: ['a', 'b'], rationale: 'same' }
@@ -54,4 +55,10 @@ it('manual resume after restart is explicit and can complete', { timeout: 90_000
     await new Promise(resolve => setTimeout(resolve, 10))
   }
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
+  // finish() writes run-meta after the rows settle; let it land before teardown.
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const meta = await readRunMeta(io, home, runId)
+    if (meta !== null && meta.phase !== 'running') break
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
 })

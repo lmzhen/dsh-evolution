@@ -53,5 +53,5 @@
 - HMR 替换 store service 的真机验证；
 - Key 错误态：空/有/清除已通过 credentials RPC 验证；错误态需要真实扫描/model key，尚未测。
 - 迁移后重启的**完整** UI 再验收（本轮只做了 API + 迁移/回退）；
-- 完整 family suite 最终跑通：本机 80+ 分钟仍未结束，已终止；CI cohort 绿。日志中的 `detached run finish failed: ENOENT` 已修（测试等 run-meta 终态再 teardown）。
+- 完整 family suite 最终跑通：本机 80+ 分钟仍未结束，已终止；CI cohort 绿。日志中的 `detached run finish failed: ENOENT/EPERM` 已修（runtime-scan 与 rg6-kill-client/rg6-restart 都等 run-meta 收尾再 teardown）。
 - 正式版本确认、tag、唯一一次发布、发布后 fresh npm 安装验收。

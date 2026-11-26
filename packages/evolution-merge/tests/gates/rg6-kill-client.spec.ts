@@ -4,6 +4,7 @@ import { expect, it, vi } from 'vitest'
 import { newRunRegistry, nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 import { pairKey, rowIdOf, runApproveCommand, type MergeDecision, type MergeRow } from '../../src/index.ts'
+import { readRunMeta } from '../../src/domain/run-coordinator.ts'
 
 const AT = '2026-10-20T00:00:00.000Z'
 const DECISION: MergeDecision = { shouldMerge: true, mode: 'merge-into-existing', target: 'a', sources: ['a', 'b'], rationale: 'same' }
@@ -24,4 +25,10 @@ it('a detached run completes and stays readable after the client is gone', { tim
   const report = await io.readText(run!.resultRef!)
   expect(report).not.toBeNull()
   expect(report).toContain('"schemaVersion"')
+  // finish() writes run-meta after the registry settles; let it land before teardown.
+  await vi.waitFor(async () => {
+    const meta = await readRunMeta(io, home, runId)
+    expect(meta).not.toBeNull()
+    expect(meta?.phase).not.toBe('running')
+  }, { timeout: 10_000, interval: 20 })
 })
