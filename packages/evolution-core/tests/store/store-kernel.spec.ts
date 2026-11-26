@@ -38,6 +38,29 @@ describe('home MVCC store kernel', () => {
     expect(snapshot.tree).toBeNull()
   })
 
+  it('retries a transient EPERM when readers hold the head target', async () => {
+    const { root, io, kernel } = await seeded()
+    await kernel.bootstrap({ state: { turns: 1 } })
+    let failures = 2
+    const wrapped = {
+      ...io,
+      async writeText(path: string, content: string): Promise<void> {
+        if (path.endsWith('head.json') && failures > 0) {
+          failures -= 1
+          const error = new Error('EPERM: head.json target is held by a reader') as NodeJS.ErrnoException
+          error.code = 'EPERM'
+          throw error
+        }
+        await io.writeText(path, content)
+      },
+    }
+    const writer = new StoreKernel({ io: wrapped, home: root, fence: openFence() })
+    const result = await writer.mutate({ domains: ['state'], source: 'command', change: () => ({ state: { turns: 2 } }) })
+    expect(failures).toBe(0)
+    expect((await writer.query(['state'])).domains.state).toEqual({ turns: 2 })
+    expect(result.commitId).toMatch(/^[0-9a-f]{64}$/)
+  })
+
   it('publishes a new commit while an already-returned snapshot stays immutable', async () => {
     const { io, root } = await seeded()
     const kernel = new StoreKernel({ io, home: root, fence: openFence() })

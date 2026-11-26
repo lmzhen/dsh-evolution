@@ -38,6 +38,16 @@ const SCHEMA_VERSION = 1
 const HEAD_FILE = 'head.json'
 const COMMITS_DIR = 'commits'
 const OBJECTS_DIR = 'objects'
+/**
+ * Windows readers open `head.json` through the platform fs `readText` without
+ * FILE_SHARE_DELETE, so a continuous read burst can make the replacing rename
+ * fail with EPERM even though no writer lock is held. The IO seam already
+ * retries the rename for ~2s; these outer attempts cover a read burst that
+ * outlives that window, then fail closed rather than spin forever.
+ */
+const HEAD_PUBLISH_RETRY_MAX_ATTEMPTS = 5
+const HEAD_PUBLISH_RETRY_BASE_MS = 100
+const HEAD_PUBLISH_RETRY_MAX_DELAY_MS = 1_000
 
 const DOMAIN_IDS: ReadonlySet<string> = new Set(STORE_DOMAIN_IDS)
 
@@ -461,7 +471,22 @@ export class StoreKernel {
       commitSha256: sha256(stableStringify(commit)),
       updatedAt: new Date(this.now()).toISOString(),
     }
-    await this.io.writeText(join(this.root, HEAD_FILE), stableStringify(head))
+    await this.publishHead(join(this.root, HEAD_FILE), stableStringify(head))
+  }
+
+  private async publishHead(path: string, content: string): Promise<void> {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await this.io.writeText(path, content)
+        return
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException | undefined)?.code
+        if (code !== 'EPERM' && code !== 'EBUSY') throw error
+        if (attempt >= HEAD_PUBLISH_RETRY_MAX_ATTEMPTS) throw error
+        await new Promise(resolve =>
+          setTimeout(resolve, Math.min(HEAD_PUBLISH_RETRY_BASE_MS * 2 ** attempt, HEAD_PUBLISH_RETRY_MAX_DELAY_MS)))
+      }
+    }
   }
 
   private async writeHeadIfAbsent(commit: StoreCommit): Promise<void> {
