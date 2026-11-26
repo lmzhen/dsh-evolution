@@ -491,7 +491,7 @@ plugin apply (sync)
 - `StoreAccess.get()` 在 legacy 模式下返回 undefined 是合法状态；在 active 模式下 undefined 必须是 `StoreUnavailableError`，带“重启/服务未挂载”指引，不能静默退回文件。
 - `AuthorityAccess` 同理管理 `evolutionMutationAuthority` / fence；`liveHomeFence` 只是它的读侧投影。
 - 平台侧无需新 API：`ctx.inject` 是公开的“可选依赖晚绑定”seam；`ctx.get` 只允许在 `get()`/使用点出现。
-- 静态门禁：`verify-store-lifecycle` 只检查 `export const inject` 声明，要求字面量字符串数组且不含可选服务名；不再用正则追 `ctx.get` 的括号/解构/别名等表达式形态，捕获行为交给 mount/late-provide 行为矩阵。
+- 静态门禁：`verify-store-lifecycle` 只检查 `export const inject` / `static inject` 声明，要求字面量字符串数组且不含可选服务名；不再用正则追 `ctx.get` 的括号/解构/别名等表达式形态，捕获行为交给 mount/late-provide 行为矩阵。
 - **唯一 oracle**：`StoreAccess.get()` 的 undefined 语义必须由激活状态决定，而不是各自 `existsSync(marker)`：
   - 所有消费者只调用 `isStoreV2Active(home)`（`state/activation.ts`）；gate-94 禁止其他源文件直接引用 marker 常量（迁移/激活文件除外）；
   - gate-93 负责“必需 inject 不含可选能力”；构造期捕获/旧句柄由 `installation-matrix`、HMR/late-provide、activation guard、scoped bridge 测试覆盖；

@@ -61,7 +61,7 @@
 |---|---|---|
 | R10-P2-1 reports 双介质 | FIXED | 读 key 对齐 `reports/<name>`；v2 下写走 `merge` surface 的 reports 域；域内保留最新 20 份 maintain 报告（JSON+MD，按 endedAt），有单测；merge 其它前缀不动。 |
 | R10-P2-2 GC retain/读失败 | FIXED | `collectGarbage` 非法 retain 抛 `store-invalid-retain`；GC 读失败被隔离，新增 `does not fail an already-published mutation when GC bookkeeping fails`。 |
-| R10-P2-3 lifecycle gate 漏闭包 | FIXED | gate-93 只做一件事：读 `export const inject` 声明，要求必须是字面量字符串数组（展开/变量会红，避免 gate 失明），并禁止可选 service 名进入必需依赖；不追括号/解构/别名等表达式形态。捕获/晚挂载由行为门禁覆盖：`installation-matrix` 在无 authority 的最小组合里断言 `skill_manage` 仍存在，HMR/late-provide、activation guard、scoped bridge 测试覆盖其余路径。 |
+| R10-P2-3 lifecycle gate 漏闭包 | FIXED | gate-93 只做一件事：读 `inject` 声明（`export const inject` 与 `static inject`），要求必须是字面量字符串数组（展开/变量会红，避免 gate 失明），并禁止可选 service 名进入必需依赖；不追括号/解构/别名等表达式形态。捕获/晚挂载由行为门禁覆盖：`installation-matrix` 在无 authority 的最小组合里断言 `skill_manage` 仍存在，HMR/late-provide、activation guard、scoped bridge 测试覆盖其余路径。 |
 | R10-P2-4 生命周期矩阵不全 | PARTIAL | 已补 state-auto 模式冻结、memory/merge/discovery activation guard、feedback attach-time service、curator 无 store/authority 的最小 mount、HMR service 新实例、GC 故障；curator 的“先 mount 后 provide”仍缺。 |
 | R10-P2-5 scoped `mtime=null` 缓存 | FIXED | scoped text 的 `mtime` 现在返回 commit id 的稳定数值投影，commit 变化即失效；新增 `exposes the commit revision as mtime`。 |
 | R10-P2-6 双跨进程锁顺序 | FIXED | `activatePendingStateV2` 现在先 HomeFence 再 state.lock，并把同一 fence 传给 promote；生产命令仍只 stage，直调 `migrateStateToV2` 的测试路径保留旧顺序。 |

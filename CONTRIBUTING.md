@@ -127,7 +127,7 @@ The same registry decides each row's lane (`local`/`pre-tag`/`ci-static`/`ci-uni
 | 90 | `node packages/scripts/verify-store-single-source.mjs packages`（DCR-85：store-v2 head/commit/objects 路径只出现在 kernel 与 state 迁移层） | mirror |
 | 91 | `node packages/evolution/evolution-core/scripts/verify-store-head.mjs`（DCR-85：head 是唯一 commit point，缺失/损坏必须 fail closed） | overlay |
 | 92 | `node packages/scripts/verify-store-read-lock.mjs packages`（DCR-85：query 及其读 helper 不得出现 fence/withFileLock/acquire；mutate 独占 fence.run） | mirror |
-| 93 | `node packages/scripts/verify-store-lifecycle.mjs packages`（DCR-85：必需 `inject` 不得含可选 evolutionStore/authority；只读字面量 `export const inject` 数组，构造期捕获交给 mount/late-provide 行为矩阵） | mirror |
+| 93 | `node packages/scripts/verify-store-lifecycle.mjs packages`（DCR-85：必需 `inject` 不得含可选 evolutionStore/authority；只读字面量 `inject` 数组（`export const inject` / `static inject`），构造期捕获交给 mount/late-provide 行为矩阵） | mirror |
 | 94 | `node packages/scripts/verify-store-activation-oracle.mjs packages`（DCR-85：v2 介质判定只能经 state/activation.ts；迁移/激活文件除外） | mirror |
 | 95 | `node packages/scripts/verify-store-manifest.mjs packages`（DCR-85：tree manifest 只能经 StoreMutation.treeManifest 在 commit 事务内写；禁止 pre-commit putObject/publish 助手） | mirror |
 

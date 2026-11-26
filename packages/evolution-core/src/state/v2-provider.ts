@@ -103,7 +103,7 @@ export function createStateV2Provider(options: StateV2ProviderOptions): Evolutio
     }
     if (value === undefined) throw new Error('evolution-state-v2: the state domain is missing from the current commit')
     return service === undefined
-      ? parseStateDocument(serializeStateDocument(value as StateDocument))
+      ? stateCodec.decode(value)
       : value as StateDocument
   }
 

@@ -688,7 +688,7 @@ export const guards = [
   gate("gate-93", {
     kind: "script",
     tree: "mirror",
-    title: "`node packages/scripts/verify-store-lifecycle.mjs packages`（DCR-85：必需 `inject` 不得含可选 evolutionStore/authority；只读字面量 `export const inject` 数组，构造期捕获交给 mount/late-provide 行为矩阵）",
+    title: "`node packages/scripts/verify-store-lifecycle.mjs packages`（DCR-85：必需 `inject` 不得含可选 evolutionStore/authority；只读字面量 `inject` 数组（`export const inject` / `static inject`），构造期捕获交给 mount/late-provide 行为矩阵）",
     argv: ["node","packages/scripts/verify-store-lifecycle.mjs","packages"],
     lanes: ["local","ci-static"],
   }),
