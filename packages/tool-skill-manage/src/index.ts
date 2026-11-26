@@ -46,6 +46,14 @@ import { commitSkillAction, isReadOnlySkillAction, skillActionOf } from './skill
 const isReadOnlyAction = isReadOnlySkillAction
 
 export const name = 'tool-skill-manage'
+/**
+ * `evolutionMutationAuthority` is deliberately NOT injected. Cordis inject names are
+ * REQUIRED dependencies: `Fiber._refresh()` keeps the epoch INACTIVE while one is
+ * missing, so the whole row — and therefore `skill_manage` — would disappear from any
+ * composition that mounts this row without the authority. The library resolves the
+ * lock and the home fence at write time instead (see `newSkillLibrary`), which heals a
+ * late `provide` without turning the authority into a mount-time prerequisite.
+ */
 export const inject = ['tools', 'skillUsage', 'evolutionIo']
 
 /** 0.3.18 (E-70): review output lists at most this many near-duplicate groups
