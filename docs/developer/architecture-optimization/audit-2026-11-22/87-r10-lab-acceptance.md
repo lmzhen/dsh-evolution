@@ -29,6 +29,7 @@
 | 合并建议页 | 打开后计数区显示 待复核/待我确认/待合并/已忽略/已过期 = 0；高级/历史/刷新可见 |
 | 响应式 | 1440×1000、1024×768、390×844 截图；390 下 tab 横排、数据总览卡片单列、无横向溢出 |
 | 跨进程读 | 独立 Node reader 进程与 writer 进程同时跑：writer 每 10ms 提交一次 feedback，reader 每 10ms 读一次 state，150/150 成功，avg 22.87ms，max 50ms（同一 store 文件，无读者锁） |
+| crash-before-commit | 3 次在 writer 提交前 kill -9；head 保持上一提交、`kernel.query(['state'])` 均成功，没有半发布 head |
 
 ### 截图
 
@@ -44,7 +45,7 @@
 ## 未完成
 
 - 两个完整 host 共享同一 home 的双进程验收：2026-11-26 晚尝试过 3099/3100 host，但机器上已有多个长寿命 host 进程，端口归属和终端 session 混淆，读延迟 2–10s，无法区分是锁竞争还是 CPU/IO 饱和；该次结果**不作为证据**。跨进程读已用“独立 Node reader + writer”单独证明；完整双 host 仍待干净机器。
-- 崩溃恢复（kill -9 在 unit 中/commit 中/head 后）；
+- 崩溃恢复的“head 已前进后 kill”还没有稳定复现：本次 kill 都发生在 head 前进前；head 前进后的 kill 需要更长写入窗口或故障注入，仍待。
 - HMR 替换 store service 的真机验证；
 - fresh profile 的 Key 空/有/错误/清除四态；
 - 迁移后重启的**完整** UI 再验收（本轮只做了 API + 迁移/回退）；
