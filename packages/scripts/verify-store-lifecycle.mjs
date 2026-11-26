@@ -28,6 +28,11 @@ function walk(dir, visit) {
 
 function audit(path, text) {
   const rel = relative(root, path)
+  // Aliasing the accessor (`const get = ctx.get`) defeats the direct-call pattern;
+  // the resolver must be invoked at the use point instead.
+  if (/(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*ctx\??\.get\s*(?:;|\n|$)/.test(text)) {
+    problems.push(rel + ': aliases ctx.get instead of resolving the service at the use point')
+  }
   for (const name of OPTIONAL) {
     // Field/const capture of the optional service at construction time.
     const capture = new RegExp('(?:this\\.[A-Za-z_$][\\w$]*|(?:private|readonly|protected)\\s+[A-Za-z_$][\\w$]*)\\s*(?:=|:)[^;\\n]*ctx\\??\\.get\\??\\.?\\(\\s*[\'"]' + name + '[\'"]')
@@ -53,6 +58,7 @@ if (process.argv.includes('--self-test')) {
     "const store = ctx.get('evolutionStore')\nexport const inject = ['tools']",
     "const store = (ctx?.get?.('evolutionStore'))\nexport const inject = ['tools']",
     "const { store } = ctx.get('evolutionStore')\nexport const inject = ['tools']",
+    "const getService = ctx.get\nconst store = getService('evolutionStore')\nexport const inject = ['tools']",
   ]
   let detected = true
   const missed = []
