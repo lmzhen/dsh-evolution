@@ -25,6 +25,7 @@
 | 重启激活 | 重启后 `evolution/state/.migrated-to-store-v2.json`：`mode=store-v2`，`generation=1795704000718`，`commitId=d53f2f02e048…`；`evolution/store-v2/head.json` 存在 |
 | 激活后读 | 重启后 `merge/view` 仍 200、`diagnostics` 200（family-version 0.61.0） |
 | 回退 | `/evolution migrate state --revert` → success；marker 改为 `mode=legacy`，`generation=1795704000719`，保留 `commitId/lastActiveCommitId=d53f2f02e048…`；`store-v2/head.json` 字节仍在（未被删除或回灌） |
+| re-stage | 回退后再次 `--to v2` → 重启激活；旧 store 归档为 `store-v2-rollback-1795704000719-1795712504922`，新 marker `mode=store-v2`、`generation=1795712528234`、新 commit；归档 head 仍指向旧 commit `fb17c1e2…`；`merge/view` 200 |
 | 技能整理页 | 技能 / 数据总览 / 待我确认 / 合并建议 四个 tab 均加载 |
 | 合并建议页 | 打开后计数区显示 待复核/待我确认/待合并/已忽略/已过期 = 0；高级/历史/刷新可见 |
 | 响应式 | 1440×1000、1024×768、390×844 截图；390 下 tab 横排、数据总览卡片单列、无横向溢出 |
