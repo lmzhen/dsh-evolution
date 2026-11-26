@@ -506,7 +506,7 @@ plugin apply (sync)
   - 完全没有 service → row 仍能 mount，能力缺失可诊断，写 fail loud（active 模式下）；
   - `inject` 必需集合固定：静态 gate 只读 `inject` 声明，禁止可选 service 名进入必需依赖；行为门禁用最小组合 mount（如 `installation-matrix` 无 authority 时断言 `skill_manage` 仍存在），不追表达式语法。
 
-已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。`verify-store-lifecycle` 已成为 gate-93（只用 AST 检查 `inject` 声明，不追表达式；捕获/晚挂载交给行为矩阵），`verify-store-activation-oracle` 成为 gate-94（除迁移/激活文件外不得直接引用 marker）。另外 `EvolutionState` 不再运行期切 v2：启动时的模式缓存 + `guardLegacyActivation` 让另一宿主激活后本进程的 state/sidecar/runs 写 fail loud，而不是继续写 legacy；单测证明 activation guard 只拦迁移路径、skill tree 等非迁移路径仍可写。**仍缺**：curator 的 late provide/无 service 矩阵、完整 activation record/generation 的消费方、HMR 旧实例断言。
+已落地的第一步（2026-11）：`StoreServiceSource` + `resolveStoreService` + `liveStoreService(ctx)`；scoped text/tree、v2 provider、usage/curator、merge、memory、discovery、feedback 的 bridge 都改为使用期解析；`usage-sidecar-v2.spec` 用“先写、后 provide service、再写”证明 late provide 自愈。`verify-store-lifecycle` 已成为 gate-93（只读 `inject` 声明数组，不追表达式；捕获/晚挂载交给行为矩阵），`verify-store-activation-oracle` 成为 gate-94（除迁移/激活文件外不得直接引用 marker）。另外 `EvolutionState` 不再运行期切 v2：启动时的模式缓存 + `guardLegacyActivation` 让另一宿主激活后本进程的 state/sidecar/runs 写 fail loud，而不是继续写 legacy；单测证明 activation guard 只拦迁移路径、skill tree 等非迁移路径仍可写。**仍缺**：curator 的 late provide/无 service 矩阵、完整 activation record/generation 的消费方、HMR 旧实例断言。
 
 ##### R10.3 激活状态机与迁移
 

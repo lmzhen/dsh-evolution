@@ -17,7 +17,6 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import ts from 'typescript'
 
 const root = process.argv[2] ?? 'packages'
 const OPTIONAL = new Set(['evolutionStore', 'evolutionMutationAuthority'])
@@ -33,27 +32,11 @@ function walk(dir, visit) {
   }
 }
 
-/** Read `export const inject = [...]` as a string array; null when it is not a literal. */
+/** Read the string entries of the `inject` array literal; null when not declared as a literal. */
 function declaredInject(text) {
-  const source = ts.createSourceFile('module.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
-  let found = null
-  const visit = (node) => {
-    if (ts.isVariableStatement(node)) {
-      for (const declaration of node.declarationList.declarations) {
-        if (!ts.isIdentifier(declaration.name) || declaration.name.text !== 'inject') continue
-        const init = declaration.initializer
-        if (init === undefined || !ts.isArrayLiteralExpression(init)) continue
-        const names = []
-        for (const element of init.elements) {
-          if (ts.isStringLiteral(element) || ts.isNoSubstitutionTemplateLiteral(element)) names.push(element.text)
-        }
-        found = names
-      }
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(source)
-  return found
+  const match = /\b(?:export\s+)?const\s+inject\s*=\s*\[([\s\S]*?)\]/.exec(text)
+  if (match === null) return null
+  return [...match[1].matchAll(/['"]([^'"]+)['"]/g)].map(entry => entry[1])
 }
 
 function audit(path, text) {
