@@ -491,10 +491,10 @@ plugin apply (sync)
 - `StoreAccess.get()` 在 legacy 模式下返回 undefined 是合法状态；在 active 模式下 undefined 必须是 `StoreUnavailableError`，带“重启/服务未挂载”指引，不能静默退回文件。
 - `AuthorityAccess` 同理管理 `evolutionMutationAuthority` / fence；`liveHomeFence` 只是它的读侧投影。
 - 平台侧无需新 API：`ctx.inject` 是公开的“可选依赖晚绑定”seam；`ctx.get` 只允许在 `get()`/使用点出现。
-- 静态门禁：长生命周期对象字段禁止 `ctx.get(...)` 赋值；新增 `verify-store-lifecycle` 扫描 `ctx.get('evolutionStore')`/`ctx.get('evolutionMutationAuthority')` 的字段化用法，和白名单（迁移命令）之外一律红。
+- 静态门禁：`verify-store-lifecycle` 只检查 `export const inject` 声明，要求字面量字符串数组且不含可选服务名；不再用正则追 `ctx.get` 的括号/解构/别名等表达式形态，捕获行为交给 mount/late-provide 行为矩阵。
 - **唯一 oracle**：`StoreAccess.get()` 的 undefined 语义必须由激活状态决定，而不是各自 `existsSync(marker)`：
   - 所有消费者只调用 `isStoreV2Active(home)`（`state/activation.ts`）；gate-94 禁止其他源文件直接引用 marker 常量（迁移/激活文件除外）；
-  - gate-93 已覆盖字段式捕获、直接 local 捕获、必需 inject；更复杂的包装表达式仍可能漏检；
+  - gate-93 负责“必需 inject 不含可选能力”；构造期捕获/旧句柄由 `installation-matrix`、HMR/late-provide、activation guard、scoped bridge 测试覆盖；
   - legacy 且无 service → 允许 base IO（bridge 常驻，不建/不拆）；
   - active 且无 service → `StoreUnavailableError`（重启/服务未挂载指引）；
   - 运行期发现另一进程激活（service 首次出现而本进程启动时无记录）→ fail loud，禁止本进程静默切介质；
@@ -620,7 +620,8 @@ interface StoreView {
 
 ##### R10.11 验收判据（新增/加强）
 
-- `verify-store-lifecycle`：构造期 `ctx.get` 可选服务、必需 inject 误加、服务替换后旧句柄残留 → 红。
+- `verify-store-lifecycle`：必需 inject 误加可选服务（且 inject 必须字面量数组，展开/变量 → 红）。
+- `installation-matrix`/late-provide 行为测试：最小组合下 row 仍挂载、surface 仍存在、服务后挂载/替换后生效（不靠源码正则追表达式）。
 - `verify-store-transaction`：object/commit/head 任一崩溃点后没有“半发布”；并发 GC 不删可达对象；retain 非法入口拒绝。
 - `verify-store-ports`：生产代码不得出现 file-shaped domain read/write（迁移命令/R4 白名单除外）；每个 port 有 codec 负例。
 - `verify-store-manifest`：已落地 gate-95，禁止 pre-commit `putObject`/`publishTreeManifest*`，要求 kernel 在 mutate 内应用 `treeManifest`；manifest 读写同源/崩溃恢复/materialized fallback 判据仍待实现。
@@ -644,7 +645,7 @@ interface StoreView {
 
 - reports fallback 的 key 前缀错误（域 key 是 `reports/x`，当前用 `x`）；写路径仍走 base；
 - GC `retain` 非法值已改为入口拒绝（`store-invalid-retain`）；GC 读阶段失败不再把已提交写判失败（有故障注入测试 `does not fail an already-published mutation when GC bookkeeping fails`）；
-- gate-93 只认字段式捕获，漏闭包捕获（`run-registry` 仍冻结 service）；R10.11 的 transaction/ports 两条门禁尚不存在，manifest 只落地了 writer 门禁（gate-95）；
+- gate-93 只认字段式捕获，漏闭包捕获（`run-registry` 仍冻结 service）；R10.11 的 transaction/ports 两条门禁尚不存在，manifest 只落地了 writer 门禁（gate-95）；**后续已修**：gate-93 收缩为 inject 声明契约，捕获交给行为矩阵；run-registry 改为每次操作解析 service；
 - 五个 bridge 无完整的 late-provide/HMR 矩阵；`store-service-plugin` 已断言 HMR 后 service 是新实例，`store-plugin` 已改用 live IO adapter，但其余消费者仍缺“先 mount 后 provide / 完全无 service”用例；
 - scoped adapter `mtime=null` 导致 ProjectionJournal 缓存永不失效：已改为返回 commit revision 的数值投影，commit 变化即失效；
 - promote 的锁顺序已改为 `HomeFence → state.lock`，与 tree 路径一致，并把同一 fence 传入 promote；直调 `migrateStateToV2` 的测试路径仍保留旧顺序；
