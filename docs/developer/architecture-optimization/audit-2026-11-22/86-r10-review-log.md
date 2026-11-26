@@ -70,7 +70,7 @@
 
 ## 当前未决
 
-- P2-3：gate 只守 `inject` 声明（字面量、含 static）；不再追跨函数包装，捕获由行为矩阵覆盖；数组内注释、对象式 `Inject` 未支持。
+- P2-3：gate 只守 `inject` 声明（字面量、含 static）；数组内注释已剥离，不再误红；对象式 `Inject` 仍不在支持范围（当前插件全是数组形式）。
 - P2-4：curator 无 store/authority 的最小 mount 已覆盖；“先 mount 后 provide”仍缺。
 - P2-10：本页即为该条的可审计记录；原始对话不在库内。
 - manifest-pending 显式持久记录仍待（boot 全树对账已覆盖可用性）。

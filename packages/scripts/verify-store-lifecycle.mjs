@@ -41,7 +41,7 @@ function declaredInject(text) {
   const rest = text.slice(equals + 1)
   const array = /^\s*\[([\s\S]*?)\]/.exec(rest)
   if (array === null) return { names: [], literal: false }
-  const body = array[1]
+  const body = array[1].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
   const strings = [...body.matchAll(/['"]([^'"]+)['"]/g)].map(entry => entry[1])
   const literal = body.replace(/['"][^'"]*['"]/g, '').replace(/[\s,]/g, '') === ''
   return { names: strings, literal }
@@ -79,6 +79,7 @@ if (process.argv.includes('--self-test')) {
     "export const inject = ['tools', 'skillUsage', 'evolutionIo']",
     "export const inject: string[] = []",
     "export const inject = ['slots', 'locale'] as const",
+    "export const inject = ['tools', /* authority is optional */ 'evolutionIo']",
     "class Row { static inject = ['tools', 'evolutionIo'] }",
   ]
   let failed = false
