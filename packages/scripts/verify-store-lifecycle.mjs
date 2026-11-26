@@ -34,7 +34,7 @@ function walk(dir, visit) {
 
 /** Read the `inject` declaration; literal=false means an audit-unfriendly expression. */
 function declaredInject(text) {
-  const start = /\b(?:export\s+)?const\s+inject\b/.exec(text)
+  const start = /\b(?:(?:export\s+)?const|static)\s+inject\b/.exec(text)
   if (start === null) return null
   const equals = text.indexOf('=', start.index)
   if (equals < 0) return { names: [], literal: false }
@@ -70,6 +70,8 @@ if (process.argv.includes('--self-test')) {
     "export const inject = ['tools', 'evolutionMutationAuthority']",
     "export const inject = ['evolutionStore', 'tools']",
     "const x = 1\nexport const inject = ['tools', 'skillUsage', 'evolutionMutationAuthority']",
+    "class Row { static inject = ['evolutionStore', 'tools'] }",
+    "class Row { static inject = pickInject() }",
     'const required = [\'tools\']\nexport const inject = [...required]',
     "export const inject = required",
   ]
@@ -77,6 +79,7 @@ if (process.argv.includes('--self-test')) {
     "export const inject = ['tools', 'skillUsage', 'evolutionIo']",
     "export const inject: string[] = []",
     "export const inject = ['slots', 'locale'] as const",
+    "class Row { static inject = ['tools', 'evolutionIo'] }",
   ]
   let failed = false
   for (const fake of shouldRed) {

@@ -408,8 +408,8 @@
     },
     "gate-93": {
       "drillCmd": "node packages/scripts/verify-store-lifecycle.mjs packages --self-test",
-      "evidence": "inject a synthetic field capture of ctx.get('evolutionStore') and a required inject listing evolutionMutationAuthority; both must be reported",
-      "provenAt": "2026-11-25T18:30:00.000Z"
+      "evidence": "a literal inject listing evolutionMutationAuthority must be reported, and a non-literal inject (spread/variable) must fail closed; a literal required-only inject must stay green",
+      "provenAt": "2026-11-26T03:30:00.000Z"
     },
     "gate-94": {
       "drillCmd": "node packages/scripts/verify-store-activation-oracle.mjs packages --self-test",

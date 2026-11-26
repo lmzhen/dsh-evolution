@@ -445,7 +445,7 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 - 测试：marker 恢复成功/拒绝两例通过；restructure manifest 通过；usage-sidecar-v2 通过；`tsc` core/curator/discovery/commands 0。
 - P1-6：跨进程无锁读 drill 注册为 gate-88（overlay tree, local lane；CI static 缺 platform 安装依赖，已登记 local-runner only），有 family-facts 声明与 no-drill reason；本地已运行通过。
 - P1-7：新增 gate-89 `verify-store-surface`、gate-90 `verify-store-single-source`、gate-91 `verify-store-head`、gate-92 `verify-store-read-lock`；分别覆盖 surface 闭包、store 路径单一来源、head 唯一 commit/fail-closed、query 无锁；均有 self-test 或真实负例；gate-manifest / check-registry 通过。gate-91 因 build overlay 依赖登记为 build-line local。
-- P1-8（按 9.0 边界）：家族插件 durable 读已收口到同一内核——state/review/pending/curator 经 `state.provider`，usage 经 `usage.rw`，merge 经 `merge`，memory 经 `memory.rw`，discovery 经 `discovery.rw`，feedback 经 `feedback.rw`；doctor/run-registry 直接消费 service；`transact` 同样走 service。skill tree 读取仍走 UnitKernel + manifest（R5），activity 事件日志按 R4 保持 append-only base，二者都不是第二读写内核。
+- P1-8（按 9.0 边界）：家族插件 durable 读已收口到同一内核——state/review/pending/curator 经 `stateCodec` + `service.read/transact('state')`，usage 经 `usage.rw`，merge 经 `merge.rw`，memory 经 `memory.rw`，discovery 经 `discovery.rw`，feedback 经 `feedback.rw`；doctor/run-registry 直接消费 service；`transact` 同样走 service。skill tree 读取仍走 UnitKernel + manifest（R5），activity 事件日志按 R4 保持 append-only base，二者都不是第二读写内核。
 - 读取范围边界见 9.0：平台、storage backend、其他插件的读不在 DCR-85 范围内，不作为 blocker。
 - P2（部分）：tree-only commit（空 domains + tree ref）不再解析全部 domain blob；manifest 发布失败改为有界重试；query 的 head 重试从 3×10ms 放宽到 5×20ms；tree manifest 移入 commit 事务后，GC 不再依赖 mtime grace（公开的 pre-commit `putObject` 已删除）。
 - P2 reports 读修复：`maintain report` 在 v2 下先读 legacy 文件，缺失时经 `merge` surface query 读 `reports` 域；不再把域内报告误报为“没有结果”。

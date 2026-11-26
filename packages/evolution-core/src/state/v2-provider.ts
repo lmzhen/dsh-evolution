@@ -14,6 +14,7 @@ import type { EvolutionIoLike } from '../io.ts'
 import { StoreKernel } from '../store/store-kernel.ts'
 import { resolveStoreService, type DomainCodec, type StoreServiceSource } from '../store/service.ts'
 import type { StoreWriterFence } from '../store/types.ts'
+import { StoreCorruptError } from '../store/types.ts'
 import type {
   EvolutionStateStorage,
   PendingResolution,
@@ -76,7 +77,11 @@ export function createStateV2Provider(options: StateV2ProviderOptions): Evolutio
   const stateCodec: DomainCodec<StateDocument> = {
     decode(value) {
       if (value === undefined) throw new Error('evolution-state-v2: the state domain is missing from the current commit')
-      return parseStateDocument(serializeStateDocument(value as StateDocument))
+      try {
+        return parseStateDocument(serializeStateDocument(value as StateDocument))
+      } catch (error) {
+        throw new StoreCorruptError('evolution-state-v2: ' + (error instanceof Error ? error.message : String(error)))
+      }
     },
     encode(value) {
       return value
@@ -97,7 +102,9 @@ export function createStateV2Provider(options: StateV2ProviderOptions): Evolutio
       throw error
     }
     if (value === undefined) throw new Error('evolution-state-v2: the state domain is missing from the current commit')
-    return parseStateDocument(serializeStateDocument(value as StateDocument))
+    return service === undefined
+      ? parseStateDocument(serializeStateDocument(value as StateDocument))
+      : value as StateDocument
   }
 
   const mutateDocument = async <T>(task: (document: StateDocument) => T | Promise<T>): Promise<T> => {
