@@ -32,18 +32,30 @@ function walk(dir, visit) {
   }
 }
 
-/** Read the string entries of the `inject` array literal; null when not declared as a literal. */
+/** Read the `inject` declaration; literal=false means an audit-unfriendly expression. */
 function declaredInject(text) {
-  const match = /\b(?:export\s+)?const\s+inject\s*=\s*\[([\s\S]*?)\]/.exec(text)
-  if (match === null) return null
-  return [...match[1].matchAll(/['"]([^'"]+)['"]/g)].map(entry => entry[1])
+  const start = /\b(?:export\s+)?const\s+inject\b/.exec(text)
+  if (start === null) return null
+  const equals = text.indexOf('=', start.index)
+  if (equals < 0) return { names: [], literal: false }
+  const rest = text.slice(equals + 1)
+  const array = /^\s*\[([\s\S]*?)\]/.exec(rest)
+  if (array === null) return { names: [], literal: false }
+  const body = array[1]
+  const strings = [...body.matchAll(/['"]([^'"]+)['"]/g)].map(entry => entry[1])
+  const literal = body.replace(/['"][^'"]*['"]/g, '').replace(/[\s,]/g, '') === ''
+  return { names: strings, literal }
 }
 
 function audit(path, text) {
   const rel = relative(root, path)
   const inject = declaredInject(text)
   if (inject === null) return
-  for (const name of inject) {
+  if (!inject.literal) {
+    problems.push(rel + ': inject must be a literal string array so optional names stay auditable')
+    return
+  }
+  for (const name of inject.names) {
     if (OPTIONAL.has(name)) problems.push(rel + ': lists optional ' + name + ' in required inject (use a use-time resolver / ctx.inject)')
   }
 }
@@ -58,10 +70,13 @@ if (process.argv.includes('--self-test')) {
     "export const inject = ['tools', 'evolutionMutationAuthority']",
     "export const inject = ['evolutionStore', 'tools']",
     "const x = 1\nexport const inject = ['tools', 'skillUsage', 'evolutionMutationAuthority']",
+    'const required = [\'tools\']\nexport const inject = [...required]',
+    "export const inject = required",
   ]
   const shouldGreen = [
     "export const inject = ['tools', 'skillUsage', 'evolutionIo']",
-    "const required = ['tools']\nexport const inject = [...required]",
+    "export const inject: string[] = []",
+    "export const inject = ['slots', 'locale'] as const",
   ]
   let failed = false
   for (const fake of shouldRed) {
