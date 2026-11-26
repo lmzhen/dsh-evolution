@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { HomeFence } from '../../src/home-fence.ts'
 import { nodeEvolutionIo } from '../../src/io.ts'
 import { StoreKernel } from '../../src/store/store-kernel.ts'
-import { createStoreService } from '../../src/store/service.ts'
+import { createStoreService, liveStoreService, resolveStoreService } from '../../src/store/service.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 
 describe('store surface service', () => {
@@ -74,5 +74,18 @@ describe('store surface service', () => {
       expectedGeneration: 7,
       change: () => ({ state: { n: 2 } }),
     })).resolves.toBeDefined()
+  })
+
+  it('resolves the live store service after a late provide', async () => {
+    const home = await tempRoot('dsh-store-service-live-')
+    const io = nodeEvolutionIo()
+    const kernel = new StoreKernel({ io, home, fence: new HomeFence({ home }) })
+    await kernel.bootstrap({ state: { n: 0 } })
+    const service = createStoreService(kernel)
+    let provided: unknown
+    const resolver = liveStoreService({ get: name => name === 'evolutionStore' ? provided : undefined })
+    expect(resolveStoreService(resolver)).toBeUndefined()
+    provided = service
+    expect(resolveStoreService(resolver)).toBe(service)
   })
 })
