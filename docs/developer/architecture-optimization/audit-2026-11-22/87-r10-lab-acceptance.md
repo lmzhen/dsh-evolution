@@ -31,6 +31,9 @@
 | 跨进程读 | 独立 Node reader 进程与 writer 进程同时跑：writer 每 10ms 提交一次 feedback，reader 每 10ms 读一次 state，150/150 成功，avg 22.87ms，max 50ms（同一 store 文件，无读者锁） |
 | crash-before-commit | 3 次在 writer 提交前 kill -9；head 保持上一提交、`kernel.query(['state'])` 均成功，没有半发布 head |
 | crash-after-head | 3 次轮询到 head 已前进后立刻 kill -9；3/3 后续 `kernel.query(['state'])` 成功，head/commit/object 可读，无半发布 |
+| Key 空 | `credentials/describe(SILICONFLOW_API_KEY,BAMBOO_API_KEY)` → 两者 `configured:false`、`writable:true` |
+| Key 有 | `credentials/set(SILICONFLOW_API_KEY, fake)` → describe `configured:true`、`source:file`、`masked:"sk-fake-••••••••3456"`（不回显完整值） |
+| Key 清除 | `credentials/unset(SILICONFLOW_API_KEY)` → describe 回到 `configured:false` |
 
 ### 截图
 
@@ -47,7 +50,7 @@
 
 - 两个完整 host 共享同一 home 的双进程验收：2026-11-26 晚尝试过 3099/3100 host，但机器上已有多个长寿命 host 进程，端口归属和终端 session 混淆，读延迟 2–10s，无法区分是锁竞争还是 CPU/IO 饱和；该次结果**不作为证据**。跨进程读已用“独立 Node reader + writer”单独证明；完整双 host 仍待干净机器。
 - HMR 替换 store service 的真机验证；
-- fresh profile 的 Key 空/有/错误/清除四态；
+- Key 错误态：空/有/清除已通过 credentials RPC 验证；错误态需要真实扫描/model key，尚未测。
 - 迁移后重启的**完整** UI 再验收（本轮只做了 API + 迁移/回退）；
 - 完整 family suite 最终跑通；
 - 正式版本确认、tag、唯一一次发布、发布后 fresh npm 安装验收。
