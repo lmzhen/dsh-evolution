@@ -54,9 +54,15 @@ describe('SkillLibrary IO boundaries', () => {
     // A stray file lands in the active root AFTER the snapshot; it is not a
     // declared skill and must not survive the manifest-driven restore.
     await io.writeText('/skills/stray-thing.md', 'not a skill')
+    // Unit journal/snapshot are protocol state, like lock files: a restore
+    // must not delete the recovery data while it rolls the tree back.
+    await io.writeText('/skills/.unit-journal-abc.json', '{}')
+    await io.writeText('/skills/.unit-snapshot-def.json', '{}')
     const restored = await lib.restoreLatestSnapshot()
     expect(restored.ok).toBe(true)
     expect(await io.exists('/skills/stray-thing.md')).toBe(false)
+    expect(await io.exists('/skills/.unit-journal-abc.json')).toBe(true)
+    expect(await io.exists('/skills/.unit-snapshot-def.json')).toBe(true)
     expect(await io.readText('/skills/keep-skill/SKILL.md')).toBeTruthy()
   })
 })

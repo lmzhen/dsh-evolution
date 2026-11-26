@@ -57,7 +57,14 @@
   - `mutation-recovery`、`skill-history`、`skill-store`、`create-tree-reads` 回归。
 - 证据：`skill-store.ts`、`mutation-storage-adapter.ts`、`80-p2-ledger` R10-P2-11。
 
-## 第五轮（state codec + gate 收口复核）
+## 第五轮（full-suite 警告复核）
+
+- 结论：新 P0=0，新 P1=1。
+- 问题：flat unit 文件放在 skill root 内后，`snapshot restore` 的清理集把它们当成“快照未声明的残留”并准备删除，会丢 unit journal/snapshot 恢复数据。
+- 已修：restore 的 writer 探测与清理集都跳过 `.unit-*`；`skill-store-boundary` 断言 restore 后 `.unit-journal-*` / `.unit-snapshot-*` 仍在。
+- 证据：`skill-store.ts` restore 清理、`skill-store-boundary.spec.ts`、85 R10.6。
+
+## 第六轮（state codec + gate 收口复核）
 
 - 结论：新 P0=0，新 P1=0。
 - 复核点：

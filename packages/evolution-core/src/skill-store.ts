@@ -5084,6 +5084,7 @@ export class SkillLibrary {
     // same way (a live `.usage.json.lock` must not be deleted by the clear).
     for (const entry of rootEntries) {
       if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json' || entry === '.curator-suppressed.json' || entry === HISTORY_DIR) continue
+      if (entry.startsWith('.unit-')) continue
       const dir = join(this.root, entry)
       if (await this.io.exists(join(dir, 'SKILL.md'))) {
         if (await this.supportDirsUnlistable(dir)) {
@@ -5116,6 +5117,7 @@ export class SkillLibrary {
     const doomed = rootEntries.filter((entry) => {
       if (entry === '.archive' || entry === '.backups' || entry === '.mutations.json') return false
       if (entry === HISTORY_DIR) return false
+      if (entry.startsWith('.unit-')) return false
       if (entry === '.curator-suppressed.json' && restoresSuppressed) return false
       return !declared.has(entry)
     })
