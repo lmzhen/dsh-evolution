@@ -213,6 +213,10 @@ HomeFence.run(tree)
 3. **对象/commit 的原子性来自 `EvolutionIoLike` 的 tmp+rename/`createTextIfAbsent`，不用 `writeFileAtomic` 直接写路径**。`nodeEvolutionIo.writeText` 已是原子替换；跨后端由 seam 保证。平台 `writeFileAtomic` 只在直接构造 kernel 的单测可注入；生产不绕过 IO seam。
 4. **第一版 kernel 只做通用对象层**：domain schema、state/merge 的适配器在 R2 接入；R1 不改变 `EvolutionStateStorage` 的现有行为，也不删除 domain provider。
 
+### 5.8b Windows 多 host 读-写窗口观察（待决）
+2026-11-27 在 lab home 上起两个完整 host（3099/3100），另起独立 writer 连续提交时观察到：host 的 `merge/view` 请求 10s 超时，writer 的 `head.json` rename 在 7 次重试后 `EPERM`；writer 退出后两 host 立即恢复 200。单独 writer 或单个空闲 host 时 writer 正常；host 持续读时用最小 Node 脚本复现了 `readFile` 读者会让 `rename` 目标偶发 `EPERM`（100 次中 28 次；改用 `open+read+close` 降到 1 次）。
+当前定性：**Windows 平台 fs readText 的共享模式与 rename 替换竞争**，不是 DCR-85 新增的读锁，也尚未归因到某个插件；可能被磁盘/杀软放大。未改代码。后续要么由平台提供 reader-friendly 的共享打开，要么在写者侧把 rename 重试预算提高到能跨过持续读 burst；在定性前不得把双 host 并发写当成通过证据。
+
 ### 5.8 R1 已落地证据
 
 - 代码：`packages/evolution-core/src/store/{types.ts,store-kernel.ts,index.ts}`；
