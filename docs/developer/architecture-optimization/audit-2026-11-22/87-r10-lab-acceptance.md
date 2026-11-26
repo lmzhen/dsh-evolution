@@ -53,5 +53,5 @@
 - HMR 替换 store service 的真机验证；
 - Key 错误态：空/有/清除已通过 credentials RPC 验证；错误态需要真实扫描/model key，尚未测。
 - 迁移后重启的**完整** UI 再验收（本轮只做了 API + 迁移/回退）；
-- 完整 family suite 最终跑通；
+- 完整 family suite 最终跑通：本机 80+ 分钟仍未结束，已终止；CI cohort 绿。日志出现 `evolution-merge: detached run finish failed: ENOENT ...run-det.json.<...>.tmp`，作为独立 flake 跟踪，不当作通过证据。
 - 正式版本确认、tag、唯一一次发布、发布后 fresh npm 安装验收。
