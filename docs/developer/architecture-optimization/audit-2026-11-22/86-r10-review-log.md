@@ -84,7 +84,8 @@
 - `usage/merge/memory/discovery/feedback` 走同一个 `scopedTextIO` 文本 codec；不再逐域手写 reader/writer。
 - promote 只在 pending 存在时发生；re-stage 归档旧 store，无需额外拒绝开关。
 - `state.provider` surface 已删除（无生产消费者，内部改为 `stateCodec`）。
-- 仅余：真机验收矩阵、最终独立复核、版本确认与唯一一次发布。
+- 仅余：双进程无锁读、崩溃/HMR、Key 四态、完整 family suite、最终独立复核、版本确认与唯一一次发布。
+- 本机隔离安装、v2 迁移/回退、四 tab 与三档截图已记录在 [87-r10-lab-acceptance](87-r10-lab-acceptance.md)。
 
 ## 复核结论的用法
 

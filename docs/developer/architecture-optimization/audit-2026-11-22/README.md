@@ -265,3 +265,4 @@
 | [84-retrieval-credentials.md](84-retrieval-credentials.md) | 检索增强：固定模型、可选官方 API Key、平台凭据与降级不变设计 |
 | [85-versioned-snapshot-read.md](85-versioned-snapshot-read.md) | DCR-85：Home MVCC Store、版本化快照无锁读、全量工具/命令/按钮读写统一 |
 | [86-r10-review-log.md](86-r10-review-log.md) | R10 独立复核整理稿：各轮 P0/P1、修复与未决 |
+| [87-r10-lab-acceptance.md](87-r10-lab-acceptance.md) | DCR-85 本机隔离验收：20/20 安装、v2 迁移/回退、四 tab 与三档截图 |
