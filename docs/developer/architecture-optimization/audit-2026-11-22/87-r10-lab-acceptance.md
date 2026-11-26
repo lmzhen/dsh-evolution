@@ -35,6 +35,7 @@
 | Key 空 | `credentials/describe(SILICONFLOW_API_KEY,BAMBOO_API_KEY)` → 两者 `configured:false`、`writable:true` |
 | Key 有 | `credentials/set(SILICONFLOW_API_KEY, fake)` → describe `configured:true`、`source:file`、`masked:"sk-fake-••••••••3456"`（不回显完整值） |
 | Key 清除 | `credentials/unset(SILICONFLOW_API_KEY)` → describe 回到 `configured:false` |
+| 双 host 只读 | 同一 lab home 同时起 3099/3100 两个 host；两者 auth 303、`merge/view` 200、`diagnostics` 200/200 且长度一致 |
 
 ### 截图
 
@@ -49,7 +50,7 @@
 
 ## 未完成
 
-- 两个完整 host 共享同一 home 的双进程验收：2026-11-26 晚尝试过 3099/3100 host，但机器上已有多个长寿命 host 进程，端口归属和终端 session 混淆，读延迟 2–10s，无法区分是锁竞争还是 CPU/IO 饱和；该次结果**不作为证据**。跨进程读已用“独立 Node reader + writer”单独证明；完整双 host 仍待干净机器。
+- 双 host 只读并发已通过（3099/3100 同 lab home，均 200）；host 写 + host 读的并发压力尚未在干净机器复验：外部 writer 高压时出现 host 请求 10s 超时和 head rename EPERM，无法区分磁盘/杀软/两 host 同读争用，未归因到锁，不作为无锁读反例。
 - HMR 替换 store service 的真机验证；
 - Key 错误态：空/有/清除已通过 credentials RPC 验证；错误态需要真实扫描/model key，尚未测。
 - 迁移后重启的**完整** UI 再验收（本轮只做了 API + 迁移/回退）；
