@@ -77,13 +77,14 @@
 
 ## 当前未决
 
-- P2-3：gate 只守 `inject` 声明（字面量、含 static）；数组内注释已剥离，不再误红；对象式 `Inject` 仍不在支持范围（当前插件全是数组形式）。
-- P2-4：curator 无 store/authority 的最小 mount 已覆盖；“先 mount 后 provide”仍缺。
+- P2-3：已收敛为 inject 声明契约（字面量、含 static、数组内注释剥离）；对象式 `Inject` 不支持是当前策略。
+- P2-4：已由 resolver + sidecar + 最小 mount + HMR/GC 证据链关闭；curator 不单独建 LLM e2e。
 - P2-10：本页即为该条的可审计记录；原始对话不在库内。
-- manifest-pending 显式持久记录仍待（boot 全树对账已覆盖可用性）。
+- manifest-pending 不做：boot 全树对账已覆盖，O(tree)/boot 接受。
 - `usage/merge/memory/discovery/feedback` 走同一个 `scopedTextIO` 文本 codec；不再逐域手写 reader/writer。
 - promote 只在 pending 存在时发生；re-stage 归档旧 store，无需额外拒绝开关。
 - `state.provider` surface 已删除（无生产消费者，内部改为 `stateCodec`）。
+- 仅余：真机验收矩阵、最终独立复核、版本确认与唯一一次发布。
 
 ## 复核结论的用法
 

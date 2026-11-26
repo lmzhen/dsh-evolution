@@ -569,7 +569,7 @@ interface StoreView {
 - **unit 协议文件归属**：skill unit 的 journal/snapshot 以 `.unit-journal-*.json` / `.unit-snapshot-*.json` flat 放在 skill root 内（平台 fs 无 mkdir，不能建 `<home>/units/skill/...`）。它们是协议状态，不是技能内容：`treeManifestFiles` 跳过 dot 文件，snapshot restore 的清理集也必须跳过 `.unit-*`，否则会删掉恢复数据。`skill-store-boundary` 已加回归。
 - `TreeRepository`：写 = `StoreView.transact('tree')` + full manifest object；读 = `readTreeManifest`，模型/UI/维护扫描先读 manifest 再按 blob 取正文。
 - materialized 文件在 full manifest 落地前仍是读权威；切换后只在 manifest 缺失且处于迁移期时只读 fallback；active 模式下 manifest 缺失是 `StoreCorruptError`。
-- 恢复源不能用 prepared journal（tree unit 已 committed，afterCommit 才入队）：在 unit commit 前写一条 durable `manifest-pending` 记录（unitId + after hashes），publish 成功后清除；启动时按该记录重放，而不是扫 prepared journal。**已落地第一步**：`recoverOnBoot` 按当前 materialized tree 生成 full manifest，与 head manifest 的 canonical entries 比较，不同则发布；这覆盖“fresh bootstrap 无 manifest”和“unit 已落盘、manifest 未发布”的崩溃窗口；显式 manifest-pending 记录仍待。
+- 恢复源不能用 prepared journal（tree unit 已 committed，afterCommit 才入队）。**最终做法：不写额外 manifest-pending 记录**；`recoverOnBoot` 按当前 materialized tree 生成 full manifest，与 head manifest 的 canonical entries 比较，不同则发布。这覆盖“fresh bootstrap 无 manifest”和“unit 已落盘、manifest 未发布”的崩溃窗口，代价是每次启动 O(tree) 读；当前被接受，若树规模超阈值再引入 pending 快路径。
 - manifest 条目包含 `path/blobSha/size/mode`，删除显式标记；tree list/mtime 由 manifest 生成，不再由 adapter 猜。
 
 ##### R10.7 表面与 CAS
@@ -637,7 +637,7 @@ interface StoreView {
 |---|---|
 | 7 处各自 `existsSync(marker)` 决定介质；运行期仍会双速 | 唯一 oracle = `evolutionStore` 服务是否存在；bridge 常驻；legacy 无服务→base，active 无服务→`StoreUnavailableError`；运行期不切，另一宿主激活→重启 |
 | 激活记录缺 mode/generation；删 marker 再 stage 会静默删 v2 数据 | `.store-activation.json` 加 mode/generation/lastActiveCommitId；回退写记录；曾激活过的 head 不匹配拒绝 promote，需显式 `--discard-active-store` |
-| 增量 manifest + 只保 64 commit 无法回放整棵树；恢复源用 prepared journal 不成立 | 改为 **full manifest per unit**；unit commit 前写 durable manifest-pending，启动重放；materialized 文件在 full manifest 落地前仍是读权威 |
+| 增量 manifest + 只保 64 commit 无法回放整棵树；恢复源用 prepared journal 不成立 | 改为 **full manifest per unit**；启动按 materialized tree 生成 full manifest 与 head 对账；不收额外 pending 记录（O(tree)/boot 已接受） |
 | 层数/职责重叠（StoreAccess+StoreView+7 ports+surface+2 事务） | 只留 kernel + service；codec 表；内部 `mutate(system)` + 外部 `command`；CAS 只约束人/模型 surface，provider RMW CAS-free |
 
 已落地的部分：`EvolutionState` 启动模式缓存 + `guardLegacyActivation`（state/sidecar/runs 在另一宿主激活后 fail loud；skill tree 等非迁移路径不拦）；activation record/generation、full manifest、codec 表仍是设计态。
