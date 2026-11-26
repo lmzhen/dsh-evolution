@@ -137,4 +137,12 @@ describe('evolution-curator boundaries', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('this process keeps auto-running'))
     warnSpy.mockRestore()
   })
+
+  it('mounts with the required services only; store and authority stay optional', async () => {
+    const home = await tempHome('dsh-curator-optional-')
+    const ctx = await mount(home)
+    expect(ctx.evolutionCurator).toBeDefined()
+    expect(ctx.get('evolutionStore')).toBeUndefined()
+    expect(ctx.get('evolutionMutationAuthority')).toBeUndefined()
+  })
 })
