@@ -70,6 +70,7 @@
 | R10-P2-9 surface/commit 元数据漂移 | FIXED | `source:'system'` 已入枚举；`StoreService.command` 对 `expectsCommit` surface 强制要求 observed commit；内部 merge/reports/runs RMW 拆成 `*.rw` CAS-free provider surface；`merge_stage writes:[]` 是 staging 文件而非 store 域，保持显式。 |
 | R10-P2-10 复核记录不可审计 | FIXED | 新增 `86-r10-review-log.md`，按轮记录复核结论、P0/P1、修复证据与未决；明确标注为整理稿，原始对话在会话记录。 |
 | R10-P2-11 测试隔离 flake | FIXED | skill unit journal/snapshot 改为 skill root 内 flat 文件 `.unit-journal-*.json`/`.unit-snapshot-*.json`，不需要新建目录（platform fs 可写）；prune 只数 `.unit-snapshot-*` 并在 ≤keep 时短路；`mutation-recovery`/`skill-history`/`skill-store`/`create-tree-reads` 回归通过。 |
+| R10-P2-12 detached run 测试假 ENOENT | FIXED | `runtime-scan.spec.ts` 的 detached 用例在 execute 返回后等到 run-meta 进入终态（settled/awaiting-approval/cancelled/undone）再结束；测试 teardown 不再删掉仍在收尾的 run-meta，消除了 `detached run finish failed: ENOENT` 警告。 |
 
 ## 发布阻断项（不是 P2）
 

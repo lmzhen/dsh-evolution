@@ -1,4 +1,5 @@
 // @tier pre-tag
+import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
@@ -65,6 +66,14 @@ it('returns an accepted run id when detached is enabled', async () => {
     cards: async () => [], screeningForRun: async () => [],
   }
   const result = await createMergeRuntime(deps).execute({ verb: 'scan' })
+  // The detached run finishes after execute() returns; let it write its meta
+  // before test teardown removes the temp home, or it would log a false ENOENT.
+  const metaPath = join(home, 'merge', 'run-meta', 'run-det.json')
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const raw = await io.readText(metaPath)
+    if (raw !== null && /"phase": "(settled|awaiting-approval|cancelled|undone)"/.test(raw)) break
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
   expect(result.ok).toBe(true)
   expect(result.text).toContain('已启动：run-det')
   expect(result.text).toContain('作用域：family-managed')
