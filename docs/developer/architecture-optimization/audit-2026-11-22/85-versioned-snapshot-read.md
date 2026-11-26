@@ -557,7 +557,7 @@ interface StoreView {
 
 - `DomainCodec` 负责 `decode` / `encode` / `empty` / 形状校验；非法值抛 `StoreCorruptError`，不再有 `recordOf` 把坏值读成 `{}`、`textOf` 读成 `null` 的 fail-open。
 - **一张 codec 表，不建 7 个手写 port**：`DomainCodecs[domain]` 提供类型；消费者直接 `service.read/transact(domain, codec)`。**已落地底座**：`StoreService.read<T>(domain, codec)` / `transact<T>(domain, codec, change)` 与 `DomainCodec<T>`，`store-service.spec` 用整数 codec 验证读写；把各域迁移到 codec 表仍待逐域完成。
-- reports 的读写只有 `reports` codec + 一个 owner：merge/commands/curator/maintenance 全部经 `service.read/transact('reports', reportsCodec)`；不再有“merge 写域、commands 读文件”的双介质。**已落地**：`reportsCodec` 提供 fail-closed 解码；maintain 写走 `service.transact`，读走 `service.read`，域内保留最新 20 份；旧 `command/query` 仅作 fake/legacy 兼容分支。
+- reports 的读写只有 `reports` codec + 一个 owner：merge/commands/curator/maintenance 全部经 `service.read/transact('reports', reportsCodec)`；不再有“merge 写域、commands 读文件”的双介质。**已落地**：`reportsCodec` 提供 fail-closed 解码；maintain 写走 `service.transact`，读走 `service.read`，域内保留最新 20 份；旧 `command/query` 仅作 fake/legacy 兼容分支。**state 域**也已有 `stateCodec`：v2 provider 在 service 存在时走 `service.read/transact('state', stateCodec)`，无 service 时保留 kernel 路径。
 - merge 收据、staging-index、reconcile journal 合并进 `merge` codec 的带 `schemaVersion` 子文档，或保持独立域；不再散落 base 文件。
 - `EvolutionIoLike` 只保留两类用途：迁移命令读 legacy；R4 activity 事件 append log。生产域代码不再接收 file-shaped IO。
 - scoped text/tree 适配器标为迁移期 shim，R10 落地后删除；删除前用 gate 禁止新消费者引用。

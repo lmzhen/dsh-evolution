@@ -12,7 +12,7 @@
 import { join } from 'node:path'
 import type { EvolutionIoLike } from '../io.ts'
 import { StoreKernel } from '../store/store-kernel.ts'
-import { resolveStoreService, type StoreServiceSource } from '../store/service.ts'
+import { resolveStoreService, type DomainCodec, type StoreServiceSource } from '../store/service.ts'
 import type { StoreWriterFence } from '../store/types.ts'
 import type {
   EvolutionStateStorage,
@@ -73,13 +73,23 @@ export function createStateV2Provider(options: StateV2ProviderOptions): Evolutio
     ...(options.now === undefined ? {} : { now: options.now }),
   })
 
+  const stateCodec: DomainCodec<StateDocument> = {
+    decode(value) {
+      if (value === undefined) throw new Error('evolution-state-v2: the state domain is missing from the current commit')
+      return parseStateDocument(serializeStateDocument(value as StateDocument))
+    },
+    encode(value) {
+      return value
+    },
+  }
+
   const readDocument = async (): Promise<StateDocument> => {
     let value: unknown
     const service = resolveStoreService(options.service)
     try {
       value = service === undefined
         ? (await kernel.query(['state'])).domains.state
-        : (await service.query('state.provider', ['state'])).snapshot.domains.state
+        : (await service.read('state', stateCodec)).value
     } catch (error) {
       if (error instanceof Error && /not initialized/.test(error.message)) {
         throw new StateV2NotInitializedError(options.home)
@@ -104,7 +114,11 @@ export function createStateV2Provider(options: StateV2ProviderOptions): Evolutio
     if (service === undefined) {
       await kernel.mutate({ domains: ['state'], source: 'command', change })
     } else {
-      await service.command({ commandId: 'state.provider', domains: ['state'], source: 'command', change })
+      await service.transact('state', stateCodec, async document => {
+        result = await task(document)
+        ran = true
+        return document
+      }, { source: 'command' })
     }
     if (!ran) throw new Error('evolution-state-v2: mutation did not run')
     return result!
