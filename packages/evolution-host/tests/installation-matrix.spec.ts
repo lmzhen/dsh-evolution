@@ -88,6 +88,9 @@ describe('layered installation matrix', () => {
     await ctx.plugin(ToolSkillManage)
     await ctx.plugin(EvolutionSkillCatalog, { root: join(root, 'skills') })
 
+    // Class-level gate for PR #26 / issue #23: this row must mount with the
+    // required services only. `evolutionMutationAuthority` is resolved per write,
+    // never required by `inject`; a source-level regex is only a fast lint.
     expect(ctx.tools.get('memory')).toBeDefined()
     expect(ctx.tools.get('skill_manage')).toBeDefined()
 

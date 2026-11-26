@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 /**
- * DCR-85 lifecycle gate: optional family services must be resolved at USE time.
+ * DCR-85 lifecycle gate: optional family services must not be REQUIRED dependencies.
  *
- * Forbids:
- *  - a field/assignment capturing ctx.get('evolutionStore'|'evolutionMutationAuthority');
- *  - a required `inject` listing either optional service (Cordis inject is required:
- *    adding it drops the whole row when the service is absent — PR #26 / issue #23).
+ * Cordis `inject` names are required: while one is missing, the fiber stays
+ * INACTIVE and the whole row disappears (issue #23 / PR #26). This gate parses
+ * the `inject` declaration only; it deliberately does not guess expression
+ * shapes for `ctx.get` captures. Use-time captures are covered by behavioral
+ * tests (installation matrix, HMR/late-provide, activation guards), because a
+ * static pattern can never be a proof of "resolved at use time".
+ *
+ * The optional names are public Cordis service contract names, not function
+ * names; keep them in this one list so a review can see every optional family
+ * capability in one place.
  *
  * Usage: node packages/scripts/verify-store-lifecycle.mjs packages [--self-test]
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import ts from 'typescript'
 
 const root = process.argv[2] ?? 'packages'
-const OPTIONAL = ['evolutionStore', 'evolutionMutationAuthority']
+const OPTIONAL = new Set(['evolutionStore', 'evolutionMutationAuthority'])
 const problems = []
 let scanned = 0
 
@@ -26,24 +33,35 @@ function walk(dir, visit) {
   }
 }
 
+/** Read `export const inject = [...]` as a string array; null when it is not a literal. */
+function declaredInject(text) {
+  const source = ts.createSourceFile('module.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  let found = null
+  const visit = (node) => {
+    if (ts.isVariableStatement(node)) {
+      for (const declaration of node.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || declaration.name.text !== 'inject') continue
+        const init = declaration.initializer
+        if (init === undefined || !ts.isArrayLiteralExpression(init)) continue
+        const names = []
+        for (const element of init.elements) {
+          if (ts.isStringLiteral(element) || ts.isNoSubstitutionTemplateLiteral(element)) names.push(element.text)
+        }
+        found = names
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return found
+}
+
 function audit(path, text) {
   const rel = relative(root, path)
-  // Aliasing the accessor (`const get = ctx.get`) defeats the direct-call pattern;
-  // the resolver must be invoked at the use point instead.
-  if (/(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*ctx\??\.get\s*(?:;|\n|$)/.test(text)) {
-    problems.push(rel + ': aliases ctx.get instead of resolving the service at the use point')
-  }
-  for (const name of OPTIONAL) {
-    // Field/const capture of the optional service at construction time.
-    const capture = new RegExp('(?:this\\.[A-Za-z_$][\\w$]*|(?:private|readonly|protected)\\s+[A-Za-z_$][\\w$]*)\\s*(?:=|:)[^;\\n]*ctx\\??\\.get\\??\\.?\\(\\s*[\'"]' + name + '[\'"]')
-    if (capture.test(text)) problems.push(rel + ': captures ctx.get(\'' + name + '\') in a field (use a use-time resolver)')
-    const local = new RegExp('(?:const|let|var)\\s+(?:[A-Za-z_$][\\w$]*|\\{[^}]*\\})\\s*=\\s*\\(*\\s*ctx\\??\\.get\\??\\.?\\(\\s*[\'"]' + name + '[\'"]')
-    if (local.test(text)) problems.push(rel + ': captures ctx.get(\'' + name + '\') in a local before use (resolve at the use point)')
-    // Required inject must not carry an optional capability.
-    const inject = /export const inject\s*=\s*\[([^\]]*)\]/.exec(text)
-    if (inject !== null && new RegExp('[\'"]' + name + '[\'"]').test(inject[1])) {
-      problems.push(rel + ': lists optional ' + name + ' in required inject')
-    }
+  const inject = declaredInject(text)
+  if (inject === null) return
+  for (const name of inject) {
+    if (OPTIONAL.has(name)) problems.push(rel + ': lists optional ' + name + ' in required inject (use a use-time resolver / ctx.inject)')
   }
 }
 
@@ -53,26 +71,33 @@ for (const pkg of readdirSync(root)) {
 }
 
 if (process.argv.includes('--self-test')) {
-  const fakes = [
-    "private store = ctx.get('evolutionStore')\nexport const inject = ['tools', 'evolutionMutationAuthority']",
-    "const store = ctx.get('evolutionStore')\nexport const inject = ['tools']",
-    "const store = (ctx?.get?.('evolutionStore'))\nexport const inject = ['tools']",
-    "const { store } = ctx.get('evolutionStore')\nexport const inject = ['tools']",
-    "const getService = ctx.get\nconst store = getService('evolutionStore')\nexport const inject = ['tools']",
+  const shouldRed = [
+    "export const inject = ['tools', 'evolutionMutationAuthority']",
+    "export const inject = ['evolutionStore', 'tools']",
+    "const x = 1\nexport const inject = ['tools', 'skillUsage', 'evolutionMutationAuthority']",
   ]
-  let detected = true
-  const missed = []
-  for (const fake of fakes) {
+  const shouldGreen = [
+    "export const inject = ['tools', 'skillUsage', 'evolutionIo']",
+    "const required = ['tools']\nexport const inject = [...required]",
+  ]
+  let failed = false
+  for (const fake of shouldRed) {
     const before = problems.length
     audit('__self-test__.ts', fake)
-    if (problems.length <= before) { detected = false; missed.push(fake.split('\n')[0]) }
+    if (problems.length <= before) { failed = true; console.error('not detected: ' + fake) }
     problems.length = before
   }
-  if (!detected) {
-    console.error('verify-store-lifecycle: SELF-TEST FAILED — not detected: ' + missed.join(' | '))
+  for (const fake of shouldGreen) {
+    const before = problems.length
+    audit('__self-test__.ts', fake)
+    if (problems.length !== before) { failed = true; console.error('false positive: ' + fake) }
+    problems.length = before
+  }
+  if (failed) {
+    console.error('verify-store-lifecycle: SELF-TEST FAILED — inject parsing is not trustworthy')
     process.exit(1)
   }
-  console.log('verify-store-lifecycle: self-test OK — constructor capture and required optional inject both turn the gate red')
+  console.log('verify-store-lifecycle: self-test OK — optional names in required inject turn the gate red')
   process.exit(0)
 }
 
@@ -85,4 +110,4 @@ if (problems.length > 0) {
   for (const problem of problems) console.error('  ' + problem)
   process.exit(1)
 }
-console.log('verify-store-lifecycle: OK — ' + String(scanned) + ' package source file(s) resolve optional services at use time')
+console.log('verify-store-lifecycle: OK — ' + String(scanned) + ' package source file(s) declare inject with required services only')
