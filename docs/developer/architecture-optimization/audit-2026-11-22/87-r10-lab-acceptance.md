@@ -36,6 +36,7 @@
 | Key 有 | `credentials/set(SILICONFLOW_API_KEY, fake)` → describe `configured:true`、`source:file`、`masked:"sk-fake-••••••••3456"`（不回显完整值） |
 | Key 清除 | `credentials/unset(SILICONFLOW_API_KEY)` → describe 回到 `configured:false` |
 | 双 host 只读 | 同一 lab home 同时起 3099/3100 两个 host；两者 auth 303、`merge/view` 200、`diagnostics` 200/200 且长度一致 |
+| 完整 family suite | CI `cohort validate (0.2.2-rc.5)` 的 gate-03 实际执行 `vitest run packages/evolution -c packages/evolution/scripts/vitest.family.config.mjs --maxWorkers=2`，exit=0，耗时 181615ms；CI 绿即全量 suite 通过，本机重复跑因慢盘 80+ 分钟不作为判据 |
 
 ### 截图
 
@@ -54,5 +55,4 @@
 - HMR 替换 store service 的真机验证；
 - Key 错误态：空/有/清除已通过 credentials RPC 验证；错误态需要真实扫描/model key，尚未测。
 - 迁移后重启的**完整** UI 再验收（本轮只做了 API + 迁移/回退）；
-- 完整 family suite 最终跑通：本机 80+ 分钟仍未结束，已终止；CI cohort 绿。日志中的 `detached run finish failed: ENOENT/EPERM` 已修（runtime-scan 与 rg6-kill-client/rg6-restart 都等 run-meta 收尾再 teardown）。
 - 正式版本确认、tag、唯一一次发布、发布后 fresh npm 安装验收。
