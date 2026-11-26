@@ -71,7 +71,7 @@
 | R10-P2-10 复核记录不可审计 | FIXED | 新增 `86-r10-review-log.md`，按轮记录复核结论、P0/P1、修复证据与未决；明确标注为整理稿，原始对话在会话记录。 |
 | R10-P2-11 测试隔离 flake | FIXED | skill unit journal/snapshot 改为 skill root 内 flat 文件 `.unit-journal-*.json`/`.unit-snapshot-*.json`，不需要新建目录（platform fs 可写）；prune 只数 `.unit-snapshot-*` 并在 ≤keep 时短路；`mutation-recovery`/`skill-history`/`skill-store`/`create-tree-reads` 回归通过。 |
 | R10-P2-12 detached run 测试假 ENOENT/EPERM | FIXED | `runtime-scan` 等 run-meta 终态；`rg6-kill-client` 等 registry 成功后 run-meta 非 running；`rg6-restart` 等 rows 清空后 run-meta 非 running。测试 teardown 不再删掉仍在收尾的 run-meta，消除了 `detached run finish failed: ENOENT/EPERM` 警告。 |
-| R10-P2-13 Windows 读者持有 head 目标 | MITIGATED | 平台 fs `readText` 的共享打开可让 `head.json` rename 瞬时 EPERM；`StoreKernel.publishHead` 在 IO 层 2s 重试外加 5 次/最长 1s 退避重试，仍失败则 fail closed；`store-kernel.spec` 覆盖“读者持有 head 目标”瞬时 EPERM。上游根治仍需平台读侧共享打开。 |
+| R10-P2-13 Windows 读者持有 head 目标 | MITIGATED | 平台 fs `readText` 的共享打开可让 `head.json` rename 瞬时 EPERM；`StoreKernel.publishHead` 在 IO 层 2s 重试外加 5 次/最长 1s 退避重试，仍失败则 fail closed；`store-kernel.spec` 覆盖“读者持有 head 目标”瞬时 EPERM；真实连续 `readFile` 读者下 writer 3 次/100 次提交均 exit 0。上游根治仍需平台读侧共享打开。 |
 
 ## 发布阻断项（不是 P2）
 

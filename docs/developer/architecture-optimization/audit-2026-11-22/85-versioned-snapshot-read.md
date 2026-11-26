@@ -215,7 +215,7 @@ HomeFence.run(tree)
 
 ### 5.8b Windows 多 host 读-写窗口观察（待决）
 2026-11-27 在 lab home 上起两个完整 host（3099/3100），另起独立 writer 连续提交时观察到：host 的 `merge/view` 请求 10s 超时，writer 的 `head.json` rename 在 7 次重试后 `EPERM`；writer 退出后两 host 立即恢复 200。单独 writer 或单个空闲 host 时 writer 正常；host 持续读时用最小 Node 脚本复现了 `readFile` 读者会让 `rename` 目标偶发 `EPERM`（100 次中 28 次；改用 `open+read+close` 降到 1 次）。
-当前定性：**Windows 平台 fs readText 的共享模式与 rename 替换竞争**，不是 DCR-85 新增的读锁，也尚未归因到某个插件；可能被磁盘/杀软放大。已在 writer 侧加 `StoreKernel.publishHead` 外层有界重试（EPERM/EBUSY，最多 5 次、100ms→1s 退避，覆盖 IO 层 2s 之外），并加“读者持有 head 目标时瞬时 EPERM”单测；平台提供 reader-friendly 共享打开仍是上游根治方向。在定性前不得把双 host 并发写当成通过证据。
+当前定性：**Windows 平台 fs readText 的共享模式与 rename 替换竞争**，不是 DCR-85 新增的读锁，也尚未归因到某个插件；可能被磁盘/杀软放大。已在 writer 侧加 `StoreKernel.publishHead` 外层有界重试（EPERM/EBUSY，最多 5 次、100ms→1s 退避，覆盖 IO 层 2s 之外），并加“读者持有 head 目标时瞬时 EPERM”单测；复验：连续 `readFile` 读者持续读 head 时，writer 3 次提交和 100 次提交都 exit 0（100 次约 50s）。平台提供 reader-friendly 共享打开仍是上游根治方向。在定性前不得把双 host 并发写当成通过证据。
 
 ### 5.8 R1 已落地证据
 
