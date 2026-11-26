@@ -5,6 +5,7 @@
 ## 环境
 
 - 安装源：`D:\dsh\dsh-evolution-mirror\packages\dist`，本机重新打包的 0.61.0 candidate；
+- candidate 源：mirror HEAD `4bb57856`（含 snapshot restore `.unit-*` 修复）；overlay 先 `build-lib`，再同步 lib 到 mirror 后打包；
 - tarball：20 个，`@lmzhen/*`；
 - `all` tarball sha256：`288C781911995EB07D60CB51BD8B31740A312C0747D6ACB9C6FDF1FD290671A6`；
 - 隔离 home：`D:\dsh-homes\lab-dcr85`，profile `web`；
@@ -41,7 +42,7 @@
 
 ## 未完成
 
-- 双进程同时挂同一 home 的无锁读验收；
+- 双进程同时挂同一 home 的无锁读验收：2026-11-26 晚尝试过两个 3099/3100 host，但机器上已有多个长寿命 host 进程，端口归属和终端 session 混淆，读延迟 2–10s，无法区分是锁竞争还是 CPU/IO 饱和；该次结果**不作为证据**，需在干净机器上重做。
 - 崩溃恢复（kill -9 在 unit 中/commit 中/head 后）；
 - HMR 替换 store service 的真机验证；
 - fresh profile 的 Key 空/有/错误/清除四态；
