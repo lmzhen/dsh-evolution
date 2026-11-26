@@ -1,10 +1,10 @@
 // @tier pre-tag
-import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { nodeEvolutionIo } from '@deepseek-ai/dsh-evolution-core'
 import type { SkillLibrary } from '@deepseek-ai/dsh-evolution-core/skills'
 import { tempRoot } from '../../test-support/temp-home.ts'
 import { createMergeRuntime, pairKey, stageKeyOf, writeStagedFile, type MergeRuntimeDeps, type SkillCard } from '../src/index.ts'
+import { readRunMeta } from '../src/domain/run-coordinator.ts'
 
 const BODY = (name: string) => ['---', 'name: ' + name, 'description: fixture', '---', '', '# ' + name, ''].join('\n')
 const cards: SkillCard[] = [{ name: 'alpha-skill', description: 'a', body: BODY('alpha-skill'), managed: true }, { name: 'beta-skill', description: 'b', body: BODY('beta-skill'), managed: true }, { name: 'umbrella', description: 'u', body: BODY('umbrella'), managed: true }]
@@ -68,12 +68,13 @@ it('returns an accepted run id when detached is enabled', async () => {
   const result = await createMergeRuntime(deps).execute({ verb: 'scan' })
   // The detached run finishes after execute() returns; let it write its meta
   // before test teardown removes the temp home, or it would log a false ENOENT.
-  const metaPath = join(home, 'merge', 'run-meta', 'run-det.json')
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const raw = await io.readText(metaPath)
-    if (raw !== null && /"phase": "(settled|awaiting-approval|cancelled|undone)"/.test(raw)) break
+  let meta = await readRunMeta(io, home, 'run-det')
+  for (let attempt = 0; attempt < 100 && (meta === null || meta.phase === 'running'); attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, 20))
+    meta = await readRunMeta(io, home, 'run-det')
   }
+  expect(meta).not.toBeNull()
+  expect(meta?.phase).not.toBe('running')
   expect(result.ok).toBe(true)
   expect(result.text).toContain('已启动：run-det')
   expect(result.text).toContain('作用域：family-managed')

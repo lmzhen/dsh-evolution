@@ -56,9 +56,11 @@ it('manual resume after restart is explicit and can complete', { timeout: 90_000
   }
   expect((await loadMergeState(io, home)).state.rows).toEqual([])
   // finish() writes run-meta after the rows settle; let it land before teardown.
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const meta = await readRunMeta(io, home, runId)
-    if (meta !== null && meta.phase !== 'running') break
+  let meta = await readRunMeta(io, home, runId)
+  for (let attempt = 0; attempt < 100 && (meta === null || meta.phase === 'running'); attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, 20))
+    meta = await readRunMeta(io, home, runId)
   }
+  expect(meta).not.toBeNull()
+  expect(meta?.phase).not.toBe('running')
 })

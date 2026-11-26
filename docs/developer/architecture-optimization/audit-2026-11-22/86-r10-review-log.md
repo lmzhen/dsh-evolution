@@ -86,6 +86,7 @@
 - `state.provider` surface 已删除（无生产消费者，内部改为 `stateCodec`）。
 - 仅余：双进程无锁读（只读并发已过；host 写并发受 Windows rename/read 共享窗口影响，已加 writer 侧有界重试，见 85 §5.8b）、崩溃/HMR、Key 错误态、最终独立复核、版本确认与唯一一次发布。
 - 本机隔离安装、v2 迁移/回退、四 tab 与三档截图已记录在 [87-r10-lab-acceptance](87-r10-lab-acceptance.md)。
+- 最新独立复核（head retry + rg6/runtime-scan 收尾）：无 P0/P1；P2 的“轮询无断言/手写路径正则/fail-closed 未覆盖”已修（rg6-restart 和 runtime-scan 改 `readRunMeta` 并断言终态，`store-kernel.spec` 增加重试耗尽 fail-closed 用例）。
 
 ## 复核结论的用法
 

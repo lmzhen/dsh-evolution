@@ -61,6 +61,26 @@ describe('home MVCC store kernel', () => {
     expect(result.commitId).toMatch(/^[0-9a-f]{64}$/)
   })
 
+  it('fails closed after the extra head retries are exhausted', async () => {
+    const { root, io, kernel } = await seeded()
+    await kernel.bootstrap({ state: { turns: 1 } })
+    const wrapped = {
+      ...io,
+      async writeText(path: string, content: string): Promise<void> {
+        if (path.endsWith('head.json')) {
+          const error = new Error('EPERM: head.json target is permanently held') as NodeJS.ErrnoException
+          error.code = 'EPERM'
+          throw error
+        }
+        await io.writeText(path, content)
+      },
+    }
+    const writer = new StoreKernel({ io: wrapped, home: root, fence: openFence() })
+    await expect(writer.mutate({ domains: ['state'], source: 'command', change: () => ({ state: { turns: 2 } }) }))
+      .rejects.toMatchObject({ code: 'EPERM' })
+    expect((await writer.query(['state'])).domains.state).toEqual({ turns: 1 })
+  })
+
   it('publishes a new commit while an already-returned snapshot stays immutable', async () => {
     const { io, root } = await seeded()
     const kernel = new StoreKernel({ io, home: root, fence: openFence() })

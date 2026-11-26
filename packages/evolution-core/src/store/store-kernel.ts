@@ -45,7 +45,7 @@ const OBJECTS_DIR = 'objects'
  * retries the rename for ~2s; these outer attempts cover a read burst that
  * outlives that window, then fail closed rather than spin forever.
  */
-const HEAD_PUBLISH_RETRY_MAX_ATTEMPTS = 5
+const HEAD_PUBLISH_EXTRA_ATTEMPTS = 5
 const HEAD_PUBLISH_RETRY_BASE_MS = 100
 const HEAD_PUBLISH_RETRY_MAX_DELAY_MS = 1_000
 
@@ -482,7 +482,7 @@ export class StoreKernel {
       } catch (error) {
         const code = (error as NodeJS.ErrnoException | undefined)?.code
         if (code !== 'EPERM' && code !== 'EBUSY') throw error
-        if (attempt >= HEAD_PUBLISH_RETRY_MAX_ATTEMPTS) throw error
+        if (attempt >= HEAD_PUBLISH_EXTRA_ATTEMPTS) throw error
         await new Promise(resolve =>
           setTimeout(resolve, Math.min(HEAD_PUBLISH_RETRY_BASE_MS * 2 ** attempt, HEAD_PUBLISH_RETRY_MAX_DELAY_MS)))
       }
