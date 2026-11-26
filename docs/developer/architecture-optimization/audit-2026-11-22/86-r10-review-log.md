@@ -73,7 +73,9 @@
 - P2-3：gate 只守 `inject` 声明（字面量、含 static）；不再追跨函数包装，捕获由行为矩阵覆盖；数组内注释、对象式 `Inject` 未支持。
 - P2-4：curator 无 store/authority 的最小 mount 已覆盖；“先 mount 后 provide”仍缺。
 - P2-10：本页即为该条的可审计记录；原始对话不在库内。
-- manifest-pending 显式持久记录、usage/merge/memory/feedback 的 codec 收敛、promote 未 re-stage 拒绝条件仍待。
+- manifest-pending 显式持久记录仍待（boot 全树对账已覆盖可用性）。
+- `usage/merge/memory/discovery/feedback` 走同一个 `scopedTextIO` 文本 codec；不再逐域手写 reader/writer。
+- promote 只在 pending 存在时发生；re-stage 归档旧 store，无需额外拒绝开关。
 - `state.provider` surface 已删除（无生产消费者，内部改为 `stateCodec`）。
 
 ## 复核结论的用法

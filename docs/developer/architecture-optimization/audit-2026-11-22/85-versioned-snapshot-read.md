@@ -517,8 +517,8 @@ none --migrate state --to v2--> staged(pending) --startup--> active
 ```
 
 - 激活记录（目标文件名 `state/.store-activation.json`，当前复用 `.migrated-to-store-v2.json`）是唯一权威：`{ mode: 'legacy'|'store-v2', generation, commitId, lastActiveCommitId?, migratedAt }`；`generation` 每次激活递增。当前实现已在既有 marker 上追加 `mode/generation/lastActiveCommitId`，并由 `readStoreActivation()` 解析：缺 marker=legacy、`mode:'legacy'`=回退、未知 mode/坏 JSON=fail loud；旧 marker 无字段按 store-v2 读，改文件名的步骤留到激活状态机完整落地。
-- **已落地**：`StoreService.read/transact` codec 底座、activation record 解析、`migrate state --revert`（写 legacy 记录、保留 v2 字节）、re-stage 把旧 store 归档为 `store-v2-rollback-*`、坏 pending 报路径并给出删除重跑指引、`StoreService` generation + `expectedGeneration` 冲突校验、gate-94/95；**未落地**：promote 对“曾激活过但用户未 re-stage”的拒绝条件，以及所有消费者在写请求中携带 generation。
-- 回退也写记录：`mode:'legacy'` + 保留 `lastActiveCommitId`，不删除记录；promote 只有在“记录显示从未激活过（无 lastActiveCommitId）且 head 无 active 记录”时才丢弃 head；曾激活过却出现不匹配 head ⇒ 拒绝 promote，要求显式 `--discard-active-store` 并打印将丢弃的 commitId。禁止“删 marker 再 stage”静默清空 v2 数据。
+- **已落地**：`StoreService.read/transact` codec 底座、activation record 解析、`migrate state --revert`（写 legacy 记录、保留 v2 字节）、re-stage 把旧 store 归档为 `store-v2-rollback-*`、坏 pending 报路径并给出删除重跑指引、`StoreService` generation + `expectedGeneration` 冲突校验、gate-94/95；所有消费者携带 generation 仍待逐域迁移。
+- 回退也写记录：`mode:'legacy'` + 保留 `lastActiveCommitId`，不删除记录；**promote 只在 pending 存在时发生**。没有 pending 时不存在“自动 promote”，所以不需要额外的 `--discard-active-store` 拒绝开关；legacy 记录 + pending 就是用户显式 re-stage 的同意，旧 v2 store 归档为 `store-v2-rollback-*` 后从当前 legacy 字节重建。禁止“删 marker 再 stage”静默清空 v2 数据——re-stage 归档而不是删除。
 - 启动时 `store-plugin` 在**任何 provider/DAO/bridge 构造前**完成 promote；promote 只允许在本进程首次 apply 执行，HMR 重挂发现 pending 只报“下次启动生效”。
 - `migrate state` 只做三件事：读当前 legacy 做校验、写 staged 记录、打印“重启后生效”；不建 head、不写 active、也不提供 `evolutionStore`。
 - promote 的锁顺序与 tree→state 一致：先 HomeFence，再 `state.lock`；不允许反向。
@@ -556,7 +556,7 @@ interface StoreView {
 ```
 
 - `DomainCodec` 负责 `decode` / `encode` / `empty` / 形状校验；非法值抛 `StoreCorruptError`，不再有 `recordOf` 把坏值读成 `{}`、`textOf` 读成 `null` 的 fail-open。
-- **一张 codec 表，不建 7 个手写 port**：`DomainCodecs[domain]` 提供类型；消费者直接 `service.read/transact(domain, codec)`。**已落地底座**：`StoreService.read<T>(domain, codec)` / `transact<T>(domain, codec, change)` 与 `DomainCodec<T>`，`store-service.spec` 用整数 codec 验证读写；把各域迁移到 codec 表仍待逐域完成。
+- **一张 codec 表，不建 7 个手写 port**：结构化域用 `DomainCodec<T>`（当前 `stateCodec`、`reportsCodec`）；文本域（usage/merge/memory/discovery/feedback）用同一个 `scopedTextIO` 文本 codec，domain+path 由调用方声明，不再各包手写 reader/writer。消费者直接 `service.read/transact(domain, codec)`。**已落地**：`StoreService.read<T>(domain, codec)` / `transact<T>(domain, codec, change)`、`DomainCodec<T>`；state/reports 已迁移，其余文本域走 `scopedTextIO`。
 - reports 的读写只有 `reports` codec + 一个 owner：merge/commands/curator/maintenance 全部经 `service.read/transact('reports', reportsCodec)`；不再有“merge 写域、commands 读文件”的双介质。**已落地**：`reportsCodec` 提供 fail-closed 解码；maintain 写走 `service.transact`，读走 `service.read`，域内保留最新 20 份；旧 `command/query` 仅作 fake/legacy 兼容分支。**state 域**也已有 `stateCodec`：v2 provider 在 service 存在时走 `service.read/transact('state', stateCodec)`，无 service 时保留 kernel 路径。
 - merge 收据、staging-index、reconcile journal 合并进 `merge` codec 的带 `schemaVersion` 子文档，或保持独立域；不再散落 base 文件。
 - `EvolutionIoLike` 只保留两类用途：迁移命令读 legacy；R4 activity 事件 append log。生产域代码不再接收 file-shaped IO。
