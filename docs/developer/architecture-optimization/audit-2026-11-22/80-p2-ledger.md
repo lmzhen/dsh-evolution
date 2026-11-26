@@ -62,7 +62,7 @@
 | R10-P2-1 reports 双介质 | FIXED | 读 key 对齐 `reports/<name>`；v2 下写走 `merge` surface 的 reports 域；域内保留最新 20 份 maintain 报告（JSON+MD，按 endedAt），有单测；merge 其它前缀不动。 |
 | R10-P2-2 GC retain/读失败 | FIXED | `collectGarbage` 非法 retain 抛 `store-invalid-retain`；GC 读失败被隔离，新增 `does not fail an already-published mutation when GC bookkeeping fails`。 |
 | R10-P2-3 lifecycle gate 漏闭包 | PARTIAL | gate-93 已拦字段式捕获、直接/括号/解构 `const` 捕获、`ctx?.get?.()` optional chain；commands 的 reportStore 和 review 的 authority 改为使用点解析；仍是静态模式匹配，不做数据流，`const g=ctx.get; g(...)` 之类别名仍可能漏检。 |
-| R10-P2-4 生命周期矩阵不全 | PARTIAL | 已补 state-auto 模式冻结、memory/merge/discovery activation guard、HMR service 新实例、GC 故障；curator/feedback 的“先 mount 后 provide / 完全无 service”仍缺。 |
+| R10-P2-4 生命周期矩阵不全 | PARTIAL | 已补 state-auto 模式冻结、memory/merge/discovery activation guard、feedback attach-time service、HMR service 新实例、GC 故障；curator 的“先 mount 后 provide / 完全无 service”仍缺。 |
 | R10-P2-5 scoped `mtime=null` 缓存 | FIXED | scoped text 的 `mtime` 现在返回 commit id 的稳定数值投影，commit 变化即失效；新增 `exposes the commit revision as mtime`。 |
 | R10-P2-6 双跨进程锁顺序 | FIXED | `activatePendingStateV2` 现在先 HomeFence 再 state.lock，并把同一 fence 传给 promote；生产命令仍只 stage，直调 `migrateStateToV2` 的测试路径保留旧顺序。 |
 | R10-P2-7 回退/坏 pending | FIXED | `migrate state --revert` 写 legacy 记录；re-stage 把旧 v2 store 归档为 `store-v2-rollback-*`；坏 pending 报出文件路径并提示删除后重跑，均有测试。 |
