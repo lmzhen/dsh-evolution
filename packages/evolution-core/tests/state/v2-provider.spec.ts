@@ -46,7 +46,7 @@ describe('MVCC state provider', () => {
     const provider = createStateV2Provider({ io, home: root, fence, service })
     await provider.saveReviewState('s1', { turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
     expect(await provider.loadReviewState('s1')).toEqual({ turnsSinceMemory: 1, turnsSinceSkill: 2, lastTurn: 3 })
-    const state = (await service.query('state.provider', ['state'])).snapshot.domains.state as { review: Record<string, unknown> }
+    const state = (await service.query('pending', ['state'])).snapshot.domains.state as { review: Record<string, unknown> }
     expect(state.review.s1).toMatchObject({ lastTurn: 3 })
   })
 

@@ -49,7 +49,7 @@ describe('evolutionStore service provider', () => {
       expect(await io.exists(join(root, 'state', STATE_V2_MIGRATION_MARKER))).toBe(true)
       expect(await io.exists(join(root, 'state', STATE_V2_PENDING_MARKER))).toBe(false)
       const store = ctx.get('evolutionStore') as { query(id: string, domains: readonly string[]): Promise<{ snapshot: { domains: { state?: { review?: Record<string, unknown> } } } }> }
-      const state = (await store.query('state.provider', ['state'])).snapshot.domains.state
+      const state = (await store.query('pending', ['state'])).snapshot.domains.state
       expect(state?.review?.post).toMatchObject({ lastTurn: 9 })
     } finally {
       if (previous === undefined) delete process.env.DSH_EVOLUTION_HOME

@@ -27,8 +27,6 @@ export interface StoreSurfaceCommand {
 }
 
 export const STORE_SURFACE_COMMANDS: readonly StoreSurfaceCommand[] = [
-  // State provider: the MVCC StateStore adapter writes/reads the state domain.
-  { id: 'state.provider', kind: 'provider', reads: ['state'], writes: ['state'], expectsCommit: false },
   // Usage sidecar bridge: usage/suppressed text documents.
   { id: 'usage.rw', kind: 'provider', reads: ['usage', 'suppressed'], writes: ['usage', 'suppressed'], expectsCommit: false },
   // Discovery bridge: domain map, projection journal and view snapshots.

@@ -74,6 +74,7 @@
 - P2-4：curator 无 store/authority 的最小 mount 已覆盖；“先 mount 后 provide”仍缺。
 - P2-10：本页即为该条的可审计记录；原始对话不在库内。
 - manifest-pending 显式持久记录、usage/merge/memory/feedback 的 codec 收敛、promote 未 re-stage 拒绝条件仍待。
+- `state.provider` surface 已删除（无生产消费者，内部改为 `stateCodec`）。
 
 ## 复核结论的用法
 
