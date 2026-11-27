@@ -16,7 +16,7 @@ import type { SkillCard } from '../skill-card.ts'
 import type { RetrievalCredentials } from '../domain/retrieval-credentials.ts'
 
 export type EngineScreenResult =
-  | { readonly ok: true; readonly report: Record<string, unknown> }
+  | { readonly ok: true; readonly report: Record<string, unknown>; readonly selection?: CandidateSelection }
   | { readonly ok: false; readonly error: { readonly code: string; readonly stage?: string; readonly detail?: string } }
 
 export interface EngineScreenPort {
@@ -150,7 +150,7 @@ export function createEngineScreening(deps: EngineScreeningDeps) {
     if (!result.ok) {
       throw new Error('engine screen failed: ' + result.error.code + (result.error.stage === undefined ? '' : ' @' + result.error.stage) + (result.error.detail === undefined ? '' : ': ' + result.error.detail))
     }
-    const selection = deps.select(result.report)
+    const selection = result.selection ?? deps.select(result.report)
     if (deps.onSelection !== undefined) await deps.onSelection(selection, runId, cards)
     const degraded = selection.reportOnly
       .filter(row => (row as { error?: unknown }).error === true)

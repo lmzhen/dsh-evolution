@@ -54,6 +54,6 @@
 - 双 host 只读并发已通过（3099/3100 同 lab home，均 200）；host 写 + host 读的并发压力尚未在干净机器复验：外部 writer 高压时出现 host 请求 10s 超时和 head rename EPERM，无法区分磁盘/杀软/两 host 同读争用，未归因到锁，不作为无锁读反例。
 - HMR 替换 store service 的真机验证；
 - Key 错误态：空/有/清除已通过 credentials RPC 验证；真实 scan 用 fake retrieval key 启动后 host 20+ 分钟无响应，未拿到错误态。该次真实扫描暴露并修复了 P1-REPORTS（merge report 用错 surface，见 80/86）；错误态仍需一次能正常结束的扫描。
-- scan 运行形态：engine screen 已移子进程（`scripts/engine-screen-worker.mjs`，模型 judge 通过 IPC 代理），但真实 host 仍在完整 scan body/report 阶段 CPU 阻塞 20+ 分钟且事件循环无响应；已确认不是 MVCC 读锁，仍未完成整体 worker 化，不能宣称 scan 可接受。
+- scan 运行形态：engine screen 和 candidate selection 已移子进程，但真实 host 仍在完整 scan body/row/report 阶段 CPU 阻塞 20+ 分钟且事件循环无响应；已确认不是 MVCC 读锁，仍需整体 worker 化，不能宣称 scan 可接受。
 - 迁移后重启的**完整** UI 再验收（本轮只做了 API + 迁移/回退）；
 - 正式版本确认、tag、唯一一次发布、发布后 fresh npm 安装验收。

@@ -233,7 +233,7 @@ HomeFence.run(tree)
 - 下一步 R2 才接 `EvolutionState`/state provider；R1 不改变 0.61.0 的运行路径。
 
 ### 5.8c scan 整体 worker 化设计（待实现）
-真实 scan 证明只把 engine `screen` 移到子进程不够：candidate selection、row/report 组装仍在宿主事件循环，host 仍会 20+ 分钟无响应。目标边界：
+真实 scan 证明只把 engine `screen` 移到子进程不够：candidate selection、row/report 组装仍在宿主事件循环，host 仍会 20+ 分钟无响应。已再移 selection 到子进程，真实 host 仍无响应，说明剩余热区在 body/row/report 组装。目标边界：
 - 子进程只做**纯 CPU**：engine screen + candidate selection + candidate/report 文档组装，不写 store；
 - 父进程保留 service/IO/registry/channel 端口，通过 IPC 提供 cards 快照、模型 judge 代理和 run stage；子进程返回候选/跳过/降级原因；
 - 父进程负责 row ledger、reports 域写入、registry settle；写仍走 `reports.rw`/`merge.rw` surface；
