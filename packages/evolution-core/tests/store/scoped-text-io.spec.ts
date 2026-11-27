@@ -126,10 +126,10 @@ describe('scoped text IO bridge', () => {
     expect(bridge).not.toBeUndefined()
     await bridge!.writeText(join(root, 'reports', 'merge-runs', 'r.json'), '{"ok":true}\n')
     expect((await service.query('reports.rw', ['reports'])).snapshot.domains.reports)
-      .toEqual({ 'merge-runs/r.json': '{"ok":true}\n' })
+      .toEqual({ 'reports/merge-runs/r.json': '{"ok":true}\n' })
     await bridge!.writeText(join(root, 'merge', 'run-meta', 'm.json'), '{"run":"m"}\n')
     expect((await service.query('merge.rw', ['mergeMeta'])).snapshot.domains.mergeMeta)
-      .toEqual({ 'run-meta/m.json': '{"run":"m"}\n' })
+      .toEqual({ 'merge/run-meta/m.json': '{"run":"m"}\n' })
   })
 })
 
