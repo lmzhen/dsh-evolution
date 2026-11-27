@@ -8,7 +8,7 @@ import { HomeFence } from '../../src/home-fence.ts'
 import { StoreKernel } from '../../src/store/store-kernel.ts'
 import { StoreActivationPendingError } from '../../src/store/activation-guard.ts'
 import { createStoreService } from '../../src/store/service.ts'
-import { memoryIoIfV2, scopedTextIO, discoveryIoIfV2 } from '../../src/store/scoped-text-io.ts'
+import { memoryIoIfV2, scopedTextIO, discoveryIoIfV2, mergeIoIfV2 } from '../../src/store/scoped-text-io.ts'
 import { STATE_V2_MIGRATION_MARKER } from '../../src/state/constants.ts'
 import { tempRoot } from '../../../test-support/temp-home.ts'
 
@@ -110,6 +110,25 @@ describe('scoped text IO bridge', () => {
     await writeFile(join(root, 'state', STATE_V2_MIGRATION_MARKER), '{}\n')
     await expect(scoped!.writeText(paths.domainMap, '{"changed":true}\n')).rejects.toBeInstanceOf(StoreActivationPendingError)
     expect(await scoped!.readText(paths.domainMap)).toBe('{}\n')
+  })
+
+  it('routes merge reports through reports.rw while merge files use merge.rw', async () => {
+    const root = await tempRoot('dsh-scoped-merge-reports-')
+    const io = nodeEvolutionIo()
+    await mkdir(join(root, 'state'), { recursive: true })
+    await writeFile(join(root, 'state', STATE_V2_MIGRATION_MARKER), '{}\n')
+    const fence = new HomeFence({ home: root })
+    const kernel = new StoreKernel({ io, home: root, fence })
+    await kernel.bootstrap({ merge: { text: '' }, mergeMeta: {}, reports: {} })
+    const service = createStoreService(kernel)
+    const bridge = mergeIoIfV2(undefined, io, root, fence, service)
+    expect(bridge).not.toBeUndefined()
+    await bridge!.writeText(join(root, 'reports', 'merge-runs', 'r.json'), '{"ok":true}\n')
+    expect((await service.query('reports.rw', ['reports'])).snapshot.domains.reports)
+      .toEqual({ 'merge-runs/r.json': '{"ok":true}\n' })
+    await bridge!.writeText(join(root, 'merge', 'run-meta', 'm.json'), '{"run":"m"}\n')
+    expect((await service.query('merge.rw', ['mergeMeta'])).snapshot.domains.mergeMeta)
+      .toEqual({ 'run-meta/m.json': '{"run":"m"}\n' })
   })
 })
 

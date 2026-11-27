@@ -9,6 +9,7 @@
 | P1-CI-20 | `verify-core-surface` 仍按已删除的 `write-kernel.ts`/`mutation-unit.ts` 校验 | `writeOwned` 改为当前 `write.ts` 导出面 | `run-gates ci --lane ci-static` 通过 |
 | P1-CI-26 | `family-test-lines` 用 family commit 做 git diff，CI overlay 无此历史 | 注册表增加 `specDigest`（spec 字节摘要），校验不再依赖 git 历史 | mirror + overlay 两边 digest 一致，`ci-only-26` 通过 |
 | P1-SERIAL | `UnitKernel.apply` 丢了旧 `MutationUnit.apply` 的 `serial` 包裹 | `apply` 恢复 `this.serial` 包裹，并加 serial 顺序测试 | unit-kernel 30 tests；全量套件 |
+| P1-REPORTS | `mergeIoIfV2` 用 `merge.rw` 同时写 `reports` 域，v2 真实 scan 报 `store surface merge.rw may not write domain reports`，run 失败 | `ScopedTreeMapping` 支持逐映射 `commandId`；`reports` 映射改用 `reports.rw`，merge/run-meta 仍用 `merge.rw`；`scoped-text-io.spec` 覆盖两个映射的命令 id | 新单测 7 passed；真实 scan 复验报告命令不再被 surface 拒绝 |
 
 ## P2 台账（DEFERRED）
 

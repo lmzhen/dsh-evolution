@@ -323,7 +323,7 @@ R1 的 kernel 只是对象层。R2 才把 review/pending/curator 的 state 接�
 
 #### R3c 已落地（merge 辅助文件）
 
-- `store/scoped-tree-io.ts`：`merge/run-meta` → `mergeMeta` 域、`reports` → `reports` 域，均存 `path -> text` map；dot 开头的锁文件（如 `reports/.retention`）仍走 base IO，不进入 commit。
+- `store/scoped-tree-io.ts`：`merge/run-meta` → `mergeMeta` 域、`reports` → `reports` 域，均存 `path -> text` map；每个 mapping 可带自己的 surface command（`merge`/`mergeMeta` 用 `merge.rw`，`reports` 用 `reports.rw`）；dot 开头的锁文件（如 `reports/.retention`）仍走 base IO，不进入 commit。
 - `mergeAuxIoIfV2` 只在 v2 marker 存在时包裹 merge IO；未迁移路径不变。
 - `migrateStateToV2` 首 commit 同时读取旧 `merge/run-meta/*.json` 与 `reports/*`，避免 v2 下报告/运行元数据消失。
 - 测试：tree IO 1 test、v2 state/migration 7 tests（含 run-meta/report 迁移）通过；`tsc` core/merge 0；io-discipline gate 通过。

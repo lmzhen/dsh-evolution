@@ -38,6 +38,8 @@ export interface ScopedTreeMapping {
   /** Directory relative to `home`, e.g. `merge/run-meta`. */
   readonly prefix: string
   readonly domain: StoreDomainId
+  /** Surface command for this mapping; defaults to the options command. */
+  readonly commandId?: string | undefined
 }
 
 export interface ScopedTreeIOOptions {
@@ -54,24 +56,24 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
   const root = resolve(options.home)
   const prefixes = options.mappings.map(mapping => ({ ...mapping, prefix: mapping.prefix.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') }))
   const relativeKey = (path: string): string => relative(root, resolve(path)).replace(/\\/g, '/')
-  const mapped = (path: string): { domain: StoreDomainId; key: string } | undefined => {
+  const mapped = (path: string): { domain: StoreDomainId; key: string; commandId?: string } | undefined => {
     const key = relativeKey(path)
     if (basename(key).startsWith('.')) return undefined
     for (const entry of prefixes) {
       if (key === entry.prefix) continue
-      if (key.startsWith(entry.prefix + '/')) return { domain: entry.domain, key }
+      if (key.startsWith(entry.prefix + '/')) return { domain: entry.domain, key, ...(entry.commandId === undefined ? {} : { commandId: entry.commandId }) }
     }
     return undefined
   }
 
-  const readMap = async (domain: StoreDomainId): Promise<FileMap> => {
+  const readMap = async (domain: StoreDomainId, commandId: string | undefined): Promise<FileMap> => {
     const service = resolveStoreService(options.service)
     const snapshot = service === undefined
       ? await options.kernel.query([domain])
-      : (await service.query(options.commandId ?? 'merge', [domain])).snapshot
+      : (await service.query(commandId ?? options.commandId ?? 'merge', [domain])).snapshot
     return recordOf(snapshot.domains[domain])
   }
-  const writeMap = async (domain: StoreDomainId, key: string, text: string | null): Promise<void> => {
+  const writeMap = async (domain: StoreDomainId, key: string, text: string | null, commandId: string | undefined): Promise<void> => {
     const service = resolveStoreService(options.service)
     const change = async (current: { domains: Partial<Record<StoreDomainId, unknown>> }): Promise<Record<string, FileMap>> => {
       const map = recordOf(current.domains[domain])
@@ -81,7 +83,7 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
     }
     if (service !== undefined) {
       await service.command({
-        commandId: options.commandId ?? 'merge',
+        commandId: commandId ?? options.commandId ?? 'merge',
         domains: [domain],
         source: 'command',
         change,
@@ -96,7 +98,7 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
     async readText(path) {
       const target = mapped(path)
       if (target === undefined) return await base.readText(path)
-      return (await readMap(target.domain))[target.key] ?? null
+      return (await readMap(target.domain, target.commandId))[target.key] ?? null
     },
     async writeText(path, content) {
       const target = mapped(path)
@@ -104,7 +106,7 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
         await base.writeText(path, content)
         return
       }
-      await writeMap(target.domain, target.key, content)
+      await writeMap(target.domain, target.key, content, target.commandId)
     },
     async createTextIfAbsent(path, content) {
       const target = mapped(path)
@@ -113,8 +115,8 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
         await base.createTextIfAbsent(path, content)
         return
       }
-      if ((await readMap(target.domain))[target.key] !== undefined) throw Object.assign(new Error('scoped-tree-io: mapped file exists'), { code: 'EEXIST' })
-      await writeMap(target.domain, target.key, content)
+      if ((await readMap(target.domain, target.commandId))[target.key] !== undefined) throw Object.assign(new Error('scoped-tree-io: mapped file exists'), { code: 'EEXIST' })
+      await writeMap(target.domain, target.key, content, target.commandId)
     },
     async transact(path, task) {
       const target = mapped(path)
@@ -133,7 +135,7 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
       }
       const service = resolveStoreService(options.service)
       if (service !== undefined) {
-        await service.command({ commandId: options.commandId ?? 'merge', domains: [target.domain], source: 'command', change })
+        await service.command({ commandId: target.commandId ?? options.commandId ?? 'merge', domains: [target.domain], source: 'command', change })
         return
       }
       await options.kernel.mutate({ domains: [target.domain], source: 'command', change })
@@ -142,7 +144,7 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
       const key = relativeKey(path).replace(/\/+$/, '')
       const mapping = prefixes.find(entry => entry.prefix === key)
       if (mapping === undefined) return await base.list(path)
-      const map = await readMap(mapping.domain)
+      const map = await readMap(mapping.domain, mapping.commandId)
       const prefix = key === '' ? '' : key + '/'
       const names = new Set<string>()
       for (const file of Object.keys(map)) {
@@ -156,18 +158,18 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
     async exists(path) {
       const target = mapped(path)
       if (target === undefined) return await base.exists(path)
-      return (await readMap(target.domain))[target.key] !== undefined
+      return (await readMap(target.domain, target.commandId))[target.key] !== undefined
     },
     size: async (path) => {
       const target = mapped(path)
       if (target === undefined) return base.size === undefined ? null : await base.size(path)
-      const text = (await readMap(target.domain))[target.key]
+      const text = (await readMap(target.domain, target.commandId))[target.key]
       return text === undefined ? null : Buffer.byteLength(text, 'utf8')
     },
     isSymlink: async (path) => {
       const target = mapped(path)
       if (target === undefined) return base.isSymlink === undefined ? null : await base.isSymlink(path)
-      return (await readMap(target.domain))[target.key] === undefined ? null : false
+      return (await readMap(target.domain, target.commandId))[target.key] === undefined ? null : false
     },
     mtime: async (path) => {
       const target = mapped(path)
@@ -184,7 +186,7 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
         await base.remove(path)
         return
       }
-      await writeMap(target.domain, target.key, null)
+      await writeMap(target.domain, target.key, null, target.commandId)
     },
     rename: async (path, destination) => {
       const from = mapped(path)
@@ -193,11 +195,11 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
         await base.rename(path, destination)
         return
       }
-      const text = from === undefined ? await base.readText(path) : (await readMap(from.domain))[from.key] ?? null
+      const text = from === undefined ? await base.readText(path) : (await readMap(from.domain, from.commandId))[from.key] ?? null
       if (text === null) throw new Error('scoped-tree-io: source is missing')
       if (to === undefined) await base.writeText(destination, text)
-      else await writeMap(to.domain, to.key, text)
-      if (from !== undefined) await writeMap(from.domain, from.key, null)
+      else await writeMap(to.domain, to.key, text, to.commandId)
+      if (from !== undefined) await writeMap(from.domain, from.key, null, from.commandId)
     },
     copy: async (path, destination) => {
       const from = mapped(path)
@@ -206,10 +208,10 @@ export function scopedTreeIO(base: EvolutionIoLike, options: ScopedTreeIOOptions
         await base.copy(path, destination)
         return
       }
-      const text = from === undefined ? await base.readText(path) : (await readMap(from.domain))[from.key] ?? null
+      const text = from === undefined ? await base.readText(path) : (await readMap(from.domain, from.commandId))[from.key] ?? null
       if (text === null) throw new Error('scoped-tree-io: source is missing')
       if (to === undefined) await base.writeText(destination, text)
-      else await writeMap(to.domain, to.key, text)
+      else await writeMap(to.domain, to.key, text, to.commandId)
     },
   }
   return adapter
@@ -244,7 +246,7 @@ export function mergeIoIfV2(
     ...serviceOptions,
     mappings: [
       { prefix: 'merge/run-meta', domain: 'mergeMeta' },
-      { prefix: 'reports', domain: 'reports' },
+      { prefix: 'reports', domain: 'reports', commandId: 'reports.rw' },
     ],
   })
 }
