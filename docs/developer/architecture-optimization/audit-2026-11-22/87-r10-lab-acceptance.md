@@ -53,6 +53,6 @@
 
 - 双 host 只读并发已通过（3099/3100 同 lab home，均 200）；host 写 + host 读的并发压力尚未在干净机器复验：外部 writer 高压时出现 host 请求 10s 超时和 head rename EPERM，无法区分磁盘/杀软/两 host 同读争用，未归因到锁，不作为无锁读反例。
 - HMR 替换 store service 的真机验证；
-- Key 错误态：空/有/清除已通过 credentials RPC 验证；错误态需要真实扫描/model key，尚未测。
+- Key 错误态：空/有/清除已通过 credentials RPC 验证；真实 scan 用 fake retrieval key 启动后 host 20+ 分钟无响应，未拿到错误态。该次真实扫描暴露并修复了 P1-REPORTS（merge report 用错 surface，见 80/86）；错误态仍需一次能正常结束的扫描。
 - 迁移后重启的**完整** UI 再验收（本轮只做了 API + 迁移/回退）；
 - 正式版本确认、tag、唯一一次发布、发布后 fresh npm 安装验收。
