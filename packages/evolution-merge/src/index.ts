@@ -6,7 +6,7 @@ import type { Context as HostContext } from '@deepseek-ai/cordis/src/context.ts'
 type Context = Omit<CordisContext, 'logger'> & HostContext
 import { screen as engineScreen } from '@deepseek-ai/dsh-evolution-merge-engine'
 import { selectWithErrors } from './adapters/select.ts'
-import { createEngineScreening, type EngineScreenPort } from './adapters/engine-screen.ts'
+import { createEngineScreening, createProcessEngineScreen, type EngineScreenPort } from './adapters/engine-screen.ts'
 import { createEngineRunner, type EvolutionLlmLike } from './adapters/model-runner.ts'
 import { resolveRetrievalCredentials } from './domain/retrieval-credentials.ts'
 import { commandsPort, settingsPort, toolsPort } from '@deepseek-ai/dsh-evolution-platform/ports'
@@ -284,7 +284,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
     const engineScreening = createEngineScreening({
       io,
       home,
-      engine: { screen: engineScreen as unknown as EngineScreenPort['screen'] },
+      engine: { screen: createProcessEngineScreen(engineScreen as unknown as EngineScreenPort['screen']) },
       select: selectWithErrors,
       cfg: { ...engineConfig, judge: runner === undefined ? 'stub' : 'deepseek', ...(engineInput.maxTokens === 0 ? {} : { maxTokens: engineInput.maxTokens }), ...(engineInput.timeoutMs === 0 ? {} : { timeoutMs: engineInput.timeoutMs }) },
       credentials: async () => await resolveRetrievalCredentials(ctx as unknown as { get(name: string): unknown }),

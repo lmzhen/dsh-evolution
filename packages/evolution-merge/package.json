@@ -32,6 +32,7 @@
     "scripts/merge-migrate.mjs",
     "scripts/merge-restore.mjs",
     "scripts/merge-backup.mjs",
+    "scripts/engine-screen-worker.mjs",
     "package.json"
   ],
   "license": "MIT",

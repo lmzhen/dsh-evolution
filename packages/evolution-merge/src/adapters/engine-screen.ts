@@ -6,7 +6,10 @@
  * decide candidates: the Q02 selector is injected so engine/report-map stays the
  * single source of that policy.
  */
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fork } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import type { EvolutionIoLike } from '@deepseek-ai/dsh-evolution-core'
 import type { MergeCandidate } from '../contracts.ts'
 import type { SkillCard } from '../skill-card.ts'
@@ -61,6 +64,73 @@ export async function snapshotCards(io: EvolutionIoLike, home: string, runId: st
     await io.writeText(join(root, safeName(card.name, index), 'SKILL.md'), card.body)
   }
   return root
+}
+
+/**
+ * Run the local engine in a child process. The engine's local screening is
+ * CPU-bound and would otherwise occupy the host event loop for the whole scan;
+ * the model-backed path keeps the in-process runner because a function cannot
+ * cross the process boundary.
+ * @param direct - the in-process engine port used when a runner is present.
+ * @returns an engine port that isolates the local screening process.
+ */
+export function createProcessEngineScreen(direct: EngineScreenPort['screen']): EngineScreenPort['screen'] {
+  const workerPath = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'engine-screen-worker.mjs')
+  return async input => {
+    if (!existsSync(workerPath)) return await direct(input)
+    const child = fork(workerPath, [], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] })
+    const result = await new Promise<EngineScreenResult>((resolveResult, reject) => {
+      let settled = false
+      const finish = (value: EngineScreenResult): void => {
+        if (settled) return
+        settled = true
+        input.signal?.removeEventListener('abort', abort)
+        resolveResult(value)
+      }
+      const fail = (error: Error): void => {
+        if (settled) return
+        settled = true
+        input.signal?.removeEventListener('abort', abort)
+        reject(error)
+      }
+      const abort = (): void => {
+        child.kill()
+        fail(new Error('engine screen aborted'))
+      }
+      child.once('error', fail)
+      child.once('exit', code => {
+        if (!settled) fail(new Error('engine screen worker exited with code ' + String(code)))
+      })
+      child.on('message', (message: { type?: string; id?: string; prompt?: string; cfg?: Record<string, unknown>; ok?: boolean; value?: string; error?: string; result?: EngineScreenResult }) => {
+        if (message.type === 'runner-request') {
+          if (input.runner === undefined) {
+            child.send({ type: 'runner-response', id: message.id, ok: false, error: 'no runner in this host' })
+            return
+          }
+          void input.runner(message.prompt ?? '', message.cfg, input.signal)
+            .then(value => { if (!settled) child.send({ type: 'runner-response', id: message.id, ok: true, value }) })
+            .catch(error => { if (!settled) child.send({ type: 'runner-response', id: message.id, ok: false, error: error instanceof Error ? error.message : String(error) }) })
+          return
+        }
+        if (message.type !== 'result' || message.result === undefined) return
+        finish(message.result)
+      })
+      if (input.signal?.aborted === true) {
+        abort()
+        return
+      }
+      input.signal?.addEventListener('abort', abort, { once: true })
+      child.send({
+        type: 'screen',
+        corpusDir: input.corpusDir,
+        outDir: input.outDir,
+        ...(input.cfg === undefined ? {} : { cfg: input.cfg }),
+        ...(input.credentials === undefined ? {} : { credentials: input.credentials }),
+        ...(input.runner === undefined ? {} : { hasRunner: true }),
+      })
+    })
+    return result
+  }
 }
 
 export function createEngineScreening(deps: EngineScreeningDeps) {
