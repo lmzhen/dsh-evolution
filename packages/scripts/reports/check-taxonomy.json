@@ -206,6 +206,7 @@
         "evolution-merge::tests/authoring-manifest.spec.ts",
         "evolution-merge::tests/engine-remote-key.spec.ts",
         "evolution-merge::tests/engine-substance.spec.ts",
+        "evolution-merge::tests/report-surface.spec.ts",
         "evolution-merge::tests/run-meta-merge.spec.ts",
         "evolution-merge::tests/runtime-busy-target.spec.ts",
         "evolution-merge::tests/state-migrate-v4.spec.ts",
@@ -774,6 +775,7 @@
         "evolution-merge::tests/read-convergence.spec.ts",
         "evolution-merge::tests/reconcile.spec.ts",
         "evolution-merge::tests/recovery-settle.spec.ts",
+        "evolution-merge::tests/report-surface.spec.ts",
         "evolution-merge::tests/report.spec.ts",
         "evolution-merge::tests/retrieval-credentials.spec.ts",
         "evolution-merge::tests/revision.spec.ts",
@@ -1501,6 +1503,7 @@
         "evolution-merge::tests/read-convergence.spec.ts",
         "evolution-merge::tests/reconcile.spec.ts",
         "evolution-merge::tests/recovery-settle.spec.ts",
+        "evolution-merge::tests/report-surface.spec.ts",
         "evolution-merge::tests/report.spec.ts",
         "evolution-merge::tests/retrieval-credentials.spec.ts",
         "evolution-merge::tests/revision.spec.ts",
@@ -2176,6 +2179,7 @@
         "evolution-merge::tests/read-convergence.spec.ts",
         "evolution-merge::tests/reconcile.spec.ts",
         "evolution-merge::tests/recovery-settle.spec.ts",
+        "evolution-merge::tests/report-surface.spec.ts",
         "evolution-merge::tests/report.spec.ts",
         "evolution-merge::tests/retrieval-credentials.spec.ts",
         "evolution-merge::tests/revision.spec.ts",
@@ -2416,11 +2420,11 @@
   "counts": {
     "fast": {
       "gates": 75,
-      "specs": 163
+      "specs": 164
     },
     "pre-tag": {
       "gates": 75,
-      "specs": 474
+      "specs": 475
     },
     "ci-only": {
       "gates": 10,
@@ -2428,16 +2432,16 @@
     },
     "full(ci=off)": {
       "gates": 75,
-      "specs": 474
+      "specs": 475
     },
     "full(ci=on)": {
       "gates": 85,
-      "specs": 545
+      "specs": 546
     }
   },
   "specs": {
-    "total": 545,
-    "marked": 545,
+    "total": 546,
+    "marked": 546,
     "unmarked": 0
   }
 }
