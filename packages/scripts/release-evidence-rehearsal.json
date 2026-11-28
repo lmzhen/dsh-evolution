@@ -1,15 +1,15 @@
 {
-  "note": "0.61.1: P1/scan fixes; S1-S4 readings carried forward from 0.61.0 and bound to the 0.61.1 dist; CI cohort is the final host gate",
-  "familyVersion": "0.61.1",
+  "note": "0.61.2: scan worker/model-root fixes; S1-S4 readings carried forward and bound to the 0.61.2 dist",
+  "familyVersion": "0.61.2",
   "spikes": [
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.61.1",
+      "familyVersion": "0.61.2",
       "startedAt": "2026-11-24T11:19:20.778Z",
-      "artifactSha256": "c09dfe5d503621bf9cc2de671536edc335be5cd019017d8fe8327662049a4d43",
+      "artifactSha256": "3e8769e31c497fe492125eb91c33eb8e241a9dcb12b947f3c7dff3e12c45dfd6",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "fc80b255b6cd5f94d59b8c537ee7af4eaff6cb7e",
+      "commit": "597209acc591ae502b099985dbb78d2fadcfa6d7",
       "spike": "S1",
       "verdict": "pass",
       "readings": {
@@ -27,11 +27,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.61.1",
+      "familyVersion": "0.61.2",
       "startedAt": "2026-11-24T11:19:20.778Z",
-      "artifactSha256": "c09dfe5d503621bf9cc2de671536edc335be5cd019017d8fe8327662049a4d43",
+      "artifactSha256": "3e8769e31c497fe492125eb91c33eb8e241a9dcb12b947f3c7dff3e12c45dfd6",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "fc80b255b6cd5f94d59b8c537ee7af4eaff6cb7e",
+      "commit": "597209acc591ae502b099985dbb78d2fadcfa6d7",
       "spike": "S2",
       "verdict": "pass",
       "readings": {
@@ -49,11 +49,11 @@
     {
       "face": "web",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.61.1",
+      "familyVersion": "0.61.2",
       "startedAt": "2026-11-24T11:19:20.778Z",
-      "artifactSha256": "c09dfe5d503621bf9cc2de671536edc335be5cd019017d8fe8327662049a4d43",
+      "artifactSha256": "3e8769e31c497fe492125eb91c33eb8e241a9dcb12b947f3c7dff3e12c45dfd6",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "fc80b255b6cd5f94d59b8c537ee7af4eaff6cb7e",
+      "commit": "597209acc591ae502b099985dbb78d2fadcfa6d7",
       "spike": "S3",
       "verdict": "pass",
       "readings": {
@@ -66,11 +66,11 @@
     {
       "face": "headless",
       "hostVersion": "0.2.2-rc.5",
-      "familyVersion": "0.61.1",
+      "familyVersion": "0.61.2",
       "startedAt": "2026-11-24T11:19:20.778Z",
-      "artifactSha256": "c09dfe5d503621bf9cc2de671536edc335be5cd019017d8fe8327662049a4d43",
+      "artifactSha256": "3e8769e31c497fe492125eb91c33eb8e241a9dcb12b947f3c7dff3e12c45dfd6",
       "inputsSha256": "4feec231e03556c5b36a4a41cffa7f2b5d373997928abd8c7b9d3da32963be5e",
-      "commit": "fc80b255b6cd5f94d59b8c537ee7af4eaff6cb7e",
+      "commit": "597209acc591ae502b099985dbb78d2fadcfa6d7",
       "spike": "S4",
       "verdict": "pass",
       "readings": {
@@ -90,8 +90,8 @@
     "covered": 52,
     "total": 52,
     "planned": false,
-    "source": "verify-traceability --strict at fc80b255",
-    "measuredCommit": "fc80b255b6cd5f94d59b8c537ee7af4eaff6cb7e"
+    "source": "verify-traceability --strict at 597209ac",
+    "measuredCommit": "597209acc591ae502b099985dbb78d2fadcfa6d7"
   },
   "generatedAt": "2026-11-24T11:19:20.778Z",
   "cohort": {
