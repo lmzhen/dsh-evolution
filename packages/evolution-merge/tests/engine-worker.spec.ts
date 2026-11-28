@@ -14,5 +14,5 @@ it('runs a local engine screen in a child process instead of the host loop', asy
   const port = createProcessEngineScreen(direct)
   const result = await port({ corpusDir, outDir, cfg: { judge: 'stub' } })
   expect(direct).not.toHaveBeenCalled()
-  expect(typeof result.ok).toBe('boolean')
+  if (!result.ok) expect(String(result.error.detail ?? '')).not.toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME')
 }, 60_000)

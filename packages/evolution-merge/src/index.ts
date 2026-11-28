@@ -82,6 +82,7 @@ export interface MergePresentationScope {
 }
 
 export interface EngineModelConfig {
+  readonly models_dir: string
   readonly embedder_model: string
   readonly embedder_model_last: string
 }
@@ -90,6 +91,10 @@ export function engineConfigFromRoot(configuredRoot?: string): EngineModelConfig
   const root = configuredRoot?.trim() ?? ''
   if (root === '') return undefined
   return {
+    // The engine's registry lives beside the artifact directories under the
+    // configured root; without models_dir it falls back to the published
+    // package's @lmzhen/models path, which does not exist outside the monorepo.
+    models_dir: root,
     embedder_model: join(root, 'potion-multilingual-128M-int8'),
     embedder_model_last: join(root, 'potion-multilingual-128M-pca64-int8'),
   }
@@ -274,8 +279,12 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       return state.kind === 'unavailable' ? { code: 'E-323' as const, detail: state.reason } : undefined
     })
     const stage = new StageToolRegistry()
-    const engineInput = resolveEngineInput({ modelsRoot: startupParams.mergeModelsRoot })
-    const engineConfig = engineConfigFromRoot(engineInput.modelsRoot)
+    const liveEngineConfig = (): Record<string, unknown> | undefined => {
+      const engineInput = resolveEngineInput({ modelsRoot: getParams().mergeModelsRoot })
+      const engineConfig = engineConfigFromRoot(engineInput.modelsRoot)
+      if (engineConfig === undefined) return undefined
+      return { ...engineConfig, judge: runner === undefined ? 'stub' : 'deepseek', ...(engineInput.maxTokens === 0 ? {} : { maxTokens: engineInput.maxTokens }), ...(engineInput.timeoutMs === 0 ? {} : { timeoutMs: engineInput.timeoutMs }) }
+    }
     const llm = (ctx as unknown as { get(name: string): unknown }).get('evolutionLlm') as EvolutionLlmLike | undefined
     const defaultModel = (ctx as unknown as { get(name: string): unknown }).get('agentDefaultModel') as { currentSelection(): { provider: string; model: string } } | undefined
     const runner = llm === undefined || defaultModel === undefined
@@ -286,7 +295,7 @@ export function apply(ctx: Context, rawConfig: Record<string, unknown> = {}): vo
       home,
       engine: { screen: createProcessEngineScreen(engineScreen as unknown as EngineScreenPort['screen']) },
       select: selectWithErrors,
-      cfg: { ...engineConfig, judge: runner === undefined ? 'stub' : 'deepseek', ...(engineInput.maxTokens === 0 ? {} : { maxTokens: engineInput.maxTokens }), ...(engineInput.timeoutMs === 0 ? {} : { timeoutMs: engineInput.timeoutMs }) },
+      cfg: liveEngineConfig,
       credentials: async () => await resolveRetrievalCredentials(ctx as unknown as { get(name: string): unknown }),
       ...(runner === undefined ? {} : { runner }),
       async onSelection(selection, _runId, cards) {

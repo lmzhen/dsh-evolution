@@ -2,6 +2,7 @@
 // monopolize the host event loop. Model judging is proxied back to the parent,
 // because a runner function cannot cross the process boundary.
 import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 
 const require = createRequire(import.meta.url)
 const pending = new Map()
@@ -58,14 +59,13 @@ process.on('message', async message => {
   if (started) return
   started = true
   const input = message
+  const send = result => process.send?.({ type: 'result', result }, () => process.disconnect?.())
   try {
-    const engine = await import(require.resolve('@deepseek-ai/dsh-evolution-merge-engine'))
+    const engine = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-evolution-merge-engine')).href)
     const result = await engine.screen({ ...input, ...(input.hasRunner === true ? { runner } : {}) })
     const selection = result.ok && result.report !== undefined ? selectWithErrors(engine, result.report) : undefined
-    process.send?.({ type: 'result', result: { ...result, ...(selection === undefined ? {} : { selection }) } })
+    send({ ...result, ...(selection === undefined ? {} : { selection }) })
   } catch (error) {
-    process.send?.({ type: 'result', result: { ok: false, error: { code: 'WORKER_FAILED', detail: error instanceof Error ? error.stack ?? error.message : String(error) } } })
-  } finally {
-    process.disconnect?.()
+    send({ ok: false, error: { code: 'WORKER_FAILED', detail: error instanceof Error ? error.stack ?? error.message : String(error) } })
   }
 })

@@ -44,7 +44,8 @@ export interface EngineScreeningDeps {
   readonly home: string
   readonly engine: EngineScreenPort
   readonly select: (report: Record<string, unknown>) => CandidateSelection
-  readonly cfg?: Record<string, unknown>
+  /** Static config or a live getter; the getter keeps `mergeModelsRoot` hot-reloadable. */
+  readonly cfg?: Record<string, unknown> | (() => Record<string, unknown> | undefined)
   readonly credentials?: () => Promise<RetrievalCredentials>
   readonly runner?: (prompt: string, cfg?: Record<string, unknown>, signal?: AbortSignal | undefined) => Promise<string>
   readonly onSelection?: (selection: CandidateSelection, runId: string, cards: readonly SkillCard[]) => Promise<void>
@@ -75,9 +76,16 @@ export async function snapshotCards(io: EvolutionIoLike, home: string, runId: st
  * @returns an engine port that isolates the local screening process.
  */
 export function createProcessEngineScreen(direct: EngineScreenPort['screen']): EngineScreenPort['screen'] {
-  const workerPath = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'engine-screen-worker.mjs')
+  const here = dirname(fileURLToPath(import.meta.url))
+  // Source adapters live under src/adapters; the published/bundled entry lives
+  // directly under lib/. Check both layouts so packaging never silently falls
+  // back to the in-process engine (which is the whole reason this adapter exists).
+  const workerPath = [
+    resolve(here, '..', '..', 'scripts', 'engine-screen-worker.mjs'),
+    resolve(here, '..', 'scripts', 'engine-screen-worker.mjs'),
+  ].find(candidate => existsSync(candidate))
   return async input => {
-    if (!existsSync(workerPath)) return await direct(input)
+    if (workerPath === undefined) return await direct(input)
     const child = fork(workerPath, [], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] })
     const result = await new Promise<EngineScreenResult>((resolveResult, reject) => {
       let settled = false
@@ -139,10 +147,11 @@ export function createEngineScreening(deps: EngineScreeningDeps) {
     const outDir = join(deps.home, 'merge', 'runs', runId, 'engine')
     const runner = deps.runner === undefined ? undefined : (prompt: string, cfg?: Record<string, unknown>) => deps.runner!(prompt, cfg, signal)
     const credentials = deps.credentials === undefined ? undefined : await deps.credentials()
+    const cfg = typeof deps.cfg === 'function' ? deps.cfg() : deps.cfg
     const result = await deps.engine.screen({
       corpusDir,
       outDir,
-      ...(deps.cfg === undefined ? {} : { cfg: deps.cfg }),
+      ...(cfg === undefined ? {} : { cfg }),
       ...(credentials === undefined ? {} : { credentials }),
       ...(runner === undefined ? {} : { runner }),
       signal,

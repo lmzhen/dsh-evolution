@@ -55,9 +55,13 @@
 - fresh home：`D:\dsh-homes\fresh0611`，只复制 profile 骨架与 credentials，`pnpm add @lmzhen/dsh-evolution-all@0.61.1` + `pnpm install --force`；host 3098 启动后 auth=303、`diagnostics`=200。
 - 真实 scan：`/evolution merge scan` 返回 200 启动，run `e069a377…` 约 41s 后 `state=failed`；report note 为 `SCAN_FAILED @pipeline: UnreadableError ... node_modules/@lmzhen/models/registry.json (ENOENT)`，即 `mergeModelsRoot` 为空时 fail loud，而不是 Key 错误。
 - 把 `mergeModelsRoot` 配到 merge-engine 自带 `vendor/skill-merge-pipeline` 后，doctor 显示 `models [warn] 缺少 int8/pca64`；发布包只带 `models/registry.json` 与 `pca64/`，不带 int8 权重。
-- 指向本机 `D:\dsh\skill-merge\models` 并重启后，doctor 为 `models [ok] D:\dsh\skill-merge\models`；`/evolution merge scan` 返回 200 启动，但 host 连续 9+ 分钟 `merge/view` 20s 超时、CPU 升至 1667s，未拿到完成/错误态，已停止进程。确认剩余瓶颈是完整 scan body/row/report 的宿主 CPU，而不是模型根配置。
-- 旧 web home `D:\dsh-homes\web` 从 0.59.5 升到 0.61.1 后仍卡在启动：日志反复 `prepared-unit recovery failed ... evolutionIo in inactive context`，20 分钟无 `dsh web` token，已停止进程。
-- 结论：0.61.1 包本身发布成功；fresh profile 需要显式配置本地模型根（文档/引导不足），且配置正确后真实 scan 仍会阻塞宿主事件循环，Key 错误态仍未取得。HMR 未验证。
+- 清掉本机 6 个 11-23 遗留 web host（3091–3096，各累计 ~67h CPU）后复测：fresh 空库 scan 在 1s 内 `succeeded`；3080 也能正常启动并响应。此前的 20+ 分钟无响应主要是这 6 个旧 host 的 CPU 争用，不能归因于 scan body。
+- 3080 配置 `D:\dsh\skill-merge\models` 后 doctor `models [ok]`，scan 仍失败，report note 指向 `node_modules/@lmzhen/models/registry.json`。定位为发布包内 engine bundle 的 `defaultRegistryPath()` 按 `lib/../..` 解析，结果落到 `@lmzhen/models`；实际 registry 随包在 `.../dsh-evolution-merge-engine/lib/vendor/skill-merge-pipeline/models/registry.json`。
+- 本批修掉 5 个真实缺陷：`engineConfigFromRoot` 补 `models_dir`；`mergeModelsRoot` 改为 scan 时读取 live params；发布 bundle 的 worker 路径多退一级导致静默回退进程内 engine；worker 动态 import 未把 Windows 绝对路径转 `file://` URL；worker `process.disconnect()` 在 IPC 结果落地前关闭，父进程误报 `worker exited with code 0`。
+- 另修 engine 打包：`scripts/build.mjs` 把 bundle 内 `defaultRegistryPath()` 指向包内 `lib/vendor/skill-merge-pipeline/models/registry.json`，不再要求外部 `@lmzhen/models`。
+- 修复后复测 3080：scan 200 启动，约 3.3s `succeeded`，`scope.candidatePairs=170`，host `merge/view` 持续 200；worker 已真实使用子进程，不再回退进程内。
+- 旧 web home `D:\dsh-homes\web` 从 0.59.5 升到 0.61.1 后启动错误仍多，但清理旧 host 后可出 token，说明之前“启动卡死”也混入了 CPU 争用。
+- 结论：0.61.1 已发布包仍带上述 worker/registry 路径问题，需 0.61.2；修复源码后真实 scan 可在 3s 级完成且 host 保持可读。Key 错误态仍未取得（本轮 170 候选对未触发检索错误），HMR 未验证。
 
 ## 未完成
 
