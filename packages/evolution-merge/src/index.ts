@@ -82,7 +82,6 @@ export interface MergePresentationScope {
 }
 
 export interface EngineModelConfig {
-  readonly models_dir: string
   readonly embedder_model: string
   readonly embedder_model_last: string
 }
@@ -90,11 +89,10 @@ export interface EngineModelConfig {
 export function engineConfigFromRoot(configuredRoot?: string): EngineModelConfig | undefined {
   const root = configuredRoot?.trim() ?? ''
   if (root === '') return undefined
+  // Only the two documented artifact directories belong to the user root.
+  // models_dir would flip the engine to managed mode and demand the full
+  // f32/f16/proj set, which the merge README/doctor do not promise.
   return {
-    // The engine's registry lives beside the artifact directories under the
-    // configured root; without models_dir it falls back to the published
-    // package's @lmzhen/models path, which does not exist outside the monorepo.
-    models_dir: root,
     embedder_model: join(root, 'potion-multilingual-128M-int8'),
     embedder_model_last: join(root, 'potion-multilingual-128M-pca64-int8'),
   }

@@ -4,17 +4,16 @@ import { expect, it, vi } from 'vitest'
 import { engineConfigFromRoot } from '../src/index.ts'
 import { ENGINE_FORBIDDEN_KEYS, resolveEngineInput } from '../src/domain/engine-input.ts'
 
-it('derives the model root and embedder paths from the configured root', () => {
+it('derives only the documented embedder paths from the configured root', () => {
   const cfg = engineConfigFromRoot('C:/models')
   expect(cfg).toBeDefined()
   if (cfg === undefined) return
-  expect(Object.keys(cfg).sort()).toEqual(['embedder_model', 'embedder_model_last', 'models_dir'])
+  expect(Object.keys(cfg).sort()).toEqual(['embedder_model', 'embedder_model_last'])
   expect(cfg).toEqual({
-    models_dir: 'C:/models',
     embedder_model: join('C:/models', 'potion-multilingual-128M-int8'),
     embedder_model_last: join('C:/models', 'potion-multilingual-128M-pca64-int8'),
   })
-  for (const forbidden of ['offline', 'auto_provision', 'embed_backend', 'rank_mode', 'judge_model']) {
+  for (const forbidden of ['models_dir', 'offline', 'auto_provision', 'embed_backend', 'rank_mode', 'judge_model']) {
     expect(cfg).not.toHaveProperty(forbidden)
   }
 })

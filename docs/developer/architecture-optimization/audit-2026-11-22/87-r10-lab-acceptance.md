@@ -63,7 +63,7 @@
 - 旧 web home `D:\dsh-homes\web` 从 0.59.5 升到 0.61.1 后启动错误仍多，但清理旧 host 后可出 token，说明之前“启动卡死”也混入了 CPU 争用。
 - 0.61.2 已发布：tag `v0.61.2`（run 46149227670）validate/pack/cohort/desktop/publish/verify published bytes 全绿；`@lmzhen/dsh-evolution-all@0.61.2`、`core@0.61.2` 可读。
 - fresh profile 从 registry 安装 0.61.2：host 3098 启动、auth=303、diagnostics=200；空技能库 scan 200 启动并约 0.3s `succeeded`、`candidatePairs=0`，host 保持可读。
-- 结论：0.61.1 的 worker/registry 路径问题已由 0.61.2 修复并在发布包复测；真实有候选的 scan 在修复版上 3.3s 完成（170 对）。Key 错误态仍未取得（候选未触发检索错误），HMR 未验证。
+- 结论：0.61.1 的 worker/registry 路径问题已由 0.61.2 修复并在发布包复测；真实有候选的 scan 在修复版上 3.3s 完成（170 对）。独立复核发现 P1：0.61.2 的 `models_dir` 会把 engine 切到 managed 模式、要求完整 artifact 集，与文档/doctor 的两目录约定冲突；已移除该字段，待 0.61.3 发布。Key 错误态仍未取得，HMR 未验证。
 
 ## 未完成
 
