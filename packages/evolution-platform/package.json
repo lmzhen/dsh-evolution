@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-evolution-platform",
   "description": "The platform adapter and generated-contract surface for the dsh-evolution family",
-  "version": "0.61.2",
+  "version": "0.61.3",
   "publishConfig": {
     "access": "public"
   },

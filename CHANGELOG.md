@@ -1,3 +1,10 @@
+## 0.61.3 (2026-11-28) — 恢复两目录模型根与 worker 失败即报
+
+- 移除 0.61.2 引入的 models_dir：它会把 engine 切到 managed 模式并要求完整 f32/f16/proj 集，与 README/doctor 的两目录约定冲突；
+- worker 文件缺失时 fail loud，不再静默回退到宿主事件循环；
+- 发布 tarball 审计强制检查 merge 包包含 scripts/engine-screen-worker.mjs；
+- engine bundle 构建后断言 registry 路径改写生效。
+
 ## 0.61.2 (2026-11-28) — scan worker 真子进程与模型根修正
 
 - 修复发布包 worker 路径多退一级导致静默回退进程内 engine；source 与 bundled lib 两种布局都能找到 `scripts/engine-screen-worker.mjs`；
