@@ -1,3 +1,12 @@
+## 0.61.2 (2026-11-28) — scan worker 真子进程与模型根修正
+
+- 修复发布包 worker 路径多退一级导致静默回退进程内 engine；source 与 bundled lib 两种布局都能找到 `scripts/engine-screen-worker.mjs`；
+- worker 动态 import 使用 `pathToFileURL`，修复 Windows 绝对路径 `ERR_UNSUPPORTED_ESM_URL_SCHEME`；
+- worker 结果先等 IPC flush 再 disconnect，修复父进程误报 `worker exited with code 0`；
+- `mergeModelsRoot` 同时写入 `models_dir`，并在每次 scan 读取 live params，热更新配置后无需重建 engine；
+- engine 打包把 `defaultRegistryPath()` 指向包内 `lib/vendor/skill-merge-pipeline/models/registry.json`，不再要求外部 `@lmzhen/models`；
+- 验证：3080 clean 环境 scan 200 启动、约 3.3s succeeded、170 candidatePairs，host 全程可读；merge targeted tests 6/6。
+
 ## 0.61.1 (2026-11-28) — v2 报告 surface、head 发布重试与 scan 子进程
 
 - 修复 P1：v2 真实 scan 报告写入使用 `merge.rw` 被 surface 拒绝；`scopedTreeIO` 支持逐映射 commandId，merge/run-meta 走 `merge.rw`，reports 走 `reports.rw`；
