@@ -54,9 +54,10 @@
 - 发布：`v0.61.1` tag CI（run 46116924926 attempt 2）全绿，20 个包发布成功；`@lmzhen/dsh-evolution-core@0.61.1`、`@lmzhen/dsh-evolution-all@0.61.1` 均可从 registry 读取；未建 GitHub Release。
 - fresh home：`D:\dsh-homes\fresh0611`，只复制 profile 骨架与 credentials，`pnpm add @lmzhen/dsh-evolution-all@0.61.1` + `pnpm install --force`；host 3098 启动后 auth=303、`diagnostics`=200。
 - 真实 scan：`/evolution merge scan` 返回 200 启动，run `e069a377…` 约 41s 后 `state=failed`；report note 为 `SCAN_FAILED @pipeline: UnreadableError ... node_modules/@lmzhen/models/registry.json (ENOENT)`，即 `mergeModelsRoot` 为空时 fail loud，而不是 Key 错误。
-- 把 `mergeModelsRoot` 配到 merge-engine 自带 `vendor/skill-merge-pipeline` 后，doctor 显示 `models [warn] 缺少 int8/pca64`；发布包只带 `models/registry.json` 与 `pca64/`，不带 int8 权重。指向本机 `D:\dsh\skill-merge\models` 后 host 重启未稳定出 token（配置/启动阶段），未继续该路径。
+- 把 `mergeModelsRoot` 配到 merge-engine 自带 `vendor/skill-merge-pipeline` 后，doctor 显示 `models [warn] 缺少 int8/pca64`；发布包只带 `models/registry.json` 与 `pca64/`，不带 int8 权重。
+- 指向本机 `D:\dsh\skill-merge\models` 并重启后，doctor 为 `models [ok] D:\dsh\skill-merge\models`；`/evolution merge scan` 返回 200 启动，但 host 连续 9+ 分钟 `merge/view` 20s 超时、CPU 升至 1667s，未拿到完成/错误态，已停止进程。确认剩余瓶颈是完整 scan body/row/report 的宿主 CPU，而不是模型根配置。
 - 旧 web home `D:\dsh-homes\web` 从 0.59.5 升到 0.61.1 后仍卡在启动：日志反复 `prepared-unit recovery failed ... evolutionIo in inactive context`，20 分钟无 `dsh web` token，已停止进程。
-- 结论：0.61.1 包本身发布成功，但 fresh profile 的 scan 仍要求用户先完成本地模型根/模型权重准备，缺少一键 provisioning；Key 错误态仍未取得。HMR 未验证。
+- 结论：0.61.1 包本身发布成功；fresh profile 需要显式配置本地模型根（文档/引导不足），且配置正确后真实 scan 仍会阻塞宿主事件循环，Key 错误态仍未取得。HMR 未验证。
 
 ## 未完成
 
