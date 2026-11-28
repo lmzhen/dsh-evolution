@@ -85,7 +85,10 @@ export function createProcessEngineScreen(direct: EngineScreenPort['screen']): E
     resolve(here, '..', 'scripts', 'engine-screen-worker.mjs'),
   ].find(candidate => existsSync(candidate))
   return async input => {
-    if (workerPath === undefined) return await direct(input)
+    // A missing worker means packaging is broken; falling back would put the
+    // CPU-bound engine back on the host event loop this adapter exists to protect.
+    if (workerPath === undefined) throw new Error('engine screen worker missing: refusing to run CPU-bound screening in the host')
+    void direct
     const child = fork(workerPath, [], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] })
     const result = await new Promise<EngineScreenResult>((resolveResult, reject) => {
       let settled = false

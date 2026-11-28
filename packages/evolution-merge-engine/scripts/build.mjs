@@ -39,6 +39,9 @@ const output = source
   // two-level default path would resolve to node_modules/@lmzhen/models.
   // Point it at the registry copied beside the bundle instead.
   .replace(bundledRegistryPath, shippedRegistryPath)
+if (!output.includes(shippedRegistryPath) || output.includes(bundledRegistryPath)) {
+  throw new Error('engine bundle registry path rewrite failed')
+}
 writeFileSync(join(lib, 'index.js'), output)
 cpSync(join(root, 'src', 'index.d.ts'), join(lib, 'index.d.ts'))
 for (const rel of ['registry.json', 'pca64']) {

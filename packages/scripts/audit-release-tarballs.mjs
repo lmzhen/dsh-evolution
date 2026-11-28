@@ -97,6 +97,9 @@ for (const tarball of tarballs) {
     if (typeof manifest.name !== 'string' || !manifest.name.startsWith('@lmzhen/')) problems.push(short + ': name is not @lmzhen-scoped')
     if (expectedVersion !== undefined && manifest.version !== expectedVersion) problems.push(short + ': version ' + String(manifest.version) + ' != ' + expectedVersion)
     if (!Array.isArray(manifest.files) || manifest.files.length === 0) problems.push(short + ': no files allowlist')
+    if (manifest.name === '@lmzhen/dsh-evolution-merge' && !files.includes('scripts/engine-screen-worker.mjs')) {
+      problems.push(short + ': missing scripts/engine-screen-worker.mjs (scan would fall back to the host engine)')
+    }
 
     const entryTargets = []
     if (typeof manifest.main === 'string') entryTargets.push(manifest.main)
