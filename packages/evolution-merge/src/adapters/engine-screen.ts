@@ -75,15 +75,20 @@ export async function snapshotCards(io: EvolutionIoLike, home: string, runId: st
  * @param direct - the in-process engine port used when a runner is present.
  * @returns an engine port that isolates the local screening process.
  */
+/** Resolve the worker in both source (src/adapters) and bundled (lib) layouts. */
+export function resolveEngineWorkerPath(here: string): string | undefined {
+  return [
+    resolve(here, '..', '..', 'scripts', 'engine-screen-worker.mjs'),
+    resolve(here, '..', 'scripts', 'engine-screen-worker.mjs'),
+  ].find(candidate => existsSync(candidate))
+}
+
 export function createProcessEngineScreen(direct: EngineScreenPort['screen']): EngineScreenPort['screen'] {
   const here = dirname(fileURLToPath(import.meta.url))
   // Source adapters live under src/adapters; the published/bundled entry lives
   // directly under lib/. Check both layouts so packaging never silently falls
   // back to the in-process engine (which is the whole reason this adapter exists).
-  const workerPath = [
-    resolve(here, '..', '..', 'scripts', 'engine-screen-worker.mjs'),
-    resolve(here, '..', 'scripts', 'engine-screen-worker.mjs'),
-  ].find(candidate => existsSync(candidate))
+  const workerPath = resolveEngineWorkerPath(here)
   return async input => {
     // A missing worker means packaging is broken; falling back would put the
     // CPU-bound engine back on the host event loop this adapter exists to protect.

@@ -1,9 +1,20 @@
 // @tier fast
 import { expect, it, vi } from 'vitest'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tempRoot } from '../../test-support/temp-home.ts'
-import { createProcessEngineScreen } from '../src/adapters/engine-screen.ts'
+import { createProcessEngineScreen, resolveEngineWorkerPath } from '../src/adapters/engine-screen.ts'
+
+it('resolves the worker in both source and bundled layouts', async () => {
+  const root = await tempRoot('dsh-engine-worker-path-')
+  await mkdir(join(root, 'scripts'), { recursive: true })
+  const worker = join(root, 'scripts', 'engine-screen-worker.mjs')
+  await writeFile(worker, '// worker\n')
+  expect(resolveEngineWorkerPath(join(root, 'lib'))).toBe(worker)
+  const sourceAdapters = join(root, 'src', 'adapters')
+  await mkdir(sourceAdapters, { recursive: true })
+  expect(resolveEngineWorkerPath(sourceAdapters)).toBe(worker)
+})
 
 it('runs a local engine screen in a child process instead of the host loop', async () => {
   const root = await tempRoot('dsh-engine-worker-')
