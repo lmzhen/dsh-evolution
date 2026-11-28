@@ -1,3 +1,11 @@
+## 0.61.1 (2026-11-28) — v2 报告 surface、head 发布重试与 scan 子进程
+
+- 修复 P1：v2 真实 scan 报告写入使用 `merge.rw` 被 surface 拒绝；`scopedTreeIO` 支持逐映射 commandId，merge/run-meta 走 `merge.rw`，reports 走 `reports.rw`；
+- Windows 读者短暂持有 `head.json` 时，`StoreKernel.publishHead` 在 IO 层重试外增加有界 EPERM/EBUSY 重试，仍失败则 fail closed；
+- merge engine screen 与 candidate selection 移入子进程，模型 judge 通过 IPC 代理，避免最重的 CPU 直接占宿主事件循环；
+- 修复 detached run 测试与 rg6 收尾等待，新增报告 surface 回归与 head 重试耗尽用例；
+- 验证：目标测试、typecheck、CI static/unit/release 全绿；v2 迁移/回退/re-stage、Key 空/有/清除、lab UI 截图证据保留在 85/86/87 文档。
+
 ## 0.61.0 (2026-11-24) — 检索增强与写入 authority 时序修复
 
 - 检索增强（可选）：设置角色新增“检索增强（可选）”卡片，只允许 SiliconFlow / StartLux 两把官方 Key；Key 通过平台 `ctx.credentials` 的固定 refs 解析，不新增插件自有 secret 存储、不写 `process.env`、不进入 cfg/report/log/客户端快照；
